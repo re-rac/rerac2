@@ -7,6 +7,8 @@
 //!   `& ~0x20 | 0x100` (`| 0x800` when the moby has it), no collision, its source `+0x54`, a spin of 90..270°/s about a
 //!   random axis; `0x2dbff8` mode 2 its body: the velocity, the spin (a quaternion a tick), the piece's centre as the
 //!   pivot (in the moby's frame), gravity 10..20 /3600 a tick², 180 ticks, the bounce sound.
+//! * **Throw every piece** `0x3210c0` ([`throw_all`]): the level's bolts, then each piece in the mask thrown with its
+//!   own velocity, spin and gravity drawn from ranges (Oozla's breakables, crate::moby::classes::smash).
 //! * **Tick** `0x39c4a8` → `0x2dc1f0` → `0x2dc390` ([`update`]): with no contact it falls and spins about its pivot
 //!   (`0x2dc7a8`); with one or two it pivots about them under its own weight (`0x2dc968`, two: about their line); a
 //!   point of the piece that crosses the level (the segment from the pivot to it, `0x2dcb80`) pushes it out, turns the
@@ -65,6 +67,39 @@ pub fn break_into(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, h: (f32, f32), v:
         let spin = rng.randf(90.0, 270.0);
         let gravity = rng.randf(10.0, 20.0);
         spawn_piece(w, id, ctx, spin, gravity, k as u8, vel, sound);
+    }
+}
+
+/// `0x3210c0(moby, h, spin, gravity, 0xffff, sound, skip, flags, mask, 0xff, 0)`: the bolts (flag 1 clear: the level's
+/// once; 0x10: nine times, else 0x20: twice), class sound `sound` (−1 none), then each piece of the class (`0x3078b0`)
+/// in `mask` but `skip` thrown (`0x2d1520` mode 2): its gravity and spin drawn from their ranges, its velocity from
+/// `h` (x from `h[0]..h[4]`, y `h[1]..h[5]`, z `h[2]..h[6]`; flags 2 / 4: x / y of either sign), a sixtieth a tick,
+/// through its rows unless flag 8.
+#[allow(clippy::too_many_arguments)]
+pub fn throw_all(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, h: [f32; 8], spin: (f32, f32), gravity: (f32, f32), sound: i32, skip: i32, flags: u32, mask: u32) {
+    if flags & 1 == 0 { super::bolts::level_drop(w, id, 0.0, 1, ctx); }
+    if flags & 0x10 != 0 {
+        super::bolts::level_drop(w, id, 0.0, 9, ctx);
+    } else if flags & 0x20 != 0 {
+        super::bolts::level_drop(w, id, 0.0, 2, ctx);
+    }
+    w.mobys[id].piece = None;
+    if 0 <= sound { ctx.host.play_sound(&w.mobys[id], sound, 0); }
+    let n = w.class(w.mobys[id].o_class).map_or(0, |c| c.pieces.len());
+    for k in 0..n {
+        if k as i32 == skip || mask >> k & 1 == 0 { continue; }
+        let rng = &mut ctx.game.rng;
+        let g = rng.randf(gravity.0, gravity.1);
+        let s = rng.randf(spin.0, spin.1);
+        let x = if flags & 2 == 0 { rng.randf(h[0], h[4]) } else { rng.randf_signed(h[0], h[4]) };
+        let y = if flags & 4 == 0 { rng.randf(h[1], h[5]) } else { rng.randf_signed(h[1], h[5]) };
+        let z = rng.randf(h[2], h[6]);
+        let mut v: V3 = scale([x, y, z], 0.016_666_668);
+        if flags & 8 == 0 {
+            let r = w.mobys[id].rows;
+            v = std::array::from_fn(|i| v[0] * r[0][i] + v[1] * r[1][i] + v[2] * r[2][i]);
+        }
+        spawn_piece(w, id, ctx, s, g, k as u8, v, 0xff);
     }
 }
 

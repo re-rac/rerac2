@@ -6,7 +6,7 @@
 //!
 //! * 0x0f02 (`0x410440`), 0x0f08 (`0x410688`), 0x0f2e (`0x4108d0`), 0x0f33 (`0x410ec8`): pieces by `0x31d130`
 //!   ([`Pieces`]).
-//! * 0x0f32 (`0x410b18`): every piece by `0x3210c0` ([`throw_all`]), the first flung up on its own ([`update_0f32`]).
+//! * 0x0f32 (`0x410b18`): every piece by `0x3210c0` ([`shards::throw_all`]), the first flung up on its own ([`update_0f32`]).
 //! * 0x0af7 (`0x3d7d20`): leaves its wreck, a 0x0f94 (`0x31d530`) ([`update_0af7`]).
 //! * 0x10ef (`0x414388`): every piece by `0x3210c0`, gone at once ([`update_10ef`]).
 //! * 0x10fa (`0x414498`): every piece but the box's middle, more bolts and a blast ([`update_10fa`]).
@@ -114,39 +114,6 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
 }
 
-/// `0x3210c0(moby, h, spin, gravity, 0xffff, sound, skip, flags, mask, 0xff, 0)`: the bolts (flag 1 clear: the level's
-/// once; 0x10: nine times, else 0x20: twice), class sound `sound` (−1 none), then each piece of the class (`0x3078b0`)
-/// in `mask` but `skip` thrown (`0x2d1520` mode 2): its gravity and spin drawn from their ranges, its velocity from
-/// `h` (x from `h[0]..h[4]`, y `h[1]..h[5]`, z `h[2]..h[6]`; flags 2 / 4: x / y of either sign), a sixtieth a tick,
-/// through its rows unless flag 8.
-#[allow(clippy::too_many_arguments)]
-fn throw_all(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, h: [f32; 8], spin: (f32, f32), gravity: (f32, f32), sound: i32, skip: i32, flags: u32, mask: u32) {
-    if flags & 1 == 0 { bolts::level_drop(w, id, 0.0, 1, ctx); }
-    if flags & 0x10 != 0 {
-        bolts::level_drop(w, id, 0.0, 9, ctx);
-    } else if flags & 0x20 != 0 {
-        bolts::level_drop(w, id, 0.0, 2, ctx);
-    }
-    w.mobys[id].piece = None;
-    if 0 <= sound { ctx.host.play_sound(&w.mobys[id], sound, 0); }
-    let n = w.class(w.mobys[id].o_class).map_or(0, |c| c.pieces.len());
-    for k in 0..n {
-        if k as i32 == skip || mask >> k & 1 == 0 { continue; }
-        let rng = &mut ctx.game.rng;
-        let g = rng.randf(gravity.0, gravity.1);
-        let s = rng.randf(spin.0, spin.1);
-        let x = if flags & 2 == 0 { rng.randf(h[0], h[4]) } else { rng.randf_signed(h[0], h[4]) };
-        let y = if flags & 4 == 0 { rng.randf(h[1], h[5]) } else { rng.randf_signed(h[1], h[5]) };
-        let z = rng.randf(h[2], h[6]);
-        let mut v: V3 = scale([x, y, z], 0.016_666_668);
-        if flags & 8 == 0 {
-            let r = w.mobys[id].rows;
-            v = std::array::from_fn(|i| v[0] * r[0][i] + v[1] * r[1][i] + v[2] * r[2][i]);
-        }
-        shards::spawn_piece(w, id, ctx, s, g, k as u8, v, 0xff);
-    }
-}
-
 /// 0x0f32: the lesser break is a `0x31d130` one (1..3 across, 2..5 up, pieces 0 and 4) with the level's bolts; the
 /// full one throws every piece but the first (`0x1b1590`: x and y ±0.75..2.5, z 2..5; spin 90..360, gravity 5..10)
 /// and flings the first up (spin 180..360, gravity 15; ±1/60 across, 1/12 up). Its timer is `+0x68`[8].
@@ -156,7 +123,7 @@ pub fn update_0f32(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         1 => wait_hit(w, id, ctx, true),
         2 => {
             if full(w, id) {
-                throw_all(w, id, ctx, [0.75, 0.75, 2.0, 0.0, 2.5, 2.5, 5.0, 0.0], (90.0, 360.0), (5.0, 10.0), 0, 0, 6, 0xffff);
+                shards::throw_all(w, id, ctx, [0.75, 0.75, 2.0, 0.0, 2.5, 2.5, 5.0, 0.0], (90.0, 360.0), (5.0, 10.0), 0, 0, 6, 0xffff);
                 let rng = &mut ctx.game.rng;
                 let x = rng.randf(-1.0, 1.0) * 0.016_666_668;
                 let y = rng.randf(-1.0, 1.0) * 0.016_666_668;
@@ -214,7 +181,7 @@ pub fn update_10ef(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         0 => set_up(w, id, ctx),
         1 => wait_hit(w, id, ctx, true),
         2 => {
-            throw_all(w, id, ctx, [-3.0, -3.0, 1.0, 0.0, 3.0, 3.0, 7.0, 0.0], (90.0, 360.0), (10.0, 20.0), 0, -1, 0, 0xffff);
+            shards::throw_all(w, id, ctx, [-3.0, -3.0, 1.0, 0.0, 3.0, 3.0, 7.0, 0.0], (90.0, 360.0), (10.0, 20.0), 0, -1, 0, 0xffff);
             w.delete(id);
         }
         _ => {}
@@ -229,7 +196,7 @@ pub fn update_10fa(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         0 => w.mobys[id].set_state(1, -1),
         1 => wait_hit(w, id, ctx, false),
         2 => {
-            throw_all(w, id, ctx, [-3.0, -3.0, 1.0, 0.0, 3.0, 3.0, 7.0, 0.0], (90.0, 360.0), (10.0, 20.0), 0, -1, 1, 0xc7f);
+            shards::throw_all(w, id, ctx, [-3.0, -3.0, 1.0, 0.0, 3.0, 3.0, 7.0, 0.0], (90.0, 360.0), (10.0, 20.0), 0, -1, 1, 0xc7f);
             bolts::level_drop(w, id, 1.1, 3, ctx);
             let m = &w.mobys[id];
             let at = add(m.pos, scale(m.rows[2], m.scale * 21.5));
