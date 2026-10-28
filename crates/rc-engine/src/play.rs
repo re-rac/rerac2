@@ -1884,6 +1884,8 @@ fn draw_hud(
                 let menu = menu.chain(tables.grids.iter().flatten().filter(|c| c.icon != 0).map(|c| (c.icon, c.frame))).chain([(0xea9a, 0), (0xe99a, 10), (0xe99e, 0), (0xe99e, 1), (0xe99e, 2), (0xeaa2, 0), (0xe99d, 1)]);
                 // The space fights' HUD icons (rc_game::ship::HUD_ICONS).
                 let menu = menu.chain((0..16).map(|f| (rc_game::ship::HUD_ICONS, f)));
+                // The boss bar's pictures (rc_game::hud::boss_bar, icon 0xeaa7 by boss).
+                let menu = menu.chain((0..8).map(|f| (0xeaa7, f)));
                 for (id, f) in menu {
                     if !h.has_icon(id) || icons.contains_key(&(id, f)) { continue; }
                     if let Ok(t) = h.decode_frame_raw(h.icon_frame(id, f as i32)) {
@@ -1970,7 +1972,7 @@ fn draw_hud(
         let draws = rc_game::travel::menu_draws(&p.game, &text, &width, &mut lines, &mut texts, &mut scroll);
         p.game.travel.menu.mission_scroll += scroll;
         let icon = |id: u16, f: u16| hud.icons.get(&(id, f)).map(|&(i, s)| (rc_game::gui::Tex::Slot(i), s));
-        quads.extend(rc_game::hud::quads(&draws, &a.sprites, &a.glyphs, &icon));
+        quads.extend(rc_game::hud::quads(&draws, &a.sprites, &a.glyphs, &icon, rc_game::gui::MENU_TAN));
         // The planet widget draws its picture after its window (`0x435f10`: `0x431fa8`, then `0x355508`).
         if let Some(d) = pp.planet {
             if hud.planet_shown != Some(d.level) {
@@ -2043,7 +2045,8 @@ fn draw_hud(
             for item in f.hud_items(&m.world, (p.game.space_bolts, p.game.space_bolts_shown), &label) {
                 match item {
                     rc_game::ship::HudItem::Quad(q) => quads.push(q),
-                    rc_game::ship::HudItem::Draw(d) => quads.extend(rc_game::hud::quads(std::slice::from_ref(&d), &hud.data.assets().sprites, &hud.data.assets().glyphs, &icon)),
+                    rc_game::ship::HudItem::Draw(d) => quads.extend(rc_game::hud::quads(std::slice::from_ref(&d), &hud.data.assets().sprites, &hud.data.assets().glyphs, &icon, rc_game::gui::PLAY_TAN)),
+                    rc_game::ship::HudItem::Text2 { text, pos, colour } => rc_game::gui::text(&mut quads, &hud.data.assets().glyphs_2, 2, text.as_bytes(), pos[0], pos[1], 1.0, colour.to_le_bytes()),
                 }
             }
             let tex = |fx: u16| hud.fx.get(&fx).map(|&(i, s)| (rc_game::gui::Tex::Slot(i), s));
@@ -2051,6 +2054,8 @@ fn draw_hud(
         }
         // In the space fights the ship's HUD stands for Ratchet's (rc_game::ship::Flight::status).
         let mut draws = if p.ship.is_some() { Vec::new() } else { p.hud.draw(p.game.bolts) };
+        // The boss bar while a fight refreshes it (`0x2f2158`).
+        if let (None, Some((f, _))) = (&p.ship, p.game.boss_bar) { rc_game::hud::boss_bar(f, p.game.boss_icon, &mut draws); }
         // The quick select's ring and texts (rc_game::quick_select).
         if let Some(m) = p.mobys.as_ref() {
             let slots = rc_game::quick_select::slots(&p.game, &m.level.items);
@@ -2058,7 +2063,7 @@ fn draw_hud(
             p.qs.draw(&slots, &p.pad, &|id| strings.get(id).to_vec(), &mut draws);
         }
         let icon = |id: u16, f: u16| hud.icons.get(&(id, f)).map(|&(i, s)| (rc_game::gui::Tex::Slot(i), s));
-        quads.extend(rc_game::hud::quads(&draws, &hud.data.assets().sprites, &hud.data.assets().glyphs, &icon));
+        quads.extend(rc_game::hud::quads(&draws, &hud.data.assets().sprites, &hud.data.assets().glyphs, &icon, rc_game::gui::MENU_TAN));
         let a = hud.data.assets();
         // The action prompt's text (rc_game::prompt) and the vendor's menu (rc_game::vendor): the level's texts, else
         // the front end's strings.
@@ -2069,7 +2074,7 @@ fn draw_hud(
         }
         if p.glyphs.is_none() { p.glyphs = Some(Box::new(a.glyphs)); }
         p.boxes.draw(&mut quads, &a.glyphs, &a.sprites);
-        quads.extend(p.help.draw(&p.game, &p.texts, &a.glyphs, &a.sprites));
+        quads.extend(p.help.draw(&p.game, &p.texts, &a.glyphs_2, &a.sprites));
     }
     // The flight between the planets (rc_game::travel, `0x363ba0`): the destination's pictures into their textures
     // once, then the planet picture quad and the caption over the flight's world.

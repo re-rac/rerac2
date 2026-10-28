@@ -17,11 +17,9 @@
 //! the wings 0x10d4 (both sides), 0x10d7, the canopy 0x10e3 (alpha 0x60), 0x10da, 0x10de and 0x10e5 (both sides).
 //! Each tick (`0x411aa8` → `0x415d88`) they take the ship's place and rows, the second side's left row turned over.
 //!
-//! Not ported: the other modes (the fades, the death `0x434ad0`, the U-turn `0x434c98`), the auto level `0x4356c8`,
-//! the boost (`0x22183c`, `0x375168`), Gorn's and Hrugis's special cases (levels 0xf, 0x14, 5 / 10), the spheres the
-//! ship must stay in (the mission object 0x0eee's `+0x68`[0]), the collision `0x437a70`, the guns but the
-//! lasers and the boost (the missiles ○ `0x3caae8`, the weapons 2 / 3 / 4), the
-//! upgrades' parts, the ship's light and draws (`0x436d20`, `0x437258`, `0x4383d8`).
+//! Not ported: the warp (modes 7 / 8, `0x434c98`: an upgrade, the bit 0x2000 with L1 + L2 or R1 + R2 — to the
+//! farther of two of the ship's nine restart points behind a fade), the weapons 2 / 3 / 4 and the upgrades' parts
+//! (bought), Gorn's and Hrugis's special cases (levels 0xf, 0x14, 5 / 10), the ship's light.
 //!
 //! **The lasers** (`0x436440`, ✕): every 10 ticks (`$gp+0x25b0`; during a barrel roll only on even frames) a shot
 //! from each gun (`$gp+0x2640` / `+0x2650`: 1.23 ahead, ±0.045 across, 0.055 up in the ship's frame) toward the point
@@ -30,18 +28,17 @@
 //! update (`0x412e38`): the step; gone at the end of its time or out of the 2..1021 box; the step's line against the
 //! world (`0x2f1998`, not the material 6) ends it; a moby (`0x2f45d0`) whose centre comes within the radius of the
 //! step takes a hit (1, flags 0x110000; `0x32f910`) and ends it. Its draw (`0x4137d0`, meshes of FX 0xb and 8 with a
-//! spinning star) is drawn here as an additive streak. Not ported: the shots' sounds (`0x36cb90`), the burst of the
-//! end (`0x4134b0`), an enemy's shots hitting the ship.
+//! spinning star) is drawn here as an additive streak. The end's burst: [`laser_burst`].
 //!
 //! **The hits** (`0x375e78`): each takes 1 from the shield (34), then from the hull (100); the hull at 0 is the
 //! death (`0x434ad0`, mode 6: the ship gone, the camera drifting back 0.133 a tick for 60 ticks, then `0x2c63f0`,
-//! here the level again). Not ported: the shield's upgrades, the half damage of `0x4380b8`, the burst.
+//! here the level again). A hit during a barrel roll is
+//! halved (`0x4380b8`). Not ported: the shield's upgrades.
 //!
 //! **The boost** (`0x436440`, □; the weapon slot 7 of `0x29c300`, 0x28 each: `+0` had, `+0x10` the most fuel 600,
 //! `+0x14` the fuel): held with fuel, the ship's `+0x34` counts up to 8 and the fuel down by 1 a tick; else `+0x34`
 //! counts down, and at 0 with □ up the fuel comes back by 1 every third frame. With `+0x34` the move (`0x435a18`)
 //! springs the speed to 50 a second (`$gp+0x25d4`; 30 with `0x375168`) at 0.005 (`+0x2700`) instead of the cruise.
-//! Not ported: its sound (`0x36cc38(0x11, …)`).
 
 use crate::hero::physics::{add, cross, dot, scale, set_len, sub, unit, V3};
 use crate::moby::hits::HitTemplate;
@@ -351,12 +348,15 @@ impl Flight {
         self.hits_heard = self.hits_heard.wrapping_add(1);
         if self.hits_heard % 6 == 1 { self.hit_sound = true; }
         if self.mode == 6 { return; }
-        self.damage(w, n);
+        // Each shot its own `0x375e78(1)` (a roll's half of 1 is nothing).
+        for _ in 0..n { self.damage(w, 1.0); }
     }
 
-    /// `0x375e78(n)`: the shield takes it first, then the hull; at 0 the death.
-    fn damage(&mut self, w: &mut MobyWorld, n: i32) {
+    /// `0x375e78(n)`: half while the barrel roll lasts (`0x4380b8`: the ship camera's record `+0xd8`, the roll's
+    /// side), in whole points (truncated); the shield takes it first, then the hull; at 0 the death.
+    fn damage(&mut self, w: &mut MobyWorld, n: f32) {
         if self.mode == 6 { return; }
+        let n = if self.roll_dir != 0 { n * 0.5 } else { n } as i32;
         let from_shield = n.min(self.shield);
         self.shield -= from_shield;
         self.hull -= n - from_shield;
@@ -801,12 +801,15 @@ fn push_strip(out: &mut Vec<crate::fx::FxQuad>, fx: usize, additive: bool, (rows
 /// - facing the camera, four rays (FX 0x40, additive, 0x10) a quarter turn apart, the flare turning 2° a frame
 ///   (`+0x1fbc`) by its gun's side (`+0xc`) from a random start (`+8`).
 ///
-/// A fighter's shot: `0x378960` twice (0.05 white, 0.1 in its colour 0x60008000, from its tail to its head).
+/// A fighter's shot: a glow at its head (`0x300aa0`: 0.35, FX 0x31, its colour, a roll the update draws), then
+/// `0x378960` twice (0.05 white, 0.1 in its colour 0x60008000, from its tail to its head).
 pub fn draw_laser(w: &MobyWorld, id: usize, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
     let m = &w.mobys[id];
     if m.pv_i(0x44) != 0 {
         let st = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]];
         let (a, b) = (m.pv_v(0x50), m.pos);
+        // The head's glow first (`0x300aa0(0.35, 0, roll, head, FX 0x31, colour, additive)`), then the two streaks.
+        crate::fx::sprite(out, 0.35, 0.0, m.pv_f(0x6c), b, cam, 0x31, m.pv_i(0x68) as u32, true);
         for (half, c) in [(0.05, 0x807f_7f7fu32), (0.1, m.pv_i(0x68) as u32)] {
             let side = set_len(cross(sub(b, a), sub(cam, a)), half);
             out.push(crate::fx::FxQuad { fx: 0xe, additive: true, corners: [add(a, side), sub(a, side), add(b, side), sub(b, side)], st, rgba: [c; 4] });
@@ -892,6 +895,10 @@ fn update_enemy_shot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     m.set_pv_f(0x48, flown);
     if 350.0 <= flown { return w.delete(id); }
     let head = m.pos;
+    // `0x300aa0`'s roll for the head's glow (the random stream's, every tick).
+    let roll = ctx.game.rng.rand_angle();
+    w.mobys[id].set_pv_f(0x6c, roll);
+    let m = &w.mobys[id];
     if let Some(s) = usize::try_from(m.pv_i(0x4c) - 1).ok().filter(|&s| w.mobys.get(s).is_some_and(|x| x.state < 0x80 && x.draw_dist != 0)) {
         if crate::hero::physics::dist(head, w.mobys[s].pos) < w.mobys[id].pv_f(0x60) {
             let n = w.mobys[s].pv_i(HITS) + 1;
@@ -923,8 +930,8 @@ fn lerp_rgba(t: f32, a: u32, b: u32) -> u32 {
 /// `0x411c78` (the ship's draw callback, registered by its update `0x411a80`; drawn here after the flight's tick so
 /// it sits on the ship as this tick placed it, the boost moving it 0.8 a tick): its exhaust from (−0.135, 0, 0.07) in its frame, two layers of sprites
 /// (`0x412308` → `0x300aa0`: FX 0x2e, additive, a random roll each, jittered) stepping back along its forward and
-/// shrinking, their sizes, steps and colours from the cruise's to the boost's by `+0x34` / 8. Not ported: the hull
-/// 0x10d9's three nozzles, the sparks `0x412910`, the boost's trail `0x412430`.
+/// shrinking, their sizes, steps and colours from the cruise's to the boost's by `+0x34` / 8. Not ported: the upgraded hull
+/// 0x10d9's three nozzles.
 pub fn draw_flame(w: &MobyWorld, id: usize, cam: V3, rng: &mut crate::rng::Rng, out: &mut Vec<crate::fx::FxQuad>) {
     let m = &w.mobys[id];
     if m.draw_dist == 0 { return; }
@@ -1150,8 +1157,6 @@ impl Flight {
         }
         w.mobys[mid].set_pv_i(crate::moby::classes::space::PASSIVE, passive as i32);
         w.mobys[mid].set_pv_i(crate::moby::classes::space::ACTIVE_COUNT, active as i32);
-        let lead = crate::moby::classes::space::leader(w, self.frame);
-        w.mobys[mid].set_pv_i(crate::moby::classes::space::LEADER, lead);
     }
 
     /// `0x434670`'s modes 1..5: the fades of the cut (`$gp+0x2a70`, 0.05 a tick). 1 flying while the screen goes
@@ -1351,7 +1356,7 @@ impl Flight {
 /// `0x3caca8`: the missile. While its target lives, after its first 4 ticks it flies at it (before, it turns to it,
 /// `0x3cb1e0`: here at once too); it grows to its scale (0.05 a tick); its time, the 2..1021 box, the world's line
 /// (`0x2f1998`) and the mobys' (`0x2f29f8`, 0.2) end it — a moby hit takes 5 (flags 0x810000, `0x3cb4f0`), and it
-/// bursts (`0x3cbfe8`, here the blast at 0.3). Not ported: its trail (`0x3420e8`), the 0x956's sparks.
+/// bursts (`0x3cbfe8`, here the blast at 0.3). Not ported: the 0x956's sparks.
 pub fn update_missile(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let from = w.mobys[id].pos;
     let mut v = w.mobys[id].pv_v(0);
@@ -1407,10 +1412,12 @@ pub fn update_missile(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 impl Flight {
     /// `0x437a70`: the ship's step swept in 0.25 spheres (0.075 up in its frame; at most 30 long) against the world
     /// and the mobys. The world met nose-on (|n · forward| > 0.75) is the death (`0x434ad0`); else the camera and the
-    /// ship are pushed out and the hull takes 1 every fourth frame. A moby met head-on (its facing against the ship's)
-    /// takes 1 (flags 0x10000) and the hull 30, once in 15 ticks (the record's `+0x58`). Either way the scrape
-    /// (`+0x90`, drawn by [`Flight::draw_scrape`]) at the contact. Not ported: the Hrugis special case, the pad's
-    /// rumble (`0x2e9f18(0x2b3200)`).
+    /// ship are pushed out and the hull takes 1 every fourth frame (pushed back to within 0.1 of the tick's start:
+    /// pinned, the death). A moby met head-on (its facing against the ship's) takes 1 (flags 0x10000) and the hull
+    /// 30, once in 15 ticks (the record's `+0x58`). Either way the scrape (`+0x90`, drawn by [`Flight::draw_scrape`])
+    /// at the contact. Not ported (none on Wupash): the Hrugis special case (level 10: the class 0xf86's 1000, the
+    /// 0x1315 passed), the classes 0x1327 / 0x1328 passed, a moby of type 0xb met as the world; the pad's rumble
+    /// (`0x2e9f18(0x2b3200)`).
     fn collide(&mut self, w: &mut MobyWorld, coll: Option<&rc_formats::collision::Collision>, scene: Option<&crate::collision::mobys::MobyScene>, from: V3) {
         countdown(&mut self.ram_wait);
         self.scrape = None;
@@ -1433,7 +1440,7 @@ impl Flight {
                             let tmpl = HitTemplate::new(1.0, Some(ship), 0x0001_0000, [dir[0], dir[1], dir[2], 0.0]);
                             let q = w.mobys[m].pos;
                             w.deliver_hit_any(m, &tmpl, [q[0], q[1], q[2], 1.0]);
-                            self.damage(w, 30);
+                            self.damage(w, 30.0);
                             self.ram_wait = 15;
                         }
                         self.scrape = Some(h.point);
@@ -1450,9 +1457,12 @@ impl Flight {
                         self.pos = add(self.pos, out);
                         w.mobys[ship].pos = add(w.mobys[ship].pos, out);
                     }
-                    if self.frame.is_multiple_of(4) { self.damage(w, 1); }
+                    // `0x437a70`: doubled while rolling, so the roll's half leaves it whole.
+                    if self.frame.is_multiple_of(4) { self.damage(w, if self.roll_dir != 0 { 2.0 } else { 1.0 }); }
                     // `+0x90`: the contact, out along the face by 0.8 of the sphere (`$gp+0x272c` 0.25).
                     self.scrape = Some(add(h.point, scale(nrm, 0.25 * 0.8)));
+                    // Pushed back to within 0.1 of where the tick started: pinned, the death.
+                    if crate::hero::physics::dist(from, w.mobys[ship].pos) < 0.1 { self.die(w); }
                 }
             }
             return;
@@ -1470,9 +1480,21 @@ impl Flight {
 /// The mission object's word the flight asks the ship's blast through (`0x434ad0` → `0x3cbfe8`, the place).
 pub const BOOM: usize = 0x110;
 
-/// The mission object 0x0eee's update here: what [`Flight::mission`] cannot do without the particles — the ship's
-/// blast at its death (`0x3cbfe8(ship, 0, 1)`: here the ground's blast, crate::moby::blast, at size 1).
+/// The mission object 0x0eee's update here: what [`Flight::mission`] cannot do without the game's random numbers and
+/// the particles — the tick's leading group (`0x374e10`, crate::moby::classes::space::leader), and the ship's blast at
+/// its death (`0x3cbfe8(ship, 0, 1)`: here the ground's blast, crate::moby::blast, at size 1).
 pub fn update_mission(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    // `0x40e340`'s start: updated and drawn from anywhere (`+0x30` 0xff, `+0x32` 0x1ff).
+    if w.mobys[id].state == 0 {
+        let m = &mut w.mobys[id];
+        m.update_dist = 0xff;
+        m.draw_dist = 0x1ff;
+        m.state = 1;
+    }
+    // `0x307ce0(0x1b2884 · −230 + 0.5, 2)` every tick: the help panel 230 up, over the fight's HUD at the bottom.
+    ctx.game.help_offset(-230, 2);
+    let lead = crate::moby::classes::space::leader(w, &mut ctx.game.rng);
+    w.mobys[id].set_pv_i(crate::moby::classes::space::LEADER, lead);
     if w.mobys[id].pv_i(BOOM + 0xc) == 0 { return; }
     let at = w.mobys[id].pv_v(BOOM);
     w.mobys[id].set_pv_i(BOOM + 0xc, 0);
@@ -1480,20 +1502,33 @@ pub fn update_mission(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     crate::moby::blast::burst(w, ctx, at, &crate::moby::blast::Blast { size: 1.0, bursts: [0x32, 0x1e, 0x1e], puffs: 0x1e, streaks: 0x28, light: false, shake: false });
 }
 
-/// `0x4134b0(at, 20, colour, laser)`: the laser's end — 20 sparks (crate::particles::spark standing in for `0x346ee8`)
-/// thrown toward the camera's side, 0.05..3 a second across and 1..5 up, a white and a coloured one each.
+/// `0x4134b0(at, 20, colour, laser)`: the laser's end — 20 times: `r` 0.25..1 (`$gp+0x1e30`), a spin of ±1, the way
+/// toward the camera turned ±60° about up and 0.05..3 a second long, 1..5 a second up (`+0x1e1c..+0x1e28`); the
+/// point wandering ±0.15 each time; two twinkles (`0x346ee8`, crate::particles::twinkle: falling 0.002, 60 ticks,
+/// frame 6 of type 0x61's list, far byte 0x74): the shot's colour (`+0x24`: its colour | alpha 0x7f) from `r` to
+/// `r`·0.1, and grey `0x7f7f7f7f` from `r`·0.7 to `r`·0.07 (its roll 0x20, the spin the other way).
 fn laser_burst(ctx: &mut Ctx, at: V3, rgb: u32) {
     let cam = ctx.host.camera_pos();
     let Some(sys) = ctx.parts.as_deref_mut() else { return };
-    let toward = set_len(sub(cam, at), 0.5);
+    let frame = sys.def_frame(0x61, 6);
+    let toward = sub(cam, at);
+    let mut p = at;
+    let colour = rgb & 0x00ff_ffff | 0x7f00_0000;
     for _ in 0..20 {
         let g = &mut ctx.game.rng;
-        let size = g.randf(0.25, 1.0);
-        let across = crate::moby::classes::shot::polar(g.randf(0.05, 3.0) / 60.0, g.rand_angle(), g.rand_angle());
-        let v = add(add(across, [0.0, 0.0, g.randf(1.0, 5.0) / 60.0]), scale(toward, 0.01));
-        let p = [at[0] + g.randf(-0.15, 0.15), at[1] + g.randf(-0.15, 0.15), at[2] + g.randf(-0.15, 0.15)];
-        crate::particles::spark(sys, g, size * 0.1 * 210_000.0, 0.0, 0.002, 0.0, 1.0, p, v, 60, 0x7f, rgb & 0xff_ffff, 0);
-        crate::particles::spark(sys, g, size * 0.07 * 210_000.0, 0.0, 0.002, 0.0, 1.0, p, v, 60, 0x7f, 0x7f_7f7f, 0);
+        let r = g.randf(0.25, 1.0);
+        let spin: i8 = if g.randi(2) != 0 { 1 } else { -1 };
+        let (s, c) = g.randf(-1.047_197_6, 1.047_197_6).sin_cos();
+        let turned = [toward[0] * c - toward[1] * s, toward[0] * s + toward[1] * c, toward[2]];
+        let mut v = set_len(turned, g.randf(0.05, 3.0) / 60.0);
+        v[2] = g.randf(1.0, 5.0) / 60.0;
+        for k in 0..3 { p[k] += g.randf(-0.15, 0.15); }
+        for (size, end, rgba, rot, sp) in [(r * 0.1, r, colour, 0u8, spin), (r * 0.07, r * 0.7, 0x7f7f_7f7f, 1, -spin)] {
+            if let Some(i) = crate::particles::twinkle(sys, g, size, end, 0.002, p, 60, rgba, rot, sp, v, 0) {
+                sys.pool.recs[i][2] = frame;
+                sys.pool.recs[i][9] = 0x74;
+            }
+        }
     }
 }
 
@@ -1501,6 +1536,8 @@ fn laser_burst(ctx: &mut Ctx, at: V3, rgb: u32) {
 pub enum HudItem {
     Draw(crate::hud::Draw),
     Quad(crate::gui::Quad),
+    /// Text in font 2 (`0x2fd2b8`: texture slot 2), left at `pos`.
+    Text2 { text: String, pos: [f32; 2], colour: u32 },
 }
 
 /// `0x2fc7f8(x0, y0, x1, y1, 1, colours)`: a bar from `left`'s colour to `right`'s (here in 32 slices).
@@ -1552,8 +1589,9 @@ impl Flight {
             out.push(d(Draw::Sprite { id: 0xc1, pos: [84.0, y], scale: [1.1, 1.0], frame: 0.0, colour: 0x6044_2d00 }));
             out.push(d(Draw::Sprite { id: 0xc2, pos: [84.0, y], scale: [1.1, 1.0], frame: 0.0, colour: 0x55f0_c070 }));
         }
+        // In font 2 (`0x2fd2b8`); the ammo below is font 1's (`0x2fd238`).
         for (id, n, pos) in self.counts(w) {
-            out.push(d(Draw::Text { text: format!("{}: {n}", label(id)), pos, scale: 1.0, colour: 0x8080_8080, align: Align::Left }));
+            out.push(HudItem::Text2 { text: format!("{}: {n}", label(id)), pos, colour: 0x8080_8080 });
         }
         // The frame and the shield's gauge.
         let mid = [256.0, 200.0];
