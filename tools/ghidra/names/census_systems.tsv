@@ -89,8 +89,8 @@ L00:002eef88	FUN_002eef88	math	trivial	range
 L00:00343678	FUN_00343678	enemy	has	cite
 L00:00327498	FUN_00327498	breakfx	has	cite
 L00:00313330	get_moby_colour	moby	trivial	L
-L00:00322668	FUN_00322668	moby	has	cite
 L00:00343fb8	steer_maths	math	trivial	L
+L00:00322668	FUN_00322668	moby	has	cite
 L00:002eed78	FUN_002eed78	math	trivial	range
 L00:002e71b8	FUN_002e71b8	other	has	cite
 L00:0032a818	FUN_0032a818	moby	has	cite
@@ -194,6 +194,7 @@ L00:002efa50	FUN_002efa50	math	trivial	range
 L00:0031ebd8	FUN_0031ebd8	hero	has	cite
 L00:00327a28	message_slot	ui	missing	L
 L00:00335bb8	FUN_00335bb8	particles	has	cite
+L00:0033d400	FUN_0033d400	docs	missing	cite
 L00:003244e8	FUN_003244e8	group	has	cite
 L00:002eebc8	FUN_002eebc8	math	trivial	range
 L00:002eeb10	FUN_002eeb10	math	trivial	range
