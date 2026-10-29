@@ -40,6 +40,8 @@ pub struct PartAux<'a> {
     pub water_z: f32,
     /// The level's collision (the drops' line test).
     pub coll: Option<&'a Collision>,
+    /// The rain's (crate::particles::rain).
+    pub rain: super::rain::RainAux<'a>,
 }
 
 /// `0x3378b0(size, top, pos, vel)`: a bubble (type 0x22) at `pos` moving `vel` a tick, its size 5250 growing to

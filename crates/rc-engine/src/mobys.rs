@@ -614,6 +614,7 @@ impl Mobys {
         let rails = g2::grind_paths(&lv.gameplay).map_err(|e| eprintln!("mobys: grind paths: {e}")).unwrap_or_default();
         Mobys { world, shadow_casters: Default::default(), shadow_tris: Default::default(), coll, cache: Arc::new(Mutex::new(PoseCache::default())), hero_moby, snap, created: HashMap::new(), skinned: HashMap::new(), canopy: None, canopy_frame: None, loop_slots: HashMap::new(), hero_chains, hero_targets, hero_seconds, hold, chains, targets, rails, level: {
             let mut l = rc_game::level::LevelData::load(&lv.gameplay);
+            l.height_map = lv.height_map.clone();
             l.items = crate::play::menu_tables(&crate::level_load::extracted_root(), crate::level_load::level_index()).items;
             l
         }, footstep_base: footstep_base(&lv.gameplay), left_out }

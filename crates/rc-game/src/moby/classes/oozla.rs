@@ -4,6 +4,7 @@
 //! * 0x0f14 (`0x4108b0`): on its first tick state 1, update distance 0xff.
 //! * 0x0a6a / 0x0a6b / 0x0aa0 / 0x0aa1 (`0x3ca620`): movers between two poses ([`update_mover`]).
 //! * 0x0c58 (`0x3ed598`): moves once to a cuboid's place when poked ([`update_0c58`]).
+//! * 0x0e89 (`0x406860`): the same move, silent, started also by its moby gone or the boots ([`update_0e89`]).
 //! * 0x0a17 (`0x3bcdd8`): the swamp's water level ([`update_0a17`]).
 //! * 0x0a92 / 0x0a93 (`0x3cfcc0`): float on that water ([`update_float`]).
 //! * 0x0a53 (`0x41def0`): the floating bridges, tilting under Ratchet or sinking with him ([`update_0a53`]).
@@ -21,8 +22,6 @@
 //! * 0x0b21 (`0x3dad40`): the lily pads of the low basin ([`update_0b21`]).
 //! * 0x02e1 (`0x395620`): the camera cutaways, as the flower's first sight ([`update_02e1`]).
 //!
-//! Not ported here: 0x0e89 (`0x406860`, the 0x0c58 mover, started also by
-//! `0x1a7b13` / `0x1a7b32`), 0x0ca0 (`0x3ee1d0`, the switch that pokes them: the use system, G-UI-001).
 
 use crate::hero::physics::{add, add_rot, approach, dist2, scale, set_len, sub, sub_rot, V3};
 use crate::moby::ai;
@@ -308,6 +307,48 @@ pub fn update_0c58(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 w.mobys[id].set_state(3, -1);
             }
         }
+        _ => {}
+    }
+    let m = &w.mobys[id];
+    if m.state < 3 { carry_hero(ctx, id, old, old_yaw, m.pos, m.rot[2]); }
+}
+
+/// 0x0e89 (`0x406860`): 0x0c58's move without its sounds. It starts (state 2) when poked (`+0xbc`), when its moby
+/// `+0x8c` is −1 or gone (state 0xfe / 0xfd), without the Gravity Boots (`0x1a7b13`) or with the item 0x32
+/// (`0x1a7b32`); it moves over `+0x84` ticks (progress `+0x88`) from its place (`+0x60` / `+0x70`) to the cuboid
+/// `+0x80`'s, carrying Ratchet, and there it freezes (state 3, mode |= 2).
+pub fn update_0e89(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let (old, old_yaw) = (w.mobys[id].pos, w.mobys[id].rot[2]);
+    match w.mobys[id].state {
+        0 => {
+            let m = &mut w.mobys[id];
+            m.set_pv_f(0x88, 0.0);
+            m.set_pv_i(0x5c, m.pv_i(0x5c) | 1);
+            let (pos, rot) = (m.pos, m.rot);
+            m.set_pv_v(0x60, pos);
+            m.set_pv_v(0x70, rot);
+            m.set_state(1, -1);
+        }
+        1 => {
+            let had = |i: usize| ctx.game.items.get(i).is_some_and(|&b| b != 0);
+            if w.mobys[id].timer != 0 || other(w, w.mobys[id].pv_i(0x8c)).is_none() || !had(0x13) || had(0x32) {
+                w.mobys[id].set_state(2, -1);
+            }
+            w.mobys[id].hit_slot = -1;
+        }
+        2 => {
+            if let Some((to, to_rot)) = ctx.level.cuboid_place(w.mobys[id].pv_i(0x80)) {
+                let m = &mut w.mobys[id];
+                let p = (m.pv_f(0x88) + 1.0 / m.pv_f(0x84)).min(1.0);
+                m.set_pv_f(0x88, p);
+                let e = ease(p);
+                let (home, angles) = (m.pv_v(0x60), m.pv_v(0x70));
+                m.pos = add(home, scale(sub(to, home), e));
+                for k in [2, 1, 0] { m.rot[k] = lerp_rot(angles[k], to_rot[k], e); }
+                if 1.0 <= p { m.set_state(3, -1); }
+            }
+        }
+        3 => w.mobys[id].mode |= 2,
         _ => {}
     }
     let m = &w.mobys[id];

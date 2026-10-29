@@ -27,6 +27,7 @@ pub mod moby_shadow;
 pub mod sky;
 pub mod collision;
 pub mod occlusion;
+pub mod height_map;
 pub mod particle_tex;
 pub mod hud;
 pub mod pif;

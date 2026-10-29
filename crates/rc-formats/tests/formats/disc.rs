@@ -172,3 +172,20 @@ fn tie_colour_programs() {
     assert!(cols.iter().all(Option::is_some));
     assert_eq!(cols[0].as_ref().map(|c| (c.bias, c.shift, c.slots.len())), Some(([0x18, 0x18, 0x18], 3, 92)));
 }
+
+#[test]
+fn height_maps() {
+    use rc_formats::disc::level::{LevelWad, Lump};
+    let mut seen = Vec::new();
+    for level in 0..30 {
+        let Some(file) = read(&format!("G/LEVEL{level}.WAD")) else { continue };
+        let w = LevelWad::parse(&file).unwrap();
+        let core_data = rc_formats::wad::decompress(w.lump(Lump::CoreData).unwrap().unwrap()).unwrap();
+        let core = rc_formats::level::parse_level_core(w.lump(Lump::CoreIndex).unwrap().unwrap(), core_data.len()).unwrap();
+        let Some(m) = rc_formats::height_map::parse_height_map(&core, &core_data).unwrap() else { continue };
+        assert!(m.cell[0] > 0.0 && m.cell[1] > 0.0 && m.step > 0.0);
+        seen.push(level);
+    }
+    // The three levels that place the weather (class 0x0578).
+    if !seen.is_empty() { assert_eq!(seen, [1, 15, 19]); }
+}

@@ -23,11 +23,13 @@
 //! | 0xb | [`billow`] `0x333a70` | `0x333d00` ([`update_billow`]) | the Gravity Bomb's smoke: billowing, splitting, rising and fading |
 //! | 0xf | [`ember`] `0x3348c0` | `0x334a18` ([`update_ember`]) | the Gravity Bomb's sparks: falling, shrinking, trailing embers |
 //! | 0x22, 0x23, 0x2d, 0x2e | [`water`] | [`water`] | the water: bubbles, drops, rings and the bow spray (the hero's swim effects) |
+//! | 0, 1 | [`rain`] | [`rain`] | the rain's drops and splashes (crate::moby::classes::weather) |
 //!
 //! Any other type kills itself on its first update. The gravity direction (`0x18a0e0`) is (0, 0, −1): normal gravity.
 //! Not ported: the gravity-boots bend of the positions (`0x380e08`, `+0x1c` = 2).
 
 mod pool;
+pub mod rain;
 pub mod type23;
 pub mod type48;
 pub mod water;
@@ -1017,6 +1019,8 @@ pub fn update_parts(sys: &mut Particles, mobys: &crate::moby::MobyWorld, cam: [f
             TRAIL => update_trail(sys, i),
             BILLOW => update_billow(sys, i, cam, rng),
             EMBER => update_ember(sys, i, rng, mobys.frame),
+            rain::DROP => rain::update_drop(sys, i, &aux.rain),
+            rain::SPLASH => rain::update_splash(sys, i),
             water::BUBBLE => water::update_bubble(sys, i, rng, aux),
             water::DROP => water::update_drop(sys, i, rng, aux),
             water::RING => water::update_ring(sys, i, aux),

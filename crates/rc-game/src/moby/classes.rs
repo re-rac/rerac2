@@ -33,6 +33,7 @@ pub mod tie_lights;
 pub mod maktar;
 pub mod tractor;
 pub mod vendor;
+pub mod weather;
 pub mod wrench;
 
 use super::UpdateFn;
@@ -98,6 +99,8 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x0f14 => Some(oozla::update_0f14),
         0x0a6a | 0x0a6b | 0x0aa0 | 0x0aa1 => Some(oozla::update_mover),
         0x0c58 => Some(oozla::update_0c58),
+        0x0e89 => Some(oozla::update_0e89),
+        0x0578 => Some(weather::update),
         0x0ca0 => Some(oozla::update_0ca0),
         0x046f => Some(oozla::update_046f),
         0x0a17 => Some(oozla::update_0a17),

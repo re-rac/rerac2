@@ -504,6 +504,8 @@ pub struct MobyWorld {
     /// The dying mobys' fades and their manager (crate::moby::classes::death_fade).
     pub fades: Vec<classes::death_fade::Fade>,
     pub fade_manager: Option<usize>,
+    /// The weather's globals (classes::weather).
+    pub weather: classes::weather::Weather,
     /// The point lights (`0x1c6ec0`), owned by the explosion lights (classes::light); the engine lights the world and
     /// the mobys with them.
     pub point_lights: crate::point_lights::PointLights,

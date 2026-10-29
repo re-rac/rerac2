@@ -87,6 +87,8 @@ Then the breakable effects (same day): `0x32b580` is shards::throw_all (L01 `0x3
 (blast::smoke_burst): verdicts cheap 209 units / 3,001, missing 168 / 5,007, partly 102 / 1,041, unknown 100 / 1,062;
 breakfx left at 13 units / 392 (the debris chunks `0x327648`, the burst `0x2ecfb0`).
 
+**Re-run 2026-10-30 (the rain, the carrier tagged).** 875 unported class-levels, 10,149 placed / 10,107 created in 577 units; 137 ported units. Verdicts: cheap 251 units / 4,331, missing 142 / 3,043, partly 38 / 984, unknown 146 / 1,749. Oozla's last two small classes are ported: the weather 0x0578 (rain over the level's height map, rc_game::moby::classes::weather; the rain's top `0x3269e0` and landing `0x326b28` tagged) and the mover 0x0e89. The teleport-in carrier (H:a054c90325f108e8, G-ENM-003) is tagged missing: 19 units / 645 call it, 12 / 514 with nothing else missing; none of its users is ported yet, so it waits for them. The particle spawner L00 `0x33d400` (12 units) has no ported user either (levels 02..15).
+
 Missing systems now (`systems.tsv`, every unit calling the system, not only the blocked; status as the ranking reads
 it):
 

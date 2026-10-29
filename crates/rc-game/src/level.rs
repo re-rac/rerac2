@@ -21,6 +21,8 @@ pub struct LevelData {
     pub items: Vec<rc_formats::disc::menu_tables::ItemRecord>,
     /// The variant planes (`0x1c92e0` / `0x1c9300`: a point and a normal each; [`LevelData::in_variant`]).
     pub variant_planes: Vec<([f32; 3], [f32; 3])>,
+    /// The height map the rain stops on (core header `+0xa4`; the engine sets it from the core).
+    pub height_map: Option<rc_formats::height_map::HeightMap>,
 }
 
 impl LevelData {
@@ -37,6 +39,7 @@ impl LevelData {
             light_regions: g::light_regions(gameplay).map_err(|e| eprintln!("level: light regions: {e}")).unwrap_or_default(),
             items: Vec::new(),
             variant_planes: g::variant_planes(gameplay).map_err(|e| eprintln!("level: variant planes: {e}")).unwrap_or_default(),
+            height_map: None,
         }
     }
 

@@ -256,6 +256,7 @@ pub fn load(root: &Path, index: u32) -> Result<LoadedLevel> {
     let particles = crate::particle_render::LevelParticles {
         textures: rc_formats::particle_tex::parse_particle_textures(&core, core_index, &core_data).map_err(|e| eprintln!("level: no particle textures ({e})")).ok(),
     };
+    let height_map = rc_formats::height_map::parse_height_map(&core, &core_data).map_err(|e| eprintln!("level: no height map ({e})")).ok().flatten();
     let death_z = rc_formats::disc::gameplay::level_settings(&gameplay)?
         .and_then(|s| s.get(0x28..0x2c))
         .map_or(f32::NEG_INFINITY, |b| f32::from_le_bytes(b.try_into().unwrap()));
@@ -267,7 +268,7 @@ pub fn load(root: &Path, index: u32) -> Result<LoadedLevel> {
     );
     Ok(LoadedLevel {
         tfrags, textures, fog, background, mobys, ties, shrubs, sky, occlusion, tfrag_lod, particles,
-        audio: audio(root, index, &wad, core_index, &core, &core_data, &gameplay, collision.clone()), collision, death_z, gameplay, timings: t,
+        audio: audio(root, index, &wad, core_index, &core, &core_data, &gameplay, collision.clone()), collision, death_z, height_map, gameplay, timings: t,
     })
 }
 

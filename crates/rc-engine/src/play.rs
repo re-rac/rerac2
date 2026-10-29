@@ -724,7 +724,7 @@ fn tick(
     rc_game::hero::layers::upkeep(&mut p.hero, &p.anim.ctl(class));
     // `UpdateParts` (`0x331150`), after the hero.
     if let Some(s) = parts.as_deref_mut() {
-        let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, coll: Some(coll) };
+        let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, coll: Some(coll), rain: mobys.world.weather.aux(&mobys.level, &p.game) };
         rc_game::particles::update_parts(&mut s.sys, &mobys.world, p.camera.pos, p.hero.pos, &mut p.game.rng, &aux);
     }
     // The draw callbacks the updates registered, called by the frame's draw (rc_game::fx).
@@ -1700,7 +1700,7 @@ fn scene_tick(p: &mut Play, lv: &mut crate::level_load::LoadedLevel, commands: &
     let ship = p.game.scenes.player.as_ref().and_then(|pl| pl.actors.iter().map(|a| a.0).find(|&a| mobys.world.mobys.get(a).is_some_and(|m| m.o_class == 0xd54)));
     canopy_tick(mobys, lv, occl.as_deref(), anim.as_deref_mut(), ship, frame.camera.eye, p.game.scenes.mode);
     if let Some(sys) = parts.as_deref_mut() {
-        let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, coll: Some(coll) };
+        let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, coll: Some(coll), rain: mobys.world.weather.aux(&mobys.level, &p.game) };
         rc_game::particles::update_parts(sys, &mobys.world, frame.camera.eye, p.hero.pos, &mut p.game.rng, &aux);
     }
     // The frame's draw calls the callbacks the scene tick's updates registered too (rc_game::fx): the enemies hidden

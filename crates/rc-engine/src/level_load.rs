@@ -37,6 +37,8 @@ pub struct LoadedLevel {
     pub death_z: f32,
     /// Sound bank, defs, sound instances and music (crate::audio_out); None with `RC_AUDIO=0`.
     pub audio: Option<rc_game::audio::LevelAudio>,
+    /// The rain's height map (core header `+0xa4`, rc_formats::height_map).
+    pub height_map: Option<rc_formats::height_map::HeightMap>,
     /// The decompressed gameplay file (NTSC), for the moby scheduler's loader (pvars, groups, splines, the
     /// spawnable count; crate::gameplay).
     pub gameplay: Vec<u8>,

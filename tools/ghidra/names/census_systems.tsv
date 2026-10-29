@@ -55,8 +55,8 @@ L00:0032cc30	FUN_0032cc30	enemy	has	cite
 L00:002efea8	FUN_002efea8	math	trivial	range
 L00:003f8348	FUN_003f8348	moby	has	cite
 L00:002df8d8	FUN_002df8d8	camera	has	cite
-L00:002eefd0	FUN_002eefd0	math	trivial	range
 L00:0032cd20	FUN_0032cd20	enemy	has	cite
+L00:002eefd0	FUN_002eefd0	math	trivial	range
 L00:00313dc0	FUN_00313dc0	moby	has	cite
 L00:00323bf8	seq_reached	anim	has	L
 L00:0031f230	spring	math	trivial	L
@@ -107,6 +107,7 @@ L00:002efa00	FUN_002efa00	math	trivial	range
 L00:00321688	clamp_length	math	trivial	L
 L00:00313420	FUN_00313420	moby	has	cite
 L00:002ef920	FUN_002ef920	math	trivial	range
+H:a054c90325f108e8	teleport_in	teleport	missing	L
 L00:00321c00	FUN_00321c00	moby	has	cite
 L00:00326448	hero_direction	hero	partly	L
 L00:002e14b0	FUN_002e14b0	hero	has	cite
@@ -159,8 +160,8 @@ L00:00320128	moby_colour_lerp	moby	trivial	L
 L00:002dbdb0	FUN_002dbdb0	breakfx	has	cite
 L00:002f4ee8	FUN_002f4ee8	moby	has	cite
 L00:002f5030	FUN_002f5030	game	has	cite
-L00:0031e980	vec_helper	math	trivial	L
 L00:00326328	FUN_00326328	moby	has	cite
+L00:0031e980	vec_helper	math	trivial	L
 L00:003253f0	FUN_003253f0	enemy	has	cite
 L00:0031cac0	next_in_group	group	has	L
 L00:0031c078	FUN_0031c078	enemy	has	cite
@@ -318,12 +319,12 @@ L00:00339e10	FUN_00339e10	particles	has	cite
 L00:002ea608	FUN_002ea608	other	has	cite
 L00:002f51a0	item_18	items	missing	cite
 L00:002eec18	FUN_002eec18	math	trivial	range
-L00:002eeb40	FUN_002eeb40	math	trivial	range
 L00:002dbff8	FUN_002dbff8	breakfx	has	cite
 L00:00321bb8	FUN_00321bb8	other	has	cite
 L00:003219e8	FUN_003219e8	level	has	cite
 L00:002ec618	FUN_002ec618	moby	has	cite
 L00:002e89d8	FUN_002e89d8	other	has	cite
+L00:002eeb40	FUN_002eeb40	math	trivial	range
 L00:002b3af8	FUN_002b3af8	hero	has	cite
 L00:00426080	FUN_00426080	camera	has	cite
 L00:002e5df8	FUN_002e5df8	game	has	cite
@@ -400,6 +401,8 @@ L00:00322af0	FUN_00322af0	bolts	has	cite
 L00:003245b0	FUN_003245b0	group	missing	cite
 L00:003257a0	FUN_003257a0	enemy	has	cite
 L00:00325f90	FUN_00325f90	enemy	has	cite
+L00:003269e0	rain_top	weather	has	L
+L00:00326b28	rain_land	weather	has	L
 L00:00326f38	FUN_00326f38	moby	has	cite
 L00:00327478	FUN_00327478	other	has	cite
 L00:0032b3b0	FUN_0032b3b0	weapons	has	cite
@@ -649,7 +652,6 @@ H:b7f87b32b3acf0e9		trivial	trivial	leaf
 L00:002f1c10	FUN_002f1c10	trivial	trivial	leaf
 H:5b19eeb41edcd5ea		trivial	trivial	leaf
 H:7bb943cd028db352		trivial	trivial	leaf
-L00:003251a0	FUN_003251a0	moby	has	calls
 H:41e63a0d4fdb2b6f		math	trivial	calls
 H:4c4861af28367464		moby	has	calls
 L00:002f1ae8	FUN_002f1ae8	trivial	trivial	leaf
@@ -688,6 +690,7 @@ L00:002d2858	FUN_002d2858	trivial	trivial	leaf
 L00:002d4350	FUN_002d4350	trivial	trivial	leaf
 L00:0031b910	FUN_0031b910	trivial	trivial	leaf
 L00:0031dc10	FUN_0031dc10	math	trivial	wrap
+L00:003251a0	FUN_003251a0	moby	has	calls
 L00:00326520	FUN_00326520	hero	partly	wrap
 L00:00326598	FUN_00326598	hero	partly	calls
 L00:0032b318	FUN_0032b318	math	trivial	calls
