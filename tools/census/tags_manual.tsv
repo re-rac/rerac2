@@ -55,7 +55,7 @@ boot:00123298	softfloat	libc	trivial	L	the boot ELF's double maths
 boot:001234f0	softfloat	libc	trivial	L	the boot ELF's double maths
 L00:00321a78	in_variant	level	has	L	rc_game::level::LevelData::in_variant (the variant planes; the chunk switch that changes the variant is G-LVL-007)
 L00:0031cac0	next_in_group	group	has	L	rc_game::moby::MobyWorld::next_in_group
-L00:002edd50	fx_beam	fxdraw	missing	L	a quad strip through 0x2eb998 with the effect texture 0x2ecef8
+L00:002edd50	fx_beam	fxdraw	has	L	the quads behind a moby's points (rc_game::fx::strip; the flocks' trails)
 L00:002da530	vec_to_angles	math	trivial	L	maths only
 L00:0031e048	ballistic	math	trivial	L	maths only: a throw's speed for a time and gravity
 L00:00326248	moby_matrix_point	math	trivial	L	maths only

@@ -91,6 +91,8 @@ breakfx left at 13 units / 392 (the debris chunks `0x327648`, the burst `0x2ecfb
 
 Then Maktar's small classes (same day): 0x0a24 / 0x0a55 (at their path's start), 0x0a4b (the shadow probe), 0x0adf (the swinging platform; its lift branch left): 857 unported class-levels / 9,912 created, 141 ported units; cheap 247 / 4,136, missing 153 / 3,218, partly 38 / 984, unknown 135 / 1,574.
 
+Then the flocks (same day, U112: L02 `0x38ce78`, rc_game::moby::classes::flock, 11 classes on nine levels) with the strip `0x2edd50` (rc_game::fx::strip): 826 unported class-levels / 9,484 created, 143 ported units; cheap 247 / 4,136, missing 152 / 2,850, partly 38 / 984, unknown 134 / 1,514.
+
 Missing systems now (`systems.tsv`, every unit calling the system, not only the blocked; status as the ranking reads
 it):
 

@@ -13,6 +13,7 @@ pub mod flyer;
 pub mod debris;
 pub mod enemies;
 pub mod flash;
+pub mod flock;
 pub mod gate;
 pub mod gravity_bomb;
 pub mod lancer;
@@ -101,6 +102,7 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x0c58 => Some(oozla::update_0c58),
         0x0e89 => Some(oozla::update_0e89),
         0x0578 => Some(weather::update),
+        c if flock::CLASSES.contains(&c) => Some(flock::update),
         0x0ca0 => Some(oozla::update_0ca0),
         0x046f => Some(oozla::update_046f),
         0x0a17 => Some(oozla::update_0a17),

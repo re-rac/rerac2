@@ -48,6 +48,23 @@ fn unit(v: V3) -> V3 {
     if 0.0 < l { scale(v, 1.0 / l) } else { v }
 }
 
+/// `0x2edd50(a, b, phase, moby, points, n, c0, c1, fx)`: a quad behind each of a moby's `points` (in its frame: `rows`
+/// and `pos`), from the point back along its facing by `b` and `a` to either side across the view (`(−forward) ×
+/// (camera − pos)`); s runs from `phase` to `phase + 1` along it, t across; colours c0 at the point and c1 at the back;
+/// additive (the effect texture's ALPHA row 1, `0x2ecef8(fx, 1, 0x80)`).
+#[allow(clippy::too_many_arguments)]
+pub fn strip(out: &mut Vec<FxQuad>, a: f32, b: f32, phase: f32, rows: &[V3; 3], pos: V3, cam: V3, points: &[V3], c0: u32, c1: u32, fx: usize) {
+    let back = scale(rows[0], -1.0);
+    let side = crate::hero::physics::set_len(cross(back, sub(cam, pos)), a);
+    let back = crate::hero::physics::set_len(back, b);
+    let st = [[phase, 0.0], [phase, 1.0], [phase + 1.0, 0.0], [phase + 1.0, 1.0]];
+    for p in points {
+        let w = add(add(add(scale(rows[0], p[0]), scale(rows[1], p[1])), scale(rows[2], p[2])), pos);
+        let tail = add(w, back);
+        out.push(FxQuad { fx, additive: true, corners: [sub(w, side), add(w, side), sub(tail, side), add(tail, side)], st, rgba: [c0, c0, c1, c1] });
+    }
+}
+
 /// `0x2edf78(size, push, roll, point, fx, rgba, additive)`: a sprite facing the camera, `push` toward it: its rows the
 /// way to the camera, that across gravity (`0x18a0e0`, down) and the third, turned by `roll` about the first; the
 /// template `0x1aa310` (±1 square) × `size`.
@@ -157,6 +174,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         0x0a9d => crate::moby::classes::oozla::draw_0a9d(w, id, out),
         0x0a17 => crate::moby::classes::oozla::draw_0a17(w, id, game, cam, host.camera_rows(), out),
         crate::vendor::CLASS => crate::moby::classes::vendor::draw(w, id, game, host.camera_rows(), out),
+        c if crate::moby::classes::flock::CLASSES.contains(&c) => crate::moby::classes::flock::draw(w, id, view, cam, out),
         0x00bc => crate::moby::classes::tractor::draw(w, id, cam, -0.3 * (game.frame % 27) as f32, out),
         crate::ship::LASER_CLASS => crate::ship::draw_laser(w, id, cam, out),
         _ => {}

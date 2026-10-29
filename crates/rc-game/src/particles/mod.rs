@@ -221,8 +221,14 @@ pub fn puff(sys: &mut Particles, rng: &mut Rng, jitter: f32, grow_lo: f32, grow_
 /// update places it the same tick.
 #[allow(clippy::too_many_arguments)]
 pub fn glow(sys: &mut Particles, rng: &mut Rng, size: f32, pull: f32, offset: [f32; 3], moby: usize, pos: [f32; 3], far: i16, facing: bool, rgba: u32, life: i16) -> Option<usize> {
+    glow_def(sys, rng, size, pull, offset, moby, pos, far, facing, rgba, life, 1)
+}
+
+/// [`glow`] with the def's frame `def` (the callers that pass 0).
+#[allow(clippy::too_many_arguments)]
+pub fn glow_def(sys: &mut Particles, rng: &mut Rng, size: f32, pull: f32, offset: [f32; 3], moby: usize, pos: [f32; 3], far: i16, facing: bool, rgba: u32, life: i16, def: usize) -> Option<usize> {
     let i = sys.create_part(0x59)?;
-    let def = sys.def_frame(0x59, 1);
+    let def = sys.def_frame(0x59, def);
     let rot = rng.randi(0xff) as u8;
     let r = &mut sys.pool.recs[i];
     rec::set_u32(r, 4, rgba);
