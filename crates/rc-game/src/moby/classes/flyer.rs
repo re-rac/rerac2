@@ -25,7 +25,7 @@
 //! `0x31c618`, not ported: stood in for by a line to the next place, the move stopping at what it meets).
 //!
 //! Not ported: its glow (a point light, `0x2f3538`, and its colour), its trail particles (`0x335288`), the splashes
-//! and ripples (`0x3be580`, `0x3be818`), the death's fade (`0x3eb1d0`), the screen test of the glow (`0x2f0080`), the
+//! and ripples (`0x3be580`, `0x3be818`), the screen test of the glow (`0x2f0080`), the
 //! game-mode word `$gp−0x60b0` (= 2 stops the dives) and Ratchet's word `0x18c0bc` (0x11 / 0x12 stop them).
 
 use crate::hero::physics::*;
@@ -456,7 +456,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             alarm(w, id);
             release(w, id);
             crate::moby::bolts::drop(w, id, 0, 3, ctx);
-            w.delete(id);
+            super::death_fade::start(w, id, ctx, 0.0, None);
             return;
         }
         _ => {}

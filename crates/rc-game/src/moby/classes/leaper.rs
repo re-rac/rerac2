@@ -29,7 +29,7 @@
 //!
 //! Not ported: the head's and tail's aims (`0x31a0e0`, `0x31cfa0`), the
 //! splashes, ripples and their sounds (`0x3b5608`, `0x3b5888`, `0x3b64d0`), the companion moby 0x660 it makes at the
-//! set-up (`0x3a7680`), the death's fade (`0x3eb1d0`, the class 0xc41 manager: it is deleted at once), the sphere
+//! set-up (`0x3a7680`), the sphere
 //! query `0x2d6c20` (a scan of the mobys within 3.5).
 
 use crate::hero::physics::*;
@@ -464,7 +464,7 @@ fn die(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     alarm_group(w, id);
     crate::moby::bolts::drop(w, id, 0, 3, ctx);
     release(w, id);
-    w.delete(id);
+    super::death_fade::start(w, id, ctx, 0.0, None);
 }
 
 /// 0x09a2 (module docs).

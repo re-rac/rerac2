@@ -62,6 +62,7 @@ L00:00323bf8	seq_reached	anim	has	L
 L00:0031f230	spring	math	trivial	L
 L00:003602f0	FUN_003602f0	moby	has	cite
 L00:0031bbc0	FUN_0031bbc0	rng	has	cite
+H:c0a367fb31d59c29	death_fade	moby	has	L
 L00:00324208	FUN_00324208	enemy	has	cite
 L00:0031eb18	FUN_0031eb18	other	has	cite
 L00:00360698	FUN_00360698	moby	has	cite

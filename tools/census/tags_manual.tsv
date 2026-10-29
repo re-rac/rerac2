@@ -70,3 +70,4 @@ L00:003210a8	smoke_burst	breakfx	has	L	rc_game::moby::blast::smoke_burst
 L00:00327648	throw_chunks	breakfx	missing	L	class 0x43e chunks (update 0x39c6b8): shard mode 1, not ported
 L00:002ecfb0	staged_burst	particles	has	L	rc_game::particles::staged_burst (type 2 puffs)
 L00:00304058	variant_of	level	has	L	the region of a point: LevelData::in_variant's plane walk
+H:c0a367fb31d59c29	death_fade	moby	has	L	the dying mobys' fade (L01 0x3eb1d0; manager 0xc41 0x3eacd8): rc_game::moby::classes::death_fade

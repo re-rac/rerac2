@@ -22,6 +22,7 @@ pub mod light;
 pub mod nanotech;
 pub mod pickup;
 pub mod platinum;
+pub mod death_fade;
 pub mod props;
 pub mod space;
 pub mod spitter;
@@ -137,6 +138,7 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x0c23 => Some(oozla::update_0c23),
         0x0af0 => Some(oozla::update_0af0),
         platinum::CLASS => Some(platinum::update),
+        death_fade::CLASS => Some(death_fade::update),
         0x0825 => Some(dynamo::update),
         0x00bc => Some(tractor::update),
         0x0acb | 0x0acc => Some(tractor::update_box),

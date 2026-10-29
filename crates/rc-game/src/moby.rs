@@ -501,6 +501,9 @@ pub struct MobyWorld {
     pub gravity_bomb: classes::gravity_bomb::Effect,
     /// The frame's blob shadows (`0x1be840`, crate::shadows), asked for by the updates and drawn with crate::fx's quads.
     pub shadows: crate::shadows::Shadows,
+    /// The dying mobys' fades and their manager (crate::moby::classes::death_fade).
+    pub fades: Vec<classes::death_fade::Fade>,
+    pub fade_manager: Option<usize>,
     /// The point lights (`0x1c6ec0`), owned by the explosion lights (classes::light); the engine lights the world and
     /// the mobys with them.
     pub point_lights: crate::point_lights::PointLights,

@@ -27,7 +27,7 @@
 //! tick from the spit's first spray frame for its life of 30..36 ticks (the spawn's arguments).
 //!
 //! Not ported: the shadow, the tail's aim (`0x31cfa0`), the splashes and ripples (`0x3dd160`, `0x3dd3e0`,
-//! `0x3dd030`), the spray's particles, the death's fade (`0x3eb1d0`).
+//! `0x3dd030`), the spray's particles. Its death's fade: crate::moby::classes::death_fade (`0x3eb1d0`).
 
 use crate::hero::physics::*;
 use crate::moby::{ai, countdown, Ctx, MobyWorld};
@@ -420,7 +420,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         6 => {
             crate::moby::bolts::drop(w, id, 0, 3, ctx);
-            w.delete(id);
+            super::death_fade::start(w, id, ctx, 0.0, None);
             return;
         }
         _ => {}
