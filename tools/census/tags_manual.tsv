@@ -32,9 +32,7 @@ L00:0037c948	hw_timer	game	trivial	L	reads the EE timer 0x10000000
 L00:0031c618	line_collide	collision	partly	L	a line test through 0x2de878 / 0x2df8d8
 L00:00326820	hero_distance	hero	partly	L	distance to Ratchet (0x1b1a90), or 100 − it in the ship mode (0x1a8ff4)
 L00:00326448	hero_direction	hero	partly	L	direction to Ratchet / his ship (0x189ed0, 0x3263d0)
-L00:0032b580	shards	breakfx	missing	cite	props.rs: the shards, not drawn
 L00:002ecfb0	burst	breakfx	missing	cite	props.rs: the burst, not drawn
-L00:003210a8	debris	breakfx	missing	cite	enemies: the debris and the burst
 L00:0031fa50	colour_take	colour	missing	cite	the moby's colour taken over
 L00:003241d8	colour_take2	colour	missing	cite	the moby's colour taken over
 L00:0037d5a0	splash	particles	missing	cite	hero: the bubbles and splashes
@@ -58,7 +56,6 @@ boot:00123298	softfloat	libc	trivial	L	the boot ELF's double maths
 boot:001234f0	softfloat	libc	trivial	L	the boot ELF's double maths
 L00:00321a78	variant_region	level	missing	L	the level's variant boxes (0x1c92e0 / 0x1c9300, count 0x1c92cc, from the gameplay header): the box holding a point = the variant 0x1c92c0
 L00:0031cac0	group_iter	group	partly	L	iterates the moby group 0x1fa8a0[+0x21] (cached 0x1b1ff8 / 0x1b2000)
-L00:00327648	debris_chunks	breakfx	missing	L	spawns n mobys 0x43e (0x2dbdb0) with the callback 0x39c6b8: thrown debris
 L00:002edd50	fx_beam	fxdraw	missing	L	a quad strip through 0x2eb998 with the effect texture 0x2ecef8
 L00:002da530	vec_to_angles	math	trivial	L	maths only
 L00:0031e048	ballistic	math	trivial	L	maths only: a throw's speed for a time and gravity
@@ -68,3 +65,7 @@ B:1	sound bank 1	level chunks	has	L	chunk 0's sound bank (level header +0x48), l
 B:2	sound bank 2	level chunks	missing	L	chunk 1's sound bank: loaded only by the chunk switch 0x2f9bd8 → 0x323ca0(1) (L01), not ported: its sounds play nothing
 B:3	sound bank 3	level chunks	missing	L	chunk 2's sound bank: the chunk switch, as bank 2
 B:4	sound bank 4	gadget banks	has	L	the hand gadget's bank (0x306018), appended per gadget (level_wad::gadget_sounds)
+L00:0032b580	shards	breakfx	has	L	throw every piece: rc_game::moby::shards::throw_all (L01 0x3210c0); mode 1 pieces not ported
+H:55c6aaae9bdd29ad	shards	breakfx	has	L	the level copies of 0x32b580 (shards::throw_all)
+L00:003210a8	smoke_burst	breakfx	has	L	rc_game::moby::blast::smoke_burst
+L00:00327648	throw_chunks	breakfx	missing	L	class 0x43e chunks (update 0x39c6b8): shard mode 1, not ported

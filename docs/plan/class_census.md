@@ -83,6 +83,10 @@ missing: the colour take-over (10 / 362, G-REN-005), platform carry (2 / 50, G-L
 Clank's animation (1 / 2, G-HERO-004); the rest are partly there (the first draw list, the breakable effects and the
 particle types lead).
 
+Then the breakable effects (same day): `0x32b580` is shards::throw_all (L01 `0x3210c0`), `0x3210a8` the smoke burst
+(blast::smoke_burst): verdicts cheap 209 units / 3,001, missing 168 / 5,007, partly 102 / 1,041, unknown 100 / 1,062;
+breakfx left at 13 units / 392 (the debris chunks `0x327648`, the burst `0x2ecfb0`).
+
 Missing systems now (`systems.tsv`, every unit calling the system, not only the blocked; status as the ranking reads
 it):
 

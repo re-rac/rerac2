@@ -61,6 +61,37 @@ fn turn(v: V3, n: V3, a: f32) -> V3 {
     std::array::from_fn(|k| v[k] * c + x[k] * s + n[k] * d * (1.0 - c))
 }
 
+/// `0x3210a8`'s smoke colours (`0x1aa260..`): six start colours and six end colours, one of each at random a billow.
+const SMOKE_C0: [u32; 6] = [0x4f00_8fff, 0x4f00_8fff, 0x4f00_7fff, 0x4f00_6fff, 0x2fff_ffff, 0x2fff_ffff];
+const SMOKE_C1: [u32; 6] = [0x2f00_5f7f, 0x2f00_4f7f, 0x2f00_3f7f, 0x2f00_004f, 0x2f00_0000, 0x3f00_0000];
+
+/// `0x3210a8(size, light, source, at, sound)`: a smoke burst at `at` (the enemies' fall out of the level and their
+/// parts' breaks): three billows (`0x333a70`: 400000·`size`, 8..10 a second × `size` a random way, a random pair of
+/// [`SMOKE_C0`] / [`SMOKE_C1`], 15..20 ticks, held 25..30); with a source, two orange flashes (`0x38e5a8`: 4·`size`
+/// for 20 ticks at alpha 0x30, 3·`size` for 29 at 0x20) and, the source alive and `sound` ≥ 0, its sound `sound`;
+/// with `light` ≠ 0 the explosion light (`0x39e7f0` on the template `0x2816e0`, the Gravity Bomb's with the radius
+/// `light`, 13 when negative).
+pub fn smoke_burst(w: &mut MobyWorld, ctx: &mut Ctx, size: f32, light: f32, src: Option<usize>, at: V3, sound: i32) {
+    for _ in 0..3 {
+        let rng = &mut ctx.game.rng;
+        let speed = rng.randf(8.0, 10.0) * 0.016_666_668;
+        let (c0, c1) = (SMOKE_C0[rng.randi(6) as usize], SMOKE_C1[rng.randi(6) as usize]);
+        let life = rng.rand_range(0xf, 0x14);
+        let hold = rng.rand_range(0x19, 0x1e) as u8;
+        if let Some(sys) = ctx.parts.as_deref_mut() { particles::billow(sys, &mut ctx.game.rng, size * 400_000.0, speed * size, at, [0.0; 3], c0, c1, life, hold, 0, 0); }
+    }
+    if let Some(s) = src {
+        super::classes::flash::spawn(w, ctx, size * 4.0, 0.0, at, [0.0; 3], 0x14, [0x7f, 0x40, 0], 0x30);
+        super::classes::flash::spawn(w, ctx, size * 3.0, 0.0, at, [0.0; 3], 0x1d, [0x60, 0x20, 0], 0x20);
+        if 0 <= sound && w.mobys.get(s).is_some_and(|m| m.state < 0x80) { ctx.host.play_sound(&w.mobys[s], sound, 0); }
+    }
+    if light != 0.0 {
+        let r = if light <= 0.0 { 13.0 } else { light };
+        let t = super::classes::light::Template { radius: [r; 3], ..super::classes::light::GRAVITY_BOMB };
+        super::classes::light::spawn(w, ctx, &t, at);
+    }
+}
+
 /// `0x3f8348` → `0x3f8a70`: a blast at `at` (crate docs).
 pub fn burst(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, b: &Blast) {
     let cam = ctx.host.camera_pos();

@@ -70,7 +70,7 @@ pub fn break_into(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, h: (f32, f32), v:
     }
 }
 
-/// `0x3210c0(moby, h, spin, gravity, 0xffff, sound, skip, flags, mask, 0xff, 0)`: the bolts (flag 1 clear: the level's
+/// L00 `0x32b580` (L01 `0x3210c0`) `(moby, h, spin, gravity, 0xffff, sound, skip, flags, mask, 0xff, 0)`: the bolts (flag 1 clear: the level's
 /// once; 0x10: nine times, else 0x20: twice), class sound `sound` (−1 none), then each piece of the class (`0x3078b0`)
 /// in `mask` but `skip` thrown (`0x2d1520` mode 2): its gravity and spin drawn from their ranges, its velocity from
 /// `h` (x from `h[0]..h[4]`, y `h[1]..h[5]`, z `h[2]..h[6]`; flags 2 / 4: x / y of either sign), a sixtieth a tick,

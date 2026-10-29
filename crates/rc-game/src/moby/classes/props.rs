@@ -276,7 +276,8 @@ pub fn update_12f9(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 }
 
 /// The breakables (0x12fa the lamps `0x383ce0`, 0x1143 `0x414368`): a hit with the flags 0x4010000 (the wrench and
-/// blasts) while `+0x68`[0] = 0 breaks them (state 2: the shards `0x32b580` and the burst `0x2ecfb0`, not drawn),
+/// blasts) while `+0x68`[0] = 0 breaks them (state 2: the lamp's pieces, crate::moby::shards::throw_all `0x32b580`; the
+/// burst `0x2ecfb0` and 0x1143's pieces, whose ranges its set-up computes, are not ported),
 /// then they are deleted. The lamp at its start sheds its lasting glow (crate::particles::glow: grey 0x32608080 at (0,
 /// 0, −23) × its scale, its size 5.25e6 and its pull 15 × its scale, far 0x60).
 pub fn update_breakable(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
@@ -295,7 +296,14 @@ pub fn update_breakable(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
             w.clear_hit(id);
         }
-        2 => w.delete(id),
+        2 => {
+            // The lamp's pieces (`0x32b580`, `$gp − 0x3b0` / `− 0x3b8` / `− 0x3c0`: −4..4 across, −3..0 up, 90..360°/s,
+            // gravity 10..20; every piece, its class sound 0).
+            if w.mobys[id].o_class == 0x12fa {
+                crate::moby::shards::throw_all(w, id, ctx, [-4.0, -4.0, -3.0, 0.0, 4.0, 4.0, 0.0, 0.0], (90.0, 360.0), (10.0, 20.0), 0, -1, 0, 0xffff);
+            }
+            w.delete(id);
+        }
         _ => {}
     }
 }

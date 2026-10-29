@@ -342,7 +342,7 @@ pub fn update_099c(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 // along its joint 4 doing `+0x298`), else it walks up to 2.8 of him (its yaw offset `+0x284`) or turns to him; 0xd the
 // bite's turn; 0xe after a bite: farther than 4, the fight (0x1c), else sequence 7.
 //
-// Not ported: its sounds but the two, the burst `0x3210a8`, the pieces' burning (`0x3d8f70`, with `+0x2b4`), the
+// Not ported: its sounds but the two, the pieces' burning (`0x3d8f70`, with `+0x2b4`), the
 // head's and tail's aims (`0x324208` / `0x327308`, the joint records `+0x3d0` / `+0x450`), the
 // emerge flash (`0x3d8920`), the gravity frames. Its glows and wire are draw callbacks (crate::fx); its flame jet is
 // particles ([`bite`]).
@@ -491,6 +491,8 @@ fn checks_0b0a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     let f2 = ai::find_target(w, id, ctx, r2, 10.0, a2, None, false);
     w.mobys[id].set_pv_i(0x25c, f2 as i32);
     if w.mobys[id].pos[2] < 90.0 {
+        let at = w.mobys[id].pos;
+        crate::moby::blast::smoke_burst(w, ctx, 0.5, 13.0, Some(id), at, -1);
         crate::moby::bolts::drop(w, id, 0, 3, ctx);
         return true;
     }
@@ -868,7 +870,7 @@ pub fn update_0b0a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 // (sequence 0x11, its parts still through frames 12..15). The parts spin 8° a tick but on the ground, as a mound or
 // in the flight.
 //
-// Not ported: its sounds but the two, the burst `0x3210a8`, the parts'
+// Not ported: its sounds but the two, the parts'
 // sparks (`0x3dbc20`), the bite's trail (`0x3dbde8`, `0x3dbe88`, `0x3dc100`), the head's
 // aims (`0x324208`, `0x327308`), the draw callbacks, the scene's hiding (`0x1a8f00` = 2).
 
@@ -1083,6 +1085,8 @@ fn checks_0b0b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     w.mobys[id].set_pv_i(0x25c, f2 as i32);
     if w.mobys[id].pos[2] < 90.0 {
         delete_parts(w, id, 0x2a0);
+        let at = w.mobys[id].pos;
+        crate::moby::blast::smoke_burst(w, ctx, 0.5, 13.0, Some(id), at, -1);
         crate::moby::bolts::drop(w, id, 0, 3, ctx);
         return true;
     }
@@ -1267,6 +1271,8 @@ pub fn update_0b0b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             ai::flight(w, id, ctx);
             if super::props::wrapped(w, id, ctx) || w.mobys[id].pos[2] < 100.0 {
                 delete_parts(w, id, 0x2a0);
+                let at = w.mobys[id].pos;
+                crate::moby::blast::smoke_burst(w, ctx, 0.5, 13.0, Some(id), at, -1);
                 crate::moby::bolts::drop(w, id, 0, 3, ctx);
                 w.delete(id);
                 return;

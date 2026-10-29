@@ -80,6 +80,7 @@ B:1	sound bank 1	level chunks	has	L
 L00:00320000	FUN_00320000	other	has	cite
 L00:0032a838	FUN_0032a838	moby	has	cite
 L00:002ef340	FUN_002ef340	math	trivial	range
+H:55c6aaae9bdd29ad	shards	breakfx	has	L
 L00:0031ed78	FUN_0031ed78	other	has	cite
 L00:003201e8	FUN_003201e8	enemy	has	cite
 L00:002f0080	FUN_002f0080	math	trivial	range
@@ -118,7 +119,7 @@ L00:0031d2c8	FUN_0031d2c8	enemy	has	cite
 L00:00327388	drop_bolts_scaled	bolts	has	L
 L00:0031d4c8	FUN_0031d4c8	hero	has	cite
 L00:0032ce98	FUN_0032ce98	enemy	has	cite
-L00:0032b580	shards	breakfx	missing	cite
+L00:0032b580	shards	breakfx	has	L
 L00:0031d158	FUN_0031d158	hits	has	cite
 L00:002ef188	FUN_002ef188	math	trivial	range
 L00:0031c618	line_collide	collision	partly	L
@@ -130,7 +131,7 @@ L00:00428810	script_cam_look	camera	missing	L
 L00:00428880	script_cam_start	camera	missing	L
 L00:00360750	play_level_sound	sound	partly	L
 L00:004289f0	script_cam_update	camera	missing	L
-L00:003210a8	debris	breakfx	missing	cite
+L00:003210a8	smoke_burst	breakfx	has	L
 L00:0031f030	FUN_0031f030	hero	has	cite
 L00:002e23e0	FUN_002e23e0	other	has	cite
 L00:002b9e68	FUN_002b9e68	moby	has	cite
@@ -178,7 +179,7 @@ L00:002e7c90	FUN_002e7c90	game	has	cite
 L00:002eeeb8	FUN_002eeeb8	math	trivial	range
 L00:0031c278	FUN_0031c278	enemy	has	cite
 L00:003246c0	FUN_003246c0	group	has	cite
-L00:00327648	debris_chunks	breakfx	missing	L
+L00:00327648	throw_chunks	breakfx	missing	L
 L00:00324430	FUN_00324430	group	has	cite
 L00:0031ec88	FUN_0031ec88	enemy	has	cite
 L00:002ef650	FUN_002ef650	math	trivial	range
@@ -536,19 +537,18 @@ H:dadd29b35001fbea		trivial	trivial	leaf
 H:62d5a953ce6b612f		enemy	has	near
 H:dacafa0e572851e2		breakfx	has	near
 H:e09c40414108eca7		math	trivial	calls
-H:55c6aaae9bdd29ad		breakfx	missing	near
 L00:0032ceb8	FUN_0032ceb8	enemy	has	wrap
 H:13f2d249cf66bf79		math	trivial	calls
 L00:0031d620	FUN_0031d620	hero	has	wrap
 H:3264b18aeb9576ee		enemy	has	calls
-H:699556095593bd28		breakfx	missing	near
+H:699556095593bd28		breakfx	has	near
 H:faad2ad731c269f3		moby	has	calls
 H:91e31346e413c054		math	trivial	calls
 L00:0031fe80	FUN_0031fe80	trivial	trivial	leaf
 H:50049e46a17ea479		math	trivial	calls
 H:2df3b1856eecbb19		enemy	has	near
 H:75d44116251e1d3a		trivial	trivial	leaf
-H:f6c2162195566679		breakfx	missing	near
+H:f6c2162195566679		breakfx	has	near
 L00:003269a0	FUN_003269a0	math	trivial	calls
 H:3a095f20b7045e1b		trivial	trivial	leaf
 L00:00326378	FUN_00326378	math	trivial	calls
