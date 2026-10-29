@@ -24,7 +24,7 @@ pub fn bolt_class(value: i32) -> i16 {
 /// `$gp − 0x448 + 4·k` (L00 `0x1aeba8..`): the size factor of every bolt class, 0.5.
 pub const BOLT_SCALE: f32 = 0.5;
 /// `$gp − 0x418` (L00 `0x1aebd8`, the same bytes on every level): the bolts' ambient (`0x3241d8`).
-pub const BOLT_AMBIENT: [u8; 3] = [0x10, 0x10, 0x18];
+pub const BOLT_AMBIENT: u32 = 0x8018_1010;
 
 /// The bolt look (`0x381e60` state 0 and `0x383380`): mode 0x100, shine 0x14, the scale class × 0.5, the ambient
 /// ([`BOLT_AMBIENT`] through `0x3241d8`) and light set 0xd with it kept (`0x313330` / `0x3132e0(m, 0, 0xd, 0, 0)` /
@@ -33,7 +33,7 @@ pub fn dress(m: &mut Moby, class_scale: f32) {
     m.mode |= super::mode::KEEP_ROWS;
     m.shine = 0x14;
     m.scale = class_scale * BOLT_SCALE;
-    m.ambient = BOLT_AMBIENT;
+    m.set_ambient_word(BOLT_AMBIENT);
     m.light = 0xd;
 }
 

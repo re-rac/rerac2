@@ -696,6 +696,21 @@ pub(crate) fn damage_of(m: &mut Moby, hit: Option<&super::hits::HitRecord>, wren
     dmg
 }
 
+/// `0x323b78(x, n)`: `x` rounded to `n` decimals (`ftoi0((x + 1/(2·10ⁿ))·10ⁿ) / 10ⁿ`).
+pub fn round_to(x: f32, n: u32) -> f32 {
+    let p = 10i32.pow(n) as f32;
+    ((x + 1.0 / (p + p)) * p) as i32 as f32 / p
+}
+
+/// `0x323bf8(t, m)`: the sequence has just reached frame time `t` (`0x311880`, rounded to 4 decimals): at or past it,
+/// by less than half its playback speed (`+0x48`, rounded the same).
+pub fn reached(w: &MobyWorld, id: usize, ctx: &Ctx, t: f32) -> bool {
+    let m = &w.mobys[id];
+    let now = round_to(ctx.host.frame_time(m), 4);
+    let half = round_to(ctx.host.anim(m).map_or(1.0, |a| a.speed) * 0.5, 4);
+    t <= now && now - t < half
+}
+
 /// `0x3201e8(m, b)`: a colour flash's tick. The block: `+0` the ticks left, `+2` the phase, `+4..+6` the colour it
 /// comes back to, `+7..+9` the flash's colour (0: that channel stays), `+0xc` / `+0xe` the ticks in and out. The
 /// moby's ambient (`+0x3c`) eases to the flash's colour, then back; when it is over, the colour it came back to.

@@ -58,7 +58,7 @@ L00:002df8d8	FUN_002df8d8	camera	has	cite
 L00:002eefd0	FUN_002eefd0	math	trivial	range
 L00:0032cd20	FUN_0032cd20	enemy	has	cite
 L00:00313dc0	FUN_00313dc0	moby	has	cite
-L00:00323bf8	seq_time_check	anim	partly	L
+L00:00323bf8	seq_reached	anim	has	L
 L00:0031f230	spring	math	trivial	L
 L00:003602f0	FUN_003602f0	moby	has	cite
 L00:0031bbc0	FUN_0031bbc0	rng	has	cite
@@ -109,7 +109,7 @@ L00:002ef920	FUN_002ef920	math	trivial	range
 L00:00321c00	FUN_00321c00	moby	has	cite
 L00:00326448	hero_direction	hero	partly	L
 L00:002e14b0	FUN_002e14b0	hero	has	cite
-L00:0031c970	group_flag	group	partly	L
+L00:0031c970	poke_group	group	has	L
 L00:0031f4b0	FUN_0031f4b0	enemy	has	cite
 L00:003261f8	moby_space_point	math	trivial	L
 L00:002ef2a8	FUN_002ef2a8	math	trivial	range
@@ -161,7 +161,7 @@ L00:002f5030	FUN_002f5030	game	has	cite
 L00:0031e980	vec_helper	math	trivial	L
 L00:00326328	FUN_00326328	moby	has	cite
 L00:003253f0	FUN_003253f0	enemy	has	cite
-L00:0031cac0	group_iter	group	partly	L
+L00:0031cac0	next_in_group	group	has	L
 L00:0031c078	FUN_0031c078	enemy	has	cite
 L00:0031dd48	FUN_0031dd48	enemy	has	cite
 L00:002f46e0	FUN_002f46e0	other	has	cite
@@ -284,7 +284,7 @@ L00:00322730	FUN_00322730	game	has	cite
 L00:002db498	FUN_002db498	ui	has	cite
 L00:0031d930	FUN_0031d930	other	has	cite
 L00:003432d8	FUN_003432d8	path	has	cite
-L00:003241d8	colour_take2	colour	missing	cite
+L00:003241d8	set_ambient_word	moby	has	L
 L00:0031ce98	FUN_0031ce98	enemy	has	cite
 L00:0042a4e0	FUN_0042a4e0	camera	has	cite
 boot:001153d4	memcpy	libc	trivial	L

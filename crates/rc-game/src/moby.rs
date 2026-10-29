@@ -370,6 +370,8 @@ impl Moby {
         self.pvars[off] = v;
     }
     pub fn set_pv_v(&mut self, off: usize, v: V3) { for (k, x) in v.iter().enumerate() { self.set_pv_f(off + 4 * k, *x); } }
+    /// `0x3241d8(m, rgb)`: the ambient from a colour word (r in the low byte; `0x313300`).
+    pub fn set_ambient_word(&mut self, c: u32) { self.ambient = [c as u8, (c >> 8) as u8, (c >> 16) as u8]; }
     /// A quaternion in the pvars (crate::quat).
     pub fn pv_q(&self, off: usize) -> crate::quat::Q { [self.pv_f(off), self.pv_f(off + 4), self.pv_f(off + 8), self.pv_f(off + 12)] }
     pub fn set_pv_q(&mut self, off: usize, q: crate::quat::Q) { for (k, x) in q.iter().enumerate() { self.set_pv_f(off + 4 * k, *x); } }
@@ -765,6 +767,25 @@ impl MobyWorld {
         for &i in members {
             if let Some(m) = self.mobys.get_mut(i) { m.timer = v; }
         }
+    }
+
+    /// `0x31cac0(&out, m, any, dead)`: the next member after `id` in its group's list (`0x1fa8a0[+0x21]`): with `any`
+    /// clear the next live one (a dead one, state ≥ 0x80, skipped); with `any` the next one, or with `dead` too the next
+    /// dead one; `None` at the list's end (or with `dead` but not `any`, which takes none). The game caches the last
+    /// member and the list cursor (`0x1b2000` / `0x1b1ff8`) so a loop walks the list once; this walks it from `id`.
+    pub fn next_in_group(&self, id: usize, any: bool, dead: bool) -> Option<usize> {
+        let g = usize::try_from(self.mobys.get(id)?.group).ok()?;
+        let list = self.groups.get(g)?;
+        let at = list.iter().position(|&i| i == id)?;
+        list[at + 1..].iter().copied().find(|&i| {
+            let gone = self.mobys.get(i).is_none_or(|m| 0x80 <= m.state);
+            match (any, dead) {
+                (false, false) => !gone,
+                (true, false) => true,
+                (true, true) => gone,
+                (false, true) => false,
+            }
+        })
     }
 
     /// `0x313dc0`: rows from the Euler angles (unless mode 0x100; mode 0x8000 mirrors the second row), the bounding
