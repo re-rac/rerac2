@@ -19,6 +19,8 @@ pub struct LevelData {
     pub light_regions: Vec<rc_formats::disc::gameplay::LightRegion>,
     /// The item records (`0x262500`, by row; the overlay's: rc_formats::disc::menu_tables), set by the engine.
     pub items: Vec<rc_formats::disc::menu_tables::ItemRecord>,
+    /// The variant planes (`0x1c92e0` / `0x1c9300`: a point and a normal each; [`LevelData::in_variant`]).
+    pub variant_planes: Vec<([f32; 3], [f32; 3])>,
 }
 
 impl LevelData {
@@ -34,7 +36,15 @@ impl LevelData {
             areas: g::areas(gameplay).map_err(|e| eprintln!("level: areas: {e}")).unwrap_or_default(),
             light_regions: g::light_regions(gameplay).map_err(|e| eprintln!("level: light regions: {e}")).unwrap_or_default(),
             items: Vec::new(),
+            variant_planes: g::variant_planes(gameplay).map_err(|e| eprintln!("level: variant planes: {e}")).unwrap_or_default(),
         }
+    }
+
+    /// `0x321a78(p)`: the region of `p` is the level's loaded variant (`0x1c92c0`): the region is the last plane `p` is
+    /// on the front of (`0x2f0048`: `(p − point)·normal ≥ 0`), counted from 1, 0 before them all.
+    pub fn in_variant(&self, p: V3, variant: i32) -> bool {
+        let region = self.variant_planes.iter().rposition(|(o, n)| 0.0 <= (p[0] - o[0]) * n[0] + (p[1] - o[1]) * n[1] + (p[2] - o[2]) * n[2]).map_or(0, |k| k + 1);
+        region as i32 == variant
     }
 
     /// `0x321858(p, i)`: `p` inside the cuboid `i` (−1, or out of range: never).

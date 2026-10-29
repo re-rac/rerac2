@@ -79,7 +79,7 @@ under `crates/` shortened to `<crate>/src/...`, or the doc §. *Seen*: whether a
 
 | ID | System | Consumers | Census | Sources | Seen |
 |---|---|---|---|---|---|
-| G-LVL-001 | **Level variant regions** `0x321a78`: the gameplay header's boxes (`0x1c92e0` / `0x1c9300`, count `0x1c92cc`) against the variant `0x1c92c0` | 14 units | 14 / 1,186 (7 / 841) | census; game.rs (the variant) | yes |
+| G-LVL-001 | ~~**Level variant regions**~~ closed 2026-10-29: `0x321a78` = rc_game::level::LevelData::in_variant over the variant planes (level settings, `rc_formats::disc::gameplay::variant_planes`; planes, not boxes: Oozla z 100 down, Maktar z 420 up). The variant itself changes only with the chunk switch (G-LVL-007) | 14 units | 14 / 1,186 (7 / 841) | rc-game/src/level.rs | yes |
 | G-LVL-002 | **Level streaming and change steps** `0x304200` | 16 units | partly | census | yes |
 | G-LVL-003 | **Gravity frames** (`$gp − 0x6000`, `0x18c0e3`, `0x1a8ff0`): R&C2's gravity surfaces and walkways | Ratchet (physics, walk, melee, ledge, posture), aim, AI, shards, wrench, particles | — | physics.rs:26, 404; ai.rs:30; aim.rs:10; shards.rs:26; wrench.rs:15 | yes |
 | G-LVL-004 | **Sliding floors and ice** (the drag `0x18a890`, `0x2b96a0`) | Ratchet's walk, jump, melee | — | physics.rs:467; walk.rs:17; jump.rs:28; melee.rs:12 | yes |

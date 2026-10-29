@@ -91,6 +91,22 @@ pub fn section<'a>(gameplay: &'a [u8], name: &str) -> Result<Option<&'a [u8]>> {
 /// The level-settings section (R&C1's fields where they are the same; header word 0).
 pub fn level_settings(gameplay: &[u8]) -> Result<Option<&[u8]>> { section(gameplay, "level_settings") }
 
+/// The level's variant planes (level settings words 0x17..: the count in word 0x1a, then per plane 0x20 bytes, a point
+/// and its normal, w unused; the level load `0x3012a0` copies them to `0x1c92e0` / `0x1c9300`, count `0x1c92cc`):
+/// `(point, normal)`. None for a level without (count 0).
+pub fn variant_planes(gameplay: &[u8]) -> Result<Vec<([f32; 3], [f32; 3])>> {
+    let Some(s) = level_settings(gameplay)? else { return Ok(Vec::new()) };
+    let b = Buf(s);
+    let n = b.i32(0x68)?;
+    if !(0..=64).contains(&n) { return invalid(format!("implausible variant plane count {n}")); }
+    (0..n as usize)
+        .map(|k| {
+            let o = 0x5c + 0x20 * k;
+            Ok(([b.f32(o)?, b.f32(o + 4)?, b.f32(o + 8)?], [b.f32(o + 0x10)?, b.f32(o + 0x14)?, b.f32(o + 0x18)?]))
+        })
+        .collect()
+}
+
 /// R&C2's tie instance (0x60 bytes): R&C1's record without the 64 per-light-slot colours (0x50..0xd0), so
 /// `{o_class, draw distance, 0, occlusion index, matrix, directional lights, uid, 0, 0}`.
 const TIE_INSTANCE: usize = 0x60;

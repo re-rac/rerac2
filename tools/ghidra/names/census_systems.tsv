@@ -71,7 +71,7 @@ L00:003217d8	FUN_003217d8	other	has	cite
 L00:00325100	FUN_00325100	moby	has	cite
 L00:00312728	FUN_00312728	moby	has	cite
 L00:0032a848	FUN_0032a848	formats	has	cite
-L00:00321a78	variant_region	level	missing	L
+L00:00321a78	in_variant	level	has	L
 L00:003327e8	staged	particles	has	L
 L00:00321858	FUN_00321858	moby	has	cite
 L00:0031c8e0	FUN_0031c8e0	moby	has	cite
@@ -532,6 +532,7 @@ L00:0041b058		moby	missing	cite
 L00:0041b170		moby	missing	cite
 L00:0042a508	FUN_0042a508	moby	has	cite
 B:4	sound bank 4	gadget banks	has	L
+L00:00304058	variant_of	level	has	L
 H:4f75811bc46e3aab		trivial	trivial	leaf
 H:3ee41218b715c799		trivial	trivial	leaf
 H:c03a5511ef01f8b8		enemy	has	calls

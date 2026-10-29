@@ -53,7 +53,7 @@ boot:00115da8	sprintf	libc	trivial	L	the boot ELF's sprintf (a string FILE, 0x7f
 boot:00122b00	softfloat	libc	trivial	L	the boot ELF's double maths
 boot:00123298	softfloat	libc	trivial	L	the boot ELF's double maths
 boot:001234f0	softfloat	libc	trivial	L	the boot ELF's double maths
-L00:00321a78	variant_region	level	missing	L	the level's variant boxes (0x1c92e0 / 0x1c9300, count 0x1c92cc, from the gameplay header): the box holding a point = the variant 0x1c92c0
+L00:00321a78	in_variant	level	has	L	rc_game::level::LevelData::in_variant (the variant planes; the chunk switch that changes the variant is G-LVL-007)
 L00:0031cac0	next_in_group	group	has	L	rc_game::moby::MobyWorld::next_in_group
 L00:002edd50	fx_beam	fxdraw	missing	L	a quad strip through 0x2eb998 with the effect texture 0x2ecef8
 L00:002da530	vec_to_angles	math	trivial	L	maths only
@@ -69,3 +69,4 @@ H:55c6aaae9bdd29ad	shards	breakfx	has	L	the level copies of 0x32b580 (shards::th
 L00:003210a8	smoke_burst	breakfx	has	L	rc_game::moby::blast::smoke_burst
 L00:00327648	throw_chunks	breakfx	missing	L	class 0x43e chunks (update 0x39c6b8): shard mode 1, not ported
 L00:002ecfb0	staged_burst	particles	has	L	rc_game::particles::staged_burst (type 2 puffs)
+L00:00304058	variant_of	level	has	L	the region of a point: LevelData::in_variant's plane walk
