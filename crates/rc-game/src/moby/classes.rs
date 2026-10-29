@@ -30,6 +30,7 @@ pub mod spitter;
 pub mod shot;
 pub mod smash;
 pub mod spawn_point;
+pub mod teleport;
 pub mod tie_lights;
 pub mod maktar;
 pub mod tractor;
@@ -102,6 +103,7 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x0c58 => Some(oozla::update_0c58),
         0x0e89 => Some(oozla::update_0e89),
         0x0578 => Some(weather::update),
+        teleport::CLASS => Some(teleport::update),
         c if flock::CLASSES.contains(&c) => Some(flock::update),
         0x0ca0 => Some(oozla::update_0ca0),
         0x046f => Some(oozla::update_046f),
