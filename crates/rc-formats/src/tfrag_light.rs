@@ -50,6 +50,11 @@ pub struct LightBank {
     pub(crate) count: usize,
 }
 
+impl LightBank {
+    /// Each set's light A direction (the moby key light `0x313360` reads, rc_game::shadow_volumes::key_light).
+    pub fn key_lights(&self) -> Vec<[f32; 3]> { self.sets.iter().map(|s| [s.dir_a[0], s.dir_a[1], s.dir_a[2]]).collect() }
+}
+
 impl Default for LightBank {
     fn default() -> Self { LightBank { sets: [DirLightSet::default(); BANK_SETS], count: 0 } }
 }

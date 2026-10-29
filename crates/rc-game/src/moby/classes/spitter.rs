@@ -241,6 +241,8 @@ fn setup(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// `0x3de848`: the damage, the target, the group's pick.
 fn checks(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    // Its shadow, drawn within 24 of the camera (range 0x16; `0x313af8`, crate::shadow_volumes).
+    crate::shadow_volumes::probe_near(w, id, ctx, 24.0, 0x16);
     let scale = w.class(CLASS).map_or(1.0, |c| c.scale) * 1.5;
     w.mobys[id].scale = scale;
     if ai::take_damage(w, id, ctx, false) != 0 {

@@ -18,7 +18,7 @@
 //! `0x392ce0` (0.2), `0x3ab088`, `0x3abb40`, `0x3afd40`, `0x3d5e70` (0.3), `0x3deaf8`, `0x3e86f0`, `0x3ed5c0`,
 //! `0x4003a0`, `0x4010a0`, `0x404338`, `0x409328`, `0x40abb0`, which add their own calls as they are ported.
 //!
-//! Not ported: the moby's own shadow (`0x31da58`: `+0x70` / `+0x74` for the shadow-volume pass), a different system.
+//! The casters' own shadows (`0x31da58`'s slab and the shadow-volume pass) are a different system: crate::shadow_volumes.
 
 use crate::hero::physics::{add, scale, unit, V3};
 use crate::moby::{Ctx, MobyWorld};

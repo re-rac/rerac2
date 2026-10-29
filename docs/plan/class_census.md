@@ -75,6 +75,14 @@ the sound-bank tags (`B:`) add the level chunks. The extensions, each for a blin
   Aranos's overlay on every level (`play.rs` 1276: the same table in every overlay, to confirm: G-TRI-004), New Game's
   "already on level 0" (`front_end.rs` 404: right). The canopy's tables were the fifth (relocated in 04c4ea4).
 
+**Re-run 2026-10-29 (after PR #5 and the casters' shadows).** **879 unported class-levels, 10,153 placed / 10,111
+created** instances in **579 units**; 861 shared functions. Verdicts: cheap 187 units / 2,026, missing 207 / 6,366,
+partly 89 / 734, unknown 96 / 985. The shadow pass (`0x31da58`, G-REN-001) is ported (rc_game::shadow_volumes, crate
+`rc-engine` `shadow_render`): its 80 units / 2,512 created no longer count it missing. The systems still wholly
+missing: the colour take-over (10 / 362, G-REN-005), platform carry (2 / 50, G-LVL-005), dialogue (10 / 24, G-AUD-003),
+Clank's animation (1 / 2, G-HERO-004); the rest are partly there (the first draw list, the breakable effects and the
+particle types lead).
+
 Missing systems now (`systems.tsv`, every unit calling the system, not only the blocked; status as the ranking reads
 it):
 

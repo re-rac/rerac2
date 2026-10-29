@@ -11,17 +11,17 @@ L00:0031b9a0	FUN_0031b9a0	rng	has	cite
 L00:002efe60	FUN_002efe60	math	trivial	range
 L00:002effb8	FUN_002effb8	math	trivial	range
 L00:002ef138	FUN_002ef138	math	trivial	range
-L00:002eeee0	FUN_002eeee0	math	trivial	range
-L00:002eeea0	FUN_002eeea0	math	trivial	range
 L00:0031b9e0	FUN_0031b9e0	rng	has	cite
+L00:002eeea0	FUN_002eeea0	math	trivial	range
+L00:002eeee0	FUN_002eeee0	math	trivial	range
 L00:003605f0	FUN_003605f0	moby	has	cite
-L00:002eeab0	FUN_002eeab0	math	trivial	range
 L00:002ef460	FUN_002ef460	math	trivial	range
+L00:002eeab0	FUN_002eeab0	math	trivial	range
 L00:0031dce8	FUN_0031dce8	moby	has	cite
-L00:002ef050	FUN_002ef050	math	trivial	range
 L00:002ef510	FUN_002ef510	math	trivial	range
-L00:002ef318	FUN_002ef318	math	trivial	range
+L00:002ef050	FUN_002ef050	math	trivial	range
 L00:0031b5f0	FUN_0031b5f0	moby	has	cite
+L00:002ef318	FUN_002ef318	math	trivial	range
 L00:002ef448	FUN_002ef448	math	trivial	range
 L00:002ef018	FUN_002ef018	math	trivial	range
 L00:0031bb00	FUN_0031bb00	rng	has	cite
@@ -34,34 +34,34 @@ L00:0031ce20	FUN_0031ce20	other	has	cite
 L00:002effa8	FUN_002effa8	math	trivial	range
 L00:002f0000	FUN_002f0000	math	trivial	range
 L00:0031d180	FUN_0031d180	enemy	has	cite
-L00:003127c8	FUN_003127c8	moby	has	cite
 L00:0031ba98	FUN_0031ba98	rng	has	cite
+L00:003127c8	FUN_003127c8	moby	has	cite
 L00:0032ad38	FUN_0032ad38	enemy	has	cite
 L00:002eefa0	FUN_002eefa0	math	trivial	range
 L00:002eff48	FUN_002eff48	math	trivial	range
 L00:00311880	FUN_00311880	moby	has	cite
+L00:0031da58	shadow	shadow	has	L
 L00:002ef6b8	FUN_002ef6b8	math	trivial	range
-L00:0031da58	shadow	shadow	missing	cite
 L00:0032dcf0	FUN_0032dcf0	enemy	has	cite
 H:582266980bbdcff0	draw_list_add	fxdraw	partly	L
 L00:002de878	FUN_002de878	moby	has	cite
 L00:00311320	FUN_00311320	moby	has	cite
 L00:002eef60	FUN_002eef60	math	trivial	range
-L00:002a48f0	stub	trivial	trivial	L
 L00:00320538	FUN_00320538	moby	has	cite
+L00:002a48f0	stub	trivial	trivial	L
 L00:00327308	FUN_00327308	enemy	has	cite
 L00:0032a7f0	FUN_0032a7f0	moby	has	cite
+L00:0032cc30	FUN_0032cc30	enemy	has	cite
 L00:002efea8	FUN_002efea8	math	trivial	range
 L00:003f8348	FUN_003f8348	moby	has	cite
-L00:0032cc30	FUN_0032cc30	enemy	has	cite
 L00:002df8d8	FUN_002df8d8	camera	has	cite
-L00:00313dc0	FUN_00313dc0	moby	has	cite
 L00:002eefd0	FUN_002eefd0	math	trivial	range
 L00:0032cd20	FUN_0032cd20	enemy	has	cite
+L00:00313dc0	FUN_00313dc0	moby	has	cite
 L00:00323bf8	seq_time_check	anim	partly	L
 L00:0031f230	spring	math	trivial	L
 L00:003602f0	FUN_003602f0	moby	has	cite
-L00:0031bbc0	FUN_0031bbc0	breakfx	has	cite
+L00:0031bbc0	FUN_0031bbc0	rng	has	cite
 L00:00324208	FUN_00324208	enemy	has	cite
 L00:0031eb18	FUN_0031eb18	other	has	cite
 L00:00360698	FUN_00360698	moby	has	cite
@@ -71,22 +71,23 @@ L00:003217d8	FUN_003217d8	other	has	cite
 L00:00325100	FUN_00325100	moby	has	cite
 L00:00312728	FUN_00312728	moby	has	cite
 L00:0032a848	FUN_0032a848	formats	has	cite
-L00:00321858	FUN_00321858	moby	has	cite
 L00:00321a78	variant_region	level	missing	L
 L00:003327e8	part_spawn_02	particles	missing	L
-L00:0033f550	FUN_0033f550	particles	has	cite
+L00:00321858	FUN_00321858	moby	has	cite
 L00:0031c8e0	FUN_0031c8e0	moby	has	cite
-L00:00320000	FUN_00320000	group	has	cite
+L00:0033f550	FUN_0033f550	particles	has	cite
+B:1	sound bank 1	level chunks	has	L
+L00:00320000	FUN_00320000	other	has	cite
 L00:0032a838	FUN_0032a838	moby	has	cite
 L00:002ef340	FUN_002ef340	math	trivial	range
 L00:0031ed78	FUN_0031ed78	other	has	cite
-L00:002f0080	FUN_002f0080	math	trivial	range
 L00:003201e8	FUN_003201e8	enemy	has	cite
+L00:002f0080	FUN_002f0080	math	trivial	range
 L00:002eef88	FUN_002eef88	math	trivial	range
-L00:00327498	FUN_00327498	breakfx	has	cite
-L00:00322668	FUN_00322668	moby	has	cite
 L00:00343678	FUN_00343678	enemy	has	cite
+L00:00327498	FUN_00327498	breakfx	has	cite
 L00:00313330	get_moby_colour	moby	trivial	L
+L00:00322668	FUN_00322668	moby	has	cite
 L00:00343fb8	steer_maths	math	trivial	L
 L00:002eed78	FUN_002eed78	math	trivial	range
 L00:002e71b8	FUN_002e71b8	other	has	cite
@@ -104,7 +105,6 @@ L00:002efa00	FUN_002efa00	math	trivial	range
 L00:00321688	clamp_length	math	trivial	L
 L00:00313420	FUN_00313420	moby	has	cite
 L00:002ef920	FUN_002ef920	math	trivial	range
-L00:00327388	drop_bolts_scaled	bolts	has	L
 L00:00321c00	FUN_00321c00	moby	has	cite
 L00:00326448	hero_direction	hero	partly	L
 L00:002e14b0	FUN_002e14b0	hero	has	cite
@@ -115,43 +115,43 @@ L00:002ef2a8	FUN_002ef2a8	math	trivial	range
 L00:002ef940	FUN_002ef940	math	trivial	range
 L00:00313300	set_moby_colour	moby	trivial	L
 L00:0031d2c8	FUN_0031d2c8	enemy	has	cite
+L00:00327388	drop_bolts_scaled	bolts	has	L
 L00:0031d4c8	FUN_0031d4c8	hero	has	cite
 L00:0032ce98	FUN_0032ce98	enemy	has	cite
-L00:004287b8	script_cam_pos	camera	missing	L
-L00:00428810	script_cam_look	camera	missing	L
-L00:00428880	script_cam_start	camera	missing	L
-L00:00327448	FUN_00327448	other	has	cite
 L00:0032b580	shards	breakfx	missing	cite
-L00:004289f0	script_cam_update	camera	missing	L
 L00:0031d158	FUN_0031d158	hits	has	cite
 L00:002ef188	FUN_002ef188	math	trivial	range
 L00:0031c618	line_collide	collision	partly	L
+L00:00327448	FUN_00327448	other	has	cite
 L00:0032a748	FUN_0032a748	enemy	has	cite
-L00:0033a6a0	FUN_0033a6a0	moby	has	cite
+L00:0033a6a0	FUN_0033a6a0	particles	has	cite
+L00:004287b8	script_cam_pos	camera	missing	L
+L00:00428810	script_cam_look	camera	missing	L
+L00:00428880	script_cam_start	camera	missing	L
 L00:00360750	play_level_sound	sound	partly	L
-L00:002b9e68	FUN_002b9e68	moby	has	cite
+L00:004289f0	script_cam_update	camera	missing	L
 L00:003210a8	debris	breakfx	missing	cite
 L00:0031f030	FUN_0031f030	hero	has	cite
 L00:002e23e0	FUN_002e23e0	other	has	cite
-L00:0030d658	FUN_0030d658	game	has	cite
-L00:003132a8	FUN_003132a8	moby	has	cite
-L00:0033b5e0	part_spawn_3c	particles	missing	L
+L00:002b9e68	FUN_002b9e68	moby	has	cite
 L00:002b31f0	FUN_002b31f0	game	has	cite
-L00:0031c9d8	FUN_0031c9d8	moby	has	cite
+L00:003132a8	FUN_003132a8	moby	has	cite
 L00:0031b518	anim_state_helper	anim	has	L
-L00:0031cac0	group_iter	group	partly	L
+L00:0030d658	FUN_0030d658	game	has	cite
 L00:0031e8d8	FUN_0031e8d8	hero	has	cite
 L00:00371ba8	FUN_00371ba8	moby	has	cite
 L00:002eeff8	FUN_002eeff8	math	trivial	range
 boot:00115484	memset	libc	trivial	L
-L00:002d7508	FUN_002d7508	camera	has	cite
-L00:00359b20	FUN_00359b20	game	has	cite
+L00:0033b5e0	part_spawn_3c	particles	missing	L
 L00:002ef9b0	FUN_002ef9b0	math	trivial	range
+L00:002d7508	FUN_002d7508	camera	has	cite
 L00:00322028	FUN_00322028	moby	missing	cite
-L00:002d7468	FUN_002d7468	camera	has	cite
 L00:0032de68	FUN_0032de68	enemy	has	cite
 L00:002edd50	fx_beam	fxdraw	missing	L
+L00:00359b20	FUN_00359b20	game	has	cite
+L00:002d7468	FUN_002d7468	camera	has	cite
 L00:00336148	FUN_00336148	hero	has	cite
+L00:0031c9d8	FUN_0031c9d8	moby	has	cite
 L00:002eee88	FUN_002eee88	math	trivial	range
 L00:00320128	moby_colour_lerp	moby	trivial	L
 L00:002dbdb0	FUN_002dbdb0	breakfx	has	cite
@@ -160,6 +160,7 @@ L00:002f5030	FUN_002f5030	game	has	cite
 L00:0031e980	vec_helper	math	trivial	L
 L00:00326328	FUN_00326328	moby	has	cite
 L00:003253f0	FUN_003253f0	enemy	has	cite
+L00:0031cac0	group_iter	group	partly	L
 L00:0031c078	FUN_0031c078	enemy	has	cite
 L00:0031dd48	FUN_0031dd48	enemy	has	cite
 L00:002f46e0	FUN_002f46e0	other	has	cite
@@ -167,16 +168,17 @@ L00:0031fa50	colour_take	colour	missing	cite
 L00:003227d8	FUN_003227d8	moby	has	cite
 L00:002da530	vec_to_angles	math	trivial	L
 L00:003282b0	FUN_003282b0	enemy	has	cite
-L00:00327898	FUN_00327898	moby	has	cite
 L00:002eecb8	FUN_002eecb8	math	trivial	range
-L00:002e7c90	FUN_002e7c90	game	has	cite
-L00:002eeeb8	FUN_002eeeb8	math	trivial	range
+B:2	sound bank 2	level chunks	missing	L
 L00:00324bd0	FUN_00324bd0	group	has	cite
 L00:0032dd60	FUN_0032dd60	enemy	has	cite
-L00:00327648	debris_chunks	breakfx	missing	L
+L00:00327898	FUN_00327898	moby	has	cite
 L00:002eee58	FUN_002eee58	math	trivial	range
+L00:002e7c90	FUN_002e7c90	game	has	cite
+L00:002eeeb8	FUN_002eeeb8	math	trivial	range
 L00:0031c278	FUN_0031c278	enemy	has	cite
 L00:003246c0	FUN_003246c0	group	has	cite
+L00:00327648	debris_chunks	breakfx	missing	L
 L00:00324430	FUN_00324430	group	has	cite
 L00:0031ec88	FUN_0031ec88	enemy	has	cite
 L00:002ef650	FUN_002ef650	math	trivial	range
@@ -187,7 +189,6 @@ L00:0031e048	ballistic	math	trivial	L
 L00:002efa50	FUN_002efa50	math	trivial	range
 L00:0031ebd8	FUN_0031ebd8	hero	has	cite
 L00:00327a28	message_slot	ui	missing	L
-L00:002ef1d0	FUN_002ef1d0	math	trivial	range
 L00:00335bb8	FUN_00335bb8	particles	has	cite
 L00:003244e8	FUN_003244e8	group	has	cite
 L00:002eebc8	FUN_002eebc8	math	trivial	range
@@ -195,27 +196,28 @@ L00:002eeb10	FUN_002eeb10	math	trivial	range
 L00:002eebf0	FUN_002eebf0	math	trivial	range
 L00:002edf78	FUN_002edf78	fxdraw	has	cite
 L00:0031cd18	FUN_0031cd18	enemy	has	cite
-L00:0033b468	FUN_0033b468	particles	has	cite
 L00:002ecef8	fx_texture_set	fxdraw	partly	L
-L00:00312480	FUN_00312480	hero	has	cite
 L00:0037c948	hw_timer	game	trivial	L
-L00:002c4560	FUN_002c4560	hero	has	cite
 L00:002ef478	FUN_002ef478	math	trivial	range
 L00:00330f40	FUN_00330f40	particles	has	cite
+L00:002ef1d0	FUN_002ef1d0	math	trivial	range
 L00:0032d800	FUN_0032d800	enemy	has	cite
 L00:002ecfb0	burst	breakfx	missing	cite
+L00:00312480	FUN_00312480	hero	has	cite
+B:3	sound bank 3	level chunks	missing	L
 L00:0033ef78	FUN_0033ef78	particles	has	cite
-L00:0031f0c8	FUN_0031f0c8	hero	has	cite
 L00:00323958	FUN_00323958	enemy	has	cite
-L00:002d2508	FUN_002d2508	hero	has	cite
+L00:0033b468	FUN_0033b468	particles	has	cite
 L00:003607e8	FUN_003607e8	moby	has	cite
 L00:00381900	FUN_00381900	ui	has	cite
 boot:00115da8	sprintf	libc	trivial	L
+L00:002c4560	FUN_002c4560	hero	has	cite
 L00:00339848	FUN_00339848	particles	has	cite
 L00:0039c4a8	FUN_0039c4a8	breakfx	has	cite
 L00:00321930	FUN_00321930	level	has	cite
 L00:002e94a8	FUN_002e94a8	other	has	cite
 L00:002fdc48	FUN_002fdc48	weapons	has	cite
+L00:0031d898	FUN_0031d898	other	has	cite
 L00:0031b918	FUN_0031b918	moby	has	cite
 L00:00371b60	FUN_00371b60	moby	has	cite
 L00:003223e8	FUN_003223e8	moby	missing	cite
@@ -224,11 +226,13 @@ boot:001234f0	softfloat	libc	trivial	L
 L00:002ea068	FUN_002ea068	ui	has	cite
 L00:00425f18	FUN_00425f18	camera	has	cite
 L00:00425f60	FUN_00425f60	camera	has	cite
+L00:002d2508	FUN_002d2508	hero	has	cite
 L00:002d4440	FUN_002d4440	hero	has	cite
 L00:002efb60	FUN_002efb60	math	trivial	range
 L00:002dc1f0	FUN_002dc1f0	breakfx	has	cite
 L00:0031a8e4	FUN_0031a8e4	light	has	cite
 L00:0031ef68	FUN_0031ef68	hero	has	cite
+L00:0031f0c8	FUN_0031f0c8	hero	has	cite
 L00:003dbed0	FUN_003dbed0	enemy	has	cite
 L00:003dbfb0	FUN_003dbfb0	enemy	has	cite
 L00:003dc100	FUN_003dc100	enemy	has	cite
@@ -258,10 +262,6 @@ L00:003701d0	FUN_003701d0	moby	has	cite
 L00:0031fa20	FUN_0031fa20	enemy	has	cite
 L00:003116e0	FUN_003116e0	moby	has	cite
 L00:0032c5f0	FUN_0032c5f0	game	has	cite
-L00:002a6708	FUN_002a6708	hero	has	cite
-L00:002f79d8	FUN_002f79d8	other	has	cite
-L00:002f8498	FUN_002f8498	other	has	cite
-L00:002f84e8	FUN_002f84e8	other	has	cite
 L00:003175f8	FUN_003175f8	moby	has	cite
 boot:001163a0	FUN_001163a0	rng	has	cite
 L00:0031d128	FUN_0031d128	moby	has	cite
@@ -316,14 +316,14 @@ L00:002f51a0	item_18	items	missing	cite
 L00:002eec18	FUN_002eec18	math	trivial	range
 L00:002eeb40	FUN_002eeb40	math	trivial	range
 L00:002dbff8	FUN_002dbff8	breakfx	has	cite
-L00:00321bb8	FUN_00321bb8	breakfx	has	cite
+L00:00321bb8	FUN_00321bb8	other	has	cite
 L00:003219e8	FUN_003219e8	level	has	cite
 L00:002ec618	FUN_002ec618	moby	has	cite
 L00:002e89d8	FUN_002e89d8	other	has	cite
 L00:002b3af8	FUN_002b3af8	hero	has	cite
 L00:00426080	FUN_00426080	camera	has	cite
 L00:002e5df8	FUN_002e5df8	game	has	cite
-L00:0031d7a0	FUN_0031d7a0	hero	has	cite
+L00:0031d7a0	FUN_0031d7a0	other	has	cite
 L00:0038e5a8	FUN_0038e5a8	moby	has	cite
 L00:0039ff50	FUN_0039ff50	moby	has	cite
 L00:002b2b48	FUN_002b2b48	game	has	cite
@@ -332,7 +332,7 @@ L00:0031bc68	FUN_0031bc68	other	has	cite
 L00:00425f98	FUN_00425f98	camera	has	cite
 L00:00426058	FUN_00426058	camera	has	cite
 L00:002ea570	FUN_002ea570	other	has	cite
-L00:0031fe98	FUN_0031fe98	moby	has	cite
+L00:0031fe98	FUN_0031fe98	other	has	cite
 L00:00321b28	FUN_00321b28	moby	has	cite
 L00:002d7e50	FUN_002d7e50	other	has	cite
 L00:00426030	FUN_00426030	camera	has	cite
@@ -362,6 +362,7 @@ L00:002ef6f8	FUN_002ef6f8	math	trivial	range
 L00:00333a70	FUN_00333a70	particles	has	cite
 L00:0033c390	FUN_0033c390	particles	missing	cite
 L00:0039e7f0	FUN_0039e7f0	moby	has	cite
+L00:002a6708	FUN_002a6708	hero	has	cite
 L00:002af5e0	FUN_002af5e0	items	has	cite
 L00:002b9c90	FUN_002b9c90	hero	has	cite
 L00:002d2870	FUN_002d2870	hero	has	cite
@@ -382,8 +383,12 @@ L00:002eee40	FUN_002eee40	math	trivial	range
 L00:002ef0f0	FUN_002ef0f0	math	trivial	range
 L00:002ef3b0	FUN_002ef3b0	math	trivial	range
 L00:002f0048	FUN_002f0048	math	trivial	range
+L00:002f79d8	FUN_002f79d8	other	has	cite
+L00:002f8498	FUN_002f8498	other	has	cite
+L00:002f84e8	FUN_002f84e8	other	has	cite
 L00:0030d910	FUN_0030d910	ui	has	cite
 L00:00311cf0	FUN_00311cf0	breakfx	has	cite
+L00:003167f8	FUN_003167f8	moby	has	cite
 L00:0031d100	FUN_0031d100	camera	missing	cite
 L00:0031d648	FUN_0031d648	weapons	has	cite
 L00:0031f7d0	FUN_0031f7d0	moby	missing	cite
@@ -416,6 +421,7 @@ L00:00381e60	FUN_00381e60	moby	has	cite
 L00:00382c18	FUN_00382c18	moby	has	cite
 L00:00382e20	FUN_00382e20	moby	has	cite
 L00:003831a8	FUN_003831a8	moby	has	cite
+L00:00383758	FUN_00383758	moby	has	cite
 L00:00383b90	FUN_00383b90	moby	has	cite
 L00:00383bb0	FUN_00383bb0	moby	has	cite
 L00:00383ce0	FUN_00383ce0	moby	has	cite
@@ -522,9 +528,6 @@ L00:00414368	FUN_00414368	moby	has	cite
 L00:0041b058		moby	missing	cite
 L00:0041b170		moby	missing	cite
 L00:0042a508	FUN_0042a508	moby	has	cite
-B:1	sound bank 1	level chunks	has	L
-B:2	sound bank 2	level chunks	missing	L
-B:3	sound bank 3	level chunks	missing	L
 B:4	sound bank 4	gadget banks	has	L
 H:4f75811bc46e3aab		trivial	trivial	leaf
 H:3ee41218b715c799		trivial	trivial	leaf
@@ -540,11 +543,11 @@ L00:0031d620	FUN_0031d620	hero	has	wrap
 H:3264b18aeb9576ee		enemy	has	calls
 H:699556095593bd28		breakfx	missing	near
 H:faad2ad731c269f3		moby	has	calls
-H:75d44116251e1d3a		trivial	trivial	leaf
 H:91e31346e413c054		math	trivial	calls
 L00:0031fe80	FUN_0031fe80	trivial	trivial	leaf
 H:50049e46a17ea479		math	trivial	calls
 H:2df3b1856eecbb19		enemy	has	near
+H:75d44116251e1d3a		trivial	trivial	leaf
 H:f6c2162195566679		breakfx	missing	near
 L00:003269a0	FUN_003269a0	math	trivial	calls
 H:3a095f20b7045e1b		trivial	trivial	leaf
@@ -552,9 +555,9 @@ L00:00326378	FUN_00326378	math	trivial	calls
 L00:003262c8	FUN_003262c8	math	trivial	calls
 H:eeee8445d055c904		moby	has	near
 H:8ef8b216b7f0fe7b		trivial	trivial	leaf
-L00:00326190	FUN_00326190	math	trivial	calls
 H:b213a991c39c640a		trivial	trivial	leaf
 H:72414252929eee3f		enemy	has	calls
+L00:00326190	FUN_00326190	math	trivial	calls
 H:2bfe420e7ba37c93		hero	partly	wrap
 L00:003687a0	FUN_003687a0	trivial	trivial	leaf
 H:b65b43706170ef94		trivial	trivial	leaf
@@ -575,7 +578,6 @@ H:650646a3d744d34d		trivial	trivial	leaf
 H:e0a3d4a077088882		enemy	has	near
 H:66a9da336def0ec9		trivial	trivial	leaf
 H:b341aedfdaf73b1b		enemy	has	near
-H:c55e53efc314cec4		group	has	near
 H:587c8952e7c78d1b		math	trivial	calls
 H:886d02382b6fc222		moby	has	calls
 L00:0030da30	FUN_0030da30	trivial	trivial	leaf
@@ -587,13 +589,12 @@ H:688f6a98b84c9959		trivial	trivial	leaf
 H:9fd4c1db17d4f76a		bolts	has	near
 H:acfb1b6b74dd0bfc		trivial	trivial	leaf
 H:4364524ef981fcad		math	trivial	calls
-H:b2efbcb1dddc3efe		trivial	trivial	leaf
+H:c55e53efc314cec4		group	has	near
 H:a22ec907aba3e58c		math	trivial	calls
 H:509d8cdf4ba64c38		trivial	trivial	leaf
 H:fcae8e5f9ff56e0a		trivial	trivial	leaf
 H:14bad108f02be236		trivial	trivial	leaf
 H:34d774c91b645b44		moby	has	calls
-L00:002d2858	FUN_002d2858	trivial	trivial	leaf
 H:8250b8eb866ba390		moby	has	calls
 H:e9ffc8c22b38591f		moby	has	calls
 L00:0031eb70	FUN_0031eb70	math	trivial	calls
@@ -660,10 +661,10 @@ H:1ae3bac824213e24		particles	has	calls
 H:25eae62100706a3c		math	trivial	calls
 H:8354ca0acf6ac003		trivial	trivial	leaf
 H:9d2b75bd9e713c1f		moby	has	calls
+H:b2efbcb1dddc3efe		trivial	trivial	leaf
 H:c1d7e334dcee7e95		moby	has	calls
 H:e0e66b373d532413		trivial	trivial	leaf
 L00:0030df70	FUN_0030df70	trivial	trivial	leaf
-L00:0039ff40	FUN_0039ff40	trivial	trivial	leaf
 H:09e7d4c1e18c6bcd		math	trivial	calls
 H:0b5c5518112cbd2b		colour	missing	near
 H:205ad60d079e2aa3		trivial	trivial	wrap
@@ -680,6 +681,7 @@ H:9580148d0c9c9d7c		bolts	has	near
 H:a5a27edd53f9d05b		trivial	trivial	leaf
 H:af7f6c377b740a36		weapons	has	near
 H:ef3724bc786d5533		trivial	trivial	leaf
+L00:002d2858	FUN_002d2858	trivial	trivial	leaf
 L00:002d4350	FUN_002d4350	trivial	trivial	leaf
 L00:0031b910	FUN_0031b910	trivial	trivial	leaf
 L00:0031dc10	FUN_0031dc10	math	trivial	wrap
@@ -691,5 +693,6 @@ L00:0032d968	FUN_0032d968	trivial	trivial	leaf
 L00:003697c0	FUN_003697c0	trivial	trivial	wrap
 L00:0037f5f8	FUN_0037f5f8	trivial	trivial	leaf
 L00:00397d00	FUN_00397d00	trivial	trivial	leaf
+L00:0039ff40	FUN_0039ff40	trivial	trivial	leaf
 L00:003f09d0	FUN_003f09d0	trivial	trivial	leaf
 H:f8da6de82cf3465f		moby	has	calls

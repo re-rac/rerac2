@@ -17,7 +17,8 @@
 //! 3 at 1.75: spheres of 0.17 at its joints 0..3 doing `+0x2b0`; his hurt by it → 9; out of reach after 2 s → the
 //! chase); 9 20 ticks, then 10 sequence 4 to its end, then the chase. It bobs 0.1 and sways 8° once `+0x272` is out.
 //!
-//! Not ported: its sounds (`0x3605f0`), the shadow (`0x31da58`), the lighting (`0x31a8e4`).
+//! Not ported: its sounds (`0x3605f0`), the lighting (`0x31a8e4`). Its shadow: crate::shadow_volumes::probe_near
+//! (`0x31da58`).
 
 use crate::hero::physics::*;
 use crate::moby::ai;
@@ -92,6 +93,8 @@ fn checks_099c(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
         m.set_state(2, 0);
         super::props::set_seq(w, id, ctx, 0, 0, 0);
     }
+    // Its shadow, drawn within 48 of the camera (range 0x2d).
+    crate::shadow_volumes::probe_near(w, id, ctx, 48.0, 0x2d);
     let dying = w.mobys[id].pv_b(0x2e) == 2;
     let kind = ai::take_damage(w, id, ctx, false);
     if kind != 0 || dying {
@@ -339,7 +342,7 @@ pub fn update_099c(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 // along its joint 4 doing `+0x298`), else it walks up to 2.8 of him (its yaw offset `+0x284`) or turns to him; 0xd the
 // bite's turn; 0xe after a bite: farther than 4, the fight (0x1c), else sequence 7.
 //
-// Not ported: its sounds but the two, the burst `0x3210a8`, the pieces' burning (`0x3d8f70`, with `+0x2b4`), the shadow, the
+// Not ported: its sounds but the two, the burst `0x3210a8`, the pieces' burning (`0x3d8f70`, with `+0x2b4`), the
 // head's and tail's aims (`0x324208` / `0x327308`, the joint records `+0x3d0` / `+0x450`), the
 // emerge flash (`0x3d8920`), the gravity frames. Its glows and wire are draw callbacks (crate::fx); its flame jet is
 // particles ([`bite`]).
@@ -449,6 +452,8 @@ fn checks_0b0a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
             w.mobys[id].update_dist = 0x80;
         }
     }
+    // Its shadow, drawn within 24 of the camera (range 0x16).
+    crate::shadow_volumes::probe_near(w, id, ctx, 24.0, 0x16);
     // The points of its joints 0..2 and the mouth (0.25 out along joint 3).
     for (k, o) in [(0, 0x390), (1, 0x3a0), (2, 0x3b0)] {
         if let Some(p) = ctx.host.joint(&w.mobys[id], k) { w.mobys[id].set_pv_v(o, p); }
@@ -864,7 +869,7 @@ pub fn update_0b0a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 // in the flight.
 //
 // Not ported: its sounds but the two, the burst `0x3210a8`, the parts'
-// sparks (`0x3dbc20`), the bite's trail (`0x3dbde8`, `0x3dbe88`, `0x3dc100`), the shadow, the head's
+// sparks (`0x3dbc20`), the bite's trail (`0x3dbde8`, `0x3dbe88`, `0x3dc100`), the head's
 // aims (`0x324208`, `0x327308`), the draw callbacks, the scene's hiding (`0x1a8f00` = 2).
 
 const PART: i16 = 0x0aa2;
@@ -1046,6 +1051,8 @@ fn checks_0b0b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
         }
         make_parts(w, id, id, 0x2a0, ctx);
     }
+    // Its shadow, drawn within 24 of the camera (range 0x16).
+    crate::shadow_volumes::probe_near(w, id, ctx, 24.0, 0x16);
     let alive = w.mobys[id].pv_b(0x2e) != 2;
     if let Some(p) = ctx.host.joint(&w.mobys[id], 3) { w.mobys[id].set_pv_v(0x310, p); }
     let kind = ai::take_damage(w, id, ctx, false);

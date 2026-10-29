@@ -61,6 +61,7 @@ mod clock;
 mod world_screen;
 mod frame_log;
 mod pre_shadow;
+mod shadow_render;
 mod shrub_billboard;
 mod shrub_render;
 mod sky_render;
@@ -148,6 +149,7 @@ fn main() -> anyhow::Result<()> {
     .add_plugins(tfrag_lod::TfragLodPlugin)
     .add_plugins(moby_render::MobyRenderPlugin)
     .add_plugins(pre_shadow::PreShadowPlugin)
+    .add_plugins(shadow_render::ShadowPlugin)
     .add_plugins(frame_log::FrameLogPlugin)
     .add_plugins(tie_render::TieRenderPlugin)
     .add_plugins(shrub_render::ShrubRenderPlugin)

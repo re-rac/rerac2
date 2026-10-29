@@ -244,6 +244,8 @@ fn arm_checks(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let area = w.mobys[id].pv_i(AREA);
     let any = w.mobys[id].sub_state < 5;
     ai::find_target(w, id, ctx, 0.0, 0.0, area, None, any);
+    // Its shadow, drawn within 48 of the camera (range 0x2d; `0x313af8`, crate::shadow_volumes).
+    crate::shadow_volumes::probe_near(w, id, ctx, 48.0, 0x2d);
 }
 
 /// `0x3cd668`: the timers.

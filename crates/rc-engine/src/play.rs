@@ -362,6 +362,8 @@ fn tick(
         println!("play: {} mobys, {} with collision, Ratchet's joint lists {}", m.world.mobys.len(), m.world.mobys.iter().filter(|m| m.has_collision).count(), m.hero_chains.len());
         // `0x2fd028(level)` (the level start `0x2fcf60`): the planet's weapons into the vendor's stock (rc_game::vendor).
         p.game.stock_for_level(crate::level_load::level_index() as i32, &m.level.items);
+        // The level's key lights, for the casters' shadow directions (rc_game::shadow_volumes::key_light).
+        p.game.shadow.key_lights = rc_formats::tfrag_light::parse_light_bank(&lv.gameplay).map(|b| b.key_lights()).unwrap_or_default();
         p.mobys = Some(m);
         // `0x2da248`: the level cameras' slots (their pvar blocks are in the moby pvar table).
         use rc_formats::disc::gameplay as g2;
@@ -701,6 +703,15 @@ fn tick(
         rc_game::hero::items::item_pass(&mut mobys.world, &mut ctx);
         // The swim's effects (crate::hero::water's requests of this tick), into the particle pool.
         rc_game::hero::water::fx_pass(&mobys.world, &mut ctx);
+        // Ratchet's shadow and the casters' direction (rc_game::shadow_volumes).
+        rc_game::shadow_volumes::hero_pass(&mut mobys.world, &mut ctx);
+        // The casters MobyProc defers and their volumes, from the game camera (crate::shadow_render).
+        let [fwd, left, up] = p.camera.rows.map(Vec3::from);
+        let rows = crate::moby_lod::camera_rows(fwd, left, up);
+        let tans = crate::game_camera::projection_tans(None);
+        let (tris, casters) = crate::shadow_render::collect(&mobys.world, &host, &p.game, mobys.hero_moby, Vec3::from(p.camera.pos), &rows, tans);
+        mobys.shadow_casters = casters;
+        mobys.shadow_tris = std::sync::Arc::new(tris);
     }
     // The use stance's sequence for Ratchet (`0x2af5e0` / `0x2af848` call `0x2d2508` from the item pass).
     if let Some((blend, seq)) = p.hero.items.hero_anim.take() {

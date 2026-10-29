@@ -39,6 +39,7 @@ pub mod scene_camera;
 pub mod ship;
 pub mod script_camera;
 pub mod shadows;
+pub mod shadow_volumes;
 pub mod sky;
 pub mod spline;
 pub mod vendor;

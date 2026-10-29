@@ -27,7 +27,7 @@
 //! within `+0x39c`), the damage (a hurt in the water swims on: sub 1), the group's pick; at the end (`0x3b6718`) its
 //! timers, and on the bank its body tilts to the floor (40° at most).
 //!
-//! Not ported: its shadow (`0x313af8` = L00 `0x31da58`), the head's and tail's aims (`0x31a0e0`, `0x31cfa0`), the
+//! Not ported: the head's and tail's aims (`0x31a0e0`, `0x31cfa0`), the
 //! splashes, ripples and their sounds (`0x3b5608`, `0x3b5888`, `0x3b64d0`), the companion moby 0x660 it makes at the
 //! set-up (`0x3a7680`), the death's fade (`0x3eb1d0`, the class 0xc41 manager: it is deleted at once), the sphere
 //! query `0x2d6c20` (a scan of the mobys within 3.5).
@@ -342,6 +342,8 @@ fn setup(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
 
 /// `0x3b67d0`: the target, the damage, the group's pick (module docs).
 fn checks(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    // Its shadow, drawn within 24 of the camera (range 0x16; `0x313af8`, crate::shadow_volumes).
+    crate::shadow_volumes::probe_near(w, id, ctx, 24.0, 0x16);
     let m = &w.mobys[id];
     let t = 0x230;
     let kept: Vec<u8> = m.pvars[t..t + 0x20].to_vec();

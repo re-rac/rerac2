@@ -124,6 +124,8 @@ pub struct ClassInfo {
     pub reactions: Vec<Option<ai::Reaction>>,
     /// The break pieces' centre and points (1/1024 of the moby's scale; `rc_formats::moby::MobyPiece`), by piece.
     pub pieces: Vec<Option<(V3, Vec<V3>)>>,
+    /// Class header byte 0x0f ≠ 0: its shadow proxy (rc_formats::moby_shadow; crate::shadow_volumes).
+    pub shadow: Option<std::sync::Arc<rc_formats::moby_shadow::ShadowBlock>>,
 }
 
 /// One moby.
@@ -196,6 +198,11 @@ pub struct Moby {
     /// packets 0x18 (created mobys, the scene actors `0x305428`), the static spawn 8 (`0x3035c8`), Ratchet's items 0x10
     /// (`0x2afc68`) and Ratchet 0x10 every tick (`0x2a94d8`).
     pub shine: u8,
+    /// `+0x6f`: the shadow's range in units (crate::shadow_volumes; 0x18 for a caster), `+0x70` / `+0x74`: its slab
+    /// (the offset along the up row, the half thickness; 0 none), `+0xbd`: its direction (−1 the up row reversed).
+    pub shadow_range: u8,
+    pub shadow_slab: [f32; 2],
+    pub shadow_dir: i8,
     /// The port's: which creation this slot holds (MobyWorld's count at `CreateMoby`; 0 for the placed ones), so the
     /// engine's state of a deleted moby is not carried over to the next one created in its slot.
     pub serial: u32,
@@ -314,7 +321,7 @@ impl Moby {
             grid_rect: GRID_NONE, o_class, rebuilds: 0, mission: 0, sub_index: 0, uid: 0, rows: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
             rot: [0.0; 3], instance: None, hit_slot: -1, parent: None, pvar_index: -1, bolts: 0, xp: 0, timer: 0, drops: 0, prev_state: 0, sub_state: 0, state_ticks: 0, once: 0, drive: false, manips: Vec::new(), serial: 0, freed_at: 0,
             // `0x311418`: `+0x38` = 0x40404000000000.
-            light: 0, ambient: [0x40; 3], glow: 0, piece: None, bangles: 0, shine: 0,
+            light: 0, ambient: [0x40; 3], glow: 0, piece: None, bangles: 0, shine: 0, shadow_range: 0, shadow_slab: [0.0; 2], shadow_dir: 0,
         };
         match class {
             Some(c) => {
@@ -330,6 +337,12 @@ impl Moby {
                     m.glow = c.glow;
                 }
                 if c.metal { m.shine = 0x18; }
+                // A class with a shadow block (byte 0x0f): a caster, its slab empty.
+                if c.shadow.is_some() {
+                    m.shadow_range = crate::shadow_volumes::RANGE;
+                    m.mode |= crate::shadow_volumes::MODE_CASTER;
+                    m.shadow_dir = 0;
+                }
             }
             None => m.mode |= mode::NO_UPDATE | 5,
         }

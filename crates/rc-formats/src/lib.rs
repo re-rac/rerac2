@@ -23,6 +23,7 @@ pub mod moby_light;
 pub mod moby_anim;
 pub mod moby_collision;
 pub mod moby_spawn;
+pub mod moby_shadow;
 pub mod sky;
 pub mod collision;
 pub mod occlusion;

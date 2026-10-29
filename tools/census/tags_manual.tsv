@@ -45,7 +45,7 @@ L00:00323c90	trail	fxdraw	missing	cite	the trail at +0x70
 L00:00325270	equip_item	items	missing	cite	equipping a reward item
 L00:00323d10	clank_anim	clank	missing	cite	Clank's own animation
 L00:00323e58	clank_anim2	clank	missing	cite	Clank's own animation
-L00:0031da58	shadow	shadow	missing	cite	the blob shadow
+L00:0031da58	shadow	shadow	has	L	the casters' slab probe (rc_game::shadow_volumes::probe_down; the shadow-volume pass in rc-engine shadow_render)
 L00:002fda20	flash_light	light	missing	cite	the Lancer's flash: a point light
 L00:002d6d60	rumble	rumble	missing	cite	pad rumble
 boot:001153d4	memcpy	libc	trivial	L	the boot ELF's memcpy
