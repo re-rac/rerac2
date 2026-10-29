@@ -19,9 +19,9 @@
 //!
 //! Before them, the frame's blob shadows (`0x2e7ab0`, crate::shadows: FX 0, ALPHA 0x44) go first into the same quads.
 //!
-//! The frame's first list (`0x2e7718`, run by `0x2e7768` before the particles, `0x3311e0`) holds on Aranos the
-//! arrival ship's draw (`0x362b40`, which the engine's created-moby draw does), class 0xd0's ribbon (`0x39ac30`, not
-//! placed) and the nanotech clusters' glow (here with the others: it draws no random numbers); its other users are
+//! The frame's first list (`0x2e7718`, run by `0x2e7768` before the particles, `0x3311e0`; [`Lists::first`]) holds on
+//! Aranos the arrival ship's draw (`0x362b40`, which the engine's created-moby draw does), the ship's shadow
+//! (`0x361af8`), class 0xd0's ribbon (`0x39ac30`, not placed) and the nanotech clusters' glow; its other users are
 //! other levels' classes (G-REN-003).
 //!
 //! Not ported: 0x0b0a's emerge flash
@@ -118,33 +118,47 @@ fn draw_0b0b(w: &MobyWorld, host: &dyn crate::moby::MobyHost, id: usize, rng: &m
     glow(out, rng, 0.15, c, GLOW_0B0B[1], 0x10, 0x30, cam);
 }
 
-/// The frame's callbacks after the tick: those the mobys' updates registered ([`MobyWorld::draws`]), in that order.
-/// `hero_state`: Ratchet's (`0x18c0b4`). `view`: the frame's camera for the callbacks' sphere checks (`0x2f0080`).
-pub fn callbacks(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, hero_state: i32, view: &crate::particles::BSphereView, cam: V3) -> Vec<FxQuad> {
-    use crate::moby::classes::tie_lights;
+/// The frame's callbacks after the tick, by list: the first (`0x2e7718`'s, drawn before the particles) and the second
+/// (`0x2e7920`'s, after them; the blob shadows and the ship's shadow first), each in the order the mobys registered
+/// ([`MobyWorld::draws_first`] / [`MobyWorld::draws`]), the first list's run first. `hero_state`: Ratchet's
+/// (`0x18c0b4`). `view`: the frame's camera for the callbacks' sphere checks (`0x2f0080`).
+#[derive(Clone, Debug, Default)]
+pub struct Lists {
+    pub first: Vec<FxQuad>,
+    pub second: Vec<FxQuad>,
+}
+
+pub fn callbacks(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, hero_state: i32, view: &crate::particles::BSphereView, cam: V3) -> Lists {
+    let mut first = Vec::new();
+    // The ship's shadow (`0x361af8`, a first-list callback; crate::travel).
+    crate::travel::draw_ship_shadow(game, view, &mut first);
+    for id in w.draws_first.clone() { one(w, host, game, hero_state, view, cam, id, &mut first); }
     let mut out = Vec::new();
     // The blob shadows first (`0x2e7ab0` runs before the callbacks' list, `0x2e7970`).
     crate::shadows::draw(&w.shadows, &mut out);
-    // The ship's shadow (`0x361af8`, its callback; crate::travel).
-    crate::travel::draw_ship_shadow(game, view, &mut out);
-    for id in w.draws.clone() {
-        if w.mobys.get(id).is_none_or(|m| 0x80 <= m.state) { continue; }
-        match w.mobys[id].o_class {
-            0x0ce9 => tie_lights::draw(w, id, view, cam, &mut out),
-            0x0b0a => draw_0b0a(w, id, &mut game.rng, cam, &mut out),
-            0x0b0b => draw_0b0b(w, host, id, &mut game.rng, cam, &mut out),
-            crate::moby::classes::shot::SHOT_CLASS => crate::moby::classes::shot::draw_trail(&mut w.mobys[id], cam, &mut game.trail_phase, &mut out),
-            crate::moby::classes::nanotech::CLASS => crate::moby::classes::nanotech::draw(w, id, cam, &mut out),
-            crate::moby::classes::gravity_bomb::HAND_CLASS => crate::moby::classes::gravity_bomb::draw_marker(w, id, hero_state, game.frame, &mut out),
-            crate::moby::classes::gravity_bomb::BLAST_CLASS => crate::moby::classes::gravity_bomb::draw_blast(w, id, view, cam, &mut out),
-            0x0a7b => crate::moby::classes::oozla::draw_0a7b(w, id, &mut out),
-            0x0a9d => crate::moby::classes::oozla::draw_0a9d(w, id, &mut out),
-            0x0a17 => crate::moby::classes::oozla::draw_0a17(w, id, game, cam, host.camera_rows(), &mut out),
-            crate::vendor::CLASS => crate::moby::classes::vendor::draw(w, id, game, host.camera_rows(), &mut out),
-            0x00bc => crate::moby::classes::tractor::draw(w, id, cam, -0.3 * (game.frame % 27) as f32, &mut out),
-            crate::ship::LASER_CLASS => crate::ship::draw_laser(w, id, cam, &mut out),
-            _ => {}
-        }
+    for id in w.draws.clone() { one(w, host, game, hero_state, view, cam, id, &mut out); }
+    Lists { first, second: out }
+}
+
+/// One registered callback (the class's).
+#[allow(clippy::too_many_arguments)]
+fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, hero_state: i32, view: &crate::particles::BSphereView, cam: V3, id: usize, out: &mut Vec<FxQuad>) {
+    use crate::moby::classes::tie_lights;
+    if w.mobys.get(id).is_none_or(|m| 0x80 <= m.state) { return; }
+    match w.mobys[id].o_class {
+        0x0ce9 => tie_lights::draw(w, id, view, cam, out),
+        0x0b0a => draw_0b0a(w, id, &mut game.rng, cam, out),
+        0x0b0b => draw_0b0b(w, host, id, &mut game.rng, cam, out),
+        crate::moby::classes::shot::SHOT_CLASS => crate::moby::classes::shot::draw_trail(&mut w.mobys[id], cam, &mut game.trail_phase, out),
+        crate::moby::classes::nanotech::CLASS => crate::moby::classes::nanotech::draw(w, id, cam, out),
+        crate::moby::classes::gravity_bomb::HAND_CLASS => crate::moby::classes::gravity_bomb::draw_marker(w, id, hero_state, game.frame, out),
+        crate::moby::classes::gravity_bomb::BLAST_CLASS => crate::moby::classes::gravity_bomb::draw_blast(w, id, view, cam, out),
+        0x0a7b => crate::moby::classes::oozla::draw_0a7b(w, id, out),
+        0x0a9d => crate::moby::classes::oozla::draw_0a9d(w, id, out),
+        0x0a17 => crate::moby::classes::oozla::draw_0a17(w, id, game, cam, host.camera_rows(), out),
+        crate::vendor::CLASS => crate::moby::classes::vendor::draw(w, id, game, host.camera_rows(), out),
+        0x00bc => crate::moby::classes::tractor::draw(w, id, cam, -0.3 * (game.frame % 27) as f32, out),
+        crate::ship::LASER_CLASS => crate::ship::draw_laser(w, id, cam, out),
+        _ => {}
     }
-    out
 }

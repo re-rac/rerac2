@@ -189,6 +189,8 @@ pub(crate) struct Play {
     /// The level's scene file (`G/SCENEn.WAD`) and its table, read at the first scene.
     /// This tick's draw-callback quads (rc_game::fx), drawn by [`draw_shots`].
     fx_quads: Vec<rc_game::fx::FxQuad>,
+    /// The first list's callbacks' quads (`0x2e7718`, drawn before the particles; rc_game::fx::Lists).
+    fx_quads_first: Vec<rc_game::fx::FxQuad>,
     /// The ship's exhaust and smoke (rc_game::exhaust).
     exhaust: rc_game::exhaust::Exhaust,
     scene_wad: Option<(Vec<u8>, rc_formats::disc::scene::SceneWad)>,
@@ -732,7 +734,8 @@ fn tick(
         let (tx, ty) = crate::game_camera::projection_tans(None);
         let [fwd, left, up] = p.camera.rows;
         let view = rc_game::particles::BSphereView::from_camera(p.camera.pos, fwd, left, up, tx, ty);
-        p.fx_quads = rc_game::fx::callbacks(&mut mobys.world, &host, &mut p.game, p.hero.state, &view, p.camera.pos);
+        let lists = rc_game::fx::callbacks(&mut mobys.world, &host, &mut p.game, p.hero.state, &view, p.camera.pos);
+        (p.fx_quads_first, p.fx_quads) = (lists.first, lists.second);
     }
     // The point lights the mobys merge (crate::moby_render).
     if let Some(l) = lights.as_deref_mut() {
@@ -1707,7 +1710,8 @@ fn scene_tick(p: &mut Play, lv: &mut crate::level_load::LoadedLevel, commands: &
         let (tx, ty) = crate::game_camera::projection_tans(None);
         let [fwd, left, up] = frame.camera.rows;
         let view = rc_game::particles::BSphereView::from_camera(frame.camera.eye, fwd, left, up, tx, ty);
-        p.fx_quads = rc_game::fx::callbacks(&mut mobys.world, &host, &mut p.game, p.hero.state, &view, frame.camera.eye);
+        let lists = rc_game::fx::callbacks(&mut mobys.world, &host, &mut p.game, p.hero.state, &view, frame.camera.eye);
+        (p.fx_quads_first, p.fx_quads) = (lists.first, lists.second);
         // The flight's draw (`0x363ba0`): on the variant's first actor, the ship without the trip's own moby (kind 0),
         // at `+0x95` past 0x10 (0xe8, fading with the arrival), its exhaust (`0x362ac8`) and its smoke (`0x3684b0`).
         use rc_game::moby::MobyHost;
@@ -2328,7 +2332,9 @@ fn draw_canopy(
 /// trails, 0x0b0a's glows), one group per texture and blend.
 #[derive(Resource, Default)]
 struct ShotDraw {
+    /// The second list's (after the particles) and the first list's (before them).
     slots: crate::fx_draw::FxSlots,
+    first: crate::fx_draw::FxSlots,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2343,21 +2349,22 @@ fn draw_shots(
     mut materials: ResMut<Assets<crate::fx_draw::FxPrimMaterial>>,
     mut vis: Query<&mut Visibility>,
 ) {
-    let mut groups = Vec::new();
-    // The callbacks' quads, one group per texture and blend in the order they came.
-    if let Some(p) = play.as_ref() {
+    // The callbacks' quads by list, one group per texture and blend in the order they came.
+    let group = |quads: &[rc_game::fx::FxQuad]| {
         let mut keyed: Vec<((usize, bool), crate::fx_draw::PrimBuf)> = Vec::new();
-        for q in &p.fx_quads {
+        for q in quads {
             let k = (q.fx, q.additive);
             let i = keyed.iter().position(|(kk, _)| *kk == k).unwrap_or_else(|| { keyed.push((k, crate::fx_draw::PrimBuf::default())); keyed.len() - 1 });
             keyed[i].1.quad(q.corners, q.st, q.rgba);
         }
-        for ((fx, additive), prims) in keyed { if !prims.is_empty() { groups.push(crate::fx_draw::FxGroup { fx, additive, subtract: false, prims }); } }
-    }
+        keyed.into_iter().filter(|(_, p)| !p.is_empty()).map(|((fx, additive), prims)| crate::fx_draw::FxGroup { fx, additive, subtract: false, prims }).collect::<Vec<_>>()
+    };
+    let (first, second) = play.as_ref().map_or((Vec::new(), Vec::new()), |p| (group(&p.fx_quads_first), group(&p.fx_quads)));
     let fog = fog.map(|f| f.uniform).unwrap_or_else(|| crate::game_camera::TfragFog::new(&level.0.fog));
     let tex = level.0.particles.textures.as_ref().map(|t| t.fx_textures.as_slice());
     let mut a = crate::fx_draw::FxAssets { meshes: &mut meshes, images: &mut images, materials: &mut materials, fx: tex, fog };
-    draw.slots.show(&mut commands, &mut vis, &mut a, groups, crate::fx_draw::LIST1_BIAS, "shot trails");
+    draw.first.show(&mut commands, &mut vis, &mut a, first, crate::fx_draw::LIST1_BIAS, "draw list 1");
+    draw.slots.show(&mut commands, &mut vis, &mut a, second, crate::fx_draw::LIST2_BIAS, "draw list 2");
 }
 
 /// `0x2e54a0`'s mode (`GameState::occlusion`, `0x1b19d0`) onto the occlusion frame: 0 everything visible, 2 the
@@ -2401,7 +2408,7 @@ fn start(lv: &crate::level_load::LoadedLevel) -> Option<Play> {
     Some(Play {
         anim: RatchetAnim { curves: &rc_game::hero::CURVES, ..RatchetAnim::new(&m.anim[class]) },
         hero, class, instance, scale, pad: PadState::default(), camera, ship: None, chain: false, mobys: None, game: Default::default(), hud: rc_game::hud::Hud::new(rc_game::game::GameState::default().max_health), ticks: 0, loaded: false,
-        fx_quads: Vec::new(), exhaust: Default::default(), scene_wad: None, shared_scenes: None, scene_slots: Vec::new(), movie: None, movie_picture: None, leaving: None, scene_listener: None, movie_started: false, hero_loops: [-1; 9], pause: None, pause_opened: false, death_fade: None, qs: Default::default(), qs_paused: false, vendor: Default::default(), space_scene: None, flight: None, flight_cam: None, flight_quads: Vec::new(),
+        fx_quads: Vec::new(), fx_quads_first: Vec::new(), exhaust: Default::default(), scene_wad: None, shared_scenes: None, scene_slots: Vec::new(), movie: None, movie_picture: None, leaving: None, scene_listener: None, movie_started: false, hero_loops: [-1; 9], pause: None, pause_opened: false, death_fade: None, qs: Default::default(), qs_paused: false, vendor: Default::default(), space_scene: None, flight: None, flight_cam: None, flight_quads: Vec::new(),
         help: Default::default(), boxes: Default::default(), glyphs: None, texts: rc_formats::strings::parse_strings(&lv.gameplay, rc_formats::strings::lang::ENGLISH).map_err(|e| eprintln!("play: no help texts ({e:#})")).unwrap_or_default(),
         trace: std::env::var("RC_PLAY_TRACE").is_ok_and(|v| v.trim() == "1"),
     })

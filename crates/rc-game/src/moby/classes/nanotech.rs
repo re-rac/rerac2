@@ -322,7 +322,8 @@ fn common(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let at = w.mobys[id].pos;
     let c = up(at, 0.5);
     if ctx.view.is_some_and(|v| v.culled(64.0, [c[0], c[1], c[2], 1.0])) { return; }
-    w.register_draw(id);
+    // `0x2e7718(0x3a17f0, m)`: its glow on the frame's first list.
+    w.register_draw_first(id);
     let life = if 10.0 < dist2(at, ctx.host.camera_pos()) { 5 } else { 0x28 };
     let state = w.mobys[id].state;
     let anchor = if state == 2 { id } else { w.mobys[id].parent.unwrap_or(id) };

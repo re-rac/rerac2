@@ -17,6 +17,8 @@ use bevy::shader::ShaderRef;
 const SHADER_PATH: &str = "shaders/fx_prim.wgsl";
 /// Transparent3d sort bias of the list-1 callback draws: after the mobys, before the particles (1e6).
 pub const LIST1_BIAS: f32 = 9.0e5;
+/// The second list's (`0x2e7920`): after the particles (1e6).
+pub const LIST2_BIAS: f32 = 1.1e6;
 
 /// Static uniform of one draw group.
 #[derive(Clone, Copy, Debug, Default, ShaderType)]

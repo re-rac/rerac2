@@ -43,7 +43,7 @@ L00:00311880	FUN_00311880	moby	has	cite
 L00:0031da58	shadow	shadow	has	L
 L00:002ef6b8	FUN_002ef6b8	math	trivial	range
 L00:0032dcf0	FUN_0032dcf0	enemy	has	cite
-H:582266980bbdcff0	draw_list_add	fxdraw	partly	L
+H:582266980bbdcff0	draw_list_first	fxdraw	has	L
 L00:002de878	FUN_002de878	moby	has	cite
 L00:00311320	FUN_00311320	moby	has	cite
 L00:002eef60	FUN_002eef60	math	trivial	range
@@ -375,7 +375,7 @@ L00:002d43e0	FUN_002d43e0	items	has	cite
 L00:002d6d60	rumble	rumble	missing	cite
 L00:002d6f38	FUN_002d6f38	moby	has	cite
 L00:002d7f80	FUN_002d7f80	other	has	cite
-L00:002e7718	draw_list_add	fxdraw	partly	L
+L00:002e7718	draw_list_first	fxdraw	has	L
 L00:002e7920	FUN_002e7920	moby	has	cite
 L00:002eeb90	FUN_002eeb90	math	trivial	range
 L00:002eedb0	FUN_002eedb0	math	trivial	range
@@ -454,7 +454,7 @@ L00:003a0678	FUN_003a0678	moby	has	cite
 L00:003a0730	FUN_003a0730	moby	has	cite
 L00:003a07a8	FUN_003a07a8	moby	has	cite
 L00:003a0800	FUN_003a0800	moby	has	cite
-L00:003a17f0	FUN_003a17f0	fxdraw	has	cite
+L00:003a17f0	FUN_003a17f0	moby	has	cite
 L00:003a1e28	FUN_003a1e28	moby	has	cite
 L00:003a2030	FUN_003a2030	moby	has	cite
 L00:003a8060	FUN_003a8060	weapons	has	cite

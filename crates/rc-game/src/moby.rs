@@ -460,6 +460,9 @@ pub struct MobyWorld {
     /// `0x2e7920`'s list: the mobys whose update registered their class's draw callback this tick, in that order
     /// (crate::fx runs them after the tick). A moby drawn as another's piece runs the piece's update and has none.
     pub draws: Vec<usize>,
+    /// `0x2e7718`'s list, the frame's first (run by `0x2e7768` before the particles): the mobys that registered there
+    /// this tick (crate::fx runs them before the second list).
+    pub draws_first: Vec<usize>,
     /// `0x1b1e20`: the first created moby's slot. The placed mobys come before it, and a placed moby's slot is never
     /// taken again: deleted, it stays there (state 0xfd) with its pvars, as the group lists and links name it.
     pub first_created: usize,
@@ -687,6 +690,7 @@ impl MobyWorld {
             self.load_pass(ctx);
         }
         self.draws.clear();
+        self.draws_first.clear();
         self.shadows.clear();
         for id in self.run_list(cam) {
             if self.mobys[id].state >= 0x80 { continue; }
@@ -725,6 +729,8 @@ impl MobyWorld {
 
     /// `0x2e7920(callback, moby)`: the moby's draw callback runs after this tick (crate::fx).
     pub fn register_draw(&mut self, id: usize) { self.draws.push(id); }
+    /// `0x2e7718(callback, moby)`: the moby's callback on the frame's first list (before the particles; crate::fx).
+    pub fn register_draw_first(&mut self, id: usize) { self.draws_first.push(id); }
 
     /// `0x1b1d40`: the free moby slots (past the placed mobys).
     pub fn free_slots(&self) -> usize {
