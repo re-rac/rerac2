@@ -6,8 +6,8 @@ L00:002a48f0	stub	trivial	trivial	L	empty function
 L00:002e7718	draw_list_add	fxdraw	partly	L	(fn, arg) into the 0x40-entry list 0x1be040 / 0x1be140 (count 0x1b18c8); Aranos's users: the arrival's ship draw 0x362b40 and class 0xd0
 H:582266980bbdcff0	draw_list_add	fxdraw	partly	L	the first draw list's registrar 0x2e7718 on the other levels (L01 0x2dce00: (fn, arg) into 0x1be7c0; same code as 0x2e7920, the second list's, so it is keyed by its hash): the port has the second list only; the callbacks are the classes' own (G-REN-003)
 L00:00323bf8	seq_time_check	anim	partly	L	a time / sequence-frame comparison over 0x311880, 0x323b78
-L00:003327e8	part_spawn_02	particles	missing	L	0x330df0(2): particle type 2
-L00:0033b5e0	part_spawn_3c	particles	missing	L	0x330df0(0x3c): particle type 0x3c
+L00:003327e8	staged	particles	has	L	rc_game::particles::staged (type 2, update 0x3329a8)
+L00:0033b5e0	glint	particles	has	L	rc_game::particles::glint (type 0x3c)
 L00:00327388	drop_bolts_scaled	bolts	has	L	0x322af0 with the per-level bolt value 0x2a0d30[level]; 3 within 7 of Ratchet
 L00:00313300	set_moby_colour	moby	trivial	L	+0x38's high bytes
 L00:00313330	get_moby_colour	moby	trivial	L	+0x38's high bytes
@@ -32,7 +32,6 @@ L00:0037c948	hw_timer	game	trivial	L	reads the EE timer 0x10000000
 L00:0031c618	line_collide	collision	partly	L	a line test through 0x2de878 / 0x2df8d8
 L00:00326820	hero_distance	hero	partly	L	distance to Ratchet (0x1b1a90), or 100 − it in the ship mode (0x1a8ff4)
 L00:00326448	hero_direction	hero	partly	L	direction to Ratchet / his ship (0x189ed0, 0x3263d0)
-L00:002ecfb0	burst	breakfx	missing	cite	props.rs: the burst, not drawn
 L00:0031fa50	colour_take	colour	missing	cite	the moby's colour taken over
 L00:003241d8	colour_take2	colour	missing	cite	the moby's colour taken over
 L00:0037d5a0	splash	particles	missing	cite	hero: the bubbles and splashes
@@ -69,3 +68,4 @@ L00:0032b580	shards	breakfx	has	L	throw every piece: rc_game::moby::shards::thro
 H:55c6aaae9bdd29ad	shards	breakfx	has	L	the level copies of 0x32b580 (shards::throw_all)
 L00:003210a8	smoke_burst	breakfx	has	L	rc_game::moby::blast::smoke_burst
 L00:00327648	throw_chunks	breakfx	missing	L	class 0x43e chunks (update 0x39c6b8): shard mode 1, not ported
+L00:002ecfb0	staged_burst	particles	has	L	rc_game::particles::staged_burst (type 2 puffs)

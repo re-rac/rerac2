@@ -72,7 +72,7 @@ L00:00325100	FUN_00325100	moby	has	cite
 L00:00312728	FUN_00312728	moby	has	cite
 L00:0032a848	FUN_0032a848	formats	has	cite
 L00:00321a78	variant_region	level	missing	L
-L00:003327e8	part_spawn_02	particles	missing	L
+L00:003327e8	staged	particles	has	L
 L00:00321858	FUN_00321858	moby	has	cite
 L00:0031c8e0	FUN_0031c8e0	moby	has	cite
 L00:0033f550	FUN_0033f550	particles	has	cite
@@ -143,7 +143,7 @@ L00:0031e8d8	FUN_0031e8d8	hero	has	cite
 L00:00371ba8	FUN_00371ba8	moby	has	cite
 L00:002eeff8	FUN_002eeff8	math	trivial	range
 boot:00115484	memset	libc	trivial	L
-L00:0033b5e0	part_spawn_3c	particles	missing	L
+L00:0033b5e0	glint	particles	has	L
 L00:002ef9b0	FUN_002ef9b0	math	trivial	range
 L00:002d7508	FUN_002d7508	camera	has	cite
 L00:00322028	FUN_00322028	moby	missing	cite
@@ -182,6 +182,7 @@ L00:003246c0	FUN_003246c0	group	has	cite
 L00:00327648	throw_chunks	breakfx	missing	L
 L00:00324430	FUN_00324430	group	has	cite
 L00:0031ec88	FUN_0031ec88	enemy	has	cite
+L00:00326190	FUN_00326190	particles	has	cite
 L00:002ef650	FUN_002ef650	math	trivial	range
 L00:00332c10	FUN_00332c10	particles	has	cite
 L00:003602a8	FUN_003602a8	moby	has	cite
@@ -197,13 +198,14 @@ L00:002eeb10	FUN_002eeb10	math	trivial	range
 L00:002eebf0	FUN_002eebf0	math	trivial	range
 L00:002edf78	FUN_002edf78	fxdraw	has	cite
 L00:0031cd18	FUN_0031cd18	enemy	has	cite
+L00:003237c8	FUN_003237c8	particles	has	cite
 L00:002ecef8	fx_texture_set	fxdraw	partly	L
 L00:0037c948	hw_timer	game	trivial	L
 L00:002ef478	FUN_002ef478	math	trivial	range
 L00:00330f40	FUN_00330f40	particles	has	cite
 L00:002ef1d0	FUN_002ef1d0	math	trivial	range
 L00:0032d800	FUN_0032d800	enemy	has	cite
-L00:002ecfb0	burst	breakfx	missing	cite
+L00:002ecfb0	staged_burst	particles	has	L
 L00:00312480	FUN_00312480	hero	has	cite
 B:3	sound bank 3	level chunks	missing	L
 L00:0033ef78	FUN_0033ef78	particles	has	cite
@@ -557,7 +559,6 @@ H:eeee8445d055c904		moby	has	near
 H:8ef8b216b7f0fe7b		trivial	trivial	leaf
 H:b213a991c39c640a		trivial	trivial	leaf
 H:72414252929eee3f		enemy	has	calls
-L00:00326190	FUN_00326190	math	trivial	calls
 H:2bfe420e7ba37c93		hero	partly	wrap
 L00:003687a0	FUN_003687a0	trivial	trivial	leaf
 H:b65b43706170ef94		trivial	trivial	leaf

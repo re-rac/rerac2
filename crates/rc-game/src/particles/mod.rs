@@ -15,6 +15,7 @@
 //! | 0x61 | [`burst`] `0x340830` | `0x3409a8` ([`update_burst`]) | the blasts' sprites: size and alpha stepped over the life |
 //! | 0x3b | [`sparkle`] `0x33b468` | `0x33b588` ([`update_sparkle`]) | the nanotech healing ring's sparkles, riding Ratchet |
 //! | 0x3c | [`glint`] `0x33b5e0` | `0x33b710` ([`update_glint`]) | the nanotech heal's glints (and the flying bolts'): drifting, fading out |
+//! | 2 | [`staged`] `0x3327e8` | `0x3329a8` ([`update_staged`]) | three-stage puffs: in, an ease from one velocity / size / colour to another, out |
 //! | 0x35 | [`twinkle`] `0x33a6a0` | `0x33a848` ([`update_twinkle`]) | the bolts' twinkles: swelling and fading |
 //! | 0x4a | [`exhaust`] `0x349c48` | `0x349db0` ([`update_exhaust`]) | L25's ships' exhaust: puffs riding the moby, sized and coloured over the life |
 //! | 0x3e | [`orb`] `0x33bb60` | `0x33bc70` ([`update_orb`]) | the nanotech orbs (kind 1, moved by their cluster) and their trail puffs (kinds 0, 2) |
@@ -518,6 +519,127 @@ pub fn update_sparkle(sys: &mut Particles, i: usize, hero: [f32; 3]) {
     if dec_life(r) { sys.kill_part(i); }
 }
 
+/// Type 2: a three-stage puff ([`staged`]).
+pub const STAGED: u8 = 2;
+
+/// `0x3237c8(v, out)`: a velocity in four bytes: x, y, z each `v·k + 127` (truncated) with `k = 1 / (w·0.0001)`, and w
+/// the largest component's size × 158.73 (1..255) in the fourth.
+pub fn pack_vel(v: [f32; 3]) -> u32 {
+    let m = v[0].abs().max(v[1].abs()).max(v[2].abs());
+    let w = ((m * 158.730_16) as i32).clamp(1, 0xff);
+    let k = 1.0 / (w as f32 * 0.0001);
+    let b = |x: f32| ((x * k + 127.0) as i32 as u32) & 0xff;
+    b(v[0]) | b(v[1]) << 8 | b(v[2]) << 16 | (w as u32) << 24
+}
+
+/// `0x3238d0(out, packed)`: [`pack_vel`]'s velocity back: `(byte − 127)·w·0.0001`.
+pub fn unpack_vel(p: u32) -> [f32; 3] {
+    let w = (p >> 24) as f32 * 0.0001;
+    std::array::from_fn(|k| ((p >> (8 * k)) & 0xff) as f32 - 127.0).map(|x| x * w)
+}
+
+/// `0x3327e8(pos, v0, v1, c0, c1, in, ease, out, def)`: a three-stage puff (type 2) at `pos`: `in` ticks moving `v0`
+/// a tick (its w the size / 210000·1000) fading in to `c0`; `ease` ticks easing its velocity, size and colour from
+/// `v0` / `c0` to `v1` / `c1`; `out` ticks moving `v1` fading out ([`update_staged`]). The velocities packed
+/// ([`pack_vel`]); a random roll, turning one step every odd frame; ALPHA 0x44 (0x48 with `def` bit 0x10000), near 4
+/// / far 4; its frame `*def[def & 0xffff]`, `def[0x17]` for −1.
+#[allow(clippy::too_many_arguments)]
+pub fn staged(sys: &mut Particles, rng: &mut Rng, pos: [f32; 3], v0: [f32; 4], v1: [f32; 4], c0: u32, c1: u32, len_in: i16, len_ease: i16, len_out: i16, def: i32) -> Option<usize> {
+    let i = sys.create_part(STAGED)?;
+    let rot = rng.randf(0.0, 255.0) as i32 as u8;
+    let (frame, additive) = if def == -1 { (sys.def_first(0x17), false) } else { (sys.def_first((def & 0xffff) as u8), def & 0x10000 != 0) };
+    let r = &mut sys.pool.recs[i];
+    rec::set_v3(r, 0x10, pos);
+    rec::set_u32(r, 4, c0);
+    rec::set_ff(r, 0xc, 0.0);
+    r[1] = 0;
+    r[9] = 4 + 0x40;
+    r[3] = if additive { 0x48 } else { 0x44 };
+    r[8] = rot;
+    r[2] = frame;
+    rec::set_i16(r, 0xa, len_in);
+    rec::set_i16(r, 0x36, (v0[3] * 210.000_02) as i32 as i16);
+    rec::set_i16(r, 0x38, (v1[3] * 210.000_02) as i32 as i16);
+    rec::set_u32(r, 0x20, pack_vel([v0[0], v0[1], v0[2]]));
+    rec::set_u32(r, 0x24, pack_vel([v1[0], v1[1], v1[2]]));
+    rec::set_i16(r, 0x34, len_out);
+    rec::set_u32(r, 0x28, c0);
+    rec::set_u32(r, 0x2c, c1);
+    rec::set_i16(r, 0x30, len_in);
+    rec::set_i16(r, 0x32, len_ease);
+    Some(i)
+}
+
+/// `0x3329a8`: a staged puff's tick (`frame` odd: its roll one step); the stage's move, size and colour
+/// ([`staged`]); each stage's end starts the next, the last's kills it.
+pub fn update_staged(sys: &mut Particles, i: usize, frame: i32) {
+    let r = &mut sys.pool.recs[i];
+    if frame & 1 != 0 { r[8] = r[8].wrapping_add(1); }
+    let (c0, c1) = (rec::u32(r, 0x28), rec::u32(r, 0x2c));
+    let (s0, s1) = (rec::i16(r, 0x36) as f32, rec::i16(r, 0x38) as f32);
+    let (v0, v1) = (unpack_vel(rec::u32(r, 0x20)), unpack_vel(rec::u32(r, 0x24)));
+    let life = rec::i16(r, 0xa) as f32;
+    let step = |r: &mut crate::particles::Record, v: [f32; 3]| rec::set_v3(r, 0x10, add(rec::pos(r), v));
+    if rec::i16(r, 0x30) != 0 {
+        step(r, v0);
+        let t = 1.0 - life / rec::i16(r, 0x30) as f32;
+        rec::set_u32(r, 4, tween_color(t.to_bits(), c0 & 0xff_ffff, c0));
+        rec::set_ff(r, 0xc, s0 * 1000.0);
+        if dec_life(r) {
+            rec::set_i16(r, 0x30, 0);
+            rec::set_i16(r, 0xa, rec::i16(r, 0x32));
+        }
+    } else if rec::i16(r, 0x32) != 0 {
+        let f = life / rec::i16(r, 0x32) as f32;
+        step(r, std::array::from_fn(|k| v1[k] + (v0[k] - v1[k]) * f));
+        rec::set_ff(r, 0xc, ((s0 - s1) * f + s1) * 1000.0);
+        rec::set_u32(r, 4, tween_color(f.to_bits(), c1, c0));
+        if dec_life(r) {
+            rec::set_i16(r, 0x32, 0);
+            rec::set_i16(r, 0xa, rec::i16(r, 0x34));
+        }
+    } else {
+        step(r, v1);
+        let f = life / rec::i16(r, 0x34) as f32;
+        rec::set_u32(r, 4, tween_color(f.to_bits(), c1 & 0xff_ffff, c1));
+        rec::set_ff(r, 0xc, s1 * 1000.0);
+        if dec_life(r) { sys.kill_part(i); }
+    }
+}
+
+/// `0x2ecfb0`'s colour pairs by kind (the start colours' range, then the end colours', alpha 0).
+const STAGED_KINDS: [[u32; 4]; 4] = [
+    [0x8000_4080, 0x8040_8080, 0x0000_4080, 0x0040_8080],
+    [0x8010_2040, 0x8010_10a0, 0x0010_2040, 0x0010_10a0],
+    [0x8010_4010, 0x8020_a020, 0x0010_4010, 0x0020_a020],
+    [0x8020_1608, 0x8040_2510, 0x0020_1608, 0x0040_2510],
+];
+
+/// `0x2ecfb0(spread, speed, size, fall, life, moby, at, vel, count, kind)`: `count` staged puffs ([`staged`], def
+/// 0x3c additive) about `at` in the moby's frame (`rows`, `pos`, `scale`: `0x326190`), each `spread` a random way off
+/// it and moving `vel` plus `speed` a random way (through the rows); its stages `k·10`, `k·40`, `k·10` ticks with `k`
+/// = `life`·0.5..1.5, its size `size`·0.1..0.4, sinking `fall`/3600 a tick for the whole of its time by the end; its
+/// colours a random mix within the kind's pairs ([`STAGED_KINDS`], kinds past 3 the first).
+#[allow(clippy::too_many_arguments)]
+pub fn staged_burst(sys: &mut Particles, rng: &mut Rng, spread: f32, speed: f32, size: f32, fall: f32, life: f32, rows: &[[f32; 3]; 3], pos: [f32; 3], scale: f32, at: [f32; 3], vel: [f32; 3], count: i32, kind: u8) {
+    let through = |v: [f32; 3]| -> [f32; 3] { std::array::from_fn(|k| v[0] * rows[0][k] + v[1] * rows[1][k] + v[2] * rows[2][k]) };
+    let c = STAGED_KINDS.get(kind as usize).copied().unwrap_or(STAGED_KINDS[0]);
+    for _ in 0..count.max(0) {
+        let o = add(rng.rand_vec(0.0, spread), at);
+        let p = add(scale_v(through(o), scale), pos);
+        let v = through(add(rng.rand_vec(0.0, speed), vel));
+        let k = life * rng.randf(0.5, 1.5);
+        let (a, b, e) = ((k * 10.0) as i32, (k * 40.0) as i32, (k * 10.0) as i32);
+        let s = size * rng.randf(0.1, 0.4);
+        let dz = -(fall * 0.000_277_777_78) * (a + b + e) as f32;
+        let c0 = tween_color(rng.randf(0.0, 1.0).to_bits(), c[0], c[1]);
+        let c1 = tween_color(rng.randf(0.0, 1.0).to_bits(), c[2], c[3]);
+        staged(sys, rng, p, [v[0], v[1], v[2], s], [v[0], v[1], v[2] + dz, s], c0, c1, a as i16, b as i16, e as i16, 0x1003c);
+    }
+}
+
+fn scale_v(v: [f32; 3], s: f32) -> [f32; 3] { v.map(|x| x * s) }
+
 /// Type 0x35: a twinkle.
 pub const TWINKLE: u8 = 0x35;
 
@@ -889,6 +1011,7 @@ pub fn update_parts(sys: &mut Particles, mobys: &crate::moby::MobyWorld, cam: [f
             0x3b => update_sparkle(sys, i, hero),
             0x3c => update_glint(sys, i, hero),
             TWINKLE => update_twinkle(sys, i),
+            STAGED => update_staged(sys, i, mobys.frame),
             ORB => update_orb(sys, i, mobys),
             EXHAUST => update_exhaust(sys, i, mobys),
             TRAIL => update_trail(sys, i),
@@ -900,5 +1023,34 @@ pub fn update_parts(sys: &mut Particles, mobys: &crate::moby::MobyWorld, cam: [f
             water::SPRAY => water::update_spray(sys, i, aux),
             _ => sys.kill_part(i),
         }
+    }
+}
+
+#[cfg(test)]
+mod staged_tests {
+    use super::*;
+
+    #[test]
+    fn velocity_packs_within_a_step() {
+        for v in [[0.1, -0.05, 0.02], [0.0, 0.0, -0.4], [1.2, 0.3, 0.0]] {
+            let u = unpack_vel(pack_vel(v));
+            // One step is w·0.0001, about the largest component / 63.
+            let step = (pack_vel(v) >> 24) as f32 * 0.0001 + 1e-6;
+            for k in 0..3 { assert!((u[k] - v[k]).abs() <= step * 1.01, "{v:?} {u:?}"); }
+        }
+        assert_eq!(pack_vel([0.0; 3]) >> 24, 1, "w at least 1");
+    }
+
+    #[test]
+    fn staged_runs_its_three_stages() {
+        let mut sys = Particles::new(None);
+        let mut rng = Rng::default();
+        let i = staged(&mut sys, &mut rng, [10.0; 3], [0.0, 0.0, 0.1, 1.0], [0.0, 0.0, 0.0, 2.0], 0x8000_0000, 0x4000_0000, 2, 4, 3, -1).unwrap();
+        let mut ticks = 0;
+        while sys.pool.recs[i][1] & 0x80 == 0 && ticks < 20 {
+            update_staged(&mut sys, i, ticks);
+            ticks += 1;
+        }
+        assert_eq!(ticks, 2 + 4 + 3, "in, ease, out");
     }
 }
