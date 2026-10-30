@@ -17,8 +17,7 @@
 //!   0x0c1b ([`update_0c1b`]); the lock 0x0c81 ([`update_0c81`]), its four nodes dead, hooks its group: the conveyor
 //!   bridge 0x0ab0 ([`update_0ab0`]) unfolds and carries Ratchet on its belt surfaces 0x0aaf.
 //!
-//! Not ported (the lock puzzle): the lock's and the catapult's draws (`0x413460`: seven effect panels; `0x3eae18`),
-//! the catapult's aiming camera.
+//! Not ported (the lock puzzle): the catapult's draw `0x3eae18` and its aiming camera.
 //!
 //! Not ported: 0x0adf's lift (`0x3ece68`, its update when the cuboid's z scale is 2: up and down to Ratchet's level
 //! as he rides it); 0x0e96 (`0x4301b0`, the arena crowd: it waits for its controller past state 1, cheers by the
@@ -472,7 +471,7 @@ fn hook_group(w: &mut MobyWorld, group: i32, on: bool) {
 /// checkpoint at its cuboid `[5]` and goes. Showing (`[7]` ≠ 0): Ratchet against it gives a glint where a line from
 /// his centre meets it; in view its phases turn (`[0xb]` 0.0407, `[0xa]` 1/48, `[8]` / `[9]` 0.0111 a tick); its fade
 /// eases to 1 within 68 of the camera (1/120). A panel goes with the nodes it stands for (`[0xc]` node 0, `[0xd]`
-/// nodes 0 and 1, `[0xe]` 2 and 3, `[0xf]` 3). Not ported: its draw `0x413460` (seven effect panels).
+/// nodes 0 and 1, `[0xe]` 2 and 3, `[0xf]` 3).
 pub fn update_0c81(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     use crate::hero::physics::{add_rot, approach, dist2};
     let node = |w: &MobyWorld, k: usize| usize::try_from(w.mobys[id].pv_i(4 * k)).ok().filter(|&n| n < w.mobys.len());
@@ -542,12 +541,18 @@ pub fn update_0c81(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 }
             }
         }
+        // `0x2f4008(80, its place)`: in view, its phases run and it draws ([`draw_0c81`]).
+        let p = w.mobys[id].pos;
+        if !ctx.view.is_some_and(|v| v.culled(80.0, [p[0], p[1], p[2], 1.0])) {
+            let m = &mut w.mobys[id];
+            m.set_pv_f(0x2c, add_rot(m.pv_f(0x2c), 0.040_725_4));
+            let wrap = |x: f32| if 1.0 < x { x - 1.0 } else { x };
+            m.set_pv_f(0x28, wrap(m.pv_f(0x28) + 0.020_833_334));
+            m.set_pv_f(0x20, wrap(m.pv_f(0x20) + 0.011_1));
+            m.set_pv_f(0x24, wrap(m.pv_f(0x24) + 0.011_1));
+            w.register_draw(id);
+        }
         let m = &mut w.mobys[id];
-        m.set_pv_f(0x2c, add_rot(m.pv_f(0x2c), 0.040_725_4));
-        let wrap = |x: f32| if 1.0 < x { x - 1.0 } else { x };
-        m.set_pv_f(0x28, wrap(m.pv_f(0x28) + 0.020_833_334));
-        m.set_pv_f(0x20, wrap(m.pv_f(0x20) + 0.011_1));
-        m.set_pv_f(0x24, wrap(m.pv_f(0x24) + 0.011_1));
         let far = 68.0 < dist2(m.pos, cam);
         let mut f = m.pv_f(0x1c);
         approach(if far { 0.0 } else { 1.0 }, 0.008_333_334, &mut f);
@@ -1202,4 +1207,58 @@ fn arc_glint(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
     let life = rng.rand_range(0x28, 0x5a) as u16;
     let rot = rng.randi(0xff) as u8;
     crate::particles::glint(sys, 0.75, p, [0.0, 0.0, sink], 0x6000_4090, life, rot, false, hero);
+}
+
+/// The lock's bands (`0x1b1b80..0x1b1c3c`): each quad's four corners `(0, 1, z)` (two at each height), its effect and
+/// which colour and spread it takes.
+const LOCK_BANDS: [(f32, f32); 3] = [(2.5, 4.5), (2.3, 2.7), (4.3, 4.7)];
+
+/// `0x413460`, the lock's draw: a ring of light about its up axis, twice (the second 6 higher). The frame is its rows
+/// with the first 4 long (turned to the camera's side) and the second 10, at its place. Each ring is 16 segments of
+/// −π/16 (`0x2f07e8`: a half turn) of seven bands (`0x2f0750`): the main band 2.5..4.5 (effect 5, texture (½, ½),
+/// colour `sin([0xb])` of the way from 0x60203040 to 0x40203040) and six bars of effect 0x0e (texture scrolled by
+/// `[0xa]`): 2.3..2.7 and 4.3..4.7 (`sin([0xb])` of 0x40408080 → 0x60408080), the same pair drawn apart by 2·`[8]`
+/// and by 2·`[9]` (0x60408080 fading out as the phase goes past 0.2, in before it). The alphas × its fade `[7]`.
+pub fn draw_0c81(w: &MobyWorld, id: usize, cam: crate::hero::physics::V3, out: &mut Vec<crate::fx::FxQuad>) {
+    use crate::hero::physics::{dot, set_len, sub};
+    use crate::hud::lerp_rgba;
+    let m = &w.mobys[id];
+    let mut r0 = set_len(m.rows[0], 4.0);
+    let r1 = set_len(m.rows[1], 10.0);
+    let r2 = m.rows[2];
+    if dot(sub(cam, m.pos), m.rows[0]) < 0.0 { r0 = [-r0[0], -r0[1], -r0[2]]; }
+    let pulse = m.pv_f(0x2c).sin() * 0.5 + 0.5;
+    let fade = m.pv_f(0x1c);
+    let faded = |c: u32| if fade < 1.0 { lerp_rgba(fade, c & 0xff_ffff, c) } else { c };
+    let spread = |t: f32| { let t = if t < 0.2 { 1.0 - t * 5.0 } else { t }; lerp_rgba(t, 0x6040_8080, 0x0040_8080) };
+    let main = faded(lerp_rgba(pulse, 0x6020_3040, 0x4020_3040));
+    let bar = faded(lerp_rgba(pulse, 0x4040_8080, 0x6040_8080));
+    let (s8, s9) = (m.pv_f(0x20), m.pv_f(0x24));
+    let (c8, c9) = (faded(spread(s8)), faded(spread(s9)));
+    let scroll = m.pv_f(0x28);
+    // (fx, colour, band, its offsets of the low / high corners)
+    let bands: [(usize, u32, (f32, f32), (f32, f32)); 7] = [
+        (5, main, LOCK_BANDS[0], (0.0, 0.0)),
+        (0xe, bar, LOCK_BANDS[1], (0.0, 0.0)),
+        (0xe, bar, LOCK_BANDS[2], (0.0, 0.0)),
+        (0xe, c8, LOCK_BANDS[1], (-2.0 * s8, -2.0 * s8)),
+        (0xe, c8, LOCK_BANDS[2], (2.0 * s8, 2.0 * s8)),
+        (0xe, c9, LOCK_BANDS[1], (-2.0 * s9, -2.0 * s9)),
+        (0xe, c9, LOCK_BANDS[2], (2.0 * s9, 2.0 * s9)),
+    ];
+    let world = |x: f32, y: f32, z: f32| -> crate::hero::physics::V3 { std::array::from_fn(|j| x * r0[j] + y * r1[j] + z * r2[j] + m.pos[j]) };
+    let step = -std::f32::consts::PI / 16.0;
+    for lift in [0.0, 6.0] {
+        for &(fx, c, (lo, hi), (dlo, dhi)) in &bands {
+            let st = if fx == 5 { [[0.5, 0.5]; 4] } else { [[scroll, 0.0], [scroll, 1.0], [1.0 + scroll, 0.0], [1.0 + scroll, 1.0]] };
+            let (zl, zh) = (lo + dlo + lift, hi + dhi + lift);
+            for k in 1..=16 {
+                let (a, b) = (step * k as f32, step * (k + 1) as f32);
+                let corner = |ang: f32, z: f32| world(-ang.sin(), ang.cos(), z);
+                // The pair turned last leads: odd steps draw (b, a), even (a, b), as `0x2f07e8` turns them in turn.
+                let (p, q) = if k % 2 == 1 { (b, a) } else { (a, b) };
+                out.push(crate::fx::FxQuad { fx, additive: true, corners: [corner(p, zl), corner(p, zh), corner(q, zl), corner(q, zh)], st, rgba: [c; 4] });
+            }
+        }
+    }
 }

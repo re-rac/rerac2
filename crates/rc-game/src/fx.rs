@@ -15,6 +15,7 @@
 //! | `0x3cac30` | Oozla's conveyor 0x0a7b out | its belt of light ([`crate::moby::classes::oozla::draw_0a7b`]) |
 //! | `0x3d2ea8` | Oozla's hatch 0x0a9d open | its light ([`crate::moby::classes::oozla::draw_0a9d`]) |
 //! | `0x414118` | Maktar's power node 0x0c82 showing | its arc to the lock ([`ribbon`], crate::moby::classes::maktar::draw_0c82) |
+//! | `0x413460` | Maktar's lock 0x0c81 showing | its rings of light (crate::moby::classes::maktar::draw_0c81) |
 //! | `0x3ec7c8` | Maktar's conveyor bridge 0x0ab0 running | its belt's beam (crate::moby::classes::maktar::draw_0ab0) |
 //! | `0x38e4c8` | the Tractor Beam holding | its beam ([`crate::moby::classes::tractor::draw`]) |
 //! | `0x4137d0` | the space fights' laser 0xffa | a streak ([`crate::ship::draw_laser`]) |
@@ -202,6 +203,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::critter::CLASS => crate::moby::classes::critter::draw(w, id, cam, out),
         0x0ab0 => crate::moby::classes::maktar::draw_0ab0(w, id, out),
         crate::moby::classes::maktar::NODE => crate::moby::classes::maktar::draw_0c82(w, id, cam, out),
+        0x0c81 => crate::moby::classes::maktar::draw_0c81(w, id, cam, out),
         crate::moby::classes::teleport::CLASS => crate::moby::classes::teleport::draw(w, id, &host.camera_rows(), out),
         0x00bc => crate::moby::classes::tractor::draw(w, id, cam, -0.3 * (game.frame % 27) as f32, out),
         crate::ship::LASER_CLASS => crate::ship::draw_laser(w, id, cam, out),
