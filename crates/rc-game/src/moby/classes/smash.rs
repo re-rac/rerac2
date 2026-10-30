@@ -123,7 +123,7 @@ pub fn update_0f32(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         1 => wait_hit(w, id, ctx, true),
         2 => {
             if full(w, id) {
-                shards::throw_all(w, id, ctx, [0.75, 0.75, 2.0, 0.0, 2.5, 2.5, 5.0, 0.0], (90.0, 360.0), (5.0, 10.0), 0, 0, 6, 0xffff);
+                shards::throw_all(w, id, ctx, [0.75, 0.75, 2.0, 0.0, 2.5, 2.5, 5.0, 0.0], (90.0, 360.0), (5.0, 10.0), 0xffff, 0, 0, 6, 0xffff);
                 let rng = &mut ctx.game.rng;
                 let x = rng.randf(-1.0, 1.0) * 0.016_666_668;
                 let y = rng.randf(-1.0, 1.0) * 0.016_666_668;
@@ -181,7 +181,7 @@ pub fn update_10ef(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         0 => set_up(w, id, ctx),
         1 => wait_hit(w, id, ctx, true),
         2 => {
-            shards::throw_all(w, id, ctx, [-3.0, -3.0, 1.0, 0.0, 3.0, 3.0, 7.0, 0.0], (90.0, 360.0), (10.0, 20.0), 0, -1, 0, 0xffff);
+            shards::throw_all(w, id, ctx, [-3.0, -3.0, 1.0, 0.0, 3.0, 3.0, 7.0, 0.0], (90.0, 360.0), (10.0, 20.0), 0xffff, 0, -1, 0, 0xffff);
             w.delete(id);
         }
         _ => {}
@@ -196,7 +196,7 @@ pub fn update_10fa(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         0 => w.mobys[id].set_state(1, -1),
         1 => wait_hit(w, id, ctx, false),
         2 => {
-            shards::throw_all(w, id, ctx, [-3.0, -3.0, 1.0, 0.0, 3.0, 3.0, 7.0, 0.0], (90.0, 360.0), (10.0, 20.0), 0, -1, 1, 0xc7f);
+            shards::throw_all(w, id, ctx, [-3.0, -3.0, 1.0, 0.0, 3.0, 3.0, 7.0, 0.0], (90.0, 360.0), (10.0, 20.0), 0xffff, 0, -1, 1, 0xc7f);
             bolts::level_drop(w, id, 1.1, 3, ctx);
             let m = &w.mobys[id];
             let at = add(m.pos, scale(m.rows[2], m.scale * 21.5));

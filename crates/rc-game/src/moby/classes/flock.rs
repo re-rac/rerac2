@@ -237,7 +237,7 @@ fn tick(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             x.drawn = 0;
             x.has_collision = false;
             x.mode |= 1;
-            crate::moby::shards::throw_all(w, m, ctx, [-7.0, -7.0, 3.0, 0.0, 7.0, 7.0, 13.0, 0.0], (90.0, 360.0), (10.0, 20.0), 2, -1, 0, 0xffff);
+            crate::moby::shards::throw_all(w, m, ctx, [-7.0, -7.0, 3.0, 0.0, 7.0, 7.0, 13.0, 0.0], (90.0, 360.0), (10.0, 20.0), 0x3f, 2, -1, 0, 0xffff);
             match w.mobys[m].o_class {
                 0x1290 | 0x134b => { ctx.host.play_sound(&w.mobys[m], 0, 0); }
                 0x0b15 | 0x0b13 => { ctx.host.play_sound(&w.mobys[m], 1, 0); }

@@ -12,9 +12,17 @@
 //!
 //! The stacks are found when the crates start ([`stack_search`]) and fall when a crate under them goes ([`fall`]).
 //!
-//! Not ported: the TNT crate 0x1f9 and the class 0x1f6's flag test beyond
-//! the damage, the dust puffs (`0x334528`), the other classes' break sounds (`0x360698`), the respawn's stacking
-//! search (`0x31c9d8`).
+//! **The TNT crate** (0x1f9): Ratchet touching it (the wall check's moby `0x18a090`, the push-out's `0x18a08c`, the
+//! ground's `0x18a15c` while grounded) or a touch hit (flags exactly 0x1000000) lights its fuse (state 5, 179 ticks;
+//! in the movement group 0xf it goes at once); a hit lights it short (`randf(5, 15)` ticks; an explosive one, flag
+//! 0x20000, 1), and a hit on a long fuse shortens it so. The fuse beeps (its sound 1 at 13 ticks and each 60 from 57)
+//! and flashes red (ambient (200, 64, 64)) for the last 20 of each 60 and the last 14; out, or Ratchet hurt (group
+//! 0x16), it breaks as explosive: the blast (crate::moby::blast, size 1) half a unit up, then 21 ticks of a growing
+//! sphere there (0.05 a tick): twice it, every moby but the crate takes 2 damage, flags 1 (the crates near break, Ratchet
+//! is hurt); three times it, every moby but Ratchet takes 4, flags 0x10000, knocked out 1 and up 1 (`0x31def8`).
+//!
+//! Not ported: the class 0x1f6's flag test beyond the damage, the dust puffs (`0x334528`), the other classes' break
+//! sounds (`0x360698`), the respawn's stacking search (`0x31c9d8`), Ratchet's contact `0x18a3a8` (no writer found).
 //!
 //! A nanotech crate (0x1f5, 0x200) holds a nanotech cluster from its start (crate::moby::classes::nanotech, `+0xfc`).
 
@@ -24,6 +32,8 @@ use crate::moby::{bolts, mode, shards, Ctx, MobyWorld};
 
 /// `0x5830001`: the hit flags a crate takes.
 const HIT_MASK: u32 = 0x0583_0001;
+/// The TNT crate.
+const TNT: i16 = 0x1f9;
 
 /// `0x39c870`.
 pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
@@ -41,7 +51,9 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             hit = None;
         }
     }
-    if hit.is_some_and(|h| h.tmpl.flags == 0x0100_0000) { hit = None; }
+    // A touch (flags exactly 0x1000000) is no hit, but lights a TNT crate.
+    let touch = hit.is_some_and(|h| h.tmpl.flags == 0x0100_0000);
+    if touch { hit = None; }
     match w.mobys[id].state {
         0 => {
             for off in [0xa0, 0xa4] {
@@ -69,11 +81,33 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             return;
         }
         1 => {
+            if class == TNT {
+                let h = &*ctx.hero;
+                let on = h.wall_moby == Some(id) || h.push_moby == Some(id) || (h.ground_moby == Some(id) && h.air_ticks == 0);
+                if on || touch {
+                    if h.group != 0xf {
+                        w.mobys[id].timer = 0;
+                        w.mobys[id].state = 5;
+                    } else {
+                        break_crate(w, id, ctx, true);
+                        reward(w, id, ctx);
+                    }
+                    return;
+                }
+            }
             let Some(h) = hit else { return };
             if h.tmpl.damage <= 0.0 { return; }
             if class == 0x1f6 && h.tmpl.flags & 0x20000 == 0 { return; }
-            break_crate(w, id, ctx);
-            reward(w, id, ctx);
+            if class == TNT {
+                let t = if h.tmpl.flags & 0x20000 != 0 { 1 } else { ctx.game.rng.randf(5.0, 15.0) as u8 };
+                let m = &mut w.mobys[id];
+                m.state = 5;
+                m.timer = t;
+                save_colour(m);
+            } else {
+                break_crate(w, id, ctx, false);
+                reward(w, id, ctx);
+            }
         }
         2 => {
             let m = &mut w.mobys[id];
@@ -84,6 +118,11 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             return;
         }
         3 => {
+            if class == TNT && w.mobys[id].pv_b(0xca) < 0x15 {
+                blast_sphere(w, id, ctx);
+                w.clear_hit(id);
+                return;
+            }
             if w.mobys[id].pv_b(0xc8) == 0 {
                 w.delete(id);
                 return;
@@ -98,6 +137,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 w.mobys[id].set_pv_b(0xc9, t);
             }
         }
+        5 => fuse(w, id, ctx, hit.is_some()),
         6 => {
             let m = &mut w.mobys[id];
             m.set_pv_i(0x100, m.pv_i(0x100) + 1);
@@ -122,10 +162,81 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.clear_hit(id);
 }
 
+/// `+0x38..+0x3f` (the light word and the ambient) kept at `+0x68`[0xb8] while the fuse flashes.
+fn save_colour(m: &mut crate::moby::Moby) {
+    m.set_pv_i(0xb8, m.light as i32);
+    let [r, g, b] = m.ambient;
+    m.set_pv_i(0xbc, i32::from_le_bytes([r, g, b, 0]));
+}
+
+fn restore_colour(m: &mut crate::moby::Moby) {
+    m.light = m.pv_i(0xb8) as u32;
+    let [r, g, b, _] = m.pv_i(0xbc).to_le_bytes();
+    m.ambient = [r, g, b];
+}
+
+/// State 5, the TNT crate's fuse (module docs): lit with 0 ticks it takes 179 (its colour kept); 16 or more left, a hit
+/// cuts it to `randf(5, 15)`. The beep at `t % 60 == 57` or 13; red unless `t % 60 < 41` and `t > 14`; at 1 left (or
+/// Ratchet hurt) it breaks as explosive.
+fn fuse(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, hit: bool) {
+    let m = &mut w.mobys[id];
+    if m.timer == 0 {
+        m.timer = 0xb3;
+        save_colour(m);
+    } else if 0x10 <= m.timer && hit {
+        m.timer = ctx.game.rng.randf(5.0, 15.0) as u8;
+    }
+    let t = m.timer;
+    if t % 0x3c == 0x39 || t == 0xd { ctx.host.play_sound(&w.mobys[id], 1, 0x20); }
+    let m = &mut w.mobys[id];
+    if t % 0x3c < 0x29 && 0xe < t {
+        restore_colour(m);
+    } else {
+        // `0x313300(m, 200, 0x40, 0x40)`.
+        m.ambient = [200, 0x40, 0x40];
+    }
+    if t == 1 || ctx.hero.group == 0x16 {
+        restore_colour(&mut w.mobys[id]);
+        break_crate(w, id, ctx, true);
+        reward(w, id, ctx);
+    }
+    let m = &mut w.mobys[id];
+    m.hit_slot = -1;
+    m.timer = m.timer.wrapping_sub(1);
+}
+
+/// State 3 of an exploded TNT crate, `+0x68`[0xca] counting 1..20 (module docs): the sphere 0.5 up it, `0.05·n` across.
+fn blast_sphere(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    use crate::moby::hits::HitTemplate;
+    let m = &w.mobys[id];
+    let n = m.pv_b(0xca);
+    let centre = add(m.pos, crate::hero::physics::scale(m.rows[2], 0.5));
+    let r = n as f32 * 0.05;
+    let d = m.rows[0];
+    // `0x2e14b0(2r, centre, 0x10, crate, tmpl)`: damage 2, flags 1, its first row the way.
+    let t = HitTemplate::new(2.0, Some(id), 1, [d[0], d[1], d[2], 0.0]);
+    w.sphere_hit(ctx.scene, centre, r + r, 0x10, Some(id), Some(&t));
+    // `0x2e14b0(3r, centre, 0x10, Ratchet)` → `0x31def8(4, 1, 1, crate, centre, …, Ratchet, 0x10000, 0, 0)`.
+    if let Some(sc) = ctx.scene {
+        let ids = crate::collision::mobys::coll_sphere_mobys(sc, centre, r * 3.0, crate::collision::QueryFlags(0x10), ctx.hero_moby);
+        let class = w.mobys[id].o_class;
+        for t_id in ids {
+            if Some(t_id) == ctx.hero_moby { continue; }
+            let p = w.mobys[t_id].pos;
+            let a = crate::hero::physics::atan2(p[0] - centre[0], p[1] - centre[1]);
+            let mut t = HitTemplate::new(4.0, Some(id), 0x10000, [a.cos(), a.sin(), 1.0, 5_627.987]);
+            t.kind = (class as u16 as u32) << 16;
+            w.deliver_hit(t_id, &t, [0.0, 0.0, 0.0, 1.0]);
+        }
+    }
+    w.mobys[id].set_pv_b(0xca, n + 1);
+}
+
 /// `0x39daa0(moby, explosive, hit)`: the stack re-linked (the crate above rests on the one below and both fall), the
 /// crates above marked broken-under, the break counter (`$gp+0x3fc` decays with time, + the shard count), then broken:
-/// state 3, timer 15, hidden (mode 1), no collision.
-fn break_crate(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+/// state 3, timer 15, hidden (mode 1), no collision; explosive (the TNT crates), the blast half a unit up it and its
+/// sphere's count (`+0x68`[0xca]) from 1.
+fn break_crate(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, explosive: bool) {
     // Its sound, one crate's a frame (`0x1b2794`): class sound 0 (0x1fa / 0x1ff play another class's, not ported).
     if 1 < (ctx.game.frame - ctx.game.crate_sound_frame).abs() && !matches!(w.mobys[id].o_class, 0x1fa | 0x1ff) {
         ctx.host.play_sound(&w.mobys[id], 0, 0);
@@ -192,6 +303,12 @@ fn break_crate(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     m.grid_rect = crate::collision::mobys::GRID_NONE;
     w.grid.update(id as u16, old, crate::collision::mobys::GRID_NONE);
     w.changed = true;
+    if explosive {
+        let m = &mut w.mobys[id];
+        m.set_pv_b(0xca, 1);
+        let at = add(m.pos, crate::hero::physics::scale(m.rows[2], 0.5));
+        crate::moby::blast::burst(w, ctx, at, &crate::moby::blast::Blast { size: 1.0, bursts: [10; 3], puffs: 10, streaks: 0xf, light: false, shake: false });
+    }
 }
 
 /// `0x39d948`: a bolt crate (no ammo amount, not 501 / 0x200) drops its bolts with `rand(2)` + 2 / 1 / 0 bolt mobys
@@ -291,8 +408,10 @@ fn stack_search(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// falls, Ratchet under it (within 0.55 across in its frame, below it by less than his capsule's top and radius)
 /// breaks it as a hit would.
 ///
-/// Not ported: the crates on movers (`+0xf0`: carried by `0x3223e8` / `0x322668`), the TNT crates' (0x1f9) fuse when
-/// they land hard on a broken stack (state 5).
+/// Landing hard (the stack broke under it, moving faster than 1/120 a tick), a TNT crate in state 1 lights its fuse,
+/// or else the TNT crate it lands on does.
+///
+/// Not ported: the crates on movers (`+0xf0`: carried by `0x3223e8` / `0x322668`).
 fn fall(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].state == 0 { return; }
     let mut bottom = id;
@@ -320,7 +439,7 @@ fn fall(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let d = sub(ctx.hero.pos, m.pos);
         let l: V3 = std::array::from_fn(|k| d[0] * m.rows[0][k] + d[1] * m.rows[1][k] + d[2] * m.rows[2][k]);
         if l[0].abs() < 0.55 && l[1].abs() < 0.55 && l[2] < 0.0 && -(ctx.hero.cap_top + ctx.hero.cap_radius) < l[2] && matches!(m.state, 1 | 5) {
-            break_crate(w, c, ctx);
+            break_crate(w, c, ctx, w.mobys[c].o_class == TNT);
             reward(w, c, ctx);
         }
         let vz = (w.mobys[c].pv_f(0x98) - 0.002_722_222_4).clamp(-0.3, 0.3);
@@ -335,6 +454,17 @@ fn fall(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 (p[2] + vz < top).then_some(top)
             }
         };
+        if land.is_some() {
+            // Landing hard on a broken stack lights a TNT crate's fuse: its own, else the one under it.
+            let m = &w.mobys[c];
+            if m.pv_i(0xac) & 0x20 != 0 && 0.008_333_334 < crate::hero::physics::len(m.pv_v(0x90)) {
+                let lit = if m.o_class == TNT { Some(c) } else { m.pv_link(0xa4).filter(|&b| w.mobys[b].o_class == TNT) };
+                if let Some(t) = lit.filter(|&t| w.mobys[t].state == 1) {
+                    w.mobys[t].timer = 0;
+                    w.mobys[t].state = 5;
+                }
+            }
+        }
         let m = &mut w.mobys[c];
         match land {
             None => {

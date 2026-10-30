@@ -455,6 +455,7 @@ impl Hero {
         let slope = high.map_or(0.0, |o| slope_of(o.normal));
         let hit = if SLOPE_MAX <= slope { high } else if matches!(low_surface, Some(8) | Some(0xc)) { low } else { None };
         if let Some(o) = hit {
+            self.wall_moby = o.moby;
             let mut n = o.normal;
             n[2] = 0.0;
             let n = unit(n);
@@ -552,6 +553,7 @@ impl Hero {
             let mut o = env.capsule(self.pos, h, r, QueryFlags::exclude_surface(0) | QueryFlags::MOBY_SUBMASK);
             if let Some(g) = coll_sphere_hero_groups(env.coll, self.pos, r) { o = Some(g); }
             let Some(o) = o else { break };
+            self.push_moby = o.moby;
             if let Some(pc) = o.pushed_centre { self.pos = pc; }
             self.contact_normal = o.normal;
             self.contact_point = o.point;
@@ -696,6 +698,7 @@ impl Hero {
         }
         self.pos = add(add(self.pos, self.vel), self.drag);
         self.drag = [0.0; 3];
+        self.push_moby = None;
         self.cap_hit = 0;
         // `0x189f20`: an object's push (the chutes) moves after the resolve of the own move is skipped.
         let pushed = 0.0001 < len(self.push);

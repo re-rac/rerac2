@@ -301,7 +301,7 @@ pub fn update_breakable(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             // The lamp's pieces (`0x32b580`, `$gp − 0x3b0` / `− 0x3b8` / `− 0x3c0`: −4..4 across, −3..0 up, 90..360°/s,
             // gravity 10..20; every piece, its class sound 0).
             if w.mobys[id].o_class == 0x12fa {
-                crate::moby::shards::throw_all(w, id, ctx, [-4.0, -4.0, -3.0, 0.0, 4.0, 4.0, 0.0, 0.0], (90.0, 360.0), (10.0, 20.0), 0, -1, 0, 0xffff);
+                crate::moby::shards::throw_all(w, id, ctx, [-4.0, -4.0, -3.0, 0.0, 4.0, 4.0, 0.0, 0.0], (90.0, 360.0), (10.0, 20.0), 0xffff, 0, -1, 0, 0xffff);
                 // Its burst (`0x2ecfb0`): 40 puffs about (0, 0, −23) in its frame, 2 × its scale out, sinking 5 a
                 // second.
                 let m = &w.mobys[id];
@@ -1103,9 +1103,9 @@ fn thrusters(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
 /// the pad's collision off, the looped sound 0, the sound 0x8a1 (`0x360698`, the sound pass), 0x0ac2's sequence 2.
 /// It springs there (up: k 0.02, d 0.3, at most 0.1; down: 1/600 and 1/300, the fast spring with Ratchet just under
 /// it, held while he is in the cuboid — 0x0ac2's `[0xa8]`, 0x0aca's `[0xa4]`, the other word the spring's velocity),
-/// carrying Ratchet (`0x322668`). There (0x0ac2: within 0.14; 0x0aca: 0.25) it waits — 0x0ac2 while he is within
-/// 1.2, 0x0aca while he stands on the pad or is within 2 and not below it — the sound 1 on arriving, then the pad
-/// comes back (0x0ac2's sequence 1).
+/// its platform block at `+0x20` written (crate::moby::platform, `0x322668`), carrying Ratchet. There (0x0ac2:
+/// within 0.14; 0x0aca: 0.25) it waits — 0x0ac2 while he is within 1.2, 0x0aca while he stands on the pad or is within
+/// 2 and not below it — the sound 1 on arriving, then the pad comes back (0x0ac2's sequence 1).
 struct Lift {
     aca: bool,
 }
@@ -1115,7 +1115,7 @@ pub fn update_0aca(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) { lift(w, id, ct
 
 fn lift(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, l: Lift) {
     use crate::hero::physics::{dist, dist2, spring};
-    let (old, old_yaw) = (w.mobys[id].pos, w.mobys[id].rot[2]);
+    let (old, old_yaw, old_rot) = (w.mobys[id].pos, w.mobys[id].rot[2], w.mobys[id].rot);
     let hp = ctx.hero.pos;
     let (vel, vol) = if l.aca { (0xa8, 0xa4) } else { (0xa4, 0xa8) };
     let pad = |w: &MobyWorld| usize::try_from(w.mobys[id].pv_i(0x9c)).ok().filter(|&i| i < w.mobys.len());
@@ -1241,8 +1241,10 @@ fn lift(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, l: Lift) {
         }
         _ => {}
     }
-    let m = &w.mobys[id];
-    let (pos, yaw, at) = (m.pos, m.rot[2], pad_at(m, 0.2));
+    let m = &mut w.mobys[id];
+    let (pos, rot) = (m.pos, m.rot);
+    crate::moby::platform::write(m, 0x20, crate::hero::physics::sub(pos, old), old_rot, rot);
+    let (yaw, at) = (rot[2], pad_at(m, 0.2));
     crate::moby::carry_hero(ctx, id, old, old_yaw, pos, yaw);
     if let Some(p) = pad(w) {
         crate::moby::carry_hero(ctx, p, w.mobys[p].pos, yaw, at, yaw);
@@ -1283,7 +1285,7 @@ fn pad_set(w: &mut MobyWorld, pad: Option<usize>, on: bool) {
 /// It waits at the top while he is within 1.2, at the bottom within 1 (the sound 1, the tweak released).
 pub fn update_0ac1(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     use crate::hero::physics::{dist, dist2, ease, spring};
-    let (old, old_yaw) = (w.mobys[id].pos, w.mobys[id].rot[2]);
+    let (old, old_yaw, old_rot) = (w.mobys[id].pos, w.mobys[id].rot[2], w.mobys[id].rot);
     let hp = ctx.hero.pos;
     let pad = |w: &MobyWorld| usize::try_from(w.mobys[id].pv_i(0xa0)).ok().filter(|&i| i < w.mobys.len());
     let stop_loop = |w: &mut MobyWorld, ctx: &mut Ctx| {
@@ -1424,7 +1426,9 @@ pub fn update_0ac1(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         _ => {}
     }
-    let (pos, yaw) = (w.mobys[id].pos, w.mobys[id].rot[2]);
+    let (pos, rot) = (w.mobys[id].pos, w.mobys[id].rot);
+    crate::moby::platform::write(&mut w.mobys[id], 0x20, crate::hero::physics::sub(pos, old), old_rot, rot);
+    let yaw = rot[2];
     crate::moby::carry_hero(ctx, id, old, old_yaw, pos, yaw);
     if let Some(p) = pad(w) {
         let at = add3(pos, [0.0, 0.0, 0.25]);

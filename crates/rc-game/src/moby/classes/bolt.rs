@@ -23,13 +23,17 @@
 //!
 //! Drawn, every state but 0 adds its glitter ([`glitter`], `0x383758`).
 //!
-//! Not ported: the platforms a bolt rests on (`+0x5c`, `0x322570` / `0x3223e8`), the per-level tally (`0x18d208`),
-//! targets other than Ratchet (`+0x60`: every caller passes him).
+//! **Platforms** (`+0x5c`, crate::moby::platform): a bolt that lands (or is placed) on a platform keeps its ground in
+//! the platform's frame (`0x322570`) and puts it back in the world every tick (`0x3223e8`). Resting there, it falls
+//! again (state 1, its tumble stopped, the platform's move as its velocity) once the platform is gone or a 0.25
+//! sphere at it touches nothing.
+//!
+//! Not ported: the per-level tally (`0x18d208`), targets other than Ratchet (`+0x60`: every caller passes him).
 
 use crate::hero::physics::{add, add_rot, approach, atan2, dist2, len, scale, set_len, slope_of, sub, V3};
 use crate::moby::attach::rows_of;
 use crate::moby::bolts::{bolt_value, dress};
-use crate::moby::{Ctx, Moby, MobyWorld};
+use crate::moby::{platform, Ctx, Moby, MobyWorld};
 use crate::quat;
 
 /// `0x18c2c4` / `0x18c2c8` (Ratchet's pickup radii without the Bolt Grabber).
@@ -50,6 +54,8 @@ const SPIN_WAY: usize = 0x55;
 const OF: usize = 0x56;
 const LEFT: usize = 0x57;
 const SPEED: usize = 0x64;
+/// The platform it rests on (`0x322028`'s moby; here its index + 1, 0 none).
+const PLATFORM: usize = 0x5c;
 const START_Z: usize = 0x68;
 
 const DEG: f32 = 0.017_453_294;
@@ -78,13 +84,17 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let hit = ctx.coll.and_then(|c| crate::collision::coll_line_m(c, ctx.scene, a, b, crate::collision::QueryFlags(0x22), Some(id)));
             let m = &mut w.mobys[id];
             match hit {
-                Some(o) if m.pv_b(0x54) == 0 => set_ground(m, o.point, o.normal),
+                Some(o) if m.pv_b(0x54) == 0 => {
+                    set_ground(m, o.point, o.normal);
+                    board(w, id, o.moby);
+                }
                 _ => {
                     m.set_pv_v(GROUND, pos);
                     m.set_pv_v(GROUND_ROT, [0.0; 3]);
                 }
             }
             let (s, t) = (ctx.game.rng.rand_angle(), ctx.game.rng.rand_angle());
+            let m = &mut w.mobys[id];
             m.set_pv_f(0x50, s);
             m.set_pv_f(0x58, t);
             m.set_pv_f(START_Z, m.pos[2]);
@@ -129,6 +139,8 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     m.state = 2;
                     m.set_pv_b(OF, t);
                     m.set_pv_b(LEFT, t);
+                    board(w, id, o.moby);
+                    let m = &mut w.mobys[id];
                     let q = quat::from_rows(&m.rows);
                     m.set_pv_q(TUMBLE, q);
                 }
@@ -137,8 +149,9 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         2 => {
             mark_near(&mut w.mobys[id], hero);
+            let g = ground(w, id, ctx);
             let m = &mut w.mobys[id];
-            let ground = rest_pose(m);
+            let ground = rest_pose(m, g);
             let target = add(ground, [0.0, 0.0, 0.25]);
             let rest = quat::from_rows(&m.rows);
             let (n, of) = (m.pv_b(LEFT) as f32, m.pv_b(OF) as f32);
@@ -173,15 +186,17 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 w.delete(id);
                 return;
             }
-            let m = &mut w.mobys[id];
-            if m.drawn != 0 {
-                rest_pose(m);
+            if w.mobys[id].drawn != 0 {
+                let g = ground(w, id, ctx);
+                let m = &mut w.mobys[id];
+                rest_pose(m, g);
                 let (n, of) = (m.pv_b(LEFT), m.pv_b(OF));
                 if n != 0 {
                     let f = n as f32 / of as f32 - 0.5;
                     m.pos[2] += (0.25 - f * f) * 0.0125 * of as f32;
                 }
             }
+            let m = &mut w.mobys[id];
             let n = m.pv_b(LEFT);
             if n != 0 { m.set_pv_b(LEFT, n - 1); }
             glitter(w, id, false, ctx);
@@ -248,11 +263,52 @@ fn set_ground(m: &mut Moby, point: V3, normal: V3) {
     m.set_pv_v(GROUND_ROT, [0.0, slope_of(normal), atan2(normal[0], normal[1])]);
 }
 
-/// `0x382e20(moby, &ground, 0)` without a platform: the spin (`+0x50` by the class's step, the way `+0x55` bit 0
-/// picks, `+0x58` by 0.0125) at the class's tilt, turned into the ground's frame for the rows (mode 0x100 keeps them);
-/// the position the ground point + the class's lift along the ground's up + its offset along the first row. Returns
-/// the ground point.
-fn rest_pose(m: &mut Moby) -> V3 {
+/// The landing on moby `p` (`0x1bf198`, the moby the query touched first) when it is a platform: the ground into its
+/// frame (`0x322570`).
+fn board(w: &mut MobyWorld, id: usize, p: Option<usize>) {
+    let m = &w.mobys[id];
+    let Some(p) = p else { return };
+    let Some((g, r)) = platform::to_local(w, p, m.pv_v(GROUND), m.pv_v(GROUND_ROT)) else { return };
+    let m = &mut w.mobys[id];
+    m.set_pv_i(PLATFORM, p as i32 + 1);
+    m.set_pv_v(GROUND, g);
+    m.set_pv_v(GROUND_ROT, r);
+}
+
+/// `0x382e20`'s ground: the ground point and angles, from a platform's frame into the world when it rests on one
+/// (`0x3223e8`; its flag 4 takes the frame's place again). In state 3 on a platform that is gone (state 0xfe / 0xfd)
+/// or with nothing under it (a 0.25 sphere, flags 0x22): state 1, the tumble stopped, its velocity the platform's
+/// move (none when it is no platform any more), off the platform.
+fn ground(w: &mut MobyWorld, id: usize, ctx: &Ctx) -> (V3, V3) {
+    let m = &w.mobys[id];
+    let (g, r) = (m.pv_v(GROUND), m.pv_v(GROUND_ROT));
+    let Some(p) = (m.pv_i(PLATFORM) as usize).checked_sub(1) else { return (g, r) };
+    let out = platform::to_world(w, id, ctx.hero_moby, p, g, r);
+    let world = out.as_ref().map_or((g, r), |o| (o.pos, o.angles));
+    if let Some((l, la)) = out.and_then(|o| o.local) {
+        w.mobys[id].set_pv_v(GROUND, l);
+        w.mobys[id].set_pv_v(GROUND_ROT, la);
+    }
+    if w.mobys[id].state == 3 {
+        let pos = w.mobys[id].pos;
+        let gone = w.mobys.get(p).is_none_or(|x| matches!(x.state, 0xfe | 0xfd));
+        if gone || ctx.coll.and_then(|c| crate::collision::coll_sphere_m(c, ctx.scene, pos, 0.25, crate::collision::QueryFlags(0x22), Some(id))).is_none() {
+            let mv = w.mobys.get(p).and_then(|x| platform::block(x).map(|b| x.pv_v(b + 0x10))).unwrap_or([0.0; 3]);
+            let m = &mut w.mobys[id];
+            m.state = 1;
+            m.set_pv_q(TUMBLE, [0.0, 0.0, 0.0, 1.0]);
+            m.set_pv_v(VEL, mv);
+            m.set_pv_i(PLATFORM, 0);
+        }
+    }
+    world
+}
+
+/// `0x382e20(moby, &ground, 0)`'s pose on the ground `(point, angles)` ([`ground`]): the spin (`+0x50` by the class's
+/// step, the way `+0x55` bit 0 picks, `+0x58` by 0.0125) at the class's tilt, turned into the ground's frame for the
+/// rows (mode 0x100 keeps them); the position the ground point + the class's lift along the ground's up + its offset
+/// along the first row. Returns the ground point.
+fn rest_pose(m: &mut Moby, (g, grot): (V3, V3)) -> V3 {
     let (step, tilt, lift, out) = match m.o_class {
         0xd => (0.04, -0.25, 0.048_75, 0.325),
         0xe => (0.03, -0.5, 0.0245, 0.35),
@@ -263,10 +319,9 @@ fn rest_pose(m: &mut Moby) -> V3 {
     let (a, b) = (add_rot(m.pv_f(0x50), k * step), add_rot(m.pv_f(0x58), k * -0.0125));
     m.set_pv_f(0x50, a);
     m.set_pv_f(0x58, b);
-    let ground = rows_of(m.pv_v(GROUND_ROT));
+    let ground = rows_of(grot);
     let spin = rows_of([a, tilt, b]);
     m.rows = spin.map(|r| std::array::from_fn(|j| r[0] * ground[0][j] + r[1] * ground[1][j] + r[2] * ground[2][j]));
-    let g = m.pv_v(GROUND);
     m.pos = add(add(scale(ground[2], lift), scale(m.rows[0], out)), g);
     g
 }

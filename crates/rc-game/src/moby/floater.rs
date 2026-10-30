@@ -114,6 +114,8 @@ pub fn step(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, b: usize) {
     m.pos = sub(m.pv_v(b), turned);
     // `0x31b8f8`: down by the clamped sink (the level's gravity is straight down).
     m.pos[2] -= (-off[2]).clamp(-c[2], c[2]);
-    let (pos, yaw) = (m.pos, m.rot[2]);
-    carry_hero(ctx, id, old, yaw, pos, yaw);
+    let (pos, rot) = (m.pos, m.rot);
+    // `0x322668`: its platform block (crate::moby::platform) — the move; its angles never change here, so no turn.
+    if let Some(pb) = crate::moby::platform::block(m) { crate::moby::platform::write(m, pb, sub(pos, old), rot, rot); }
+    carry_hero(ctx, id, old, rot[2], pos, rot[2]);
 }

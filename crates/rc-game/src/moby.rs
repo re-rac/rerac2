@@ -40,6 +40,7 @@ pub mod blast;
 pub mod bolts;
 pub mod floater;
 pub mod hits;
+pub mod platform;
 pub mod shards;
 
 use crate::hero::physics::{add, scale, V3};
@@ -264,9 +265,9 @@ impl SpawnRules<'_> {
     }
 }
 
-/// `0x322668(block, pos, old_pos, old_angles)`: a mover's step (the block `+0x20` of its pvars, read for whoever
-/// stands on it): Ratchet grounded on moby `id` is carried by its move from `old` (and turned by its yaw's change
-/// about its new place).
+/// A mover's step for Ratchet: grounded on moby `id` he is carried by its move from `old` (and turned by its yaw's
+/// change about its new place). It stands in for his own read of the mover's platform block (crate::moby::platform:
+/// `0x2b4a08` and the others through `0x322028`), which turns him about every axis.
 pub fn carry_hero(ctx: &mut Ctx, id: usize, old: V3, old_yaw: f32, new: V3, yaw: f32) {
     let h = &mut *ctx.hero;
     if h.ground_moby != Some(id) || h.air_ticks != 0 { return; }

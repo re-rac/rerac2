@@ -9,9 +9,9 @@
 //! * 0x0aab / 0x0aac (`0x3eb6f8`): sliding doors, set off by a hook ([`update_0aab`]).
 //! * 0x0d0d (`0x424cf8`): a breakable target: shot, it breaks into its pieces, debris chunks and smoke ([`update_0d0d`]).
 //! * 0x0adf (`0x3ecbb8`): a platform swinging along its cuboid, carrying Ratchet ([`update_0adf`]).
-//! * 0x0e93 (`0x42fb20`): a breakable (crate::moby::classes::props::update_breakable: a hit with the flags 0x4010000
-//!   while `+0x68`[0] = 0); its start's two glows (`0x346250`), its break's shards, burst, debris and sound are not
-//!   ported, nor the count of them `0x12cf` keeps (`$gp−0x3c0`; at 10 left, once: `0x367f58`, `0x32c310(0x1233)`).
+//! * 0x0e93 (`0x42fb20`): a breakable lamp: two glows, shot it breaks into its pieces, a ball, bolts, debris chunks and
+//!   smoke ([`update_0e93`]). Not ported: the count of them `0x12cf` keeps (`$gp−0x3c0`; at 10 left, once: `0x367f58`,
+//!   `0x32c310(0x1233)`).
 //!
 //! Not ported: 0x0adf's lift (`0x3ece68`, its update when the cuboid's z scale is 2: up and down to Ratchet's level
 //! as he rides it); 0x0e96 (`0x4301b0`, the arena crowd: it waits for its controller past state 1, cheers by the
@@ -251,6 +251,76 @@ pub fn update_0d0d(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => {}
     }
     w.mobys[id].hit_slot = -1;
+}
+
+/// 0x0e93 (`0x42fb20`), a breakable lamp. At its start two glows 4 above it (`0x346250`: size 409500, colour
+/// 0x28208080, the def's first frame; size 367500 pulled 0.75 toward the camera, 0x20208080, its second; far 0x60). A
+/// hit with the flags 0x4010000 while `+0x68`[0] = 0 breaks it (state 2): its pieces thrown (`0x3311f8`: gravity
+/// 10..20, spin 90..360°/s, `randf(−5, 2)` back, `randf_signed(0, 2)` across, `randf(1, 6)` up a second through its
+/// rows; pieces 0, 1 and 3 pointed, the rest balls; piece 1 left out; no bolts there; its sound 0), the level's bolts
+/// from 4 up (`0x32c250(4, m, 1)`), piece 1 a ball with no spin and gravity 15 at (0, −0.1, 0.05) a tick through its
+/// rows (`0x2df348`), four pointed debris chunks `rand_vec(0, 0.25)` about (0, 0.2, 4.3) in its frame at
+/// `rand_vec(0, 5/60)` plus (0, 0.05, 0.025) through its rows, `randf(0.5, 1)` of the size, colour 0x50404040
+/// (crate::moby::shards::throw_chunks), its smoke ([`smoke_0e93`]); then it is deleted (`0x3157a0`).
+pub fn update_0e93(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    use crate::hero::physics::add;
+    match w.mobys[id].state {
+        0 => {
+            let pos = w.mobys[id].pos;
+            if let Some(sys) = ctx.parts.as_deref_mut() {
+                let rng = &mut ctx.game.rng;
+                crate::particles::glow_def(sys, rng, 409_500.0, 0.0, [0.0, 0.0, 4.0], id, pos, 0x60, false, 0x2820_8080, -1, 0);
+                crate::particles::glow_def(sys, rng, 367_500.0, 0.75, [0.0, 0.0, 4.0], id, pos, 0x60, false, 0x2020_8080, -1, 1);
+            }
+            w.mobys[id].set_state(1, -1);
+        }
+        1 => {
+            if w.hit_message(id).is_some_and(|h| h.tmpl.flags & 0x0401_0000 != 0) && w.mobys[id].pv_i(0) == 0 { w.mobys[id].set_state(2, -1); }
+            w.clear_hit(id);
+            w.mobys[id].hit_slot = -1;
+        }
+        2 => {
+            crate::moby::shards::throw_all(w, id, ctx, [-5.0, 0.0, 1.0, 0.0, 2.0, 2.0, 6.0, 0.0], (90.0, 360.0), (10.0, 20.0), 0xb, 0, 1, 5, 0xffff);
+            crate::moby::bolts::level_drop(w, id, 4.0, 1, ctx);
+            let m = &w.mobys[id];
+            let (rows, pos, rot, o_class) = (m.rows, m.pos, m.rot, m.o_class);
+            crate::moby::shards::spawn_ball(w, ctx, o_class, Some(id), pos, rot, 0.0, 15.0, 1, through(&rows, [0.0, -0.1, 0.05]), 0xff);
+            let at = add(through(&rows, [0.0, 0.2, 4.3]), pos);
+            let vel = through(&rows, [0.0, 0.05, 0.025]);
+            crate::moby::shards::throw_chunks(w, ctx, 0.25, 5.0, (0.5, 1.0), id, at, 4, true, vel, 0x5040_4040, None);
+            smoke_0e93(w, id, ctx, 0.016_666_668, 0.233_333_33);
+            w.delete(id);
+        }
+        _ => {}
+    }
+}
+
+/// `0x42fea8(a, b, m)`: thirty staged puffs (crate::particles::staged, def 0x1003c) from 4 above it (each jittered
+/// `randf(−0.25, 0.25)` a way, `0x325bd0`), along its +y row ± `randf(−0.8, 0.8)` of its first and `randf(0.25, 1)` of
+/// its up at `randf(a, b)` a tick, `randf(0.2, 0.6)` across, growing in over `10·f`, easing over `30·f` (sinking 0.0025
+/// a tick of it all) and out over `7·f` ticks (f `randf(0.5, 1.5)`), coloured `0x80004080..0x80408080` to
+/// `0x00004080..0x00408080`.
+fn smoke_0e93(w: &MobyWorld, id: usize, ctx: &mut Ctx, a: f32, b: f32) {
+    use crate::hero::physics::{add, set_len};
+    let m = &w.mobys[id];
+    let base = add(m.pos, [0.0, 0.0, 4.0]);
+    let rows = m.rows;
+    let Some(sys) = ctx.parts.as_deref_mut() else { return };
+    let rng = &mut ctx.game.rng;
+    for _ in 0..30 {
+        let c = set_len(rows[0], rng.randf(-0.8, 0.8));
+        let d = set_len(rows[2], rng.randf(0.25, 1.0));
+        let v = set_len(add(add(rows[1], c), d), rng.randf(a, b));
+        let f = rng.randf(0.5, 1.5);
+        let (i, e, o) = ((f * 10.0) as i32, (f * 30.0) as i32, (f * 7.0) as i32);
+        let size = rng.randf(0.2, 0.6);
+        let sink = -0.0025 * (i + e + o) as f32;
+        let c0 = crate::hud::lerp_rgba(rng.randf(0.0, 1.0), 0x8000_4080, 0x8040_8080);
+        let c1 = crate::hud::lerp_rgba(rng.randf(0.0, 1.0), 0x0000_4080, 0x0040_8080);
+        let mut p = base;
+        for x in p.iter_mut() { *x += rng.randf(-0.25, 0.25); }
+        crate::particles::staged(sys, rng, p, [v[0], v[1], v[2], size], [v[0], v[1], v[2] + sink, 0.01], c0, c1, i as i16, e as i16, o as i16, 0x1003c);
+    }
 }
 
 fn through(rows: &[[f32; 3]; 3], v: [f32; 3]) -> [f32; 3] { std::array::from_fn(|k| v[0] * rows[0][k] + v[1] * rows[1][k] + v[2] * rows[2][k]) }

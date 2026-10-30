@@ -72,13 +72,15 @@ pub fn break_into(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, h: (f32, f32), v:
     }
 }
 
-/// L00 `0x32b580` (L01 `0x3210c0`) `(moby, h, spin, gravity, 0xffff, sound, skip, flags, mask, 0xff, 0)`: the bolts (flag 1 clear: the level's
-/// once; 0x10: nine times, else 0x20: twice), class sound `sound` (−1 none), then each piece of the class (`0x3078b0`)
-/// in `mask` but `skip` thrown (`0x2d1520` mode 2): its gravity and spin drawn from their ranges, its velocity from
-/// `h` (x from `h[0]..h[4]`, y `h[1]..h[5]`, z `h[2]..h[6]`; flags 2 / 4: x / y of either sign), a sixtieth a tick,
-/// through its rows unless flag 8.
+/// L00 `0x32b580` (L01 `0x3210c0`, L02 `0x3311f8`) `(moby, h, spin, gravity, modes, sound, skip, flags, mask, 0xff,
+/// 0)`: the bolts (flag 1 clear: the level's once; 0x10: nine times, else 0x20: twice), class sound `sound` (−1 none),
+/// then each piece of the class (`0x3078b0`) in `mask` but `skip` thrown (`0x2d1520`): pointed (mode 2) when its bit is
+/// set in `modes`, else a ball about its segment (mode 1, [`spawn_ball`]); its gravity and spin drawn from their
+/// ranges, its velocity from `h` (x from `h[0]..h[4]`, y `h[1]..h[5]`, z `h[2]..h[6]`; flags 2 / 4: x / y of either
+/// sign), a sixtieth a tick, through its rows unless flag 8. (Every caller passes the pieces' sound 0xff and no update
+/// of its own.)
 #[allow(clippy::too_many_arguments)]
-pub fn throw_all(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, h: [f32; 8], spin: (f32, f32), gravity: (f32, f32), sound: i32, skip: i32, flags: u32, mask: u32) {
+pub fn throw_all(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, h: [f32; 8], spin: (f32, f32), gravity: (f32, f32), modes: u32, sound: i32, skip: i32, flags: u32, mask: u32) {
     if flags & 1 == 0 { super::bolts::level_drop(w, id, 0.0, 1, ctx); }
     if flags & 0x10 != 0 {
         super::bolts::level_drop(w, id, 0.0, 9, ctx);
@@ -101,7 +103,13 @@ pub fn throw_all(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, h: [f32; 8], spin:
             let r = w.mobys[id].rows;
             v = std::array::from_fn(|i| v[0] * r[0][i] + v[1] * r[1][i] + v[2] * r[2][i]);
         }
-        spawn_piece(w, id, ctx, s, g, k as u8, v, 0xff);
+        if modes >> k & 1 != 0 {
+            spawn_piece(w, id, ctx, s, g, k as u8, v, 0xff);
+        } else {
+            let m = &w.mobys[id];
+            let (o_class, pos, rot) = (m.o_class, m.pos, m.rot);
+            spawn_ball(w, ctx, o_class, Some(id), pos, rot, s, g, k as u8, v, 0xff);
+        }
     }
 }
 
