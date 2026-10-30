@@ -58,7 +58,7 @@ under `crates/` shortened to `<crate>/src/...`, or the doc §. *Seen*: whether a
 
 | ID | System | Consumers | Census | Sources | Seen |
 |---|---|---|---|---|---|
-| G-CAM-001 | **Script camera** (class 5): position `0x4287b8`, look `0x428810`, set-up and switch `0x428880`, update `0x4289f0` | 25 units on 22 levels | 25 / 561 (13 / 64) | census; cameras.rs:31 | yes |
+| G-CAM-001 | ~~**Script camera** (class 5): position `0x4287b8`, look `0x428810`, set-up and switch `0x428880`, update `0x4289f0`~~ closed: rc_game::script_camera (switch `0x428880`, targets `0x4287b8` / `0x428810`, update `0x428bf8`, release `0x4289f0`); the census tags caught up 2026-10-30 | 25 units on 22 levels | 25 / 561 (13 / 64) | census; cameras.rs:31 | yes |
 | G-CAM-002 | **Other camera classes and blends**: 4 first person (mode 4 / 0x51), 6, 7 (Swingshot), 0x17 the placed view (`0x42b950` / `0x42b428`, the follow camera's setters `0x425e50..0x426110`), 0x1b; the blends `0x2d8ab0` / `0x2d9488`; the fly-by's look at a moby | Aranos's placed view (cuboid 0x1d), the Swingshot, first-person aim | — | cameras.rs:31, 298; bringup.md §6 | yes |
 | G-CAM-003 | **Follow camera leftovers**: the collision grid (`0x427758`, `0x4219a0`), the moby nudges (0x8ba, 0xd07, 0x10d0, 0x477, 0xb), the focus moby `0x1b8e84` / `0x18b270`, the stick auto-centre, the tweak requests `0x2d7568`, the body cameras (Clank, Giant Clank), the water settle, the knock-down view (state 0x74) | — | — | camera.rs:31, 539, 587 | yes |
 
@@ -134,7 +134,7 @@ under `crates/` shortened to `<crate>/src/...`, or the doc §. *Seen*: whether a
 
 | ID | System | Consumers | Census | Sources | Seen |
 |---|---|---|---|---|---|
-| G-UI-001 | **The message / prompt slot** `0x327a28` / `0x327ae0` (`0x1a8fb0` / `0x1a8fb4`), with the help log `0x2f6538`, the slot's time and level bits (`0x18c95c` / `0x18c960`) | help, 38 units | 38 / 249 (20 / 78) | help.rs:18; census | yes |
+| G-UI-001 | (2026-10-30: the lease `0x327a28` is rc_game::prompt; the census tag caught up) **The message / prompt slot** `0x327a28` / `0x327ae0` (`0x1a8fb0` / `0x1a8fb4`), with the help log `0x2f6538`, the slot's time and level bits (`0x18c95c` / `0x18c960`) | help, 38 units | 38 / 249 (20 / 78) | help.rs:18; census | yes |
 | G-UI-002 | **HUD leftovers**: the weapon's experience bar (sprite 5, `0x139868`), the low-ammo pulse, the quick select ring, the vendor, PAL's sizes | HUD | — | hud.rs:32 | yes |
 | G-UI-003 | **Help leftovers**: the multi-page help `0x27d800`, the shake offset `0x27d808`, PAL's height | help | — | help.rs:18 | minor |
 | G-UI-004 | **Subtitles** in other languages and the attract-mode list | scenes | — | scene.rs:27; bringup.md §6 | yes |

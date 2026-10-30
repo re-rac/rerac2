@@ -19,11 +19,11 @@ L00:0031e980	vec_helper	math	trivial	L	maths only
 L00:003261f8	moby_space_point	math	trivial	L	a point through a moby's matrix
 L00:00343fb8	steer_maths	math	trivial	L	maths only (no engine calls)
 L00:002f5460	help_text	ui	has	L	the help block's text by id (help.rs)
-L00:00327a28	message_slot	ui	missing	L	the prompt / message slot (0x1a8fb0 / 0x1a8fb4) with a help text; help.rs: the prompt slot 0x327ae0 not ported
-L00:004287b8	script_cam_pos	camera	missing	L	camera class 5 (script): its position (+0x80); cameras.rs has classes 0 and 0x13
-L00:00428810	script_cam_look	camera	missing	L	camera class 5 (script): its look point (+0x90)
-L00:00428880	script_cam_start	camera	missing	L	camera class 5 (script): the switch (0x2d8168) and set-up
-L00:004289f0	script_cam_update	camera	missing	L	camera class 5 (script): update
+L00:00327a28	message_slot	ui	has	L	the prompt / message slot lease (rc_game::prompt)
+L00:004287b8	script_cam_pos	camera	has	L	camera class 5 (script): its position target (rc_game::cameras camera_script_targets, crate::script_camera)
+L00:00428810	script_cam_look	camera	has	L	camera class 5 (script): its Euler target (camera_script_targets, crate::script_camera)
+L00:00428880	script_cam_start	camera	has	L	camera class 5 (script): the switch (camera_script, crate::script_camera)
+L00:004289f0	script_cam_update	camera	has	L	camera class 5 (script): the release (camera_script2, crate::script_camera)
 L00:0031c970	poke_group	group	has	L	rc_game::moby::MobyWorld::poke_group (+0xbc of every member)
 L00:0031b518	anim_state_helper	anim	has	L	over 0x3116e0
 L00:00304200	level_streaming	level	partly	L	the level's load / change steps (0x1c92c0.., sound, memory card)
@@ -39,11 +39,11 @@ L00:002f51a0	item_18	items	missing	cite	the item 0x18
 L00:003222a8	platform_velocity	platform	missing	cite	a carried moby takes the platform's velocity
 L00:0032ea38	speech	dialogue	missing	cite	the scene's speech start
 L00:00323c90	trail	fxdraw	missing	cite	the trail at +0x70
-L00:00325270	equip_item	items	missing	cite	equipping a reward item
+L00:00325270	new_planet_banner	items	has	L	the "new planet" banner (rc_game::travel::new_planet_banner)
 L00:00323d10	clank_anim	clank	missing	cite	Clank's own animation
 L00:00323e58	clank_anim2	clank	missing	cite	Clank's own animation
 L00:0031da58	shadow	shadow	has	L	the casters' slab probe (rc_game::shadow_volumes::probe_down; the shadow-volume pass in rc-engine shadow_render)
-L00:002fda20	flash_light	light	missing	cite	the Lancer's flash: a point light
+L00:002fda20	point_light	light	has	L	a point light taken (rc_game::point_lights; the Lancer's flash)
 L00:002d6d60	rumble	rumble	missing	cite	pad rumble
 boot:001153d4	memcpy	libc	trivial	L	the boot ELF's memcpy
 boot:00115484	memset	libc	trivial	L	the boot ELF's memset

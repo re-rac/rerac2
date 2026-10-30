@@ -120,12 +120,12 @@ L00:0031c618	line_collide	collision	partly	L
 L00:00327448	FUN_00327448	other	has	cite
 L00:0032a748	FUN_0032a748	enemy	has	cite
 L00:0033a6a0	FUN_0033a6a0	particles	has	cite
-L00:004287b8	script_cam_pos	camera	missing	L
-L00:00428810	script_cam_look	camera	missing	L
-L00:00428880	script_cam_start	camera	missing	L
+L00:004287b8	script_cam_pos	camera	has	L
+L00:00428810	script_cam_look	camera	has	L
+L00:00428880	script_cam_start	camera	has	L
 L00:00360750	play_level_sound	sound	partly	L
 L00:0031d4c8	FUN_0031d4c8	hero	has	cite
-L00:004289f0	script_cam_update	camera	missing	L
+L00:004289f0	script_cam_update	camera	has	L
 L00:003210a8	smoke_burst	breakfx	has	L
 L00:0031f030	FUN_0031f030	hero	has	cite
 L00:00326448	hero_direction	hero	partly	L
@@ -190,7 +190,7 @@ L00:002f5270	FUN_002f5270	game	has	cite
 L00:0031e048	ballistic	math	trivial	L
 L00:002efa50	FUN_002efa50	math	trivial	range
 L00:0031ebd8	FUN_0031ebd8	hero	has	cite
-L00:00327a28	message_slot	ui	missing	L
+L00:00327a28	message_slot	ui	has	L
 L00:00335bb8	FUN_00335bb8	particles	has	cite
 L00:0032b580	shards	breakfx	has	L
 L00:0033d400	FUN_0033d400	docs	missing	cite
@@ -244,7 +244,7 @@ L00:003dc100	FUN_003dc100	enemy	has	cite
 L00:0037d5a0	splash	particles	missing	cite
 L00:002eed98	FUN_002eed98	math	trivial	range
 L00:0031d378	FUN_0031d378	moby	has	cite
-L00:002fda20	flash_light	light	missing	cite
+L00:002fda20	point_light	light	has	L
 boot:00122b00	softfloat	libc	trivial	L
 boot:00123298	softfloat	libc	trivial	L
 L00:00327ae0	FUN_00327ae0	other	has	cite
@@ -310,7 +310,7 @@ L00:003d2d30	FUN_003d2d30	moby	has	cite
 L00:00342b50	FUN_00342b50	path	has	cite
 L00:003132e0	FUN_003132e0	moby	has	cite
 L00:0032c780	FUN_0032c780	scene	has	cite
-L00:00325270	equip_item	items	missing	cite
+L00:00325270	new_planet_banner	items	has	L
 L00:002f50f8	FUN_002f50f8	game	has	cite
 L00:002eef40	FUN_002eef40	math	trivial	range
 L00:002d7a60	FUN_002d7a60	camera	has	cite
