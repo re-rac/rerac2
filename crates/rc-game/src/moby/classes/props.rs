@@ -495,16 +495,17 @@ pub fn spawn_in_place(w: &mut MobyWorld, src: usize, o_class: i16, update_dist: 
 }
 
 /// The wrecks (`0x3d0f50`: 0x0ac9, 0x0c0a..0x0c0d, 0x0e01 / 0x0e02): a hit with the flags 0x10000 while `+0x68`[0x80]
-/// = 0 breaks them — 5 pieces (14 when the frame time `0x1b194c` / `0x1b1950` is short; the class 0x43e flung out,
-/// `0x39c6b8`: the effects pass), the sound 0xc0a, the sound 0xc0a, then 0x0c0a..0x0c0d leave the wreck 0x0c10..0x0c13 in their place
-/// and are hidden without collision and deleted after 300 ticks; 0x0ac9 (turned 45° at the start) and the 0x0e0x
-/// stay as they are (`+0x7c` = 0x8001).
+/// = 0 breaks them — 14 debris chunks ([`wreck_chunks`]; 5 while the frame load is high), the sound 0xc0a, then
+/// 0x0c0a..0x0c0d leave the wreck 0x0c10..0x0c13 in their place and are hidden without collision and deleted after 300
+/// ticks, over which the chunks drift aside; 0x0ac9 (turned 45° at the start) and the 0x0e0x stay as they are (`+0x7c`
+/// = 0x8001).
 pub fn update_wreck(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let class = w.mobys[id].o_class;
     let keep = matches!(class, 0x0ac9 | 0x0e01 | 0x0e02);
     match w.mobys[id].state {
         0 => {
             let m = &mut w.mobys[id];
+            for k in 0..0x10 { m.set_pv_i(4 * k, 0); }
             if class == 0x0ac9 { m.rot[1] += std::f32::consts::FRAC_PI_4; }
             m.set_state(1, -1);
             w.changed = true;
@@ -516,8 +517,8 @@ pub fn update_wreck(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             w.clear_hit(id);
         }
         2 => {
+            wreck_chunks(w, id, ctx);
             // The sound 0xc0a (`0x360698`, by its id, not the class's: the sound pass).
-            let _ = &ctx;
             let wreck = match class { 0x0c0a => Some(0x0c10), 0x0c0b => Some(0x0c11), 0x0c0c => Some(0x0c12), 0x0c0d => Some(0x0c13), _ => None };
             if let Some(c) = wreck { spawn_in_place(w, id, c, 0, &*ctx.host); }
             w.mobys[id].set_state(3, -1);
@@ -535,9 +536,66 @@ pub fn update_wreck(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let mut t = m.pv_i(0x84);
             let done = crate::moby::countdown(&mut t);
             m.set_pv_i(0x84, t);
-            if done && !keep { w.delete(id); }
+            if done {
+                if !keep { w.delete(id); }
+                return;
+            }
+            // Its chunks drift aside (their velocity's y less the rate `+0x40..`).
+            for k in 0..0x10 {
+                let (slot, rate) = (w.mobys[id].pv_i(4 * k), w.mobys[id].pv_f(0x40 + 4 * k));
+                let Some(c) = usize::try_from(slot - 1).ok().filter(|&c| w.mobys.get(c).is_some_and(|x| x.o_class == crate::moby::shards::CHUNK && x.state < 0x80)) else { continue };
+                let x = &mut w.mobys[c];
+                x.set_pv_f(4, x.pv_f(4) - rate);
+            }
         }
         _ => {}
+    }
+}
+
+/// The wreck's chunks (`0x3d0f50` state 2): each at a point of the wreck's collision (`0x31e100(1000, m, 1, …)`) plus
+/// `rand_vec(0.85, 1.95)`, moving `randf(−6, 6)` across and `randf(0, 5)` up a second; one in four a pointed piece
+/// (mode 2) `randf(2, 4)` forward with gravity 15..20, the rest balls (mode 1) `randf(−8, −4)` with gravity 5..10
+/// that drift aside at `randf(20, 40)`/3600 a tick; piece `randi(4)` of 0x43e at the wreck's angles, spinning 180°/s,
+/// `randf(0.75, 5)` of the class's scale, tinted (0x20, 0x60, 0x80), its glint update (crate::moby::shards::update_chunk).
+fn wreck_chunks(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    use crate::moby::shards;
+    let class_scale = w.class(shards::CHUNK).map_or(1.0, |c| c.scale);
+    for k in 0..14 {
+        let off = ctx.game.rng.rand_vec(0.85, 1.95);
+        let at = shards::random_points(w, id, ctx, 1000.0, 1, 0xffff).first().copied().unwrap_or(w.mobys[id].pos);
+        let pos = [off[0] + at[0], off[1] + at[1], off[2] + at[2]];
+        let rng = &mut ctx.game.rng;
+        let vz = rng.randf(0.0, 5.0) / 60.0;
+        let vy = rng.randf(-6.0, 6.0) / 60.0;
+        let pointed = rng.randi(4) == 0;
+        let (rate, vx, g) = if pointed {
+            let vx = rng.randf(2.0, 4.0) / 60.0;
+            (0.0, vx, (15.0, 20.0))
+        } else {
+            let rate = rng.randf(20.0, 40.0) * 0.000_277_777_78;
+            (rate, rng.randf(-8.0, -4.0) / 60.0, (5.0, 10.0))
+        };
+        let gravity = rng.randf(g.0, g.1);
+        let piece = rng.randi(4) as u8;
+        let rot = w.mobys[id].rot;
+        let vel = [vx, vy, vz];
+        let c = if pointed {
+            shards::spawn_shard(w, ctx, shards::CHUNK, Some(id), pos, rot, None, 180.0, gravity, piece, vel, 0xff)
+        } else {
+            shards::spawn_ball(w, ctx, shards::CHUNK, Some(id), pos, rot, 180.0, gravity, piece, vel, 0xff)
+        };
+        w.mobys[id].set_pv_f(0x40 + 4 * k, rate);
+        w.mobys[id].set_pv_i(4 * k, c.map_or(0, |c| c as i32 + 1));
+        let Some(c) = c else { continue };
+        let s = ctx.game.rng.randf(0.75, 5.0);
+        let x = &mut w.mobys[c];
+        x.update = Some(shards::update_chunk);
+        // The class has an update in the game (`0x41af90`, not ported), so its init never sets mode 2.
+        x.mode &= !crate::moby::mode::NO_UPDATE;
+        x.scale = class_scale * s;
+        x.ambient = [0x20, 0x60, 0x80];
+        x.alpha = 0x80;
+        x.set_pv_i(0x50, 0x0180_6020);
     }
 }
 

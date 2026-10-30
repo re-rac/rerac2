@@ -67,10 +67,11 @@ B:4	sound bank 4	gadget banks	has	L	the hand gadget's bank (0x306018), appended 
 L00:0032b580	shards	breakfx	has	L	throw every piece: rc_game::moby::shards::throw_all (L01 0x3210c0); mode 1 pieces not ported
 H:55c6aaae9bdd29ad	shards	breakfx	has	L	the level copies of 0x32b580 (shards::throw_all)
 L00:003210a8	smoke_burst	breakfx	has	L	rc_game::moby::blast::smoke_burst
-L00:00327648	throw_chunks	breakfx	missing	L	class 0x43e chunks (update 0x39c6b8): shard mode 1, not ported
+L00:00327648	throw_chunks	breakfx	has	L	the debris chunks (class 0x43e): rc_game::moby::shards::throw_chunks (shard modes 1 and 2, update_chunk)
 L00:002ecfb0	staged_burst	particles	has	L	rc_game::particles::staged_burst (type 2 puffs)
 L00:00304058	variant_of	level	has	L	the region of a point: LevelData::in_variant's plane walk
 H:c0a367fb31d59c29	death_fade	moby	has	L	the dying mobys' fade (L01 0x3eb1d0; manager 0xc41 0x3eacd8): rc_game::moby::classes::death_fade
 H:a054c90325f108e8	teleport_in	teleport	has	L	the teleport-in carrier 0x9bb (L02 0x2f0170, update 0x3cb2d0): rc_game::moby::classes::teleport::start
 L00:003269e0	rain_top	weather	has	L	the rain's top over a point (L01 0x31c630): rc_game::particles::rain::top over rc_formats::height_map
 L00:00326b28	rain_land	weather	has	L	a drop landing: ring or splash (L01 0x31c778): rc_game::moby::classes::weather::land
+L00:0031e100	random_points	moby	has	L	points in a moby's collision primitives (rc_game::moby::shards::random_points; kinds 1 and 3)

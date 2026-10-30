@@ -97,6 +97,8 @@ Then the teleport carrier 0x09bb (G-ENM-003) and Maktar's creature 0x0a4e (U117,
 
 Then stale manual tags fixed (same day): the script camera's four calls (rc_game::script_camera), the prompt lease `0x327a28` (rc_game::prompt), the "new planet" banner `0x325270` (was tagged "equip item") and the point light `0x2fda20` were ported but still tagged missing: cheap 259 / 4,276, missing 96 / 1,772, partly 48 / 1,482, unknown 167 / 1,813.
 
+Then the debris chunks (same day): shard mode 1, `0x327648`, `0x39c6b8`, `0x31e100`; the Aranos wrecks' chunks and Maktar's breakable 0x0d0d: 819 unported class-levels / 9,307 created, 147 ported units; cheap 269 / 4,515, missing 84 / 1,489, partly 48 / 1,482, unknown 167 / 1,821.
+
 Missing systems now (`systems.tsv`, every unit calling the system, not only the blocked; status as the ranking reads
 it):
 

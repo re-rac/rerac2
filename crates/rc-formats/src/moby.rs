@@ -302,11 +302,14 @@ pub struct MobyClass {
 ///   count}` and its low-LOD range (the packets follow the class's LOD and metal lists).
 /// * The points: class s16 0x2e gives a table at `16·word`; its byte `k + 1` is piece k's record (in quadwords from
 ///   the table, 0xff none): the centre (f32 x, y, z, w), then the points (s16 x, y, z, w; the first's w is their count).
+/// * The segment (the debris of shard mode 1, `0x311b50`): in the byte-0x2c table at `+0x40 + 16k`, two ends of s16
+///   x, y, z and a joint word (−1: none).
 #[derive(Clone, Debug, Default)]
 pub struct MobyPiece {
     pub packets: Vec<MobySubmesh>,
     pub centre: [f32; 3],
     pub points: Vec<[f32; 3]>,
+    pub segment: Option<[([f32; 3], i16); 2]>,
 }
 
 /// The most pieces a class has (the mask's bits 0..14).
@@ -339,6 +342,9 @@ fn read_pieces(b: Buf, h: &MobyClassHeader) -> Result<Vec<Option<MobyPiece>>> {
             Ok(([b.f32(r)?, b.f32(r + 4)?, b.f32(r + 8)?], pts))
         };
         if 0 < points { if let Ok((c, pts)) = read(k) { (piece.centre, piece.points) = (c, pts); } }
+        let end = |o: usize| -> Result<([f32; 3], i16)> { Ok(([b.i16(o)? as f32, b.i16(o + 2)? as f32, b.i16(o + 4)? as f32], b.i16(o + 6)?)) };
+        let seg = ranges + 0x40 + 0x10 * k;
+        piece.segment = end(seg).and_then(|a| Ok([a, end(seg + 8)?])).ok();
         out.push(Some(piece));
     }
     while out.last().is_some_and(Option::is_none) { out.pop(); }

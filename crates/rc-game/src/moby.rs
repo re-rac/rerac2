@@ -124,6 +124,8 @@ pub struct ClassInfo {
     pub reactions: Vec<Option<ai::Reaction>>,
     /// The break pieces' centre and points (1/1024 of the moby's scale; `rc_formats::moby::MobyPiece`), by piece.
     pub pieces: Vec<Option<(V3, Vec<V3>)>>,
+    /// The break pieces' segments (the ends, 1/1024 of the moby's scale; shard mode 1, crate::moby::shards), by piece.
+    pub segments: Vec<Option<[V3; 2]>>,
     /// Class header byte 0x0f ≠ 0: its shadow proxy (rc_formats::moby_shadow; crate::shadow_volumes).
     pub shadow: Option<std::sync::Arc<rc_formats::moby_shadow::ShadowBlock>>,
 }

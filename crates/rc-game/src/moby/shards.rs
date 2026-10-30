@@ -37,6 +37,8 @@ fn cross(a: V3, b: V3) -> V3 { [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * 
 pub(crate) const VEL: usize = 0x00;
 pub(crate) const SPIN: usize = 0x10;
 const PIVOT: usize = 0x20;
+/// Mode 1: the ball's radius (the pivot's w).
+const RADIUS: usize = 0x2c;
 const LIFE: usize = 0x34;
 const PIECE: usize = 0x36;
 const LOSS: usize = 0x38;
@@ -119,9 +121,27 @@ pub fn spawn_piece(w: &mut MobyWorld, src: usize, ctx: &mut Ctx, spin: f32, grav
 /// light and ambient, its scale ratio (its scale over its class's) and its mode 0x800.
 #[allow(clippy::too_many_arguments)]
 pub fn spawn_shard(w: &mut MobyWorld, ctx: &mut Ctx, o_class: i16, src: Option<usize>, pos: V3, rot: V3, rows: Option<[V3; 3]>, spin: f32, gravity: f32, piece: u8, vel: V3, sound: u8) -> Option<usize> {
+    spawn(w, ctx, o_class, src, pos, rot, rows, spin, gravity, piece, vel, sound, 2)
+}
+
+/// [`spawn_shard`] in mode 1 (`0x2dbff8`'s): the piece a ball about its segment's middle (`0x311b50`), half the
+/// segment across; no points.
+#[allow(clippy::too_many_arguments)]
+pub fn spawn_ball(w: &mut MobyWorld, ctx: &mut Ctx, o_class: i16, src: Option<usize>, pos: V3, rot: V3, spin: f32, gravity: f32, piece: u8, vel: V3, sound: u8) -> Option<usize> {
+    spawn(w, ctx, o_class, src, pos, rot, None, spin, gravity, piece, vel, sound, 1)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, o_class: i16, src: Option<usize>, pos: V3, rot: V3, rows: Option<[V3; 3]>, spin: f32, gravity: f32, piece: u8, vel: V3, sound: u8, body: u8) -> Option<usize> {
     let info = w.class(o_class)?;
     let class_scale = info.scale;
-    let (centre, n) = match info.pieces.get(piece as usize) { Some(Some((c, p))) => (*c, p.len()), _ => return None };
+    let (centre, n, radius) = if body == 1 {
+        let [a, b] = (*info.segments.get(piece as usize)?)?;
+        let mid = scale(add(a, b), 0.5);
+        (mid, 0, len(sub(mid, a)))
+    } else {
+        match info.pieces.get(piece as usize) { Some(Some((c, p))) => (*c, p.len(), 0.0), _ => return None }
+    };
     let (ratio, src_mode, light, ambient) = match src.and_then(|s| w.mobys.get(s)) {
         Some(s) => (w.class(s.o_class).map_or(1.0, |c| if c.scale != 0.0 { s.scale / c.scale } else { 1.0 }), s.mode, s.light, s.ambient),
         None => (1.0, 0, 0, [0x40; 3]),
@@ -153,12 +173,13 @@ pub fn spawn_shard(w: &mut MobyWorld, ctx: &mut Ctx, o_class: i16, src: Option<u
     m.set_pv_i(SOURCE, src.map_or(-1, |s| s as i32));
     m.pvars[POINTS] = n as u8;
     m.pvars[COUNT] = 0;
-    m.pvars[MODE] = 2;
+    m.pvars[MODE] = body;
     m.pvars[SOUND] = sound;
     m.piece = Some(piece);
     // The pivot: the piece's centre in the moby's frame (`0x311cf0`, then `0x326248`).
     let k = sc * 0.000_976_562_5;
     m.set_pv_v(PIVOT, scale(centre, k));
+    m.set_pv_f(RADIUS, radius * k);
     m.update = Some(update);
     Some(id)
 }
@@ -190,6 +211,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// `0x2dc1f0` mode 2: true when its life is over (or it left the world).
 pub(crate) fn step(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
+    if w.mobys[id].pvars[MODE] == 1 { return ball(w, id, ctx); }
     let pts = points(w, id);
     let mut done = body(w, id, ctx, &pts);
     let m = &mut w.mobys[id];
@@ -226,6 +248,57 @@ fn body(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, pts: &[V3]) -> bool {
         ctx.host.play_sound(&w.mobys[id], sound as i32, 0);
     }
     false
+}
+
+/// `0x2dc1f0` mode 1 (`0x2dc518`): it flies ([`fly`], `0x2dc888`); a ball about its pivot (radius `+0x2c`) that meets
+/// the level or a moby (flags 2, not its source; `0x2dcd48`) is pushed out and its spin turned by `velocity × normal`.
+/// On a floor (the normal within 45° of up) half its speed into the face bounces off; under 1/30 it stays on the
+/// floor and rolls — its speed eased toward 1/30 by 0.00194 a tick and its spin a tenth of the way to the roll for its
+/// radius — and from 1/30 into the face it sounds (its sound, else the level's 8; not ported). Against a wall it
+/// reflects. Its life counts down every tick; true when it is over (or it left the world).
+fn ball(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
+    fly(w, id);
+    let m = &w.mobys[id];
+    let centre = add(through(&m.rows, m.pv_v(PIVOT)), m.pos);
+    let (r, src) = (m.pv_f(RADIUS), usize::try_from(m.pv_i(SOURCE)).ok());
+    let hit = ctx.coll.and_then(|c| crate::collision::coll_sphere_m(c, ctx.scene, centre, r, crate::collision::QueryFlags(2), src));
+    if let Some(h) = hit {
+        let m = &mut w.mobys[id];
+        if let Some(p) = h.pushed_centre { m.pos = add(m.pos, sub(p, centre)); }
+        let n = set_len(h.normal, 1.0);
+        let mut vel = m.pv_v(VEL);
+        let spin = add_turn(m.pv_q(SPIN), cross(vel, n));
+        m.set_pv_q(SPIN, spin);
+        if 0.7 < dot([0.0, 0.0, 1.0], n) {
+            let vn = dot(vel, n);
+            let half = vn * 0.5;
+            let rolling = half.abs() < 0.033_333_335;
+            vel = sub(vel, set_len(n, if rolling { vn } else { vn + half }));
+            if rolling {
+                let mut speed = len(vel);
+                crate::hero::physics::approach(0.033_333_335, 0.001_944_444_5, &mut speed);
+                vel = set_len(vel, speed);
+                let axis = cross(n, vel);
+                let s = if r != 0.0 { (len(axis) * -0.5) / r } else { 0.0 };
+                let roll = set_len(axis, s);
+                let q = [roll[0], roll[1], roll[2], (1.0 - s * s).max(0.0).sqrt()];
+                m.set_pv_q(SPIN, crate::quat::nlerp(m.pv_q(SPIN), q, 0.1));
+            }
+            m.set_pv_v(VEL, vel);
+            let sound = m.pvars[SOUND];
+            if 0.033_333_335 <= vn.abs() && sound != 0xff { ctx.host.play_sound(&w.mobys[id], sound as i32, 0); }
+        } else {
+            let d = dot(vel, n);
+            if d < 0.0 { vel = sub(vel, scale(n, 2.0 * d)); }
+            m.set_pv_v(VEL, vel);
+        }
+    }
+    let m = &mut w.mobys[id];
+    let t = m.pv_s(LIFE);
+    m.set_pv_s(LIFE, (t - 1).max(0));
+    let p = m.pos;
+    let inside = |c: f32| (2.0..=1021.0).contains(&c);
+    t <= 1 || !(inside(p[0]) && inside(p[1]) && inside(p[2]))
 }
 
 /// `0x2dc7a8`: falls, moves, and spins about its pivot.
@@ -371,5 +444,139 @@ fn settle(m: &mut super::Moby, slot: usize, up: V3, pts: &[V3]) {
             m.pvars[COUNT] -= 1;
             m.pvars[CONTACTS] = m.pvars[CONTACTS + 2];
         }
+    }
+}
+
+/// `0x31e100(density, m, most, &out, mask)`: points spread through the moby's collision primitives (in `mask`, with the
+/// flag 0x20000), each in a primitive picked by its volume: `round(density · volume)` of them, at most `most`. A
+/// sphere (kind 1) gives a point inside it (drawn in a cube until inside, through the rows); an upright cylinder (kind
+/// 3) one at a random angle and `√randf(0, r²)` out, `randf(0, height)` up. Not ported: the joint kinds 2 / 4 (no
+/// caller's class has them).
+pub fn random_points(w: &MobyWorld, id: usize, ctx: &mut Ctx, density: f32, most: usize, mask: u32) -> Vec<V3> {
+    let m = &w.mobys[id];
+    let Some(blob) = ctx.scene.and_then(|sc| sc.classes.get(&m.o_class)) else { return Vec::new() };
+    let k = m.scale * 0.000_976_562_5;
+    let f = |b: u32| f32::from_bits(b);
+    let mut prims = Vec::new();
+    let mut total = 0.0;
+    for (i, p) in blob.prims.iter().enumerate() {
+        let w0 = p.q0()[0];
+        if mask >> (i & 0x1f) & 1 != 0 && w0 & 0x20000 != 0 {
+            let q1 = p.q1();
+            let r = f(q1[3]) * k;
+            let v = match p.kind() {
+                3 => r * r * 4.187_743 * r + r * r * std::f32::consts::FRAC_PI_2 * f(p.q0()[1]) * k,
+                1 => r * r * 4.188_790_3 * r,
+                _ => 0.0,
+            };
+            prims.push((p.kind(), [f(q1[0]) * k, f(q1[1]) * k, f(q1[2]) * k], r, f(p.q0()[1]) * k, v));
+            total += v;
+        }
+        if (w0 as i32) < 0 { break; }
+    }
+    let n = ((density * total + 0.5) as i32).min(most as i32);
+    let mut out = Vec::new();
+    let rng = &mut ctx.game.rng;
+    for _ in 0..n.max(0) {
+        let mut t = rng.randf(0.0, total);
+        let mut pick = 0;
+        while pick + 1 < prims.len() && prims[pick].4 <= t {
+            t -= prims[pick].4;
+            pick += 1;
+        }
+        let Some(&(kind, c, r, h, _)) = prims.get(pick) else { break };
+        if kind == 3 {
+            let s = rng.randf(0.0, r * r);
+            let z = rng.randf(0.0, h);
+            let a = rng.rand_angle();
+            let s = s.sqrt();
+            out.push(add(add([a.cos() * s, a.sin() * s, z], m.pos), c));
+        } else {
+            let v = loop {
+                let v = [rng.randf(-r, r), rng.randf(-r, r), rng.randf(-r, r)];
+                if len(v) <= r { break v; }
+            };
+            out.push(add(through(&m.rows, add(c, v)), m.pos));
+        }
+    }
+    out
+}
+
+/// The debris chunks' class (its four pieces are both balls and pointed pieces).
+pub const CHUNK: i16 = 0x043e;
+
+/// `0x39c6b8`: a debris chunk's update — its body ([`step`]; over, it fades 2 alpha a tick and goes), and its colour
+/// (`+0x50`, the high byte set for a tinted one) lit toward white by how squarely it faces the camera (the fifth
+/// power of its facing's dot with the camera's), or by a 20-tick sparkle that starts one tick in 45 (a tinted one
+/// 0.8 as much).
+pub fn update_chunk(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    match w.mobys[id].state {
+        0 => {
+            if step(w, id, ctx) {
+                w.mobys[id].set_state(1, -1);
+                w.mobys[id].mode |= 0x2800;
+            }
+        }
+        1 => {
+            step(w, id, ctx);
+            if w.mobys[id].alpha < 2 {
+                w.delete(id);
+                return;
+            }
+            w.mobys[id].alpha -= 2;
+        }
+        _ => {}
+    }
+    let cam = ctx.host.camera_rows()[0];
+    let m = &w.mobys[id];
+    let mut f = dot(m.rows[0], cam).abs().powi(5);
+    if m.state_ticks == 0 {
+        if ctx.game.rng.randi(45) == 0 { w.mobys[id].state_ticks = 20; }
+    } else {
+        let m = &mut w.mobys[id];
+        let k = (m.state_ticks as i32 - 10).abs();
+        m.state_ticks -= 1;
+        f = (10 - k) as f32 * 0.1;
+    }
+    let m = &mut w.mobys[id];
+    let c = m.pv_i(0x50) as u32;
+    if c >> 24 != 0 { f *= 0.8; }
+    let lit = crate::hud::lerp_rgba(f, c, 0xffff_ffff);
+    m.set_ambient_word(lit);
+}
+
+/// `0x327648(reach, speed, s₀, s₁, src, at, n, pointed, vel, colour, rot)`: `n` debris chunks (class 0x43e), each
+/// `rand_vec(0, reach)` about `at` moving `rand_vec(0, speed/60) + vel` a tick at the angles `rot` (else a random yaw
+/// and roll), a ball (mode 1) or with `pointed` a pointed piece (mode 2), piece `randi(4)`, spinning 180°/s with
+/// gravity 10..20, `randf(s₀, s₁)` of the class's scale, the colour's rgb as its ambient and tint (`+0x50`, high byte
+/// set when not grey) and its alpha; its update [`update_chunk`].
+#[allow(clippy::too_many_arguments)]
+pub fn throw_chunks(w: &mut MobyWorld, ctx: &mut Ctx, reach: f32, speed: f32, s: (f32, f32), src: usize, at: V3, n: i32, pointed: bool, vel: V3, colour: u32, rot: Option<V3>) {
+    let class_scale = w.class(CHUNK).map_or(1.0, |c| c.scale);
+    for _ in 0..n {
+        let rng = &mut ctx.game.rng;
+        let v = add(rng.rand_vec(0.0, speed * 0.016_666_668), vel);
+        let p = add(rng.rand_vec(0.0, reach), at);
+        let (a, b) = (rng.rand_angle(), rng.rand_angle());
+        let r = rot.unwrap_or([a, 0.0, b]);
+        let piece = rng.randi(4) as u8;
+        let gravity = rng.randf(10.0, 20.0);
+        let c = if pointed {
+            spawn_shard(w, ctx, CHUNK, Some(src), p, r, None, 180.0, gravity, piece, v, 0xff)
+        } else {
+            spawn_ball(w, ctx, CHUNK, Some(src), p, r, 180.0, gravity, piece, v, 0xff)
+        };
+        let Some(c) = c else { continue };
+        let k = ctx.game.rng.randf(s.0, s.1);
+        let (red, green, blue) = (colour & 0xff, colour >> 8 & 0xff, colour >> 16 & 0xff);
+        let tinted = (red != green || red != blue) as u32;
+        let x = &mut w.mobys[c];
+        x.update = Some(update_chunk);
+        // The class has an update in the game (`0x41af90`, not ported), so its init never sets mode 2.
+        x.mode &= !mode::NO_UPDATE;
+        x.scale = class_scale * k;
+        x.ambient = [red as u8, green as u8, blue as u8];
+        x.alpha = (colour >> 24) as u8;
+        x.set_pv_i(0x50, (tinted << 24 | blue << 16 | green << 8 | red) as i32);
     }
 }

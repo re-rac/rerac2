@@ -515,6 +515,7 @@ impl Mobys {
                 animated: m.anim.get(ci).and_then(|a| a.sequences.first()).and_then(Option::as_ref).is_some_and(|q| q.header.frame_count >= 2),
                 kind: (c.class.header.ty as u16 | (c.class.header.mode_bits2 as u16) << 8) as i16,
                 pieces: c.class.pieces.iter().map(|p| p.as_ref().map(|p| (p.centre, p.points.clone()))).collect(),
+                segments: c.class.pieces.iter().map(|p| p.as_ref().and_then(|p| p.segment).map(|s| [s[0].0, s[1].0])).collect(),
                 // Class byte 0x0f: its shadow proxy (rc_game::shadow_volumes).
                 shadow: blobs.blobs.get(&c.o_class).and_then(|b| rc_formats::moby_shadow::ShadowBlock::of_class(b).ok().flatten()).map(std::sync::Arc::new),
                 reactions: m

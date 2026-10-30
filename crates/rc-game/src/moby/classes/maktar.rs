@@ -7,6 +7,7 @@
 //!   [`update_0a55`]).
 //! * 0x0a4b (`0x3dd3c8`): its shadow's slab probed while drawn within 64 of the camera, range 0x3c ([`update_0a4b`]).
 //! * 0x0aab / 0x0aac (`0x3eb6f8`): sliding doors, set off by a hook ([`update_0aab`]).
+//! * 0x0d0d (`0x424cf8`): a breakable target: shot, it breaks into its pieces, debris chunks and smoke ([`update_0d0d`]).
 //! * 0x0adf (`0x3ecbb8`): a platform swinging along its cuboid, carrying Ratchet ([`update_0adf`]).
 //! * 0x0e93 (`0x42fb20`): a breakable (crate::moby::classes::props::update_breakable: a hit with the flags 0x4010000
 //!   while `+0x68`[0] = 0); its start's two glows (`0x346250`), its break's shards, burst, debris and sound are not
@@ -200,5 +201,81 @@ pub fn update_0aab(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             w.changed = true;
         }
         _ => {}
+    }
+}
+
+/// 0x0d0d (`0x424cf8`): a breakable. At its start a target with all its pieces (`0x315c10`); a hit with the flags
+/// 0x4010000 breaks it (state 2): no pieces drawn (`+0x7c` = 0; here hidden), `+0` 120, no collision, the level's bolts
+/// (`0x32c250(1, m, 1)`), its sound 0, each piece thrown (spin 90..360°/s, gravity 10..20, `randf(−5, −2)` back,
+/// `randf_signed(0, 2)` across, `randf(1, 6)` up a second through its rows), four pointed chunks `rand_vec(0, 0.25)`
+/// about (−0.8, 0, 1.5) in its frame at `rand_vec(0, 5/60)` plus 1/12 back, `randf(0.5, 1)` of the size, colour
+/// 0x50404040 (crate::moby::shards::throw_chunks), and its smoke ([`smoke_0d0d`]); then state 3. Not ported: the
+/// count it lowers (`$gp−0x3c0`, 0x12cf's).
+pub fn update_0d0d(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    use crate::hero::physics::{add, set_len};
+    match w.mobys[id].state {
+        0 => {
+            let m = &mut w.mobys[id];
+            m.mode |= mode::TARGET;
+            m.set_state(1, -1);
+        }
+        1 => {
+            if w.hit_message(id).is_some_and(|h| h.tmpl.flags & 0x0401_0000 != 0) { w.mobys[id].set_state(2, -1); }
+            w.clear_hit(id);
+        }
+        2 => {
+            let m = &mut w.mobys[id];
+            m.mode |= 1;
+            m.set_pv_i(0, 0x78);
+            m.has_collision = false;
+            crate::moby::bolts::level_drop(w, id, 1.0, 1, ctx);
+            ctx.host.play_sound(&w.mobys[id], 0, 0);
+            let pieces = w.class(0x0d0d).map_or(0, |c| c.pieces.len());
+            for k in 0..pieces.min(0x10) {
+                let rng = &mut ctx.game.rng;
+                let gravity = rng.randf(10.0, 20.0);
+                let spin = rng.randf(90.0, 360.0);
+                let v = [rng.randf(-2.0, -5.0) / 60.0, rng.randf_signed(0.0, 2.0) / 60.0, rng.randf(1.0, 6.0) / 60.0];
+                let m = &w.mobys[id];
+                let v = through(&m.rows, v);
+                let (pos, rot) = (m.pos, m.rot);
+                crate::moby::shards::spawn_shard(w, ctx, 0x0d0d, Some(id), pos, rot, None, spin, gravity, k as u8, v, 0xff);
+            }
+            let m = &w.mobys[id];
+            let at = add(through(&m.rows, [-0.8, 0.0, 1.5]), m.pos);
+            let back = set_len(m.rows[0], -0.083_333_336);
+            crate::moby::shards::throw_chunks(w, ctx, 0.25, 5.0, (0.5, 1.0), id, at, 4, true, back, 0x5040_4040, None);
+            smoke_0d0d(w, id, ctx, -0.083_333_336, -0.25);
+            w.mobys[id].set_state(3, -1);
+        }
+        _ => {}
+    }
+    w.mobys[id].hit_slot = -1;
+}
+
+fn through(rows: &[[f32; 3]; 3], v: [f32; 3]) -> [f32; 3] { std::array::from_fn(|k| v[0] * rows[0][k] + v[1] * rows[1][k] + v[2] * rows[2][k]) }
+
+/// `0x425010(a, b, m)`: twenty staged puffs (crate::particles::staged, def 0x1003c) from 1.75 up and 0.5 back in its
+/// frame, each along its facing ± `randf(−1, 1)` across and `randf(−0.15, 1)` up at `randf(a, b)` a tick, `randf(0.2,
+/// 0.6)` across, growing in over `10·f`, easing over `30·f` (sinking 1/720 a tick of it all) and out over `7·f` ticks
+/// (f `randf(0.5, 1.5)`), coloured `0x80004080..0x80408080` to `0x80008040..0x00408040`.
+fn smoke_0d0d(w: &MobyWorld, id: usize, ctx: &mut Ctx, a: f32, b: f32) {
+    use crate::hero::physics::{add, scale, set_len};
+    let m = &w.mobys[id];
+    let base = add(add(scale(m.rows[2], 1.75), m.pos), scale(m.rows[0], -0.5));
+    let rows = m.rows;
+    let Some(sys) = ctx.parts.as_deref_mut() else { return };
+    let rng = &mut ctx.game.rng;
+    for _ in 0..20 {
+        let c = set_len(rows[1], rng.randf(-1.0, 1.0));
+        let d = set_len(rows[2], rng.randf(-0.15, 1.0));
+        let v = set_len(add(add(rows[0], c), d), rng.randf(a, b));
+        let f = rng.randf(0.5, 1.5);
+        let (i, e, o) = ((f * 10.0) as i32, (f * 30.0) as i32, (f * 7.0) as i32);
+        let size = rng.randf(0.2, 0.6);
+        let sink = -0.001_388_888_9 * (i + e + o) as f32;
+        let c0 = crate::hud::lerp_rgba(rng.randf(0.0, 1.0), 0x8000_4080, 0x8040_8080);
+        let c1 = crate::hud::lerp_rgba(rng.randf(0.0, 1.0), 0x8000_8040, 0x0040_8040);
+        crate::particles::staged(sys, rng, base, [v[0], v[1], v[2], size], [v[0], v[1], v[2] + sink, 0.01], c0, c1, i as i16, e as i16, o as i16, 0x1003c);
     }
 }
