@@ -12,13 +12,13 @@
 //! * 0x0e93 (`0x42fb20`): a breakable lamp: two glows, shot it breaks into its pieces, a ball, bolts, debris chunks and
 //!   smoke ([`update_0e93`]). Not ported: the count of them `0x12cf` keeps (`$gp−0x3c0`; at 10 left, once: `0x367f58`,
 //!   `0x32c310(0x1233)`).
-//! * The lock puzzle: the power nodes 0x0c82 ([`update_0c82`]) a bomb 0x09c8 kills, the lock 0x0c81
-//!   ([`update_0c81`]) that, with its four nodes dead, hooks its group, and the conveyor bridge 0x0ab0
-//!   ([`update_0ab0`]) that unfolds when hooked and carries Ratchet on its belt surfaces 0x0aaf.
+//! * The lock puzzle: the bomb 0x09c8 ([`update_09c8`]) the Tractor Beam drags, lit when taken, flung by its
+//!   catapult 0x0aa6 ([`update_0aa6`]); its blast kills the power nodes 0x0c82 ([`update_0c82`]) and breaks the walls
+//!   0x0c1b ([`update_0c1b`]); the lock 0x0c81 ([`update_0c81`]), its four nodes dead, hooks its group: the conveyor
+//!   bridge 0x0ab0 ([`update_0ab0`]) unfolds and carries Ratchet on its belt surfaces 0x0aaf.
 //!
-//! Not ported (the lock puzzle): the bomb 0x09c8 (`0x3d1020`: dragged by the Tractor Beam, its fuse, its blast,
-//! home), the catapult 0x0aa6 (`0x3e9d48`) that flings it, the walls 0x0c1b (`0x446a48`) it breaks, the nodes' and
-//! the lock's draws (`0x414118`, `0x413460`).
+//! Not ported (the lock puzzle): the nodes', the lock's and the catapult's draws (`0x414118`: an arc to the lock,
+//! `0x2f03a8`; `0x413460`: seven effect panels; `0x3eae18`), the catapult's aiming camera.
 //!
 //! Not ported: 0x0adf's lift (`0x3ece68`, its update when the cuboid's z scale is 2: up and down to Ratchet's level
 //! as he rides it); 0x0e96 (`0x4301b0`, the arena crowd: it waits for its controller past state 1, cheers by the
@@ -809,5 +809,336 @@ pub fn draw_0ab0(w: &MobyWorld, id: usize, out: &mut Vec<crate::fx::FxQuad>) {
         let corners = [world(1.0, y0 + step), world(1.0, y0), world(-1.0, y0 + step), world(-1.0, y0)];
         out.push(crate::fx::FxQuad { fx: 5, additive: true, corners, st: [[0.5, 0.5], [0.5, 0.5], [0.5, 1.5], [0.5, 1.5]], rgba: [c0; 4] });
         out.push(crate::fx::FxQuad { fx: 0x10, additive: true, corners, st: [[scroll, 0.15], [1.0 + scroll, 0.15], [scroll, 0.85], [1.0 + scroll, 0.85]], rgba: [c1; 4] });
+    }
+}
+
+/// `$gp+0x1104`: the bomb's blast size; `$gp+0x1108` its glow at rest; `0x1b00fc` / `0x1b0100` its pulse's ends.
+const BOMB_BLAST: f32 = 1.5;
+const BOMB_GLOW: u32 = 0x8080_8080;
+const BOMB_PULSE: (u32, u32) = (0x8020_2040, 0x8040_40ff);
+
+/// 0x09c8 (`0x3d1020`), the bomb, while the level's chunk is 0. Its pvars: the drag block `+0x50` (the Tractor
+/// Beam's, crate::moby::classes::tractor::drag: reach `[0x84]` 2.75, range `[0x88]` 10, flags `[0x70]` 6), its home
+/// `[0xa0]` (0.7 over the ground under where it was placed), its velocity flying `[0xb0]`, its fuse `[0xc0]` seconds
+/// and ticks `[0xd4]`, its pulse `[0xd8]`, its sphere `[0xe0]` (⅓) and its misses `[0xe4]`.
+/// * 1: dragged; the beam taking it (`0x18a3e0`) lights its fuse (2).
+/// * 2: dragged; it beeps (the TNT crate's sound 1, at 10 into each second, each half second in the last two); its
+///   fuse out it explodes (5); hooked (a catapult 0x0aa6 takes it) it waits (3) for the launch ([`launch_bomb`], 4).
+/// * 4: flying; gravity 1/240 a tick²; its sphere meeting anything, or 1 under home, it explodes (5); out of the world
+///   (2..1021) it goes home (6).
+/// * 5: on its first tick the blast (crate::moby::blast, size 1.5, with a camera shake within 24) and hidden, its
+///   sound 1; each tick a sphere of half its ticks, 5 damage, flags 0x830000 (the nodes and walls take it; one met
+///   first that is a node takes 4 off its misses); at 11 its misses + 1 grow its sphere past 8 (to 1), a last sphere of
+///   6 doing 10, and home (6).
+/// * 6: once nothing is within 0.75 of its home it goes back there (`0x3d1790`: shown, unhooked, the teleport-in).
+///
+/// Drawn it spins and its glow pulses but at rest. Not ported: its cuboid `[0xc4]` (`0x3d1848`: carried into it the
+/// screen fades and Ratchet is moved; none on Maktar's bombs is set), the words `0x18ca60` / `$gp+0x1100`.
+pub fn update_09c8(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    use crate::hero::physics::{add, add_rot, dist};
+    if ctx.game.variant != 0 { return; }
+    let sphere = |ctx: &Ctx, p: crate::hero::physics::V3, r: f32, flags: u32| {
+        ctx.coll.and_then(|c| crate::collision::coll_sphere_m(c, ctx.scene, p, r, crate::collision::QueryFlags(flags), Some(id))).is_some()
+    };
+    match w.mobys[id].state {
+        0 => {
+            let ground = crate::moby::ai::ground_z(ctx, 0.5, w.mobys[id].pos, 0);
+            let m = &mut w.mobys[id];
+            m.update_dist = 0xff;
+            m.mode |= mode::TARGET;
+            m.set_pv_f(0xe0, f32::from_bits(0x3eaa_7efa));
+            m.set_pv_f(0x84, 2.75);
+            m.set_pv_i(0x70, m.pv_i(0x70) | 6);
+            m.set_state(1, -1);
+            m.pos[2] = ground + 0.7;
+            m.set_pv_f(0x88, 10.0);
+            let p = m.pos;
+            m.set_pv_v(0xa0, p);
+            m.set_pv_i(0x90, -1);
+        }
+        1 => {
+            super::tractor::drag(w, id, ctx, 0.5, -1);
+            if super::tractor::held(w) == Some(id) {
+                let m = &mut w.mobys[id];
+                m.set_state(2, -1);
+                m.set_pv_i(0xd4, (m.pv_f(0xc0) * 60.0) as i32);
+            }
+        }
+        2 => {
+            if w.mobys[id].state_ticks == 0 { w.mobys[id].set_pv_i(0xdc, 0); }
+            super::tractor::drag(w, id, ctx, 0.5, -1);
+            let t = w.mobys[id].pv_i(0xd4);
+            if t % 0x3c == 10 || (t < 0x78 && t % 0x1e == 10) { ctx.host.play_sound_of(&w.mobys[id], 0x1f9, 1, 0); }
+            let mut t = t;
+            let out = crate::moby::countdown(&mut t);
+            w.mobys[id].set_pv_i(0xd4, t);
+            if out {
+                w.mobys[id].set_state(5, -1);
+            } else if w.mobys[id].once & 4 != 0 {
+                w.mobys[id].set_state(3, -1);
+            }
+        }
+        4 => {
+            let m = &mut w.mobys[id];
+            let mut v = m.pv_v(0xb0);
+            m.pos = add(m.pos, v);
+            v[2] -= 0.004_166_667;
+            m.set_pv_v(0xb0, v);
+            let (p, r, home) = (m.pos, m.pv_f(0xe0), m.pv_v(0xa0));
+            if sphere(ctx, p, r, 0) || p[2] < home[2] - 1.0 {
+                w.mobys[id].set_state(5, -1);
+            }
+            let p = w.mobys[id].pos;
+            if p.iter().any(|&x| !(2.0..=1021.0).contains(&x)) { w.mobys[id].set_state(6, -1); }
+        }
+        5 => {
+            let ticks = w.mobys[id].state_ticks;
+            let pos = w.mobys[id].pos;
+            if ticks == 0 {
+                crate::moby::blast::burst(w, ctx, pos, &crate::moby::blast::Blast { size: BOMB_BLAST, bursts: [0x19, 0x14, 0x14], puffs: 0x14, streaks: 0x2d, light: false, shake: true });
+                let m = &mut w.mobys[id];
+                m.drawn = 0;
+                m.mode = (m.mode & !mode::TARGET) | 1;
+                ctx.host.play_sound(&w.mobys[id], 1, 0);
+                let s = ((24.0 - dist(ctx.host.camera_pos(), pos)) * 0.006_250_000_6).clamp(0.0, 0.15);
+                if s != 0.0 { ctx.game.shakes.ask(0, s, 0x5a); }
+            }
+            crate::moby::ai::attack_sphere(w, id, ctx, ticks as f32 * 0.5, 5.0, 1.0, pos, 0x83_0000, 0, 1, 0);
+            if w.hits.last_target.is_some_and(|t| w.mobys.get(t).is_some_and(|n| n.o_class == NODE)) {
+                let m = &mut w.mobys[id];
+                m.set_pv_i(0xe4, (m.pv_i(0xe4) - 4).max(0));
+            }
+            if 0xb <= ticks {
+                let m = &mut w.mobys[id];
+                let n = m.pv_i(0xe4);
+                m.set_pv_i(0xe4, n + 1);
+                let r = if n + 1 < 8 { f32::from_bits(0x3eaa_7efa) } else { ((n - 6) as f32 * 0.095_142_86 + 0.333).min(1.0) };
+                m.set_pv_f(0xe0, r);
+                crate::moby::ai::attack_sphere(w, id, ctx, 6.0, 10.0, 1.0, pos, 0x83_0000, 0, 1, 0);
+                w.mobys[id].set_state(6, -1);
+            }
+        }
+        6 => {
+            let home = w.mobys[id].pv_v(0xa0);
+            if !sphere(ctx, [home[0], home[1], home[2] + 0.7], 0.75, 5) { bomb_home(w, id, ctx); }
+        }
+        _ => {}
+    }
+    let state = w.mobys[id].state;
+    let m = &mut w.mobys[id];
+    if m.drawn != 0 {
+        let a = add_rot(m.rot[1], 0.026_179_94);
+        m.rot[1] = a;
+        m.rot[2] = add_rot(a, 0.015_126_4);
+        m.glow = if state != 1 {
+            let p = add_rot(m.pv_f(0xd8), 0.209_439_51);
+            m.set_pv_f(0xd8, p);
+            crate::hud::lerp_rgba(p.sin() * 0.5 + 0.5, BOMB_PULSE.0, BOMB_PULSE.1)
+        } else {
+            BOMB_GLOW
+        };
+    }
+    let m = &mut w.mobys[id];
+    m.state_ticks = m.state_ticks.wrapping_add(1);
+    w.rebuild(id, ctx.host);
+    w.changed = true;
+}
+
+/// `0x3d1748(bomb, v)`: a catapult's launch — flying (4) at `v` a tick.
+pub fn launch_bomb(w: &mut MobyWorld, id: usize, v: crate::hero::physics::V3) {
+    let m = &mut w.mobys[id];
+    m.set_state(4, -1);
+    m.set_pv_v(0xb0, v);
+}
+
+/// `0x3d1790`: home — at rest (1) at its home, its drag stopped, shown, a target, unhooked, through the teleport-in
+/// carrier (crate::moby::classes::teleport::start).
+fn bomb_home(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let m = &mut w.mobys[id];
+    m.set_pv_f(0xd8, 0.0);
+    m.glow = crate::hud::lerp_rgba(0.5, BOMB_PULSE.0, BOMB_PULSE.1);
+    m.set_state(1, -1);
+    let home = m.pv_v(0xa0);
+    m.pos = home;
+    m.set_pv_v(0x60, home);
+    m.set_pv_v(0x50, [0.0; 3]);
+    m.drawn = 1;
+    m.mode = (m.mode & !1) | mode::TARGET;
+    m.once &= !4;
+    let rot = m.rot;
+    super::teleport::start(w, id, home, rot, &[]);
+    w.rebuild(id, ctx.host);
+}
+
+/// 0x0c1b (`0x446a48`), a wall a bomb breaks: gone at the start once broken (its uid counted); hit with the flags
+/// 0x10000 by a bomb 0x09c8 it leaves its wreck 0x0e43 in its place (`0x3303c0`), breaks into its pieces (mask 0x3fff:
+/// 3..6 out and up), plays its sound 0, counts its uid and goes.
+pub fn update_0c1b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let uid = w.mobys[id].uid;
+    match w.mobys[id].state {
+        0 => {
+            let gone = ctx.game.uid_dead.get(uid.max(0) as usize).is_some_and(|&d| d != 0) || ctx.game.uid_count(uid) != 0;
+            if gone { w.delete(id) } else { w.mobys[id].set_state(1, -1) }
+        }
+        1 => {
+            let bombed = w.hit_message(id).is_some_and(|h| h.tmpl.flags & 0x10000 != 0 && h.tmpl.source.is_some_and(|s| w.mobys.get(s).is_some_and(|b| b.o_class == BOMB)));
+            if !bombed {
+                w.mobys[id].hit_slot = -1;
+                return;
+            }
+            if w.class(0x0e43).is_some() {
+                let c = w.create(0x0e43);
+                let (pos, rot, light, ambient) = { let m = &w.mobys[id]; (m.pos, m.rot, m.light, m.ambient) };
+                let x = &mut w.mobys[c];
+                (x.update_dist, x.draw_dist, x.drawn) = (0xff, 0xff, 1);
+                (x.pos, x.rot, x.light, x.ambient) = (pos, rot, light, ambient);
+                x.mode &= !7;
+                w.rebuild(c, ctx.host);
+            }
+            crate::moby::shards::break_into(w, id, ctx, (3.0, 6.0), (3.0, 6.0), 0x3fff, [0.0; 3], 0xff);
+            ctx.host.play_sound(&w.mobys[id], 0, 0);
+            ctx.game.count_uid(uid);
+            w.delete(id);
+        }
+        _ => {}
+    }
+}
+
+/// 0x0aa6 (`0x3e9d48`), the catapult for its bomb `+0x68`[0] (none: it idles, 4). Its pvars: the bomb's velocity
+/// `[4]` (`+0x10`), its turn speed `[0x10]`, its launch speed `[0x11]`, its yaw at the start `[0x12]`, its looped turn
+/// sound `[0x16]`.
+/// * 1: the bomb a target, held by the Tractor Beam within 4 across: the bomb is hooked (its fuse stops counting, its
+///   state 3), its velocity cleared (2).
+/// * 2: it turns (accel 0.1°, brake 0.3°, at most 6° a tick) to face the bomb (or away, whichever is nearer) and pulls
+///   it into its cup 2 up, a tenth of a unit toward Ratchet ([`catapult_pull`]); the beam letting go or Ratchet more
+///   than 15 across off, the beam drops it and it fires (3) at `(10 + 2·max(0, d − 4))/60` a tick (d Ratchet's
+///   distance), its sound 0.
+/// * 3: the bomb flies off at 25° along its yaw away from Ratchet, its velocity's change at most 100/3600 a tick
+///   (`0x3ea400`); once past the catapult it is unhooked and launched ([`launch_bomb`]) (1).
+///
+/// While it turns faster than ¼° a tick its sound 1 loops. Not ported: its draw `0x3eae18`, the camera while aiming
+/// (`0x451ee0`, `0x451bb0`, `0x451af8`), the cannonball 0x09bc and its pad 0x0a61.
+pub fn update_0aa6(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    use crate::hero::physics::{add_rot, atan2, dist, dist2, sub_rot, turn_ease};
+    use std::f32::consts::{FRAC_PI_2, PI};
+    let bomb = usize::try_from(w.mobys[id].pv_i(0)).ok().filter(|&b| b < w.mobys.len());
+    match w.mobys[id].state {
+        0 => {
+            let m = &mut w.mobys[id];
+            m.set_pv_f(0x48, m.rot[2]);
+            m.set_pv_i(0x58, -1);
+            if bomb.is_none() { m.set_state(4, -1) } else { m.set_state(1, -1) }
+        }
+        1 => {
+            let Some(b) = bomb else { return };
+            let near = dist2(w.mobys[b].pos, w.mobys[id].pos) < 4.0;
+            if w.mobys[b].mode & mode::TARGET != 0 && super::tractor::held(w) == Some(b) && near {
+                w.mobys[b].once |= 4;
+                w.mobys[id].set_pv_v(0x10, [0.0; 3]);
+                w.mobys[id].set_state(2, -1);
+            }
+        }
+        2 => {
+            let Some(b) = bomb else { return };
+            let (bp, cp) = (w.mobys[b].pos, w.mobys[id].pos);
+            let mut yaw = add_rot(atan2(bp[0] - cp[0], bp[1] - cp[1]), PI);
+            if FRAC_PI_2 < sub_rot(yaw, w.mobys[id].rot[2]).abs() { yaw = add_rot(yaw, PI); }
+            let m = &mut w.mobys[id];
+            let (mut a, mut v) = (m.rot[2], m.pv_f(0x40));
+            turn_ease(yaw, 360.0 * 4.848_137_5e-6, 360.0 * 4.848_137_5e-6 * 3.0, 360.0 * 0.000_290_888_25, &mut a, &mut v, 0);
+            m.rot[2] = a;
+            m.set_pv_f(0x40, v);
+            catapult_pull(w, id, b, ctx);
+            let hero = ctx.hero.pos;
+            if super::tractor::held(w) != Some(b) || 15.0 < dist2(w.mobys[id].pos, hero) {
+                super::tractor::release(w);
+                let t = (dist(w.mobys[id].pos, hero) - 4.0).max(0.0);
+                w.mobys[b].mode &= !mode::TARGET;
+                w.mobys[id].set_pv_f(0x44, 10.0 / 60.0 + 2.0 * t / 60.0);
+                ctx.host.play_sound(&w.mobys[id], 0, 0);
+                w.mobys[id].set_state(3, -1);
+            } else if w.mobys[b].mode & mode::TARGET == 0 {
+                w.mobys[id].set_state(1, -1);
+            }
+        }
+        3 => {
+            let Some(b) = bomb else { return };
+            if w.mobys[id].state_ticks == 0 {
+                w.mobys[id].set_pv_v(0x10, [0.0; 3]);
+                ctx.host.play_sound(&w.mobys[id], 0, 0);
+            }
+            w.mobys[id].state_ticks = w.mobys[id].state_ticks.wrapping_add(1);
+            if let Some(v) = catapult_fly(w, id, b, ctx) {
+                w.mobys[b].once &= !4;
+                launch_bomb(w, b, v);
+                w.mobys[id].set_state(1, -1);
+            }
+        }
+        _ => {}
+    }
+    let m = &mut w.mobys[id];
+    let h = m.pv_i(0x58);
+    if 0.004_363_324 < m.pv_f(0x40).abs() {
+        if !ctx.host.sound_playing(h) {
+            let h = ctx.host.play_sound(&w.mobys[id], 1, 4);
+            w.mobys[id].set_pv_i(0x58, h);
+        }
+        if w.mobys[id].state != 2 { w.mobys[id].set_pv_f(0x40, 0.0); }
+    } else {
+        if h != -1 { ctx.host.stop_sound(h); }
+        w.mobys[id].set_pv_i(0x58, -1);
+    }
+    w.rebuild(id, ctx.host);
+    w.changed = true;
+}
+
+/// `0x3ea258`: the bomb sprung into the catapult's cup (2 up; held, a tenth of a unit toward Ratchet's centre): its
+/// velocity `[4]` takes `10·d/3600` of its offset d back and loses a thirtieth, and it moves by it.
+fn catapult_pull(w: &mut MobyWorld, id: usize, b: usize, ctx: &Ctx) {
+    use crate::hero::physics::{add, len, set_len, sub};
+    let p = w.mobys[id].pos;
+    let mut cup = [p[0], p[1], p[2] + 2.0];
+    if super::tractor::held(w) == Some(b) {
+        let h = ctx.hero.pos;
+        let d = sub([h[0], h[1], h[2] + 1.0], cup);
+        let mut l = len(d);
+        crate::hero::physics::approach(0.1, 6.0, &mut l);
+        cup = add(cup, set_len(d, l));
+    }
+    let off = sub(w.mobys[b].pos, cup);
+    let mut v = w.mobys[id].pv_v(0x10);
+    let spring = set_len(off, -(10.0 * len(off) * 0.000_277_777_8));
+    let damp = set_len(v, -(len(v) / 30.0));
+    v = add(add(v, spring), damp);
+    w.mobys[id].set_pv_v(0x10, v);
+    let bm = &mut w.mobys[b];
+    bm.pos = add(bm.pos, v);
+}
+
+/// `0x3ea400`: the bomb flies off at 25° along the catapult's yaw (turned away from Ratchet) at its launch speed, its
+/// velocity's change at most 100/3600 a tick; the velocity once it moves away from the catapult, else none.
+fn catapult_fly(w: &mut MobyWorld, id: usize, b: usize, ctx: &Ctx) -> Option<crate::hero::physics::V3> {
+    use crate::hero::physics::{add, add_rot, atan2, dot, len, set_len, sub, sub_rot};
+    let m = &w.mobys[id];
+    let mut yaw = m.rot[2];
+    let h = ctx.hero.pos;
+    if sub_rot(yaw, atan2(h[0] - m.pos[0], h[1] - m.pos[1])).abs() < std::f32::consts::FRAC_PI_2 { yaw = add_rot(yaw, std::f32::consts::PI); }
+    let (s, pitch) = (m.pv_f(0x44), 25.0f32.to_radians());
+    let want = [yaw.cos() * s * pitch.cos(), yaw.sin() * s * pitch.cos(), pitch.sin() * s];
+    let mut v = m.pv_v(0x10);
+    let mut dv = sub(want, v);
+    let cap = 100.0 * 0.000_277_777_8;
+    if cap < len(dv) { dv = set_len(dv, cap); }
+    v = add(v, dv);
+    w.mobys[id].set_pv_v(0x10, v);
+    let bm = &mut w.mobys[b];
+    bm.pos = add(bm.pos, v);
+    let mut away = sub(bm.pos, w.mobys[id].pos);
+    away[2] = 0.0;
+    if 0.0 < dot(v, away) {
+        w.mobys[id].set_pv_v(0x10, want);
+        Some(want)
+    } else {
+        None
     }
 }

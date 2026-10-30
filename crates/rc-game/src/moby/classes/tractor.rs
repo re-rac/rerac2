@@ -8,7 +8,8 @@
 //!
 //! **The pick**: the game's writer of `0x18a3e0` is not found (only two reads in the level's code; the PS2 shows it
 //! set while ○ holds a box of the target list `0x1fb3e0`, cleared at the release). The port's: at the press, the
-//! nearest box in the target list within its range ahead of Ratchet (±60°) with a clear line; kept while ○ is held.
+//! nearest box (or Maktar's bomb 0x09c8, which drags the same way) in the target list within its range ahead of
+//! Ratchet (±60°) with a clear line; kept while ○ is held.
 //!
 //! **A box** (`0x3d40e8`; `+0x50` its drag block, `0x31bd40`): every 16 ticks a target (mode 0x1000) while Ratchet
 //! is within `+0x88`. Held, a line to Ratchet that meets anything lets it go; it is pulled toward the point `+0x84`
@@ -29,8 +30,8 @@
 use crate::hero::physics::{add, dist, dot, len, scale, set_len, sub, V3};
 use crate::moby::{carry_hero, mode, Ctx, MobyWorld};
 
-/// The boxes' classes.
-const BOXES: [i16; 2] = [0x0acb, 0x0acc];
+/// The boxes' classes, and the other things it picks (Maktar's bomb 0x09c8, crate::moby::classes::maktar).
+const BOXES: [i16; 3] = [0x0acb, 0x0acc, crate::moby::classes::maktar::BOMB];
 /// The beam's pvar holding its target + 1 (the port's `0x18a3e0`).
 const TARGET: usize = 0x60;
 
@@ -44,7 +45,7 @@ pub fn held(w: &MobyWorld) -> Option<usize> {
     beam(w).and_then(|b| usize::try_from(w.mobys[b].pv_i(TARGET) - 1).ok())
 }
 
-fn release(w: &mut MobyWorld) {
+pub(crate) fn release(w: &mut MobyWorld) {
     if let Some(b) = beam(w) { w.mobys[b].set_pv_i(TARGET, 0); }
 }
 
@@ -187,8 +188,8 @@ fn push_out(w: &mut MobyWorld, id: usize, ctx: &Ctx, from: V3, to: V3) {
     m.pos[2] = z;
 }
 
-/// `0x31bd40(height, r, h2, m, block, path)`: the drag (see the module).
-fn drag(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, r: f32, path: i32) {
+/// `0x31bd40(height, r, h2, m, block, path)` (L02 `0x32af70`): the drag (see the module).
+pub(crate) fn drag(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, r: f32, path: i32) {
     let hero = ctx.hero.pos;
     let m = &mut w.mobys[id];
     if (ctx.game.frame & 0xf) as usize == id & 0xf {
