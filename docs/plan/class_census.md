@@ -99,6 +99,8 @@ Then stale manual tags fixed (same day): the script camera's four calls (rc_game
 
 Then the debris chunks (same day): shard mode 1, `0x327648`, `0x39c6b8`, `0x31e100`; the Aranos wrecks' chunks and Maktar's breakable 0x0d0d: 819 unported class-levels / 9,307 created, 147 ported units; cheap 269 / 4,515, missing 84 / 1,489, partly 48 / 1,482, unknown 167 / 1,821.
 
+Then two more stale tags (same day): `0x31fa50` is the enemy framework's reaction block (crate::moby::ai::react), not a colour take-over (G-REN-005 closed; the shards now take an enemy's colour before its flash), and `0x33d400` is the type-0x4a puff the space ships already use (L25's `0x349c48`, crate::particles::exhaust): cheap 270 / 4,518, missing 70 / 972, partly 50 / 1,810, unknown 178 / 2,007.
+
 Missing systems now (`systems.tsv`, every unit calling the system, not only the blocked; status as the ranking reads
 it):
 

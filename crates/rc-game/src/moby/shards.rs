@@ -25,8 +25,8 @@
 //! their count, `+0x5d` the mode (2), `+0x5e` the sound (0xff none).
 //!
 //! The contacts test the level's mesh with the port's segment query, as `0x2e2248` tests the triangles `0x2df8d8`
-//! gathers. Not ported: the gravity frames (`0x1a8ff0`), the moby's colour taken over (`0x31fa50` / `0x3241d8`), the
-//! other modes (0 and 3 the whole moby, 1 its joints' segments, 4 / 5).
+//! gathers. Not ported: the gravity frames (`0x1a8ff0`), the other modes (0 and 3 the whole moby, 4 / 5), mode 1's
+//! segments on joints.
 
 use super::{mode, Ctx, MobyWorld};
 use crate::hero::physics::{add, dot, len, scale, set_len, sub, V3};
@@ -118,7 +118,7 @@ pub fn spawn_piece(w: &mut MobyWorld, src: usize, ctx: &mut Ctx, spin: f32, grav
 
 /// `0x2dbdb0(spin, gravity, src, 2, class, piece, place, angles, velocity, sound)` and `0x2dbff8` mode 2: a moby of
 /// `o_class` drawn as its piece `piece`, at `pos` with the angles `rot` (or the source's rows); from the source its
-/// light and ambient, its scale ratio (its scale over its class's) and its mode 0x800.
+/// light and ambient (an enemy's before its flash), its scale ratio (its scale over its class's) and its mode 0x800.
 #[allow(clippy::too_many_arguments)]
 pub fn spawn_shard(w: &mut MobyWorld, ctx: &mut Ctx, o_class: i16, src: Option<usize>, pos: V3, rot: V3, rows: Option<[V3; 3]>, spin: f32, gravity: f32, piece: u8, vel: V3, sound: u8) -> Option<usize> {
     spawn(w, ctx, o_class, src, pos, rot, rows, spin, gravity, piece, vel, sound, 2)
@@ -143,7 +143,13 @@ fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, o_class: i16, src: Option<usize>, pos
         match info.pieces.get(piece as usize) { Some(Some((c, p))) => (*c, p.len(), 0.0), _ => return None }
     };
     let (ratio, src_mode, light, ambient) = match src.and_then(|s| w.mobys.get(s)) {
-        Some(s) => (w.class(s.o_class).map_or(1.0, |c| if c.scale != 0.0 { s.scale / c.scale } else { 1.0 }), s.mode, s.light, s.ambient),
+        // An enemy's (mode 0x20) colour before its hit flash: its reaction block's `+4..+6` (`0x31fa50`, `0x3241d8`).
+        Some(s) => (w.class(s.o_class).map_or(1.0, |c| if c.scale != 0.0 { s.scale / c.scale } else { 1.0 }), s.mode, s.light, if s.mode & 0x20 != 0 {
+            let r = super::ai::react(s);
+            [s.pv_b(r + 4), s.pv_b(r + 5), s.pv_b(r + 6)]
+        } else {
+            s.ambient
+        }),
         None => (1.0, 0, 0, [0x40; 3]),
     };
     let sc = class_scale * ratio;

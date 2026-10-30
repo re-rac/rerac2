@@ -32,7 +32,7 @@ L00:0037c948	hw_timer	game	trivial	L	reads the EE timer 0x10000000
 L00:0031c618	line_collide	collision	partly	L	a line test through 0x2de878 / 0x2df8d8
 L00:00326820	hero_distance	hero	partly	L	distance to Ratchet (0x1b1a90), or 100 − it in the ship mode (0x1a8ff4)
 L00:00326448	hero_direction	hero	partly	L	direction to Ratchet / his ship (0x189ed0, 0x3263d0)
-L00:0031fa50	colour_take	colour	missing	cite	the moby's colour taken over
+L00:0031fa50	react_block	enemy	has	L	the reaction block (pvars +0x10 of a mode-0x20 moby; rc_game::moby::ai::react)
 L00:003241d8	set_ambient_word	moby	has	L	the ambient from a colour word (0x313300; rc_game::moby::bolts::dress does it)
 L00:0037d5a0	splash	particles	missing	cite	hero: the bubbles and splashes
 L00:002f51a0	item_18	items	missing	cite	the item 0x18
@@ -75,3 +75,4 @@ H:a054c90325f108e8	teleport_in	teleport	has	L	the teleport-in carrier 0x9bb (L02
 L00:003269e0	rain_top	weather	has	L	the rain's top over a point (L01 0x31c630): rc_game::particles::rain::top over rc_formats::height_map
 L00:00326b28	rain_land	weather	has	L	a drop landing: ring or splash (L01 0x31c778): rc_game::moby::classes::weather::land
 L00:0031e100	random_points	moby	has	L	points in a moby's collision primitives (rc_game::moby::shards::random_points; kinds 1 and 3)
+L00:0033d400	exhaust	particles	has	L	the type-0x4a puff riding a moby (L25 0x349c48): rc_game::particles::exhaust; its descriptor is the caller's (EXHAUST_DESCS holds L25's)

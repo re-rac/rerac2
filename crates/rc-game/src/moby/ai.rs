@@ -60,8 +60,10 @@ pub const AI: u16 = 0x20;
 
 /// A block's base in the pvars (the pointer word at `ptr`, relative).
 pub fn block(m: &Moby, ptr: usize) -> usize { m.pv_i(ptr).max(0) as usize }
+/// `0x31fa20(m)`: the health block.
 pub fn health(m: &Moby) -> usize { block(m, 0) }
 pub fn target(m: &Moby) -> usize { block(m, 0xc) }
+/// `0x31fa50(m)`: the reaction block (the game's 0 for a moby without mode 0x20).
 pub fn react(m: &Moby) -> usize { block(m, 0x10) }
 pub fn mv(m: &Moby) -> usize { block(m, 0x18) }
 

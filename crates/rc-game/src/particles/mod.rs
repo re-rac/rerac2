@@ -17,7 +17,7 @@
 //! | 0x3c | [`glint`] `0x33b5e0` | `0x33b710` ([`update_glint`]) | the nanotech heal's glints (and the flying bolts'): drifting, fading out |
 //! | 2 | [`staged`] `0x3327e8` | `0x3329a8` ([`update_staged`]) | three-stage puffs: in, an ease from one velocity / size / colour to another, out |
 //! | 0x35 | [`twinkle`] `0x33a6a0` | `0x33a848` ([`update_twinkle`]) | the bolts' twinkles: swelling and fading |
-//! | 0x4a | [`exhaust`] `0x349c48` | `0x349db0` ([`update_exhaust`]) | L25's ships' exhaust: puffs riding the moby, sized and coloured over the life |
+//! | 0x4a | [`exhaust`] `0x349c48` (L00 `0x33d400`) | `0x349db0` (L00 `0x33d568`) ([`update_exhaust`]) | L25's ships' exhaust: puffs riding the moby, sized and coloured over the life |
 //! | 0x3e | [`orb`] `0x33bb60` | `0x33bc70` ([`update_orb`]) | the nanotech orbs (kind 1, moved by their cluster) and their trail puffs (kinds 0, 2) |
 //! | 4 | [`trail`] `0x332c10` | `0x332d28` ([`update_trail`]) | the debris' smoke trails: growing, colour eased over the life |
 //! | 0xb | [`billow`] `0x333a70` | `0x333d00` ([`update_billow`]) | the Gravity Bomb's smoke: billowing, splitting, rising and fading |
@@ -388,9 +388,10 @@ pub const EXHAUST_DESCS: [(u32, u32, i16, i16, i32); 6] = [
     (0xefff_7f4f, 0x00ff_0000, -40, 40, 8),
 ];
 
-/// `0x349c48(moby, pos, vel, desc, 1)`: an exhaust puff (type 0x4a) at `pos`, riding `moby` (its place kept in the
-/// moby's frame, `+0x30`), moving `vel` a tick in that frame; the descriptor `desc` ([`EXHAUST_DESCS`]) gives its
-/// colour, size and life; additive, its far byte 0xa0, a random roll ([`update_exhaust`]).
+/// `0x349c48(moby, pos, vel, desc, 1)` (L00 `0x33d400`, the same code on every level): an exhaust puff (type 0x4a) at
+/// `pos`, riding `moby` (its place kept in the moby's frame, `+0x30`), moving `vel` a tick in that frame; the descriptor
+/// `desc` ([`EXHAUST_DESCS`]; the game's a pointer to the caller's) gives its colour, size and life; additive (0x44 for
+/// the last argument 0), its far byte 0xa0, a random roll ([`update_exhaust`]).
 pub fn exhaust(sys: &mut Particles, rng: &mut Rng, moby: &crate::moby::Moby, moby_id: usize, pos: [f32; 3], vel: [f32; 3], desc: usize) -> Option<usize> {
     let i = sys.create_part(EXHAUST)?;
     let def = sys.def_first(EXHAUST);

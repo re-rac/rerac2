@@ -162,7 +162,7 @@ L00:002ef9b0	FUN_002ef9b0	math	trivial	range
 L00:002dbdb0	FUN_002dbdb0	breakfx	has	cite
 L00:0031dd48	FUN_0031dd48	enemy	has	cite
 L00:002f46e0	FUN_002f46e0	other	has	cite
-L00:0031fa50	colour_take	colour	missing	cite
+L00:0031fa50	react_block	enemy	has	L
 L00:003227d8	FUN_003227d8	moby	has	cite
 L00:002da530	vec_to_angles	math	trivial	L
 L00:003282b0	FUN_003282b0	enemy	has	cite
@@ -193,7 +193,7 @@ L00:0031ebd8	FUN_0031ebd8	hero	has	cite
 L00:00327a28	message_slot	ui	has	L
 L00:00335bb8	FUN_00335bb8	particles	has	cite
 L00:0032b580	shards	breakfx	has	L
-L00:0033d400	FUN_0033d400	docs	missing	cite
+L00:0033d400	exhaust	particles	has	L
 L00:003244e8	FUN_003244e8	group	has	cite
 L00:002eebc8	FUN_002eebc8	math	trivial	range
 L00:002eeb10	FUN_002eeb10	math	trivial	range
@@ -676,7 +676,7 @@ H:c1d7e334dcee7e95		moby	has	calls
 H:e0e66b373d532413		trivial	trivial	leaf
 L00:0030df70	FUN_0030df70	trivial	trivial	leaf
 H:09e7d4c1e18c6bcd		math	trivial	calls
-H:0b5c5518112cbd2b		colour	missing	near
+H:0b5c5518112cbd2b		enemy	has	near
 H:205ad60d079e2aa3		trivial	trivial	wrap
 H:35ac7d0e0a887f27		trivial	trivial	leaf
 H:413b4f4d07c01a45		moby	has	near
