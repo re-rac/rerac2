@@ -93,6 +93,8 @@ Then Maktar's small classes (same day): 0x0a24 / 0x0a55 (at their path's start),
 
 Then the flocks (same day, U112: L02 `0x38ce78`, rc_game::moby::classes::flock, 11 classes on nine levels) with the strip `0x2edd50` (rc_game::fx::strip): 826 unported class-levels / 9,484 created, 143 ported units; cheap 247 / 4,136, missing 152 / 2,850, partly 38 / 984, unknown 134 / 1,514.
 
+Then the teleport carrier 0x09bb (G-ENM-003) and Maktar's creature 0x0a4e (U117, rc_game::moby::classes::critter): 824 unported class-levels / 9,343 created, 145 ported units; cheap 249 / 4,201, missing 140 / 2,336, partly 40 / 1,111, unknown 141 / 1,695.
+
 Missing systems now (`systems.tsv`, every unit calling the system, not only the blocked; status as the ranking reads
 it):
 

@@ -7,6 +7,7 @@ pub mod bolt;
 pub mod carriers;
 pub mod chute;
 pub mod crate_;
+pub mod critter;
 pub mod dynamo;
 pub mod flower;
 pub mod flyer;
@@ -104,6 +105,7 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x0e89 => Some(oozla::update_0e89),
         0x0578 => Some(weather::update),
         teleport::CLASS => Some(teleport::update),
+        critter::CLASS => Some(critter::update),
         c if flock::CLASSES.contains(&c) => Some(flock::update),
         0x0ca0 => Some(oozla::update_0ca0),
         0x046f => Some(oozla::update_046f),
