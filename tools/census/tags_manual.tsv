@@ -76,3 +76,4 @@ L00:003269e0	rain_top	weather	has	L	the rain's top over a point (L01 0x31c630): 
 L00:00326b28	rain_land	weather	has	L	a drop landing: ring or splash (L01 0x31c778): rc_game::moby::classes::weather::land
 L00:0031e100	random_points	moby	has	L	points in a moby's collision primitives (rc_game::moby::shards::random_points; kinds 1 and 3)
 L00:0033d400	exhaust	particles	has	L	the type-0x4a puff riding a moby (L25 0x349c48): rc_game::particles::exhaust; its descriptor is the caller's (EXHAUST_DESCS holds L25's)
+L00:00320538	explosion	breakfx	has	L	the general explosion 0x320538 (L02 0x324930): rc_game::moby::blast::explode (the colour shift only 0)

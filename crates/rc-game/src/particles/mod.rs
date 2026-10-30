@@ -22,6 +22,7 @@
 //! | 4 | [`trail`] `0x332c10` | `0x332d28` ([`update_trail`]) | the debris' smoke trails: growing, colour eased over the life |
 //! | 0xb | [`billow`] `0x333a70` | `0x333d00` ([`update_billow`]) | the Gravity Bomb's smoke: billowing, splitting, rising and fading |
 //! | 0xf | [`ember`] `0x3348c0` | `0x334a18` ([`update_ember`]) | the Gravity Bomb's sparks: falling, shrinking, trailing embers |
+//! | 8 | [`flare`] `0x3335f8` | `0x3336e8` ([`update_flare`]) | the blasts' flares: growing, coloured over the life, fading at the end |
 //! | 0x22, 0x23, 0x2d, 0x2e | [`water`] | [`water`] | the water: bubbles, drops, rings and the bow spray (the hero's swim effects) |
 //! | 0, 1 | [`rain`] | [`rain`] | the rain's drops and splashes (crate::moby::classes::weather) |
 //!
@@ -1001,6 +1002,54 @@ pub fn update_ember(sys: &mut Particles, i: usize, rng: &mut Rng, frame: i32) {
     ember(sys, rng, size, p, t, c, c1, life, 0, Some(def), Some(alpha), w);
 }
 
+/// Type 8, a blast's flare (crate::moby::blast::explode).
+pub const FLARE: u8 = 8;
+
+/// `0x3335f8(size, pos, vel, c0, c1, life)`: a flare (type 8) at `pos` moving `vel` a tick, growing from nothing to
+/// `size` and going from `c0` to `c1` over `life` ticks (none with 0), its frames its type's eleven; additive, near 4
+/// / far 0xa.
+pub fn flare(sys: &mut Particles, size: f32, pos: [f32; 3], vel: [f32; 3], c0: u32, c1: u32, life: i32) -> Option<usize> {
+    if life == 0 { return None; }
+    let i = sys.create_part(FLARE)?;
+    let first = sys.def_first(FLARE);
+    let r = &mut sys.pool.recs[i];
+    rec::set_v3(r, 0x10, pos);
+    rec::set_u32(r, 4, c0);
+    r[9] = 0xa4;
+    r[3] = 0x48;
+    r[1] = 0;
+    rec::set_ff(r, 0xc, 0.0);
+    r[8] = 0;
+    r[2] = first;
+    rec::set_v3(r, 0x20, vel);
+    rec::set_i16(r, 0xa, life as i16);
+    rec::set_u32(r, 0x38, life as u32);
+    rec::set_u32(r, 0x34, c1);
+    rec::set_u32(r, 0x30, c0);
+    rec::set_ff(r, 0x3c, size / life as f32);
+    Some(i)
+}
+
+/// `0x3336e8`: the move; the life down (out: killed); the size up a step, the colour from `c0` to `c1` by the life
+/// left (its alpha down to nothing over the last 6 ticks), its frame `(spent · 10) / life` of its type's.
+pub fn update_flare(sys: &mut Particles, i: usize) {
+    let r = &mut sys.pool.recs[i];
+    let p = add(rec::v3(r, 0x10), rec::v3(r, 0x20));
+    rec::set_v3(r, 0x10, p);
+    if dec_life(r) {
+        sys.kill_part(i);
+        return;
+    }
+    rec::set_ff(r, 0xc, rec::ff(r, 0xc) + rec::ff(r, 0x3c));
+    let (left, life) = (rec::i16(r, 0xa) as i32, rec::u32(r, 0x38).max(1) as i32);
+    let mut c = tween_color((left as f32 / life as f32).to_bits(), rec::u32(r, 0x34), rec::u32(r, 0x30));
+    if left < 6 { c = c & 0xff_ffff | (((left * (c >> 24) as i32) / 6) as u32) << 24; }
+    rec::set_u32(r, 4, c);
+    let k = ((life - left) * 10 / life) as usize;
+    let frame = sys.def_frame(FLARE, k);
+    sys.pool.recs[i][2] = frame;
+}
+
 /// `UpdateParts` `0x331150`: every live record up to the high water mark at entry, in pool order (the mobys and the
 /// camera for the glows that ride a moby, Ratchet's position `0x189ea0` for the records riding him; the game's random
 /// stream; `aux`: what the water types read, [`water::PartAux`]).
@@ -1026,6 +1075,7 @@ pub fn update_parts(sys: &mut Particles, mobys: &crate::moby::MobyWorld, cam: [f
             TRAIL => update_trail(sys, i),
             BILLOW => update_billow(sys, i, cam, rng),
             EMBER => update_ember(sys, i, rng, mobys.frame),
+            FLARE => update_flare(sys, i),
             rain::DROP => rain::update_drop(sys, i, &aux.rain),
             rain::SPLASH => rain::update_splash(sys, i),
             water::BUBBLE => water::update_bubble(sys, i, rng, aux),

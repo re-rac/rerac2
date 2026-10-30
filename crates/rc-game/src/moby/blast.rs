@@ -169,3 +169,187 @@ pub fn burst(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, b: &Blast) {
         }
     }
 }
+
+/// The arguments of the general explosion `0x320538(radius, damage, flash, flash₂, near, size, light, moby, _, pos,
+/// embers, billows, flares, sound, shake, debris, lod, colour, flags)` (L02 `0x324930`).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Explosion {
+    /// The hit's sphere (none at 0), its damage and its flags.
+    pub radius: f32,
+    pub damage: f32,
+    pub flags: u32,
+    /// The flashes' sizes (none at 0); the first's two near ones only past `near` from the camera.
+    pub flash: f32,
+    pub flash2: f32,
+    pub near: f32,
+    /// Everything's scale.
+    pub size: f32,
+    /// The light's radius (none at 0; 15 below 0); only at `lod` 0.
+    pub light: f32,
+    pub embers: i32,
+    pub billows: i32,
+    pub flares: i32,
+    /// Its moby's class sound (−1 none).
+    pub sound: i32,
+    pub shake: bool,
+    pub debris: i32,
+    /// −1: as the frame rate allows (1 past 1.7 frames' load; never here); each step shortens the effects' lives.
+    pub lod: i32,
+    /// The colour shift (`0x31f7d0`; 0 none).
+    pub colour: u8,
+}
+
+/// `0x281640` / `0x281690`: the explosion's light (orange flaring up over 60 ticks), and its tinted one (the colour
+/// shift's), radius as asked.
+const EXPLOSION_LIGHT: [super::classes::light::Template; 2] = [
+    super::classes::light::Template {
+        offset: [0.0, 0.0, 0.3],
+        bytes: [0x00, 0x00, 0xff, 0x00, 0x11, 0x0b, 0x00, 0xff, 0x00, 0x11, 0x0d, 0x00, 0x64, 0x00, 0x10, 0x0d],
+        radius: [15.0; 3],
+        grow: 0.01,
+        shrink: 0.01,
+        life: 60,
+        flags: 0x0008_0000,
+        draw: 0xff,
+        holds: [0; 4],
+        periods: [0; 4],
+        delay: 0,
+    },
+    super::classes::light::Template {
+        offset: [0.0, 0.0, 0.3],
+        bytes: [0x00, 0x00, 0x80, 0x00, 0x11, 0x0d, 0x00, 0xff, 0x00, 0x11, 0x0b, 0x00, 0x64, 0x00, 0x10, 0x0d],
+        radius: [15.0; 3],
+        grow: 0.01,
+        shrink: 0.01,
+        life: 60,
+        flags: 0x0008_0000,
+        draw: 0xff,
+        holds: [0; 4],
+        periods: [0; 4],
+        delay: 0,
+    },
+];
+
+/// `0x31f7d0(c, shift)`: a colour under the explosion's colour shift (only shift 0, none, is ported).
+fn shifted(c: u32, _shift: u8) -> u32 { c }
+
+/// `0x320538`, the general explosion at `at` (else its moby's place; neither: nothing). With d the camera's distance:
+/// * a hit in a sphere of `radius` (`damage`, `flags`, the moby's class and 2 / 1 in its kind), its moby spared;
+/// * `embers` embers (crate::particles::ember: 40000·size, out at 15°..80° up a random way at 7..10.5·size a second
+///   plus 0.05 up, 0x4f007fff to 0x1f00007f, 60..120 ticks − 10·lod, trailing);
+/// * `debris` pieces (crate::moby::classes::debris): within 14 of the camera one toward it (as the Gravity Bomb's), the
+///   rest out at 15°..75° up at 7..10.5·size a second plus 1/30 up, every third smoking, 60..90 ticks;
+/// * `billows` pairs of billows (fewer within twice their number: half the distance), 400000·size at 8..10·size a
+///   second less (7 − d) within 7, rising 0.133·size a tick: one a random pair of [`SMOKE_C0`] / [`SMOKE_C1`]
+///   (15..20 ticks − 3·lod, held 30..45 − 5·lod), one white to nothing at half the speed (5..10 − 2·lod, 15..20 − 3·lod);
+/// * `flares` flares (crate::particles::flare: 200000, a random way at 0..3·size a second, a random pair of the smoke
+///   colours, 30..45 ticks − 5·lod);
+/// * with a moby the flashes (crate::moby::classes::flash, rising 0.133·size a tick): past `near`, 16 ticks grey and
+///   22 ticks yellow; 30 ticks orange; `flash2`: 27 ticks white;
+/// * `shake` in view: the camera's up-and-down shake of 0.4 − 0.0175·d (0.05 past 20) for 25 ticks;
+/// * its moby's sound `sound`;
+/// * `light` at `lod` 0 in view within 100 (crate::moby::classes::light).
+pub fn explode(w: &mut MobyWorld, ctx: &mut Ctx, src: Option<usize>, at: Option<V3>, e: &Explosion) {
+    use super::classes::{debris, flash, light, shot::polar};
+    use crate::hero::physics::{add, len, set_len};
+    let Some(pos) = at.or_else(|| src.and_then(|s| w.mobys.get(s)).map(|m| m.pos)) else { return };
+    let (size, lod) = (e.size, e.lod);
+    let rise = [0.0, 0.0, size * 0.133_333_34];
+    if 0.0 < e.radius {
+        let mut t = super::hits::HitTemplate::new(e.damage, src, e.flags, [0.0; 4]);
+        t.count = 0;
+        let class = src.and_then(|s| w.mobys.get(s)).map_or(0, |m| m.o_class as u16 as u32);
+        t.kind = class << 16 | 1 << 8 | 2;
+        w.sphere_hit(ctx.scene, pos, e.radius, 0x10, src, Some(&t));
+    }
+    for _ in 0..e.embers {
+        let g = &mut ctx.game.rng;
+        let pitch = g.randf(0.261_799_4, 1.396_263_4);
+        let yaw = g.rand_angle();
+        let s = g.randf(7.0, 10.5);
+        let mut v = polar(size * 0.016_666_668 * s, yaw, pitch);
+        v[2] += 0.05;
+        let life = g.rand_range(0x3c, 0x78) - lod * 10;
+        if let Some(sys) = ctx.parts.as_deref_mut() {
+            particles::ember(sys, &mut ctx.game.rng, size * 40_000.0, pos, v, shifted(0x4f00_7fff, e.colour), shifted(0x1f00_007f, e.colour), life, 1, None, None, 0);
+        }
+    }
+    let mut to_cam = sub(ctx.host.camera_pos(), pos);
+    let d = len(to_cam);
+    if e.debris != 0 {
+        let g = &mut ctx.game.rng;
+        let r = [g.randf(-1.0, 1.0), g.randf(-1.0, 1.0), g.randf(-1.0, 1.0)];
+        if d < 14.0 {
+            to_cam[2] += d * 0.5;
+            let mut v = add(set_len(r, d * 0.003_333_333_6), set_len(to_cam, (d + d) * 0.016_666_668));
+            // `0x2ef1d0(1/6, v, v)`: at most that long.
+            let l = len(v);
+            if 0.166_666_67 <= l { v = scale(v, 0.166_666_67 / l); }
+            let life = ctx.game.rng.rand_range(0x3c, 0x5a);
+            debris::spawn(w, ctx, pos, v, life, 0);
+        }
+        for i in 0..(e.debris - 1).max(0) {
+            let g = &mut ctx.game.rng;
+            let pitch = g.randf(0.261_799_4, 1.308_997);
+            let yaw = g.rand_angle();
+            let s = g.randf(7.0, 10.5);
+            let mut v = polar(size * 0.016_666_668 * s, yaw, pitch);
+            v[2] += 0.033_333_335;
+            let life = g.rand_range(0x3c, 0x5a);
+            debris::spawn(w, ctx, pos, v, life, (i % 3 == 0) as u8);
+        }
+    }
+    let mut n = e.billows;
+    if d < (n + n) as f32 { n = d as i32 / 2; }
+    let near = if d < 7.0 { 7.0 - d } else { 0.0 };
+    for _ in 0..n.max(0) {
+        let g = &mut ctx.game.rng;
+        let speed = (g.randf(8.0, 10.0) * 0.016_666_668 - near * 0.016_666_668) * size;
+        let c0 = shifted(SMOKE_C0[g.randi(6) as usize], e.colour);
+        let c1 = shifted(SMOKE_C1[g.randi(6) as usize], e.colour);
+        let (life, hold) = (g.rand_range(0xf, 0x14) - 3 * lod, g.rand_range(0x1e, 0x2d) - 5 * lod);
+        if let Some(sys) = ctx.parts.as_deref_mut() { particles::billow(sys, &mut ctx.game.rng, size * 400_000.0, speed, pos, rise, c0, c1, life, hold as u8, 0, 0); }
+        let g = &mut ctx.game.rng;
+        let (life, hold) = (g.rand_range(5, 10) - 2 * lod, g.rand_range(0xf, 0x14) - 3 * lod);
+        if let Some(sys) = ctx.parts.as_deref_mut() { particles::billow(sys, &mut ctx.game.rng, size * 400_000.0, speed * 0.5, pos, rise, 0x7fff_ffff, 0x00ff_ffff, life, hold as u8, 0, 0); }
+    }
+    for _ in 0..e.flares {
+        let g = &mut ctx.game.rng;
+        let r = [g.randf(-1.0, 1.0), g.randf(-1.0, 1.0), g.randf(-1.0, 1.0)];
+        let v = set_len(r, size * 0.016_666_668 * g.randf(0.0, 3.0));
+        let c0 = shifted(SMOKE_C0[g.randi(6) as usize], e.colour);
+        let c1 = shifted(SMOKE_C1[g.randi(6) as usize], e.colour);
+        let life = g.rand_range(0x1e, 0x2d) - 5 * lod;
+        if let Some(sys) = ctx.parts.as_deref_mut() { particles::flare(sys, 200_000.0, pos, v, c0, c1, life); }
+    }
+    if src.is_some() {
+        if 0.0 < e.flash {
+            let (mut a, mut b, mut c, mut x, mut y, mut z) = (0x96u8, 0x96u8, 0x96u8, 0x7fu8, 0x7fu8, 0u8);
+            if e.colour != 0 {
+                if e.colour & 4 == 0 {
+                    (a, c, x) = (0x46, 0x46, 0x3c);
+                } else {
+                    (a, b, c, x, y, z) = (0x23, 0, 0xfa, 0x20, 0, 100);
+                }
+            }
+            if e.near < d {
+                flash::spawn(w, ctx, e.flash, 0.0, pos, rise, 0x10, [a, b, c], 0x20);
+                flash::spawn(w, ctx, e.flash, 0.0, pos, rise, 0x16, [x, y, z + 0x50], 0x20);
+            }
+            flash::spawn(w, ctx, e.flash, 0.0, pos, rise, 0x1e, [x, y, z], 0x30);
+        }
+        if 0.0 < e.flash2 { flash::spawn(w, ctx, e.flash2, 0.0, pos, rise, 0x1b, [0xff, 0xff, 0xff], 0x20); }
+    }
+    if e.shake && !ctx.view.is_some_and(|v| v.culled(10.0, [pos[0], pos[1], pos[2], 2.0])) {
+        let amp = if d < 20.0 { 0.4 - d * 0.0175 } else { 0.050_000_012 };
+        ctx.game.shakes.ask(0, amp, 0x19);
+    }
+    if let (Some(s), true) = (src, e.sound != -1) {
+        if w.mobys.get(s).is_some_and(|m| m.state < 0x80) { ctx.host.play_sound(&w.mobys[s], e.sound, 0); }
+    }
+    if e.light != 0.0 && lod == 0 && !ctx.view.is_some_and(|v| v.culled(100.0, [pos[0], pos[1], pos[2], e.light])) {
+        let r = if e.light <= 0.0 { 15.0 } else { e.light };
+        let t = light::Template { radius: [r; 3], ..EXPLOSION_LIGHT[(e.colour != 0) as usize] };
+        light::spawn(w, ctx, &t, pos);
+    }
+}

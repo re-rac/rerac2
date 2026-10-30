@@ -12,8 +12,8 @@
 //! `+0x30..+0x5c` its glows' points and `+0xa0..` its trails' (both × `+0x78`), `+0x90` / `+0x94` the glows' reaches,
 //! `+0x98` the trails', `+0x1c` the trails' phase, `+0x18` its looped sound.
 //!
-//! Not ported: the kill count `0x1a9048` a shot member adds to, its burst (`0x32a590` and the blast `0x324930`); on
-//! level 0xd the leader's hiding above z 89 (that level is not ported).
+//! A shot member explodes (`0x324930`, crate::moby::blast::explode). Not ported: the kill count `0x1a9048` a shot
+//! member adds to; on level 0xd the leader's hiding above z 89 (that level is not ported).
 
 use crate::hero::physics::{add_rot, approach, atan2, dist, len2, sub, sub_rot, V3};
 use crate::hud::lerp_rgba;
@@ -243,6 +243,9 @@ fn tick(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 0x0b15 | 0x0b13 => { ctx.host.play_sound(&w.mobys[m], 1, 0); }
                 _ => {}
             }
+            // `0x324930`: the explosion (crate::moby::blast::explode).
+            let e = crate::moby::blast::Explosion { flash: 5.0, flash2: 2.5, size: 3.0, light: 15.0, embers: 0x23, billows: 8, flares: 0x10, sound: -1, debris: 10, lod: -1, flags: 0x81_0001, ..Default::default() };
+            crate::moby::blast::explode(w, ctx, Some(m), None, &e);
         }
         w.clear_hit(m);
         w.mobys[m].hit_slot = -1;

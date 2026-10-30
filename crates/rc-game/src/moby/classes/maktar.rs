@@ -1337,3 +1337,133 @@ pub fn update_12cf(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => {}
     }
 }
+
+/// 0x1259 (`0x440d10`), a floating breakable of the resort (counted by 0x12cf unless `+0x68`[0x10]). Its pvars: home
+/// `[0]`, its sway phases `[4]` / `[5]` and their steps `[6]` / `[7]` (`randf_signed(20, 40)` and `(40, 60)` degrees a
+/// second), its flight velocity `[8]`, its spins `[0xc]` / `[0xd]`, `+0x3c` it flew into something, `+0x3e` it sinks
+/// when stood on, its idle timer `+0x48`, its flight timer `+0x4a`, its cylinder `[0x14]`.
+/// * 1: drawn it sways (its angles x and y 0.05 of its phases' sines) and circles its home 0.75 out (the second row of
+///   those angles); stood on with `+0x3e` it sinks 1/15 a tick, into its cylinder: explodes (3). Hit with the flags
+///   0x4210000 (counted: one off) it is knocked a quarter a tick along the hit's way for 30..60 ticks, spinning by where
+///   it was hit; a line along that flight meeting the world: it explodes at once (3), else it flies (2).
+/// * 2: its sound 0 first; it spins and moves; out of time, it explodes (3).
+/// * 3: the explosion (crate::moby::blast::explode: size 10·its scale, 10 embers, 5 billows, 15 flares), its pieces
+///   thrown on its way (`0x32c360`: 3..6 out and up), the level's bolts 3 times, its sound 1; gone.
+///
+/// Out of its start it changes its idle (`0x4412e0`) every 135..225 ticks: one time in five (`[0x11]` 0) to sequence
+/// 0, else between 1 and 2. Not ported: its flight's sparks (`0x2f0f28`, one tick in two), its start's random frame.
+pub fn update_1259(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    use crate::hero::physics::{add, add_rot, dot, scale, set_len, sub};
+    use crate::moby::attach::rows_of;
+    match w.mobys[id].state {
+        0 => {
+            if w.mobys[id].pv_i(0x40) != 0 { w.maktar.left -= 1; }
+            let g = &mut ctx.game.rng;
+            let (a, b) = (g.rand_angle(), g.rand_angle());
+            let (sa, sb) = (g.randf_signed(20.0, 40.0) * 0.000_290_888_25, g.randf_signed(40.0, 60.0) * 0.000_290_888_25);
+            let seq = g.randi(2) as u8 + 1;
+            let m = &mut w.mobys[id];
+            let p = m.pos;
+            m.set_pv_v(0, p);
+            m.set_pv_f(0x10, a);
+            m.set_pv_f(0x14, b);
+            m.set_pv_f(0x18, sa);
+            m.set_pv_f(0x1c, sb);
+            m.set_pv_i(0x40, 0);
+            m.set_pv_f(0x4c, 0.104_719_76);
+            m.set_pv_s(0x48, 0xb4);
+            if ctx.host.anim(&w.mobys[id]).is_none_or(|a| a.seq_b != seq) { ctx.host.set_anim(&w.mobys[id], seq, 0, 5); }
+            w.mobys[id].set_state(1, -1);
+            return;
+        }
+        1 => {
+            let m = &mut w.mobys[id];
+            if m.drawn != 0 {
+                let (a, b) = (add_rot(m.pv_f(0x10), m.pv_f(0x18)), add_rot(m.pv_f(0x14), m.pv_f(0x1c)));
+                m.set_pv_f(0x10, a);
+                m.set_pv_f(0x14, b);
+                m.rot[0] = 0.05 * a.sin();
+                m.rot[1] = 0.05 * b.sin();
+                m.pos = add(scale(rows_of([a, 0.0, b])[1], 0.75), m.pv_v(0));
+            }
+            if m.pv_s(0x3e) != 0 {
+                if ctx.hero.ground_moby == Some(id) && ctx.hero.grounded_ticks != 0 { m.set_pv_s(0x3e, 2); }
+                if m.pv_s(0x3e) == 2 {
+                    let mut h = m.pv_v(0);
+                    h[2] -= 0.066_666_67;
+                    m.set_pv_v(0, h);
+                    let cyl = m.pv_i(0x50);
+                    if cyl != 0 && ctx.level.in_cylinder(cyl, m.pos) { m.set_state(3, -1); }
+                }
+            }
+            if w.mobys[id].state == 1 && w.mobys[id].pv_i(0x40) == 0 {
+                if let Some(h) = w.hit_message(id).filter(|h| h.tmpl.flags & 0x0421_0000 != 0) {
+                    w.maktar.left -= 1;
+                    let g = &mut ctx.game.rng;
+                    let t = g.rand_range(0x1e, 0x3c);
+                    let m = &mut w.mobys[id];
+                    m.set_pv_s(0x4a, t as i16);
+                    let v = set_len([h.tmpl.dir[0], h.tmpl.dir[1], h.tmpl.dir[2]], 0.25);
+                    m.set_pv_v(0x20, v);
+                    let d = sub([h.point[0], h.point[1], h.point[2]], m.pos);
+                    let l = [dot(d, m.rows[0]), dot(d, m.rows[1]), dot(d, m.rows[2])];
+                    m.set_pv_f(0x30, -(l[2].clamp(-1.0, 1.0) * 0.069_813_18));
+                    m.set_pv_f(0x34, l[1].clamp(-1.0, 1.0) * 0.052_359_886);
+                    let p = m.pos;
+                    let to = add(p, scale(v, t as f32));
+                    if ctx.coll.and_then(|c| crate::collision::coll_line_m(c, ctx.scene, p, to, crate::collision::QueryFlags(2), None)).is_some() {
+                        w.mobys[id].set_pv_s(0x3c, 1);
+                    }
+                    let s = if w.mobys[id].pv_s(0x3c) != 0 { 3 } else { 2 };
+                    w.mobys[id].set_state(s, -1);
+                }
+            }
+            w.clear_hit(id);
+        }
+        2 => {
+            if w.mobys[id].state_ticks == 0 { ctx.host.play_sound(&w.mobys[id], 0, 0); }
+            ctx.game.rng.randi(2);
+            let m = &mut w.mobys[id];
+            m.state_ticks = m.state_ticks.wrapping_add(1);
+            m.rot[1] = add_rot(m.rot[1], m.pv_f(0x30));
+            m.rot[2] = add_rot(m.rot[2], m.pv_f(0x34));
+            m.pos = add(m.pos, m.pv_v(0x20));
+            let mut t = m.pv_s(0x4a) as i32;
+            let out = crate::moby::countdown(&mut t);
+            m.set_pv_s(0x4a, t as i16);
+            if out { m.set_state(3, -1); }
+        }
+        3 => {
+            if w.mobys[id].pv_s(0x3c) != 0 { w.mobys[id].set_pv_v(0x20, [0.0; 3]); }
+            let size = w.mobys[id].scale * 10.0;
+            let e = crate::moby::blast::Explosion { near: 9.0, size, embers: 10, billows: 5, flares: 0xf, sound: -1, lod: -1, flags: 0x81_0001, ..Default::default() };
+            crate::moby::blast::explode(w, ctx, Some(id), None, &e);
+            let v = w.mobys[id].pv_v(0x20);
+            crate::moby::shards::break_into(w, id, ctx, (3.0, 6.0), (3.0, 6.0), 0x3fff, v, 0xff);
+            crate::moby::bolts::level_drop(w, id, 0.0, 3, ctx);
+            ctx.host.play_sound(&w.mobys[id], 1, 0);
+            w.delete(id);
+            return;
+        }
+        _ => {}
+    }
+    // `0x4412e0`: the idle's change.
+    let m = &mut w.mobys[id];
+    let mut t = m.pv_s(0x48) as i32;
+    let due = crate::moby::countdown(&mut t);
+    m.set_pv_s(0x48, t as i16);
+    if due {
+        let calm = m.pv_i(0x44) == 0 && 0.8 <= ctx.game.rng.randf(0.0, 1.0);
+        let a = ctx.host.anim(&w.mobys[id]);
+        if calm {
+            if a.is_some_and(|a| a.seq_b != 0) { ctx.host.set_anim(&w.mobys[id], 0, 0, 0x1e); }
+        } else {
+            let seq = if a.is_some_and(|a| a.seq_a == 1) { 2 } else { 1 };
+            if a.is_none_or(|a| a.seq_b != seq) { ctx.host.set_anim(&w.mobys[id], seq, 0, 0x1e); }
+        }
+        let t = ctx.game.rng.randf(135.0, 225.0) as i16;
+        w.mobys[id].set_pv_s(0x48, t);
+    }
+    w.rebuild(id, ctx.host);
+    w.changed = true;
+}

@@ -939,7 +939,8 @@ fn show_group(w: &mut MobyWorld, group: i32, show: bool) {
 /// 0x0ac4 (`0x3d01a0`, a gate): shut (state 0) it keeps the group `+0x68`[0x1c] hidden; Ratchet within 6 and in
 /// neither cuboid [0x14] / [0x18] opens it (1: sequence 1, no collision, the group shown), in [0x14] leaves it open
 /// for good (5); one of the four mobys [0..0xc] gone or set off (its sub-state) opens it too — or, with [0x10] ≠ 0,
-/// blows it up (the sound 2, a blast `0x320538` and debris `0x327498`: the effects pass; deleted). Opened it shows
+/// blows it up (the sound 2, the explosion 1 up (crate::moby::blast::explode: flashes, 10 embers, 3 billows, 16
+/// flares, 9 debris) and its pieces 0.3 a tick to its right (`0x327498`); deleted). Opened it shows
 /// the sequence 2 (3); Ratchet through into [0x14] shuts it (4: sequence 3, then 5: its collision back, sequence 0).
 /// Its light, the glow word `+0x78` (the class's until then): green ([`DOOR_OPENING`]) when Ratchet's nearness
 /// opens it, red-orange ([`DOOR_OPEN`]) once open (3). The state 2 (a slide 0.3 a tick to its right until it
@@ -971,6 +972,11 @@ pub fn update_0ac4(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if om.sub_state == 0 && om.state < 0x80 { continue; }
             if w.mobys[id].pv_i(0x10) != 0 {
                 ctx.host.play_sound(&w.mobys[id], 2, 0);
+                let m = &w.mobys[id];
+                let (p, yaw) = (m.pos, m.rot[2] - std::f32::consts::FRAC_PI_2);
+                let e = crate::moby::blast::Explosion { flash: 4.0, flash2: 2.0, near: 9.0, size: 1.0, light: 15.0, embers: 10, billows: 3, flares: 0x10, sound: -1, debris: 9, lod: -1, flags: 0x81_0001, ..Default::default() };
+                crate::moby::blast::explode(w, ctx, Some(id), Some([p[0], p[1], p[2] + 1.0]), &e);
+                crate::moby::shards::break_into(w, id, ctx, (3.0, 6.0), (3.0, 6.0), 0xff, [yaw.cos() * 0.3, yaw.sin() * 0.3, 0.0], 0xff);
                 w.delete(id);
                 return;
             }
