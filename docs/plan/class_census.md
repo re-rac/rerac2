@@ -101,6 +101,8 @@ Then the debris chunks (same day): shard mode 1, `0x327648`, `0x39c6b8`, `0x31e1
 
 Then two more stale tags (same day): `0x31fa50` is the enemy framework's reaction block (crate::moby::ai::react), not a colour take-over (G-REN-005 closed; the shards now take an enemy's colour before its flash), and `0x33d400` is the type-0x4a puff the space ships already use (L25's `0x349c48`, crate::particles::exhaust): cheap 270 / 4,518, missing 70 / 972, partly 50 / 1,810, unknown 178 / 2,007.
 
+Then the platform block (crate::moby::platform), the TNT crate 505 (registered at last: the census counted it ported through its unit U9, so check `update_for` when a unit reads ported), Maktar's lamp 0x0e93 and its lock puzzle (the bomb 0x09c8, the catapult 0x0aa6, the walls 0x0c1b, the power nodes 0x0c82, the lock 0x0c81, the conveyor bridge 0x0ab0; same day): 813 unported class-levels / 9,231 created, 153 ported units; cheap 270 / 4,571, missing 57 / 543, partly 54 / 2,020, unknown 181 / 2,097. What is left missing is mostly the level chunks (banks 2 / 3, G-LVL-007): on Maktar chunk 1 is the arena, switched to only by the arena master 0x0b59 (U141, 5,518 words, dialogue and items too).
+
 Missing systems now (`systems.tsv`, every unit calling the system, not only the blocked; status as the ranking reads
 it):
 

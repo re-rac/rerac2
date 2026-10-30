@@ -14,6 +14,8 @@
 //! | `0x3f0e80` | the Gravity Bomb's blast 0xce5 | its shockwave and flares ([`crate::moby::classes::gravity_bomb::draw_blast`]) |
 //! | `0x3cac30` | Oozla's conveyor 0x0a7b out | its belt of light ([`crate::moby::classes::oozla::draw_0a7b`]) |
 //! | `0x3d2ea8` | Oozla's hatch 0x0a9d open | its light ([`crate::moby::classes::oozla::draw_0a9d`]) |
+//! | `0x414118` | Maktar's power node 0x0c82 showing | its arc to the lock ([`ribbon`], crate::moby::classes::maktar::draw_0c82) |
+//! | `0x3ec7c8` | Maktar's conveyor bridge 0x0ab0 running | its belt's beam (crate::moby::classes::maktar::draw_0ab0) |
 //! | `0x38e4c8` | the Tractor Beam holding | its beam ([`crate::moby::classes::tractor::draw`]) |
 //! | `0x4137d0` | the space fights' laser 0xffa | a streak ([`crate::ship::draw_laser`]) |
 //!
@@ -102,6 +104,28 @@ pub fn glow(out: &mut Vec<FxQuad>, rng: &mut crate::rng::Rng, size: f32, point: 
     }
 }
 
+/// `0x2f03a8(_, k, v, points, fx₀, fx₁, n, c₀, c₁)` (L02): a ribbon through `points` (`{x, y, z, half-width}`)
+/// facing the camera — at each point its half-width across `dir × (point − camera)` (`dir` from the last point, the
+/// first's toward the second) — drawn twice per segment: `fx₀` in `c₀`, then `fx₁` in `c₁` `k` times as wide; s runs
+/// `v..v + 1` along each segment, t across; additive.
+pub fn ribbon(out: &mut Vec<FxQuad>, k: f32, v: f32, points: &[[f32; 4]], cam: V3, fx: [usize; 2], c: [u32; 2]) {
+    let n = points.len();
+    if n < 2 { return; }
+    let p = |i: usize| -> V3 { [points[i][0], points[i][1], points[i][2]] };
+    let side = |i: usize| -> V3 {
+        let dir = if i == 0 { sub(p(1), p(0)) } else { sub(p(i), p(i - 1)) };
+        scale(unit(cross(dir, sub(p(i), cam))), points[i][3])
+    };
+    let st = [[v, 0.0], [v, 1.0], [v + 1.0, 0.0], [v + 1.0, 1.0]];
+    for i in 1..n {
+        let (a, b) = (side(i - 1), side(i));
+        let (pa, pb) = (p(i - 1), p(i));
+        out.push(FxQuad { fx: fx[0], additive: true, corners: [add(pa, a), sub(pa, a), add(pb, b), sub(pb, b)], st, rgba: [c[0]; 4] });
+        let (a, b) = (scale(a, k), scale(b, k));
+        out.push(FxQuad { fx: fx[1], additive: true, corners: [add(pa, a), sub(pa, a), add(pb, b), sub(pb, b)], st, rgba: [c[1]; 4] });
+    }
+}
+
 /// `$gp+0x12f0` / `+0x12f4`: 0x0b0a's glow colours.
 const GLOW_0B0A: [u32; 2] = [0x0000_36f6, 0x0010_50b0];
 
@@ -177,6 +201,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         c if crate::moby::classes::flock::CLASSES.contains(&c) => crate::moby::classes::flock::draw(w, id, view, cam, out),
         crate::moby::classes::critter::CLASS => crate::moby::classes::critter::draw(w, id, cam, out),
         0x0ab0 => crate::moby::classes::maktar::draw_0ab0(w, id, out),
+        crate::moby::classes::maktar::NODE => crate::moby::classes::maktar::draw_0c82(w, id, cam, out),
         crate::moby::classes::teleport::CLASS => crate::moby::classes::teleport::draw(w, id, &host.camera_rows(), out),
         0x00bc => crate::moby::classes::tractor::draw(w, id, cam, -0.3 * (game.frame % 27) as f32, out),
         crate::ship::LASER_CLASS => crate::ship::draw_laser(w, id, cam, out),

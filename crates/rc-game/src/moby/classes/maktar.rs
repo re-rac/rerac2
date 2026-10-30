@@ -17,8 +17,8 @@
 //!   0x0c1b ([`update_0c1b`]); the lock 0x0c81 ([`update_0c81`]), its four nodes dead, hooks its group: the conveyor
 //!   bridge 0x0ab0 ([`update_0ab0`]) unfolds and carries Ratchet on its belt surfaces 0x0aaf.
 //!
-//! Not ported (the lock puzzle): the nodes', the lock's and the catapult's draws (`0x414118`: an arc to the lock,
-//! `0x2f03a8`; `0x413460`: seven effect panels; `0x3eae18`), the catapult's aiming camera.
+//! Not ported (the lock puzzle): the lock's and the catapult's draws (`0x413460`: seven effect panels; `0x3eae18`),
+//! the catapult's aiming camera.
 //!
 //! Not ported: 0x0adf's lift (`0x3ece68`, its update when the cuboid's z scale is 2: up and down to Ratchet's level
 //! as he rides it); 0x0e96 (`0x4301b0`, the arena crowd: it waits for its controller past state 1, cheers by the
@@ -366,8 +366,8 @@ pub const BOMB: i16 = 0x09c8;
 /// that height (`[4]` on 0.0582 a tick), its spin phase `[0x14]` back 0.1047 a tick and its scroll `[0x10]` back 1/15
 /// (in −1..1). Alive (1) it keeps its looped sound 0 (the handle `[0x18]`), fades in `[0xc]` (at 1/60, out past 64
 /// from the camera) and, drawn, sparkles ([`node_sparkle`]); a hit with the flags 0x10000 from a bomb 0x09c8 within 5
-/// kills it (2): no collision, hidden, its sound stopped. Not ported: its draw `0x414118` (an arc to the lock's cuboid
-/// `[0]`, `0x2f03a8`), the word `0x18cfdc` its death sets to 0xffff.
+/// kills it (2): no collision, hidden, its sound stopped. Showing, it draws its arc to the lock ([`draw_0c82`]). Not
+/// ported: the word `0x18cfdc` its death sets to 0xffff.
 pub fn update_0c82(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     use crate::hero::physics::{add_rot, approach, dist, dist2};
     match w.mobys[id].state {
@@ -392,6 +392,7 @@ pub fn update_0c82(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         1 => {
             if w.mobys[id].drawn != 0 { node_sparkle(w, id, ctx); }
+            cache_cuboid(w, ctx, w.mobys[id].pv_i(0));
             let h = w.mobys[id].pv_i(0x18);
             if !ctx.host.sound_playing(h) {
                 let h = ctx.host.play_sound(&w.mobys[id], 0, 4);
@@ -402,6 +403,10 @@ pub fn update_0c82(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let mut f = m.pv_f(0xc);
             approach(if far { 0.0 } else { 1.0 }, 1.0 / 60.0, &mut f);
             m.set_pv_f(0xc, f);
+            if f != 0.0 {
+                w.register_draw(id);
+                arc_glint(w, id, ctx);
+            }
             let bombed = w.hit_message(id).is_some_and(|h| {
                 h.tmpl.flags & 0x10000 != 0 && h.tmpl.source.is_some_and(|s| w.mobys.get(s).is_some_and(|b| b.o_class == BOMB && dist(w.mobys[id].pos, b.pos) < 5.0))
             });
@@ -563,7 +568,7 @@ pub struct Conveyor {
     pub reversed: bool,
     /// `$gp+0x1d28`: the belts' speed a tick.
     pub speed: f32,
-    /// The cuboids' matrices (`0x1b368c`), copied as the belts read them for their draws.
+    /// The cuboids' matrices (`0x1b368c`), copied as the belts and the power nodes read them for their draws.
     pub cuboids: Vec<(i32, [[f32; 4]; 4])>,
 }
 
@@ -1141,4 +1146,60 @@ fn catapult_fly(w: &mut MobyWorld, id: usize, b: usize, ctx: &Ctx) -> Option<cra
     } else {
         None
     }
+}
+
+/// The cuboid `k`'s matrix kept for the draws (`0x1b368c`; [`Conveyor::cuboids`]).
+fn cache_cuboid(w: &mut MobyWorld, ctx: &Ctx, k: i32) {
+    let Some(cb) = usize::try_from(k).ok().and_then(|i| ctx.level.cuboids.get(i)) else { return };
+    let mat = cb.matrix;
+    let cs = &mut w.conveyor.cuboids;
+    match cs.iter_mut().find(|(i, _)| *i == k) { Some(e) => e.1 = mat, None => cs.push((k, mat)) }
+}
+
+/// The power node's arc (`0x414118`): 13 points from 1.5 up its frame to its lock's cuboid `[0]` (`0x1b368c + 0x30`),
+/// each but the first sagging `sin(phase_k)·sin(k·π/13)` (phase_k from `[5]` on by 2π/13 a point), half-width 0.4.
+fn node_arc(w: &MobyWorld, id: usize) -> Option<Vec<[f32; 4]>> {
+    use crate::hero::physics::{add, add_rot, scale, sub};
+    let m = &w.mobys[id];
+    let k = m.pv_i(0);
+    let &(_, mat) = w.conveyor.cuboids.iter().find(|(i, _)| *i == k)?;
+    let start = add(through(&m.rows, [0.0, 0.0, 1.5]), m.pos);
+    let step = scale(sub([mat[3][0], mat[3][1], mat[3][2]], start), 1.0 / 12.0);
+    let mut pts: Vec<[f32; 4]> = (0..13).map(|i| { let p = add(start, scale(step, i as f32)); [p[0], p[1], p[2], 0.4] }).collect();
+    let mut ph = m.pv_f(0x14);
+    let a = std::f32::consts::PI / 13.0;
+    for (i, p) in pts.iter_mut().enumerate().skip(1) {
+        p[2] += ph.sin() * (i as f32 * a).sin();
+        ph = add_rot(ph, a + a);
+    }
+    Some(pts)
+}
+
+/// `0x414118`, the power node's draw: its arc ([`node_arc`]) as a ribbon ([`crate::fx::ribbon`]: effect 0x17 in
+/// 0x60000080, its glow 0x0e three times as wide in 0x60404040, alphas × its fade `[3]`; scrolled by `[4]`).
+pub fn draw_0c82(w: &MobyWorld, id: usize, cam: crate::hero::physics::V3, out: &mut Vec<crate::fx::FxQuad>) {
+    let Some(pts) = node_arc(w, id) else { return };
+    let m = &w.mobys[id];
+    let f = m.pv_f(0xc);
+    let c = |x: u32| crate::hud::lerp_rgba(f, x & 0xff_ffff, x);
+    crate::fx::ribbon(out, 3.0, m.pv_f(0x10), &pts, cam, [0x17, 0x0e], [c(0x6000_0080), c(0x6040_4040)]);
+}
+
+/// The draw's glint (`0x414118`, made here in the update: the draws send no particles): somewhere along a random
+/// segment of the arc, sinking `randf(2, 5.5)` a second, size 0.75, 0x60004090, 40..90 ticks.
+fn arc_glint(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
+    use crate::hero::physics::{add, scale, sub};
+    if ctx.game.scenes.mode != crate::scene::PLAY { return; }
+    let Some(pts) = node_arc(w, id) else { return };
+    let hero = ctx.hero.pos;
+    let Some(sys) = ctx.parts.as_deref_mut() else { return };
+    let rng = &mut ctx.game.rng;
+    let k = rng.randi(0xc) as usize;
+    let t = rng.randf(0.0, 1.0);
+    let (a, b) = ([pts[k][0], pts[k][1], pts[k][2]], [pts[k + 1][0], pts[k + 1][1], pts[k + 1][2]]);
+    let p = add(a, scale(sub(b, a), t));
+    let sink = -(rng.randf(2.0, 5.5) / 60.0);
+    let life = rng.rand_range(0x28, 0x5a) as u16;
+    let rot = rng.randi(0xff) as u8;
+    crate::particles::glint(sys, 0.75, p, [0.0, 0.0, sink], 0x6000_4090, life, rot, false, hero);
 }
