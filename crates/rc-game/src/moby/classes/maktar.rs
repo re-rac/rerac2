@@ -6,6 +6,7 @@
 //! * 0x0a24 (`0x3d90f0`) / 0x0a55 (`0x3dd430`): on their first tick at their path's first point ([`update_0a24`],
 //!   [`update_0a55`]).
 //! * 0x0a4b (`0x3dd3c8`): its shadow's slab probed while drawn within 64 of the camera, range 0x3c ([`update_0a4b`]).
+//! * 0x0aab / 0x0aac (`0x3eb6f8`): sliding doors, set off by a hook ([`update_0aab`]).
 //! * 0x0adf (`0x3ecbb8`): a platform swinging along its cuboid, carrying Ratchet ([`update_0adf`]).
 //! * 0x0e93 (`0x42fb20`): a breakable (crate::moby::classes::props::update_breakable: a hit with the flags 0x4010000
 //!   while `+0x68`[0] = 0); its start's two glows (`0x346250`), its break's shards, burst, debris and sound are not
@@ -140,4 +141,64 @@ pub fn update_0adf(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     let m = &w.mobys[id];
     carry_hero(ctx, id, old, old_yaw, m.pos, m.rot[2]);
+}
+
+/// 0x0aab / 0x0aac (`0x3eb6f8`): a sliding door. At its start its home (`+0`) and a pulse phase (`+0x18`); closed (1)
+/// its colour `+0x78` pulses (`0x800c0c00` | `(4·sin − 3)·208` within 0x50..0xd0, the phase 6° a tick) and, past 100
+/// with Ratchet on a 0x0a61, it glows (two glows 315000 across at (0, −1.25, −2), frames 0 and 1, colour 0x20000012,
+/// 15 ticks); hooked (`0x32a838`) it plays its sound 0 and opens (2): coloured 0xff0cff0c, it slides along its facing
+/// (0x0aac forward, 0x0aab back) by `+0x10`, its speed `+0x14` gaining (2 + 5·the distance)/3600 a tick; at 2.5 it
+/// bounces back at −0.5 of its speed until under 1/60 (state 3).
+pub fn update_0aab(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    match w.mobys[id].state {
+        0 => {
+            let a = ctx.game.rng.rand_angle();
+            let m = &mut w.mobys[id];
+            m.set_pv_f(0x18, a);
+            let pos = m.pos;
+            m.set_pv_v(0, pos);
+            m.set_state(1, -1);
+        }
+        1 => {
+            let m = &mut w.mobys[id];
+            let a = crate::hero::physics::add_rot(m.pv_f(0x18), f32::from_bits(0x3d56_7752));
+            m.set_pv_f(0x18, a);
+            let v = (((a.sin() * 4.0 - 3.0) * 208.0) as i32).clamp(0x50, 0xd0);
+            let on_pad = ctx.hero.ground_moby.and_then(|g| w.mobys.get(g)).is_some_and(|g| g.o_class == 0x0a61);
+            if on_pad && 100 < v {
+                let (pos, far) = (w.mobys[id].pos, w.mobys[id].draw_dist);
+                if let Some(sys) = ctx.parts.as_deref_mut() {
+                    for def in [0, 1] {
+                        crate::particles::glow_def(sys, &mut ctx.game.rng, 315_000.0, 0.0, [0.0, -1.25, -2.0], id, pos, far, false, 0x2000_0012, 0xf, def);
+                    }
+                }
+            }
+            let m = &mut w.mobys[id];
+            m.glow = v as u32 | 0x800c_0c00;
+            if m.once & 4 == 0 { return; }
+            ctx.host.play_sound(&w.mobys[id], 0, 0);
+            w.mobys[id].set_state(2, -1);
+        }
+        2 => {
+            let m = &mut w.mobys[id];
+            m.glow = 0xff0c_ff0c;
+            let v = m.pv_f(0x14) + 2.0 * 0.000_277_777_78 + m.pv_f(0x10) * 0.000_277_777_78 * 5.0;
+            m.set_pv_f(0x14, v);
+            m.set_pv_f(0x10, m.pv_f(0x10) + v);
+            if 2.5 < m.pv_f(0x10) {
+                m.set_pv_f(0x10, 2.5);
+                if 0.016_666_668 < m.pv_f(0x14) {
+                    m.set_pv_f(0x14, m.pv_f(0x14) * -0.5);
+                } else {
+                    m.set_pv_f(0x14, 0.0);
+                    m.set_state(3, -1);
+                }
+            }
+            let d = if m.o_class == 0x0aac { m.pv_f(0x10) } else { -m.pv_f(0x10) };
+            let along = crate::hero::physics::set_len(m.rows[0], d);
+            m.pos = crate::hero::physics::add(along, m.pv_v(0));
+            w.changed = true;
+        }
+        _ => {}
+    }
 }

@@ -158,6 +158,7 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x0a55 => Some(maktar::update_0a55),
         0x0a4b => Some(maktar::update_0a4b),
         0x0adf => Some(maktar::update_0adf),
+        0x0aab | 0x0aac => Some(maktar::update_0aab),
         crate::ship::LASER_CLASS => Some(crate::ship::update_laser),
         space::FIGHTER | space::GUNSHIP => Some(space::update_fighter),
         crate::ship::MISSION_CLASS => Some(crate::ship::update_mission),
