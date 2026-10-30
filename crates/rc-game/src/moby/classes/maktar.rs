@@ -10,8 +10,8 @@
 //! * 0x0d0d (`0x424cf8`): a breakable target: shot, it breaks into its pieces, debris chunks and smoke ([`update_0d0d`]).
 //! * 0x0adf (`0x3ecbb8`): a platform swinging along its cuboid, carrying Ratchet ([`update_0adf`]).
 //! * 0x0e93 (`0x42fb20`): a breakable lamp: two glows, shot it breaks into its pieces, a ball, bolts, debris chunks and
-//!   smoke ([`update_0e93`]). Not ported: the count of them `0x12cf` keeps (`$gp−0x3c0`; at 10 left, once: `0x367f58`,
-//!   `0x32c310(0x1233)`).
+//!   smoke ([`update_0e93`]); 0x0aa4 (`0x3e9498`) another breakable ([`update_0aa4`]); the count of the resort's
+//!   breakables 0x12cf keeps ([`update_12cf`]: at 10 left, once, a message).
 //! * The lock puzzle: the bomb 0x09c8 ([`update_09c8`]) the Tractor Beam drags, lit when taken, flung by its
 //!   catapult 0x0aa6 ([`update_0aa6`]); its blast kills the power nodes 0x0c82 ([`update_0c82`]) and breaks the walls
 //!   0x0c1b ([`update_0c1b`]); the lock 0x0c81 ([`update_0c81`]), its four nodes dead, hooks its group: the conveyor
@@ -226,7 +226,10 @@ pub fn update_0d0d(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.set_state(1, -1);
         }
         1 => {
-            if w.hit_message(id).is_some_and(|h| h.tmpl.flags & 0x0401_0000 != 0) { w.mobys[id].set_state(2, -1); }
+            if w.hit_message(id).is_some_and(|h| h.tmpl.flags & 0x0401_0000 != 0) {
+                w.maktar.left -= 1;
+                w.mobys[id].set_state(2, -1);
+            }
             w.clear_hit(id);
         }
         2 => {
@@ -278,10 +281,14 @@ pub fn update_0e93(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 crate::particles::glow_def(sys, rng, 409_500.0, 0.0, [0.0, 0.0, 4.0], id, pos, 0x60, false, 0x2820_8080, -1, 0);
                 crate::particles::glow_def(sys, rng, 367_500.0, 0.75, [0.0, 0.0, 4.0], id, pos, 0x60, false, 0x2020_8080, -1, 1);
             }
+            if w.mobys[id].pv_i(0) != 0 { w.maktar.left -= 1; }
             w.mobys[id].set_state(1, -1);
         }
         1 => {
-            if w.hit_message(id).is_some_and(|h| h.tmpl.flags & 0x0401_0000 != 0) && w.mobys[id].pv_i(0) == 0 { w.mobys[id].set_state(2, -1); }
+            if w.hit_message(id).is_some_and(|h| h.tmpl.flags & 0x0401_0000 != 0) && w.mobys[id].pv_i(0) == 0 {
+                w.maktar.left -= 1;
+                w.mobys[id].set_state(2, -1);
+            }
             w.clear_hit(id);
             w.mobys[id].hit_slot = -1;
         }
@@ -566,9 +573,13 @@ pub fn update_0c81(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if m.pv_f(0x3c) != 0.0 && !alive[3] { m.set_pv_f(0x3c, 0.0); }
 }
 
-/// The conveyor bridges' globals (`$gp+0x1d20..0x1d2c`) and the cuboids their beams draw over.
+/// Maktar's globals: the conveyor bridges' (`$gp+0x1d20..0x1d2c`), the cuboids the draws use, the breakables' count.
 #[derive(Clone, Debug, Default)]
-pub struct Conveyor {
+pub struct Globals {
+    /// `$gp−0x3c0`: the breakables left (0x12cf counts them, [`update_12cf`]; each takes one off when it breaks).
+    pub left: i32,
+    /// `0x1a7a76`: the count's message shown (a save flag in the game; here for the level's load).
+    pub told: bool,
     /// `$gp+0x1d24`: the belts' way, −1 (the data's) or 1; `reversed` holds 1.
     pub reversed: bool,
     /// `$gp+0x1d28`: the belts' speed a tick.
@@ -745,7 +756,7 @@ pub fn update_0ab0(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             w.changed = true;
         }
         8 => {
-            let c = &mut w.conveyor;
+            let c = &mut w.maktar;
             let target = if c.reversed { 1.0 } else { -1.0 } * 0.066_666_67;
             approach(target, 0.004_444_444, &mut c.speed);
             let speed = c.speed;
@@ -755,7 +766,7 @@ pub fn update_0ab0(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 if speed == target && dot(ctx.hero.vel, v) < -0.001 {
                     let n = m.pv_i(0x20) + 1;
                     m.set_pv_i(0x20, n);
-                    if 0x1e < n { w.conveyor.reversed = !w.conveyor.reversed; }
+                    if 0x1e < n { w.maktar.reversed = !w.maktar.reversed; }
                 } else {
                     m.set_pv_i(0x20, 0);
                 }
@@ -771,7 +782,7 @@ pub fn update_0ab0(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let k = m.pv_i(8);
             if let Some(cb) = usize::try_from(k).ok().and_then(|i| ctx.level.cuboids.get(i)) {
                 let mat = cb.matrix;
-                let cs = &mut w.conveyor.cuboids;
+                let cs = &mut w.maktar.cuboids;
                 match cs.iter_mut().find(|(i, _)| *i == k) { Some(e) => e.1 = mat, None => cs.push((k, mat)) }
             }
             w.register_draw(id);
@@ -805,7 +816,7 @@ pub fn draw_0ab0(w: &MobyWorld, id: usize, out: &mut Vec<crate::fx::FxQuad>) {
     use crate::hero::physics::len;
     let m = &w.mobys[id];
     let k = m.pv_i(8);
-    let Some(&(_, mat)) = w.conveyor.cuboids.iter().find(|(i, _)| *i == k) else { return };
+    let Some(&(_, mat)) = w.maktar.cuboids.iter().find(|(i, _)| *i == k) else { return };
     let n = len([mat[1][0], mat[1][1], mat[1][2]]) as i32;
     if n < 1 { return; }
     let (p, scroll, fade) = (m.pv_f(0x14), m.pv_f(0x18), m.pv_f(0x1c));
@@ -1153,11 +1164,11 @@ fn catapult_fly(w: &mut MobyWorld, id: usize, b: usize, ctx: &Ctx) -> Option<cra
     }
 }
 
-/// The cuboid `k`'s matrix kept for the draws (`0x1b368c`; [`Conveyor::cuboids`]).
+/// The cuboid `k`'s matrix kept for the draws (`0x1b368c`; [`Globals::cuboids`]).
 fn cache_cuboid(w: &mut MobyWorld, ctx: &Ctx, k: i32) {
     let Some(cb) = usize::try_from(k).ok().and_then(|i| ctx.level.cuboids.get(i)) else { return };
     let mat = cb.matrix;
-    let cs = &mut w.conveyor.cuboids;
+    let cs = &mut w.maktar.cuboids;
     match cs.iter_mut().find(|(i, _)| *i == k) { Some(e) => e.1 = mat, None => cs.push((k, mat)) }
 }
 
@@ -1167,7 +1178,7 @@ fn node_arc(w: &MobyWorld, id: usize) -> Option<Vec<[f32; 4]>> {
     use crate::hero::physics::{add, add_rot, scale, sub};
     let m = &w.mobys[id];
     let k = m.pv_i(0);
-    let &(_, mat) = w.conveyor.cuboids.iter().find(|(i, _)| *i == k)?;
+    let &(_, mat) = w.maktar.cuboids.iter().find(|(i, _)| *i == k)?;
     let start = add(through(&m.rows, [0.0, 0.0, 1.5]), m.pos);
     let step = scale(sub([mat[3][0], mat[3][1], mat[3][2]], start), 1.0 / 12.0);
     let mut pts: Vec<[f32; 4]> = (0..13).map(|i| { let p = add(start, scale(step, i as f32)); [p[0], p[1], p[2], 0.4] }).collect();
@@ -1260,5 +1271,69 @@ pub fn draw_0c81(w: &MobyWorld, id: usize, cam: crate::hero::physics::V3, out: &
                 out.push(crate::fx::FxQuad { fx, additive: true, corners: [corner(p, zl), corner(p, zh), corner(q, zl), corner(q, zh)], st, rgba: [c; 4] });
             }
         }
+    }
+}
+
+/// 0x0aa4 (`0x3e9498`), a breakable of the resort: update distance 0xff (with `+0x68`[0] set, it is not counted). In
+/// chunk 0, a hit with the flags 0x4010000 while `[0]` = 0 breaks it (2), one off the count: its pieces thrown but
+/// piece 5 (`0x3311f8`: gravity 10..20, spin 90..360, `randf(−6, 0)` back, `randf(−4, 4)` across, `randf(4, 7)` up a
+/// second; no bolts there), the level's bolts 5 times from ½ up, the blast (size 1, with the shake and the ring); then
+/// (3) only its piece 5 drawn, the wreck. Not ported: its draw once a frame (`0x3e9668`).
+pub fn update_0aa4(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    match w.mobys[id].state {
+        0 => {
+            w.mobys[id].update_dist = 0xff;
+            w.mobys[id].set_state(1, -1);
+            if w.mobys[id].pv_i(0) != 0 { w.maktar.left -= 1; }
+        }
+        1 => {
+            if ctx.game.variant == 1 { return; }
+            if w.hit_message(id).is_some_and(|h| h.tmpl.flags & 0x0401_0000 != 0) && w.mobys[id].pv_i(0) == 0 {
+                w.maktar.left -= 1;
+                w.mobys[id].set_state(2, -1);
+            }
+            w.mobys[id].hit_slot = -1;
+        }
+        2 => {
+            crate::moby::shards::throw_all(w, id, ctx, [-6.0, -4.0, 4.0, 0.0, 0.0, 4.0, 7.0, 0.0], (90.0, 360.0), (10.0, 20.0), 0xffff, 0, 5, 1, 0xffff);
+            crate::moby::bolts::level_drop(w, id, 0.5, 5, ctx);
+            let pos = w.mobys[id].pos;
+            crate::moby::blast::burst(w, ctx, pos, &crate::moby::blast::Blast { size: 1.0, bursts: [0x19, 0x14, 0x14], puffs: 0x14, streaks: 0x2d, light: false, shake: true });
+            w.mobys[id].set_state(3, -1);
+        }
+        3 => {
+            w.mobys[id].piece = Some(5);
+            w.changed = true;
+        }
+        _ => {}
+    }
+}
+
+/// The classes 0x12cf counts on Maktar.
+const COUNTED: [i16; 5] = [0x0a9c, 0x0d0d, 0x0aa4, 0x0e93, 0x1259];
+
+/// 0x12cf (`0x38b458`), the count of the resort's breakables (`$gp−0x3c0`, [`Globals::left`]): at its start (update
+/// distance 0xff) on Maktar it counts the placed 0x0a9c, 0x0d0d, 0x0aa4, 0x0e93 and 0x1259 under z 400; at the level's
+/// frame 2 the count is set to 113 (the game's own figure); at 10 left or fewer, once, the message 0x1233 shows
+/// (`0x32c310(0x1233, −1)`, crate::prompt). Not ported: the level's sound 1 then (`0x367f58`), the flag `0x1a903c`,
+/// level 3's count (classes 0xf37, 0xf38, 0xf3e: 112, at 11).
+pub fn update_12cf(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    match w.mobys[id].state {
+        0 => {
+            w.mobys[id].update_dist = 0xff;
+            if ctx.game.level == 2 {
+                let n = w.mobys.iter().filter(|m| m.state < 0x80 && COUNTED.contains(&m.o_class) && m.pos[2] < 400.0).count() as i32;
+                w.maktar.left += n;
+            }
+            w.mobys[id].set_state(1, -1);
+        }
+        1 => {
+            if ctx.game.level != 2 { return; }
+            if ctx.game.frame == 2 { w.maktar.left = 0x71; }
+            if 10 < w.maktar.left || w.maktar.told { return; }
+            w.maktar.told = true;
+            ctx.game.prompt.announce(0x1233, -1);
+        }
+        _ => {}
     }
 }

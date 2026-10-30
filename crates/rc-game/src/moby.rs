@@ -509,8 +509,8 @@ pub struct MobyWorld {
     pub fade_manager: Option<usize>,
     /// The weather's globals (classes::weather).
     pub weather: classes::weather::Weather,
-    /// Maktar's conveyor bridges' globals (classes::maktar::Conveyor).
-    pub conveyor: classes::maktar::Conveyor,
+    /// Maktar's globals (classes::maktar::Globals).
+    pub maktar: classes::maktar::Globals,
     /// The point lights (`0x1c6ec0`), owned by the explosion lights (classes::light); the engine lights the world and
     /// the mobys with them.
     pub point_lights: crate::point_lights::PointLights,
