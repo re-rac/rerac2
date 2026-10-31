@@ -5,9 +5,12 @@
 //! with it) and, through [`ChunkGeneration`], the world lights' lists.
 //!
 //! The switched-in tfrags have no occlusion mapping (the switch resets the tfrags' lists, `0x372c80`): all always
-//! visible. Not ported: the chunk's sound bank (bank k + 1, `0x3081c8`; crate::level_wad::chunk_sounds loads chunk
-//! 0's only), the other resets of the switch (`0x368320`, `0x335998`, `0x383fd8`, `0x373960`, `0x3080a0`,
-//! `0x334fe0`, `0x335630`).
+//! visible. Not ported: the chunk's sound bank (bank k + 1, `0x334fe0`; crate::level_wad::chunk_sounds loads chunk
+//! 0's only) and its ambient (`0x335630`); the hiding of what lies in the other chunk (`0x3081c8`, also at the level
+//! load: the ties' `+0x1e` bit 4, the shrubs' `+0x16` bit 0 and the mobys' `+0x34` bit 0x80 set unless the variant
+//! planes `0x308138` put them in chunk k); the chunk tfrags' occlusion words (`0x3080a0`: `+0x3a` through the table
+//! `0x1caa94` the occlusion load `0x305380` fills from all 1259 tfrag mappings on Maktar); the other resets
+//! (`0x368320`, `0x335998`, `0x383fd8`, `0x373960`).
 
 use bevy::camera::visibility::RenderLayers;
 use bevy::prelude::*;
