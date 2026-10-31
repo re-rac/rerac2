@@ -12,7 +12,8 @@
 //! * 0 (fade in): timer out → phase 1, timer `ticks(20)`, alpha 0x7f; else alpha = 0x20 + (ticks(10) − t)·96/ticks(10);
 //! * 1 (fade out): timer out → kill; else alpha = t·127/ticks(20);
 //! * 2 (timed fade): timer out → kill; else alpha = +0x2a·t/+0x2b (colour bits of +0x20 kept, its alpha replaced);
-//! * 3 (fade in then 2): alpha = +0x2a·min(1, (+0x2b − t)/ticks(30)); after `ticks(30)` → phase 2, +0x2b −= ticks(30).
+//! * 3 (fade in then 2): alpha = +0x2a·min(1, (+0x2b − t)/f); after f ticks → phase 2, +0x2b −= f; f the fade-in
+//!   length `+0x3c` (Going Commando's; R&C1's is ticks(30)).
 //!
 //! In phases 0 and 1 the alpha is OR'd into the whole base colour word (the game's `a << 24 | +0x20`).
 
@@ -20,7 +21,7 @@ use super::{fast_dec_timer, rec, Particles};
 
 /// `PartType23Update` 0x282210.
 pub(crate) fn update(sys: &mut Particles, i: usize) {
-    let (t10, t20, t30) = (sys.time.ticks(10), sys.time.ticks(20), sys.time.ticks(30));
+    let (t10, t20) = (sys.time.ticks(10), sys.time.ticks(20));
     let speed = f32::from_bits(sys.time.speed);
     let r = &mut sys.pool.recs[i];
     r[8] = r[8].wrapping_add(r[0x28]);
@@ -47,14 +48,17 @@ pub(crate) fn update(sys: &mut Particles, i: usize) {
             return;
         }
         3 => {
+            // Going Commando's fade-in length is the record's `+0x3c` (its spawner's 30, the callers' own), where
+            // R&C1's is ticks(30) (R&C2 L00 `0x335d80`, L02 `0x33c898`).
             fast_dec_timer(r, 0xa);
             let t = rec::i16(r, 0xa) as i32;
-            let f = ((r[0x2b] as i32 - t) as f32 / t30 as f32).min(1.0);
+            let fade = rec::ff(r, 0x3c);
+            let f = ((r[0x2b] as i32 - t) as f32 / fade).min(1.0);
             let a = (r[0x2a] as f32 * f) as i32 as u32;
             rec::set_u32(r, 4, a << 24 | base & 0xff_ffff);
-            if r[0x2b] as i32 - t >= t30 {
+            if r[0x2b] as i32 - t >= fade as i32 {
                 rec::set_u32(r, 0x24, 2);
-                r[0x2b] = r[0x2b].wrapping_sub(t30 as u8);
+                r[0x2b] = r[0x2b].wrapping_sub(fade as i32 as u8);
             }
             return;
         }

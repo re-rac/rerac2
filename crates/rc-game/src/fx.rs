@@ -23,6 +23,7 @@
 //! | `0x3d7858` / `0x3dc2d0` | Maktar's arena bosses 0x09f8 / 0x0a44 | their lights (crate::moby::classes::bosses) |
 //! | `0x423e10` | 0x0a44's shot 0x0d08 (the first list) | its glow and sparks (crate::moby::classes::bosses::draw_shot) |
 //! | `0x4137d0` | the space fights' laser 0xffa | a streak ([`crate::ship::draw_laser`]) |
+//! | `0x426410` (L02) | the big explosion 0x0d4e | its discs and glare ([`crate::moby::classes::explosion::draw`]) |
 //!
 //! Before them, the frame's blob shadows (`0x2e7ab0`, crate::shadows: FX 0, ALPHA 0x44) go first into the same quads.
 //!
@@ -276,6 +277,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::bosses::SHOT => crate::moby::classes::bosses::draw_shot(w, id, &mut game.rng, cam, out),
         crate::moby::classes::keeper::SHOT => crate::moby::classes::keeper::draw_shot(w, id, &mut game.rng, cam, out),
         crate::moby::classes::teleport::CLASS => crate::moby::classes::teleport::draw(w, id, &host.camera_rows(), out),
+        crate::moby::classes::explosion::CLASS => crate::moby::classes::explosion::draw(w, id, cam, host.camera_rows(), out),
         0x00bc => crate::moby::classes::tractor::draw(w, id, cam, -0.3 * (game.frame % 27) as f32, out),
         crate::ship::LASER_CLASS => crate::ship::draw_laser(w, id, cam, out),
         _ => {}

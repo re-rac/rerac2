@@ -2426,10 +2426,12 @@ fn occlusion_mode(play: Option<Res<Play>>, level: Res<crate::Level>, frame: Opti
 
 /// `0x2e4af0` at the end of the previous frame's draw: the view's fog and the particles' far from the level fog
 /// globals, or under water the alternate set (rc_game::fog); the frame drawn after this tick uses it, a camera
-/// update behind as the game's.
-fn game_fog(play: Option<Res<Play>>, fog: Option<ResMut<crate::game_camera::GameFog>>) {
-    let (Some(p), Some(mut fog)) = (play, fog) else { return };
+/// update behind as the game's. The view's fog a tick wrote itself (an explosion's flash, rc_game::fog::FogFlash) is
+/// drawn once in its place.
+fn game_fog(play: Option<ResMut<Play>>, fog: Option<ResMut<crate::game_camera::GameFog>>) {
+    let (Some(mut p), Some(mut fog)) = (play, fog) else { return };
     let (g, far) = rc_game::fog::update_fog(&p.game.fog, p.game.underwater, &rc_game::fog::UnderwaterLook::default());
+    let g = if p.game.fog_flash.view.is_some() { p.game.fog_flash.view.take().unwrap_or(g) } else { g };
     let lf = crate::game_camera::LevelFog { color: g.colour, near_dist: g.near_dist, far_dist: g.far_dist, near_intensity: g.near_intensity, far_intensity: g.far_intensity };
     if fog.fog != lf || fog.particle_far12 != far { *fog = crate::game_camera::GameFog::new(lf, far); }
 }

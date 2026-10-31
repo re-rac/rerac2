@@ -21,10 +21,10 @@
 //! **Each tick**: its scale 1.5 its class's; drawn (or flying, 2 / 4) it is placed ([`place`]); drawn while flying or
 //! dropping (2..4) its jets smoke ([`jets`]); past 1, a hit (flags 0x10000) takes its damage
 //! (crate::moby::ai::damage_of) off its health; at 0 its sound 2, its pieces thrown (crate::moby::shards::break_into,
-//! mask 0x7f7, 5..10 out and up) and it goes.
+//! mask 0x7f7, 5..10 out and up), the big explosion facing the camera (crate::moby::classes::explosion, `0x425300`)
+//! and it goes.
 //!
-//! Not ported: its death's explosion `0x425300` (a moby 0x0d4e with its own update and particles, and its blasts
-//! `0x425c68`; also used by `0x4029e8`, `0x42b978` and `0x3f8ff8`), the angles' w (`+0x13c`, the path points' w).
+//! Not ported: the angles' w (`+0x13c`, the path points' w).
 
 use crate::hero::physics::{add, add_rot, approach, atan2, ease, rot_dist, sub, V3};
 use crate::moby::{ai, mode, Ctx, MobyWorld};
@@ -178,6 +178,10 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         if hp == 0.0 {
             ctx.host.play_sound(&w.mobys[id], 2, 0);
             crate::moby::shards::break_into(w, id, ctx, (5.0, 10.0), (5.0, 10.0), 0x7f7, [0.0; 3], 0xff);
+            // `0x425300(0, m, pos, the way to the camera)`: the big explosion, no ground.
+            let pos = w.mobys[id].pos;
+            let dir = crate::hero::physics::unit(sub(ctx.host.camera_pos(), pos));
+            super::explosion::start(w, ctx, 0.0, pos, dir);
             w.delete(id);
             return;
         }

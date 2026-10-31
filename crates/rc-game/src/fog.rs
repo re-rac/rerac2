@@ -82,6 +82,57 @@ pub fn update_fog(level: &FogGlobals, underwater: bool, look: &UnderwaterLook) -
     if underwater { (look.fog, UNDERWATER_PARTICLE_FAR12) } else { (*level, PARTICLE_FAR12) }
 }
 
+/// The explosions' fog flash (L02 `0x427ab8` / `0x427b30`, `$gp+0x3184` its timer, `0x1b4320` its distance): the
+/// view's fog (`0x1bec18..0x1bec38`) turned white, clear at the eye and 100 at 0.4 of the way to the explosion, then
+/// eased back to the level's over 30 ticks. The game writes the view's fog itself and the frame's draw puts the
+/// level's back (`0x2e4af0`): [`FogFlash::view`] is that write, for the next frame's draw only.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct FogFlash {
+    /// `$gp+0x3184`: ticks left.
+    pub timer: i32,
+    /// `0x1b4320`: the explosion's distance from the camera.
+    pub dist: f32,
+    /// The view's fog the last tick wrote (None: the level's).
+    pub view: Option<FogGlobals>,
+}
+
+/// `$gp+0x3180`: the flash's length; `$gp+0x31d0`: where it is thickest, of the way to the explosion.
+const FLASH_TICKS: i32 = 30;
+const FLASH_REACH: f32 = 0.4;
+
+/// `0x2e8bd8`'s guard on the view's fog: its far at least 1024 (one unit) past its near.
+fn guarded(mut g: FogGlobals) -> FogGlobals {
+    if g.far_dist < g.near_dist + 1024.0 { g.far_dist = g.near_dist + 1024.0; }
+    g
+}
+
+impl FogFlash {
+    /// `0x427ab8(dist)`: the flash at full — white, near 0 at 255, far `dist`·0.4 (×1024) at 100 — for 30 ticks.
+    pub fn start(&mut self, dist: f32) {
+        self.timer = FLASH_TICKS;
+        self.dist = dist;
+        self.view = Some(guarded(FogGlobals { colour: [0xff; 3], near_dist: 0.0, far_dist: dist * FLASH_REACH * 1024.0, near_intensity: 255.0, far_intensity: 100.0 }));
+    }
+
+    /// `0x427b30` (each tick of an explosion): while it runs, the timer down and the view's fog the level's `level`
+    /// eased toward the flash by timer / 30 (the colour toward white, the near toward 0, the far toward the flash's,
+    /// the intensities toward 255 and 100).
+    pub fn tick(&mut self, level: &FogGlobals) {
+        if self.timer <= 0 { return; }
+        self.timer -= 1;
+        let t = self.timer as f32 / FLASH_TICKS as f32;
+        let colour = level.colour.map(|c| (c as f32 + (255.0 - c as f32) * t) as i32 as u8);
+        let far = self.dist * FLASH_REACH * 1024.0;
+        self.view = Some(guarded(FogGlobals {
+            colour,
+            near_dist: level.near_dist + -level.near_dist * t,
+            far_dist: level.far_dist + (far - level.far_dist) * t,
+            near_intensity: level.near_intensity + (255.0 - level.near_intensity) * t,
+            far_intensity: level.far_intensity + (100.0 - level.far_intensity) * t,
+        }));
+    }
+}
+
 /// `0x2d9a58` (module docs): `off` = the camera's mode 6 or outside play; `cast(a, b)` = the line (flags 0x12) → its
 /// point and surface id; `water_height(point)` = `0x31d7a0`'s patch or plane height (None: the point's own).
 pub fn underwater_test(flag: &mut bool, cam: V3, off: bool, mut cast: impl FnMut(V3, V3) -> Option<(V3, i32)>, mut water_height: impl FnMut(V3) -> Option<f32>) {
