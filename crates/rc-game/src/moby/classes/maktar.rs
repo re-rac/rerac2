@@ -822,7 +822,7 @@ fn belt_carry(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, v: crate::hero::physi
 /// (n its length, whole), each from x = 1 to −1 and y a 2/n step of −1..1 in the cuboid's frame, twice: effect 5 with
 /// texture (0.5, 0.5..1.5) coloured `sin(pulse)` of the way from 0x30805000 to 0x20805000, and effect 0x10 with s
 /// scrolling by `[6]`, t 0.15..0.85, coloured `sin(pulse + π)` of the way from 0x30508000 to 0x20508000; the alphas
-/// × its fade `[7]`; additive.
+/// × its fade `[7]`; blended (`0x2f06b0`'s blend 0: ALPHA 0x44).
 pub fn draw_0ab0(w: &MobyWorld, id: usize, out: &mut Vec<crate::fx::FxQuad>) {
     use crate::hero::physics::len;
     let m = &w.mobys[id];
@@ -839,8 +839,8 @@ pub fn draw_0ab0(w: &MobyWorld, id: usize, out: &mut Vec<crate::fx::FxQuad>) {
     for i in 0..n {
         let y0 = -1.0 + step * i as f32;
         let corners = [world(1.0, y0 + step), world(1.0, y0), world(-1.0, y0 + step), world(-1.0, y0)];
-        out.push(crate::fx::FxQuad { fx: 5, additive: true, corners, st: [[0.5, 0.5], [0.5, 0.5], [0.5, 1.5], [0.5, 1.5]], rgba: [c0; 4] });
-        out.push(crate::fx::FxQuad { fx: 0x10, additive: true, corners, st: [[scroll, 0.15], [1.0 + scroll, 0.15], [scroll, 0.85], [1.0 + scroll, 0.85]], rgba: [c1; 4] });
+        out.push(crate::fx::FxQuad { fx: 5, additive: false, corners, st: [[0.5, 0.5], [0.5, 0.5], [0.5, 1.5], [0.5, 1.5]], rgba: [c0; 4] });
+        out.push(crate::fx::FxQuad { fx: 0x10, additive: false, corners, st: [[scroll, 0.15], [1.0 + scroll, 0.15], [scroll, 0.85], [1.0 + scroll, 0.85]], rgba: [c1; 4] });
     }
 }
 

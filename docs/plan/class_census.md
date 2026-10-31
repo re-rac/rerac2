@@ -105,6 +105,8 @@ Then the platform block (crate::moby::platform), the TNT crate 505 (registered a
 
 Then Maktar's slot machines 0x0a9c (2026-10-31, rc_game::moby::classes::maktar `update_0a9c` / `draw_0a9c`) with shard mode 0 (the whole moby thrown, its points the collision blob's vertices: rc_game::moby::shards::spawn_whole) and the nanotech cluster made free (`0x3a9bf0`): 807 unported class-levels / 9,178 created, 157 ported units; cheap 270 / 4,571, missing 58 / 568, partly 51 / 1,993, unknown 179 / 2,046. The spawn lists of waiting enemies (`0x3d0110` / `0x3d02c8`, G-ENM-004) are tagged missing.
 
+Then Maktar's creature keeper 0x09c5 (2026-10-31, U117, rc_game::moby::classes::keeper) with its homing shot 0x0b5a (`0x402450`, drawn by rc_game::fx::halo / streak) and the groups' waiting mobys (`0x3d0110` / `0x3d02c8`, critter::waiting / wake): 806 unported class-levels / 9,153 created, 160 ported units; cheap 270 / 4,571, missing 57 / 543, partly 51 / 1,993, unknown 179 / 2,046.
+
 Missing systems now (`systems.tsv`, every unit calling the system, not only the blocked; status as the ranking reads
 it):
 

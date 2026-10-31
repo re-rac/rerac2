@@ -218,7 +218,7 @@ fn first_crossing(path: &[[f32; 4]], from: V3, to: V3) -> Option<f32> {
 
 /// `0x3302b8(r, from, to, &out, path)`: a point toward `to` kept inside the path: stopped short (0.99) of the first
 /// wall crossed, then kept `r` from the walls (crate::moby::ai::fence); its height `to`'s.
-fn keep_in_path(ctx: &Ctx, r: f32, from: V3, to: V3, path: i32) -> V3 {
+pub(crate) fn keep_in_path(ctx: &Ctx, r: f32, from: V3, to: V3, path: i32) -> V3 {
     let Some(pts) = usize::try_from(path).ok().and_then(|p| ctx.level.paths.get(p)) else { return to };
     let p = match first_crossing(pts, from, to) {
         Some(f) => {

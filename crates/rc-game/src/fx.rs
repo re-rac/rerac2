@@ -18,6 +18,7 @@
 //! | `0x413460` | Maktar's lock 0x0c81 showing | its rings of light (crate::moby::classes::maktar::draw_0c81) |
 //! | `0x3ec7c8` | Maktar's conveyor bridge 0x0ab0 running | its belt's beam (crate::moby::classes::maktar::draw_0ab0) |
 //! | `0x3e90c8` | Maktar's slot machine 0x0a9c drawn | its reels (crate::moby::classes::maktar::draw_0a9c) |
+//! | `0x402bc8` | the keeper's shot 0x0b5a flying | its glow and streak ([`halo`], [`streak`]; crate::moby::classes::keeper::draw_shot) |
 //! | `0x38e4c8` | the Tractor Beam holding | its beam ([`crate::moby::classes::tractor::draw`]) |
 //! | `0x4137d0` | the space fights' laser 0xffa | a streak ([`crate::ship::draw_laser`]) |
 //!
@@ -103,6 +104,61 @@ pub fn glow(out: &mut Vec<FxQuad>, rng: &mut crate::rng::Rng, size: f32, point: 
         let corner = |y: f32, z: f32| add(p, add(scale(r, y * h), scale(u, z * h)));
         let rgba = (rgb & 0xff_ffff) | a << 24;
         out.push(FxQuad { fx: 0xb, additive: true, corners: [corner(-1.0, -1.0), corner(1.0, -1.0), corner(-1.0, 1.0), corner(1.0, 1.0)], st: ST, rgba: [rgba; 4] });
+    }
+}
+
+/// `0x2f10c8(point, rgb)` (L02): a glow of three quads of FX 0x2c (additive) facing the camera at `point` pulled 0.25
+/// toward it, rolled a random way: ±2·k across (k `randf(0.3, 0.4)`) at half `rgb` and alpha `rand_range(0x30, 0x40)`,
+/// then half that size at `rgb` and then a quarter, white (`0x7f7f7f`), each at alpha `rand_range(0x40, 0x7f)`.
+pub fn halo(out: &mut Vec<FxQuad>, rng: &mut crate::rng::Rng, point: V3, rgb: u32, cam: V3) {
+    let a = rng.rand_range(0x30, 0x40) as u32;
+    let half = (rgb >> 17) << 16 | (rgb >> 9 & 0xff00) | (rgb >> 1 & 0xff);
+    let d = sub(cam, point);
+    let yaw = crate::hero::physics::atan2(d[0], d[1]);
+    let pitch = -crate::hero::physics::atan2((d[0] * d[0] + d[1] * d[1]).sqrt(), d[2]);
+    let roll = rng.rand_angle();
+    let rows = crate::hero::physics::euler_rows([roll, pitch, yaw]);
+    let at = add(point, scale(unit(d), 0.25));
+    let k = rng.randf(0.3, 0.4);
+    let corner = |y: f32, z: f32, k: f32| add(at, add(scale(rows[1], y * k), scale(rows[2], z * k)));
+    let quad = |k: f32| [corner(-2.0, -2.0, k), corner(-2.0, 2.0, k), corner(2.0, -2.0, k), corner(2.0, 2.0, k)];
+    let st = [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]];
+    out.push(FxQuad { fx: 0x2c, additive: true, corners: quad(k), st, rgba: [a << 24 | half; 4] });
+    let c = rgb.wrapping_add((rng.rand_range(0x40, 0x7f) as u32) << 24);
+    out.push(FxQuad { fx: 0x2c, additive: true, corners: quad(k * 0.5), st, rgba: [c; 4] });
+    let c = (rng.rand_range(0x40, 0x7f) as u32) << 24 | 0x7f_7f7f;
+    out.push(FxQuad { fx: 0x2c, additive: true, corners: quad(k * 0.25), st, rgba: [c; 4] });
+}
+
+/// `0x2f1430(scroll, step, head, points, rgb, n)` (L02): a streak of FX 0x17 (additive) from `head` through `points`,
+/// facing the camera: a narrow strip (half-width `randf(0.2, 0.45)`, alpha 0x7f) and one 1.5 times as wide (alpha
+/// 0x3f), each edge after the first ¾ of the one before; quad k (1..n) takes s from `step·k` (less 1 past 1) plus
+/// `scroll` to `step` more, t across (flipped one time in two); the last edge `rgb`'s own alpha.
+#[allow(clippy::too_many_arguments)]
+pub fn streak(out: &mut Vec<FxQuad>, rng: &mut crate::rng::Rng, scroll: f32, step: f32, head: V3, points: &[V3], rgb: u32, cam: V3) {
+    let Some(&first) = points.first() else { return };
+    let mut w = rng.randf(0.2, 0.45);
+    let (t0, t1) = if rng.rand() & 1 == 0 { (0.0, 1.0) } else { (1.0, 0.0) };
+    let side = |p: V3, next: V3| unit(cross(sub(cam, p), unit(sub(next, p))));
+    let (ca, cb) = (rgb | 0x7f00_0000, rgb | 0x3f00_0000);
+    let mut s = side(head, first);
+    let mut prev = (head, s, w);
+    let n = points.len();
+    for k in 1..=n {
+        let p = points[k - 1];
+        if k < n { s = side(p, points[k]); }
+        w *= 0.75;
+        let mut s0 = step * k as f32;
+        let mut s1 = s0 + step;
+        if 1.0 <= s0 { s0 -= 1.0; s1 -= 1.0; }
+        let (s0, s1) = (s0 + scroll, s1 + scroll);
+        let end = if k == n { (rgb, rgb) } else { (ca, cb) };
+        for (wide, start, stop) in [(1.0, ca, end.0), (1.5, cb, end.1)] {
+            let (a, aw, b, bw) = (prev.0, prev.2 * wide, p, w * wide);
+            let corners = [add(a, scale(prev.1, aw)), sub(a, scale(prev.1, aw)), add(b, scale(s, bw)), sub(b, scale(s, bw))];
+            out.push(FxQuad { fx: 0x17, additive: true, corners, st: [[s0, t0], [s0, t1], [s1, t0], [s1, t1]], rgba: [start, start, stop, stop] });
+        }
+        prev = (p, s, w);
     }
 }
 
@@ -206,6 +262,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::maktar::NODE => crate::moby::classes::maktar::draw_0c82(w, id, cam, out),
         0x0c81 => crate::moby::classes::maktar::draw_0c81(w, id, cam, out),
         0x0a9c => crate::moby::classes::maktar::draw_0a9c(w, id, out),
+        crate::moby::classes::keeper::SHOT => crate::moby::classes::keeper::draw_shot(w, id, &mut game.rng, cam, out),
         crate::moby::classes::teleport::CLASS => crate::moby::classes::teleport::draw(w, id, &host.camera_rows(), out),
         0x00bc => crate::moby::classes::tractor::draw(w, id, cam, -0.3 * (game.frame % 27) as f32, out),
         crate::ship::LASER_CLASS => crate::ship::draw_laser(w, id, cam, out),
