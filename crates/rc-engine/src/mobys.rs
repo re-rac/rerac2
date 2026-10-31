@@ -705,7 +705,8 @@ impl CreatedDraw {
         CreatedDraw { extra, slots: HashMap::new() }
     }
 
-    /// Draws every live created moby with a class of the level (state < 0x80, not hidden): its slot shown with its
+    /// Draws every live created moby with a class of the level (state < 0x80, not hidden), and every placed one
+    /// showing a break piece (rc_game::moby::Moby::slot_drawn; its instance is hidden then): its slot shown with its
     /// class (`show_slot`: the entities, the slot's look), its record from its rows, scale and position, its pose from
     /// its own animation, lit by its light word and ambient. Slots whose moby went away are hidden.
     #[allow(clippy::too_many_arguments)]
@@ -724,7 +725,7 @@ impl CreatedDraw {
         let lv = &level.mobys;
         let mut palette = crate::moby_anim::identity_palette(DRAW_SLOTS as u32 * SLOT_JOINTS);
         let mut records = vec![0u8; DRAW_SLOTS * moby_render::EXTRA_RECORD_SIZE];
-        let live = |m: &Moby| m.instance.is_none() && m.state < 0x80 && m.mode & 0x81 == 0 && m.o_class != 0;
+        let live = |m: &Moby| m.slot_drawn() && m.state < 0x80 && m.mode & 0x81 == 0 && m.o_class != 0;
         self.slots.retain(|id, _| mobys.world.mobys.get(*id).is_some_and(live));
         let mut shown: Vec<u32> = Vec::new();
         for m in mobys.world.mobys.iter().filter(|m| live(m)) {

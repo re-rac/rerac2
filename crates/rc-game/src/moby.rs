@@ -310,6 +310,10 @@ impl Moby {
         }
     }
 
+    /// Drawn through the engine's per-moby slots rather than its placed instance: created at run time, or showing a
+    /// break piece (the placed instances draw the whole model only).
+    pub fn slot_drawn(&self) -> bool { self.instance.is_none() || self.piece.is_some() }
+
     /// `0x32a7c8`: true the first time since the last state change.
     pub fn first(&mut self) -> bool {
         if self.once & 1 != 0 { return false; }

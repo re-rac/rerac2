@@ -764,7 +764,8 @@ fn tick(
         for &ii in &mobys.left_out { o.set_hidden(ii, true); }
         for m in &mobys.world.mobys {
             let Some(ii) = m.instance else { continue };
-            let hidden = m.state >= 0x80 || m.mode & 1 != 0;
+            // A piece shown draws through the created mobys' slots (crate::mobys::CreatedDraw) instead.
+            let hidden = m.state >= 0x80 || m.mode & 1 != 0 || m.piece.is_some();
             if m.update.is_some() || m.drive {
                 o.drive(ii, m.pos, m.rows, m.scale, crate::mobys::moby_lights(&lv.mobys, m.rows, m.light, m.ambient).as_ref(), hidden);
                 o.game_look(ii, m.alpha, m.mode, m.glow, m.draw_dist, m.shine);
@@ -1663,7 +1664,8 @@ fn scene_tick(p: &mut Play, lv: &mut crate::level_load::LoadedLevel, commands: &
         for &ii in &mobys.left_out { o.set_hidden(ii, true); }
         for m in &mobys.world.mobys {
             let Some(ii) = m.instance else { continue };
-            let hidden = m.state >= 0x80 || m.mode & 1 != 0;
+            // A piece shown draws through the created mobys' slots (crate::mobys::CreatedDraw) instead.
+            let hidden = m.state >= 0x80 || m.mode & 1 != 0 || m.piece.is_some();
             if m.update.is_some() || m.drive {
                 o.drive(ii, m.pos, m.rows, m.scale, crate::mobys::moby_lights(&lv.mobys, m.rows, m.light, m.ambient).as_ref(), hidden);
                 o.game_look(ii, m.alpha, m.mode, m.glow, m.draw_dist, m.shine);
