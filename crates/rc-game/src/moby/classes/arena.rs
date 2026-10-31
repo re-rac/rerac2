@@ -34,7 +34,8 @@
 //!
 //! The bosses 0x09f8 / 0x0a44 are crate::moby::classes::bosses (sent by [`fight`] through `send_wave_bosses`).
 //!
-//! Not ported: the crowd's cheers (`0x3fb028`, `0x42e670`: their classes 0x0b58 / 0x0e79), the announcer's speech (`0x401d98`, its
+//! Not ported: the Spiderbot Glove bots' end at a challenge's end and on Ratchet's warps (`0x3fb028(1, −1)` /
+//! `0x42e670(1, −1)`: classes 0x0b58 / 0x0e79, no glove in the port, G-WPN-009), the announcer's speech (`0x401d98`, its
 //! remarks `0x401e68` / `0x402090`), the restart's path straight into the wipe (`0x1a7904` = 2), the menu's arrows (`0x3ff388`) and its vendor (□, `0x332158(5)`), the
 //! music (`0x335928`), the level's sounds, the challenges' weapon lock (`0x18b6f4`) and the fixed held items of 7 / 8 /
 //! 13 beyond the hand request; the plates' sparks (`0x3d85a8`: the particle burst `0x345d88` has no port).
