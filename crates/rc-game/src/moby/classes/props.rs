@@ -754,6 +754,8 @@ pub fn update_1330(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 if let Some(s) = ship(w) { ship_parts(w, s, ctx); }
                 let cam = w.mobys[id].pv_i(8);
                 ctx.game.cameras.arm(cam);
+                // The occlusion off for the fly-by (`0x1b19d0` = 0; state 2's first tick again).
+                ctx.game.occlusion = 0;
                 ctx.game.scenes.fade = 1.5;
                 w.mobys[id].set_state(2, -1);
             }
@@ -773,7 +775,7 @@ pub fn update_1330(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     let to = [p[0] + yaw.cos() * 2.0, p[1] + yaw.sin() * 2.0, p[2]];
                     ctx.hero.script_walk_to(yaw, to, true);
                 }
-                // The occlusion's grid on again (`0x1b19d0` = 2; off since the level's load).
+                // The occlusion's grid on again (`0x1b19d0` = 2; off since the scene).
                 ctx.game.occlusion = 2;
                 ctx.game.cameras.reset_placed(w.mobys[id].pv_i(0x10));
                 w.mobys[id].set_state(4, -1);
@@ -795,7 +797,10 @@ pub fn update_1330(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         4 => {
-            if w.mobys[id].first() { ctx.game.cameras.reset_placed(w.mobys[id].pv_i(0x10)); }
+            if w.mobys[id].first() {
+                ctx.game.occlusion = 2;
+                ctx.game.cameras.reset_placed(w.mobys[id].pv_i(0x10));
+            }
             let m = &mut w.mobys[id];
             if !(0x62..=0x64).contains(&ctx.hero.state) { m.set_state(5, -1); }
         }

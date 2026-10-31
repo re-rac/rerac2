@@ -496,7 +496,7 @@ fn draw(mut fe: ResMut<FrontEndState>, mut images: ResMut<Assets<Image>>, mut me
             gui::Tex::Picture(gui::Picture::Splash(i)) => (Tex::Frame(SPLASH0 + i), true),
             gui::Tex::Picture(gui::Picture::Backdrop) => (Tex::Frame(BACKDROP), true),
             gui::Tex::Picture(gui::Picture::Movie) => (Tex::Frame(MOVIE), true),
-            gui::Tex::Picture(gui::Picture::Item(_)) => (Tex::None, false),
+            gui::Tex::Picture(gui::Picture::Item(_)) | gui::Tex::Sprite(..) => (Tex::None, false),
         };
         d.screen_prim(tex, q.pos, q.uv, u32::from_le_bytes(q.rgba), false);
         if nearest { if let Some(p) = d.prims.last_mut() { p.nearest = true; } }

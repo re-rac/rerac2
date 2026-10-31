@@ -7,6 +7,9 @@
 //!   the header's) or 16 bytes `{s16 x, y, z, bone; s16 u, v (/4096); RGBA}` (`FUN_0029e1d0` / `FUN_0029e090`).
 //! - Prims: four vertex indices, a quad drawn as the strip a, b, d, c; a word whose top 24 bits are all ones
 //!   selects texture `byte 0` instead (not counted: the header's count is the quads').
+//! - Textures (`FUN_00388de0` relocates them, `FUN_003891d8` uploads and selects them): 16 bytes each, `{u32 palette,
+//!   pixels (from the header's data offset `+0x1c`), width, height}`: 8-bit indices and a 256-entry RGBA32 CLUT in CSM1
+//!   order (PSMT8 / PSMCT32); the vertices' `u, v` sample them (0..1).
 //! - Frames: per bone 0x18 bytes, a quaternion (s16 / 32768), a scale (u16 / 4096), a translation (s16) and the
 //!   parent (s16, −1 = none) (`FUN_002844a0`).
 
@@ -20,7 +23,8 @@ pub(crate) const SCALE_UNIT: f32 = 0.003_211_601_6;
 pub struct Vertex {
     pub pos: [f32; 3],
     pub bone: usize,
-    pub(crate) uv: [f32; 2],
+    /// The texture coordinate (0..1 across the texture), the 16-byte vertices' only.
+    pub uv: [f32; 2],
     /// GS RGBA bytes (alpha 0x80 = 1.0).
     pub rgba: [u8; 4],
 }
@@ -51,6 +55,8 @@ pub struct Sprite {
     /// Per frame, per bone.
     pub frames: Vec<Vec<BoneKey>>,
     pub textures: usize,
+    /// The textures decoded (alpha 0..0xff, crate::texture::decode_indexed8), by the prims' texture index.
+    pub images: Vec<crate::texture::Texture>,
 }
 
 /// Every sprite of the block by id.
@@ -70,6 +76,7 @@ fn sprite(b: &Buf) -> Result<Sprite> {
     let (nv, nq, nb, nt, nf, stride) = (b.u16(0)? as usize, b.u16(2)? as usize, b.u16(4)? as usize, b.u16(6)? as usize, b.u16(8)? as usize, b.u16(10)? as usize);
     let scale = b.f32(0xc)? * SCALE_UNIT;
     let (pv, pq, pf) = (b.u32(0x10)? as usize, b.u32(0x14)? as usize, b.u32(0x20)? as usize);
+    let (pt, pd) = (b.u32(0x18)? as usize, b.u32(0x1c)? as usize);
     let packed = b.u32(0x24)? != 0;
     let colour = b.u32(0x28)?.to_le_bytes();
     let mut vertices = Vec::with_capacity(nv);
@@ -123,7 +130,17 @@ fn sprite(b: &Buf) -> Result<Sprite> {
         }
         frames.push(bones);
     }
-    Ok(Sprite { scale, vertices, prims, frames, textures: nt })
+    let mut images = Vec::with_capacity(nt);
+    for k in 0..nt {
+        let o = pt + k * 16;
+        let (clut, pixels, w, h) = (b.u32(o)? as usize, b.u32(o + 4)? as usize, b.u32(o + 8)?, b.u32(o + 12)?);
+        let n = w as usize * h as usize;
+        let (Some(c), Some(px)) = (b.0.get(pd + clut..pd + clut + 1024), b.0.get(pd + pixels..pd + pixels + n)) else {
+            return invalid(format!("GUI sprite: texture {k} ({w}×{h}) past the data"));
+        };
+        images.push(crate::texture::decode_indexed8(px, w, h, c)?);
+    }
+    Ok(Sprite { scale, vertices, prims, frames, textures: nt, images })
 }
 
 #[cfg(test)]

@@ -561,7 +561,7 @@ pub fn quads(draws: &[Draw], sprites: &HashMap<u32, Sprite>, glyphs: &[Glyph; 25
         match d {
             Draw::Sprite { id, pos, scale, frame, colour } => {
                 if colour >> 24 == 0 { continue; }
-                if let Some(s) = sprites.get(id) { gui::sprite_with(&mut out, s, *pos, *frame, *scale, rgba(*colour), tan); }
+                if let Some(s) = sprites.get(id) { gui::sprite_with(&mut out, Some(*id), s, *pos, *frame, *scale, rgba(*colour), tan); }
             }
             Draw::Icon { id, frame, pos, size, colour } => {
                 if colour >> 24 == 0 { continue; }

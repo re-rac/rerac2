@@ -303,6 +303,9 @@ fn tick(
             let f = &level.0.fog;
             p.game.fog = rc_game::fog::FogGlobals { colour: f.color, near_dist: f.near_dist, far_dist: f.far_dist, near_intensity: f.near_intensity, far_intensity: f.far_intensity };
             p.game.underwater = false;
+            // Its object load (L02 `0x305380`, L00 `0x3012a0`): the occlusion's mode 2 (the grid) when the level has a grid
+            // and occlusion mappings (their words resolved), else 0 (every word always visible).
+            p.game.occlusion = if level.0.occlusion.loader_mode == rc_formats::occlusion::OcclusionMode::Active { 2 } else { 0 };
             commands.remove_resource::<Carry>();
             commands.insert_resource(PlayView { view: camera_view(&p.camera, p.camera.pos, p.camera.rows), tan_half_fov: play_camera::GAME_TAN_HALF_FOV, far: p.game.view_far * 1024.0 });
             commands.insert_resource(p);
@@ -1862,6 +1865,8 @@ struct GameHud {
     icons: std::collections::HashMap<(u16, u16), (usize, [f32; 2])>,
     /// FX texture → layer texture and texel size (the markers', rc_game::hud::marker).
     fx: std::collections::HashMap<u16, (usize, [f32; 2])>,
+    /// `(GUI sprite, texture)` → layer texture (rc_game::gui::Tex::Sprite: the arena HUD's boss picture 0x51).
+    sprite_textures: std::collections::HashMap<(u32, u8), usize>,
     /// The level's pause tables (its item records, the Weapons grid).
     tables: rc_formats::disc::menu_tables::MenuTables,
     pictures: ItemPictures,
@@ -2028,6 +2033,16 @@ fn draw_hud(
                 textures.push(t);
             }
         }
+        // The GUI sprites' own textures (alpha as the GS has it, as the FX textures').
+        let mut sprite_textures = std::collections::HashMap::new();
+        for (&id, sp) in &data.assets().sprites {
+            for (k, t) in sp.images.iter().enumerate() {
+                sprite_textures.insert((id, k as u8), textures.len());
+                let mut t = t.clone();
+                for px in t.rgba.as_chunks_mut::<4>().0 { px[3] = ((px[3] as u16 + 1) >> 1) as u8; }
+                textures.push(t);
+            }
+        }
         // The pause pages' item pictures.
         let pictures = ItemPictures::new(&root, [textures.len(), textures.len() + 1]);
         for _ in 0..2 { textures.push(rc_formats::texture::Texture { width: 256, height: 256, rgba: vec![0; 256 * 256 * 4] }); }
@@ -2046,7 +2061,7 @@ fn draw_hud(
         let Some(cam) = flycams.iter().next() else { return };
         let scaling = crate::hud_render::scaling(crate::graphics::Hud::High);
         let layer = crate::hud_render::Layer::spawn(&mut commands, &mut images, &mut meshes, &mut materials, &mut composites, &textures, scaling, cam);
-        commands.insert_resource(GameHud { layer, data, icons, fx, tables, pictures, flight_slots, planet_slots, planet_shown: None, planet_parts });
+        commands.insert_resource(GameHud { layer, data, icons, fx, sprite_textures, tables, pictures, flight_slots, planet_slots, planet_shown: None, planet_parts });
         return;
     };
     let p: &mut Play = p;
@@ -2284,6 +2299,7 @@ fn draw_hud(
     for q in quads {
         let (tex, nearest) = match q.tex {
             rc_game::gui::Tex::Slot(i) => (crate::hud_render::Tex::Frame(i), false),
+            rc_game::gui::Tex::Sprite(id, k) => (hud.sprite_textures.get(&(id, k)).map_or(crate::hud_render::Tex::None, |&i| crate::hud_render::Tex::Frame(i)), false),
             rc_game::gui::Tex::Picture(rc_game::gui::Picture::Movie) => (crate::hud_render::Tex::Frame(crate::front_end::MOVIE), true),
             rc_game::gui::Tex::Picture(rc_game::gui::Picture::Item(k)) if k < 2 => (crate::hud_render::Tex::Frame(hud.pictures.slots[k as usize & 1]), false),
             // The flight's planet picture (2) and caption (3); the ship's planet page's surface (4) and shading (5).

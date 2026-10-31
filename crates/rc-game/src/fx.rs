@@ -270,6 +270,10 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
             crate::moby::classes::arena::draw_moat(w, id, mid, &mut game.rng, cam, out);
         }
         crate::moby::classes::fighters::MASTER => crate::moby::classes::arena::draw_lamps(w, id, cam, out),
+        crate::moby::classes::arena::PROPS => {
+            let tick = game.scenes.player.as_ref().map(|p| p.tick);
+            crate::moby::classes::arena::draw_props(w, id, &mut game.rng, tick, cam, out);
+        }
         crate::moby::classes::arena::COLUMN => crate::moby::classes::arena::draw_column(w, id, cam, out),
         crate::moby::classes::fighters::C3B => crate::moby::classes::fighters::draw_0c3b(w, id, &mut game.rng, cam, out),
         crate::moby::classes::bosses::C9F8 => crate::moby::classes::bosses::draw_09f8(w, host, id, cam, out),

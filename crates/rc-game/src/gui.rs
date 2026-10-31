@@ -26,6 +26,8 @@ pub enum Tex {
     Slot(usize),
     /// A full-screen picture.
     Picture(Picture),
+    /// A GUI sprite's own texture (`rc_formats::disc::gui_sprite::Sprite::images`): the sprite's id, the texture.
+    Sprite(u32, u8),
 }
 
 /// The pictures the front end puts in the frame buffer.
@@ -123,33 +125,40 @@ pub fn pose(s: &Sprite, frame: f32) -> Vec<Mat> {
 
 /// `FUN_003017f8(x, y, sx, sy, frame, sprite, colour)`: the sprite's quads. A vertex lands at
 /// `pos + (X·sx·scale·x, −Y·sy·scale·z) / 16` (X, Y: the projection's [`scales`] by the view's tangent; here the menus') (the GS coordinate, half a pixel right of a [`Quad`]
-/// corner); its colour is `vertex × colour >> 7`. Quads after a texture select of a texture the sprite has are not
-/// drawn (no textured GUI sprite is used yet). Nothing is drawn when the colour's alpha is 0 (`FUN_003017f8`).
+/// corner); its colour is `vertex × colour >> 7`. Quads after a texture select of a texture the sprite has sample
+/// it, modulated ([`sprite_with`] given the sprite's id; L02 `0x3891d8`), else are not drawn (the menus' draws, whose
+/// layers hold no GUI sprite textures). Nothing is drawn when the colour's alpha is 0 (`FUN_003017f8`).
 pub fn sprite(out: &mut Vec<Quad>, s: &Sprite, pos: [f32; 2], frame: f32, scale: [f32; 2], colour: [u8; 4]) {
-    sprite_with(out, s, pos, frame, scale, colour, MENU_TAN);
+    sprite_with(out, None, s, pos, frame, scale, colour, MENU_TAN);
 }
 
-pub fn sprite_with(out: &mut Vec<Quad>, s: &Sprite, pos: [f32; 2], frame: f32, scale: [f32; 2], colour: [u8; 4], tan: f32) {
+#[allow(clippy::too_many_arguments)]
+pub fn sprite_with(out: &mut Vec<Quad>, id: Option<u32>, s: &Sprite, pos: [f32; 2], frame: f32, scale: [f32; 2], colour: [u8; 4], tan: f32) {
     if colour[3] == 0 { return; }
     let (x_scale, y_scale) = scales(tan);
     let bones = pose(s, frame);
-    let pts: Vec<([f32; 2], [u8; 4])> = s.vertices.iter().map(|v| {
+    let pts: Vec<([f32; 2], [u8; 4], [f32; 2])> = s.vertices.iter().map(|v| {
         let p = bones.get(v.bone).map_or(v.pos, |m| apply(m, v.pos));
         let x = pos[0] + x_scale * scale[0] * s.scale * p[0] / 16.0 + 0.5;
         let y = pos[1] - y_scale * scale[1] * s.scale * p[2] / 16.0 + 0.5;
         let c = std::array::from_fn(|i| ((v.rgba[i] as u32 * colour[i] as u32) >> 7).min(0xff) as u8);
-        ([x, y], c)
+        ([x, y], c, v.uv)
     }).collect();
-    let mut textured = false;
+    // The texture selected (`0x80000004cc007ffb`, none, before any select or for one past the sprite's).
+    let mut texture: Option<u8> = None;
     for p in &s.prims {
         match *p {
-            Prim::Texture(t) => textured = (t as usize) < s.textures,
-            Prim::Quad([a, b, c, d]) if !textured => {
+            Prim::Texture(t) => texture = ((t as usize) < s.textures).then_some(t),
+            Prim::Quad([a, b, c, d]) => {
                 let v = [a, b, d, c].map(|i| pts[i as usize]);
                 // Flat shading: the GS takes the last vertex's colour (every GUI sprite in use has one colour).
-                out.push(Quad { pos: v.map(|q| q.0), uv: [[0.0; 2]; 4], tex: Tex::None, rgba: v[3].1 });
+                let (tex, uv) = match id.zip(texture).and_then(|(id, t)| s.images.get(t as usize).map(|im| (id, t, im))) {
+                    Some((id, t, im)) => (Tex::Sprite(id, t), v.map(|q| [q.2[0] * im.width as f32, q.2[1] * im.height as f32])),
+                    None if texture.is_some() => continue,
+                    None => (Tex::None, [[0.0; 2]; 4]),
+                };
+                out.push(Quad { pos: v.map(|q| q.0), uv, tex, rgba: v[3].1 });
             }
-            Prim::Quad(_) => {}
         }
     }
 }
@@ -330,7 +339,7 @@ mod tests {
 
     #[test]
     fn keys_blend_and_chain() {
-        let s = Sprite { scale: 1.0, vertices: vec![], prims: vec![], frames: vec![vec![key(0.0, None), key(3654.0, Some(0))], vec![key(0.0, None), key(23762.0, Some(0))]], textures: 0 };
+        let s = Sprite { scale: 1.0, vertices: vec![], prims: vec![], frames: vec![vec![key(0.0, None), key(3654.0, Some(0))], vec![key(0.0, None), key(23762.0, Some(0))]], textures: 0, images: vec![] };
         let m = pose(&s, 0.25);
         assert_eq!(m[1][3][0], 3654.0 + 0.25 * (23762.0 - 3654.0));
         // Frame 1 blends towards frame 0 (wrapping).

@@ -31,6 +31,8 @@
 //!   starts up). Up (state 1) and turning it hits what stands on it ([`hurt`]); up and in view, now and then sparks.
 //!
 //! * **The flame columns 0x0b89** ([`update_column`]) and **the crate lifts 0x0ccc** ([`update_lift`]).
+//! * **The scene props 0x0f15** ([`update_props`], [`draw_props`]): in the arena's scenes the master's moat and lamps,
+//!   the big screens and a moby moved aside.
 //!
 //! The bosses 0x09f8 / 0x0a44 are crate::moby::classes::bosses (sent by [`fight`] through `send_wave_bosses`).
 //!
@@ -1812,5 +1814,100 @@ pub fn draw_lamps(w: &MobyWorld, id: usize, cam: V3, out: &mut Vec<crate::fx::Fx
         let k = (f - 0.5) * 2.0;
         let rgba = crate::hud::lerp_rgba(k * k, 0x00ff_8020, 0x88ff_8020);
         crate::fx::sprite(out, 3.0, 1.0, 0.0, p, cam, 0xb, rgba, true);
+    }
+}
+
+/// The arena's scene props.
+pub const PROPS: i16 = 0x0f15;
+/// The port's: what the props' first-list callback draws this tick (`0x43a3c8`'s registrations, [`draw_props`]): 1
+/// with its own screens `0x43a0d8` (the scene's record 0), 0 the master's moat and lamps alone (record 1).
+const PROPS_SCREENS: usize = 0x100;
+/// `0x43a0d8`: its two screens — the scene ticks (`0x1be234`, exclusive) each is up in, the place its tie is nearest,
+/// its FX texture.
+const SCREENS: [(i32, i32, V3, usize); 2] = [(0x3b5, 0x547, [495.0, 587.0, 513.0], 0x3f), (0x4af, 0x5dd, [515.0, 596.0, 512.0], 0x40)];
+/// `0x1b2680`: a screen's corners in its tie's frame (GS strip order).
+const SCREEN_CORNERS: [[u32; 3]; 4] = [
+    [0x4056_6666, 0xc031_eb85, 0x4017_5c29],
+    [0x4056_6666, 0xc031_eb85, 0xc017_5c29],
+    [0x4056_6666, 0x4033_9581, 0x4017_5c29],
+    [0x4056_6666, 0x4033_9581, 0xc017_5c29],
+];
+
+/// 0x0f15 (`0x43a3c8`), the arena's scene props: pvars `+0` a tie group (the big screens), `+4` a moby, `+8` that
+/// moby moved, `+0xc` the master (both runtime moby indices). **0** → 1, update distance 0xff. **1** in a scene (game
+/// mode 2) by its record in the level (`0x1be230`, `0x371778`, [`rc_formats::disc::scene::record_of`]): record 1 the
+/// master's moat (`0x4014f0`) and lamps (`0x401c20`) on the first list; record 0 those and its own screens
+/// (`0x43a0d8`, [`draw_props`]), and once the moby `+4` at sequence 1 frame 7 (unless it plays 1), stopped, and 2
+/// back along its second row. Out of a scene, a moved moby goes back: sequence 0 frame 0 (unless it plays 0), stopped,
+/// 2 forward.
+///
+/// Not ported: record 6 (the master's score `+0x6c` 100 and its mode |= 2, the colours `0x258a50..58` and the scene's
+/// fourth actor's `+0x78` = 0x40ff00ea, its `+0xb8` the fifth, and that actor drawn as the boss 0x09f8's parts
+/// `0x43a360` → `0x3dc3c8` / `0x3dc6c0` / `0x3dc4f8` / `0x3dc598`): Maktar's scenes are ids 0x2b..0x30, records 0..5,
+/// so the branch never runs here (the code is shared with another arena's level).
+pub fn update_props(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    match w.mobys[id].state {
+        0 => {
+            let m = &mut w.mobys[id];
+            m.state = 1;
+            m.update_dist = 0xff;
+            m.set_pv_i(8, 0);
+        }
+        1 => {
+            let moved = w.mobys[id].pv_i(8) != 0;
+            let (seq, step) = if ctx.game.scenes.mode == crate::scene::SCENE {
+                let record = ctx.game.scenes.player.as_ref().map(|p| rc_formats::disc::scene::record_of(p.id));
+                if !matches!(record, Some(0 | 1)) { return; }
+                let own = record == Some(0);
+                w.mobys[id].set_pv_i(PROPS_SCREENS, own as i32);
+                w.register_draw_first(id);
+                if !own || moved { return; }
+                w.mobys[id].set_pv_i(8, 1);
+                ((1, 7), -2.0)
+            } else {
+                if !moved { return; }
+                w.mobys[id].set_pv_i(8, 0);
+                ((0, 0), 2.0)
+            };
+            let Some(p) = placed(w, w.mobys[id].pv_i(4)) else { return };
+            if super::props::seq(w, p, ctx) != seq.0 {
+                ctx.host.set_anim(&w.mobys[p], seq.0, seq.1, 0);
+                ctx.host.set_anim_speed(&w.mobys[p], 0.0);
+            }
+            let m = &mut w.mobys[p];
+            m.pos = add(m.pos, set_len(m.rows[1], step));
+        }
+        _ => {}
+    }
+}
+
+/// The props' first-list callbacks (`0x43a3c8` registers them in this order): the master's moat ([`draw_moat`]) and
+/// lamps ([`draw_lamps`]), then in the scene's record 0 `0x43a0d8`: each screen within its ticks of the scene
+/// (`tick`, `0x1be234`) on the tie of the group `+0` nearest its place (the first nearest), its corners
+/// ([`SCREEN_CORNERS`]) on that tie's rows at its place, FX 0x3f / 0x40 at 0x808080 (`0x2f1eb0`: blend 2, the
+/// texture as it is).
+pub fn draw_props(w: &mut MobyWorld, id: usize, rng: &mut crate::rng::Rng, tick: Option<i32>, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
+    if let Some(master) = placed(w, w.mobys[id].pv_i(0xc)) {
+        let mid = w.mobys[master].pv_v(MIDDLE_AT);
+        draw_moat(w, master, mid, rng, cam, out);
+        draw_lamps(w, master, cam, out);
+    }
+    let m = &w.mobys[id];
+    if m.pv_i(PROPS_SCREENS) == 0 { return; }
+    let (Some(tick), Some(list)) = (tick, usize::try_from(m.pv_i(0)).ok().and_then(|g| w.tie_groups.get(g))) else { return };
+    for (lo, hi, at, fx) in SCREENS {
+        if !(lo < tick && tick < hi) { continue; }
+        let mut best = (None, 99999.0);
+        for &i in list {
+            let Some(t) = w.ties.get(i as usize) else { break };
+            let d = dist([t[3][0], t[3][1], t[3][2]], at);
+            if d < best.1 { best = (Some(t), d); }
+        }
+        let Some(t) = best.0 else { continue };
+        let corners = SCREEN_CORNERS.map(|c| {
+            let c = c.map(f32::from_bits);
+            std::array::from_fn(|k| c[0] * t[0][k] + c[1] * t[1][k] + c[2] * t[2][k] + t[3][k])
+        });
+        out.push(crate::fx::FxQuad { fx, additive: false, corners, st: [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]], rgba: [0x8080_8080; 4] });
     }
 }

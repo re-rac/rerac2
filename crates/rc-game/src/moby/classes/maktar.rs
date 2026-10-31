@@ -39,9 +39,8 @@
 //! Not ported (no visible effect here, or a missing system): 0x0af3 (`0x3efea8`, four: a camera guide along its path `+0`, every placed one has −1 and deletes
 //! itself on its first tick); 0x0b25 (`0x3f6820`: the area above z 420 — the tfrags and shrubs below or above it
 //! moved out `0x2ee5a0`, and within 150 of (500, 200, 500) the gravity frames `0x1a8ff0` (G-LVL-003), the no-item
-//! area, its music; its tie group's 32 instances turned while in view; a texture's scroll); 0x0f15 (`0x43a3c8`: in the
-//! scenes, the arena master's moat and lamps drawn for it and the moby `+4` moved 2 along its second row; the
-//! master's draws are crate::moby::classes::arena's).
+//! area, its music; its tie group's 32 instances turned while in view; a texture's scroll). 0x0f15, the arena's
+//! scene props, is crate::moby::classes::arena's.
 //!
 //! Not ported: 0x0adf's lift (`0x3ece68`, its update when the cuboid's z scale is 2: up and down to Ratchet's level
 //! as he rides it); 0x0e96 (`0x4301b0`, the arena crowd: it waits for its controller past state 1, cheers by the

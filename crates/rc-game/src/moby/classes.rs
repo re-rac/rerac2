@@ -105,6 +105,7 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         arena::COLUMN => Some(arena::update_column),
         arena::LIFT => Some(arena::update_lift),
         arena::CROWD => Some(arena::update_crowd),
+        arena::PROPS => Some(arena::update_props),
         fighters::MASTER => Some(arena::update_master),
         fighters::C3E => Some(fighters::update_0c3e),
         fighters::C3B => Some(fighters::update_0c3b),

@@ -12,9 +12,10 @@ pub struct GameState {
     pub max_health: i32,
     /// `0x1a79f8`: the level (planet) index.
     pub level: i32,
-    /// `0x1b19d0`: the occlusion's mode (`0x2e54a0`): 0 everything visible, 2 the grid (`0x2e4d88`), else the mask
-    /// kept. The level's object loader `0x3012a0` sets 0 (the default here, every level entry); Aranos's arrival
-    /// sets 2 once its fly-by is over (`0x3846d0`).
+    /// `0x1b19d0` (L02 `0x1b3150`): the occlusion's mode (`0x2e54a0`): 0 everything visible, 2 the grid
+    /// (`0x2e4d88`), else the mask kept. The level's object loader (`0x3012a0`, L02 `0x305380`) sets 2 when the level
+    /// has a grid and occlusion mappings, else 0 (rc-engine's level start); Aranos's arrival sets 0 after its scene
+    /// and 2 once its fly-by is over (`0x3846d0`).
     pub occlusion: i32,
     /// `0x1b2794`: the frame a crate last played its break sound.
     pub crate_sound_frame: i32,
