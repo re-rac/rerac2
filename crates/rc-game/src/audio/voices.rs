@@ -101,6 +101,15 @@ pub struct Slot {
     pub(crate) occl: [u8; RING],
 }
 
+impl Slot {
+    /// Looping (play flag 4), for the dev overlay.
+    pub fn looped(&self) -> bool { self.flags & flags::LOOP != 0 }
+    /// The volume scale (0x400 = 1), for the dev overlay.
+    pub fn volume(&self) -> i32 { self.vol }
+    /// The owning sound instance (−1 none), for the dev overlay.
+    pub fn instance(&self) -> i32 { self.sndinst }
+}
+
 impl Default for Slot {
     fn default() -> Self {
         Slot {

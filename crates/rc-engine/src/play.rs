@@ -13,7 +13,7 @@
 //!
 //! Environment: `RC_PLAY=0` (no tick), `RC_PLAY_FLY=1` (start on the fly camera; Tab switches), `RC_PLAY_TRACE=1`
 //! (one line per tick: state, position, velocity, air ticks, sequence), `RC_SCENES=0` (the scenes count as seen),
-//! `RC_HERO_AT=x,y,z,yaw` (Ratchet's start).
+//! `RC_HERO_AT=x,y,z,yaw` (Ratchet's start), `RC_GIVE_ITEMS=a,b,…` (the items had, the last in the hand).
 
 use crate::game_camera::CameraSource;
 use crate::input_map::{self, PadFrame, Script};
@@ -325,7 +325,19 @@ fn tick(
         let dev = fresh && !DEV_START.swap(true, std::sync::atomic::Ordering::Relaxed);
         // `RC_SCENES=0`: every scene counts as seen (no opening, no scene triggers' scenes).
         if dev && std::env::var("RC_SCENES").is_ok_and(|v| v.trim() == "0") { p.game.scenes_seen.iter_mut().for_each(|s| *s = true); }
-        // `RC_HERO_AT=x,y,z,yaw`: Ratchet starts there (as the checkpoint, so the arrival leaves him).
+        // `RC_GIVE_ITEMS=a,b,…` (crate::debug_hud's repro line): the items had, their ammo full, the last in the hand.
+        if let Some(v) = std::env::var("RC_GIVE_ITEMS").ok().filter(|_| dev) {
+            let items: Vec<i32> = v.split(',').filter_map(|x| x.trim().parse().ok()).collect();
+            for &i in &items {
+                let Some(b) = p.game.items.get_mut(i as usize) else { continue };
+                *b = 1;
+                if let Some(r) = rc_game::hero::items::row(i).filter(|r| r.ammo) {
+                    if let Some(a) = p.game.ammo.get_mut(i as usize) { *a = r.max_ammo; }
+                }
+            }
+            if let Some(&last) = items.last() { equip(p.game.held, &mut p.hero, last); }
+        }
+                // `RC_HERO_AT=x,y,z,yaw`: Ratchet starts there (as the checkpoint, so the arrival leaves him).
         if let Some(v) = std::env::var("RC_HERO_AT").ok().filter(|_| dev).map(|v| v.split(',').filter_map(|x| x.trim().parse::<f32>().ok()).collect::<Vec<_>>()).filter(|v| v.len() == 4) {
             let (at, rot) = ([v[0], v[1], v[2]], [0.0, 0.0, v[3]]);
             p.hero.teleport(at, rot);
@@ -1869,6 +1881,7 @@ fn draw_hud(
     card: Option<Res<crate::card::Card>>,
     gfx: Res<crate::graphics::GraphicsSettings>,
     display: Res<crate::display::DisplaySettings>,
+    (dbg, mut audio): (Option<Res<crate::debug_hud::DebugHud>>, Option<ResMut<crate::audio_out::AudioOut>>),
 ) {
     let Some(p) = play.as_mut() else { return };
     let Some(mut hud) = hud else {
@@ -2118,7 +2131,12 @@ fn draw_hud(
         }
         quads.extend(p.flight_quads.iter().cloned());
     }
-    // The letterbox and the scene fade are the frame draw's (`0x2e82c0`, `0x1b1860`): a movie's player (`0x366de8`)
+    // The inspect overlay (crate::debug_hud, `RC_DEBUG_HUD`): over the game's HUD, under the letterbox and fades.
+    if let Some(d) = dbg.as_deref().filter(|d| d.on) {
+        let a = hud.data.assets();
+        quads.extend(crate::debug_hud::quads(d, p, audio.as_deref_mut().map(|a| &*a.system()), &a.glyphs, 1));
+    }
+        // The letterbox and the scene fade are the frame draw's (`0x2e82c0`, `0x1b1860`): a movie's player (`0x366de8`)
     // draws its pictures alone, without them.
     let movie = p.game.scenes.mode == rc_game::scene::MOVIE;
     // The letterbox (`0x2e82c0`: black bars of `0x1b186c` pixels at the top and the bottom).

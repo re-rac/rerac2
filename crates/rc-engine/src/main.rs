@@ -18,8 +18,12 @@
 //!   softening passes), crate::graphics
 //! - `RC_SETTINGS_FILE=<path>` the port-settings file (`0` or empty: none), crate::render_settings
 //! - `RC_AUDIO=0` no sound, crate::audio_out
+//! - `RC_DEBUG_HUD=1` the inspect overlay (F3 shows / hides it, F4 its page, F8 a repro line; `show`, `mobys` or
+//!   `sound` shown from the start on that page), crate::debug_hud; `RC_GIVE_ITEMS=a,b,…` the items had at the start,
+//!   the last in the hand, crate::play
 
 mod crash_log;
+mod debug_hud;
 mod asset_write;
 mod audio_out;
 mod determinism;
@@ -142,6 +146,8 @@ fn main() -> anyhow::Result<()> {
     .add_plugins(no_clusters::NoClustersPlugin)
     .add_plugins(graphics::GraphicsPlugin)
     .add_plugins(draw_stats::DrawStatsPlugin)
+    // The inspect overlay, only with `RC_DEBUG_HUD`.
+    .add_plugins(debug_hud::DebugHudPlugin)
     // MSAA of the world cameras (default off; `RenderSettings` can change it at run time).
     .add_plugins(render_settings::RenderSettingsPlugin)
     .add_plugins((MaterialPlugin::<TfragMaterial>::default(), FlyCamPlugin, game_camera::GameCameraPlugin { fog: level.fog }))
