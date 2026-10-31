@@ -77,6 +77,7 @@ under `crates/` shortened to `<crate>/src/...`, or the doc §. *Seen*: whether a
 | G-CLS-007 | **Attachments leftovers**: the carrier's joint frames (`0x3245b0`), the offset moby `+0x40`, the shrubs' sphere and scale, the ties' update `0x36c068` | carriers | — | attach.rs:8 | minor |
 | G-CLS-008 | **Talk records** `0x139a34 + 0x10·i` through the level's talk list (`0x1c5d20` from `0x28ead0[level]`; marked by `0x325980(0x3259d8(moby))`) | Oozla's Tractor Beam seller 0x0ace; the missions' conditions 4 / 5 (crate::travel::missions) | — | rc-game/src/moby/classes/oozla.rs (`update_0ace`); rc-game/src/travel/missions.rs | no |
 | G-CLS-009 | **The item-0x26 puzzle** 0x0896 (L02 `0x3c3b80`, U114, about 3,178 words; on 8 levels): its group's 0x0a24 / 0x0a55 / 0x0873, game mode 7 (`0x1a8f00`), its own script camera, draws, prompt 0x130f | Maktar (2 placed) and 7 other levels | 1 unit | rc_game::moby::classes::maktar (survey 2026-10-31) | yes |
+| G-CLS-010 | **Maktar arena's scene props** 0x0f15 (L02 `0x43a3c8`, U161): in a scene (`0x1a8f00` = 2), by the scene's phase `0x1be230` (0, 1, 6), the master's moat and lamps drawn (`0x4014f0` / `0x401c20`), its own draws `0x43a0d8` / `0x43a360`, the master's score set to 100 and its mode \| 2 (phase 6), moby `+4` set to sequence 1 frame 7 and moved 2 back along its second row (and back after) | the arena's welcome and first-win scenes | 1 unit | rc_game::moby::classes::arena | minor |
 
 ## Levels (LVL)
 
