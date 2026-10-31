@@ -262,6 +262,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::maktar::NODE => crate::moby::classes::maktar::draw_0c82(w, id, cam, out),
         0x0c81 => crate::moby::classes::maktar::draw_0c81(w, id, cam, out),
         0x0a9c => crate::moby::classes::maktar::draw_0a9c(w, id, out),
+        crate::moby::classes::fighters::C3B => crate::moby::classes::fighters::draw_0c3b(w, id, &mut game.rng, cam, out),
         crate::moby::classes::keeper::SHOT => crate::moby::classes::keeper::draw_shot(w, id, &mut game.rng, cam, out),
         crate::moby::classes::teleport::CLASS => crate::moby::classes::teleport::draw(w, id, &host.camera_rows(), out),
         0x00bc => crate::moby::classes::tractor::draw(w, id, cam, -0.3 * (game.frame % 27) as f32, out),
