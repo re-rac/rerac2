@@ -32,8 +32,9 @@
 //!
 //! * **The flame columns 0x0b89** ([`update_column`]) and **the crate lifts 0x0ccc** ([`update_lift`]).
 //!
-//! Not ported: the bosses 0x09f8 / 0x0a44 (the challenges with a boss wave, 2, 4, 6, 9, 11, 12 and 13, are kept off the
-//! menu until they are: they could not end), the crowd's cheers (`0x3fb028`, `0x42e670`: their classes 0x0b58 / 0x0e79), the announcer's speech (`0x401d98`, its
+//! The bosses 0x09f8 / 0x0a44 are crate::moby::classes::bosses (sent by [`fight`] through `send_wave_bosses`).
+//!
+//! Not ported: the crowd's cheers (`0x3fb028`, `0x42e670`: their classes 0x0b58 / 0x0e79), the announcer's speech (`0x401d98`, its
 //! remarks `0x401e68` / `0x402090`), the restart's path straight into the wipe (`0x1a7904` = 2), the menu's arrows (`0x3ff388`) and its vendor (□, `0x332158(5)`), the
 //! music (`0x335928`), the level's sounds, the challenges' weapon lock (`0x18b6f4`) and the fixed held items of 7 / 8 /
 //! 13 beyond the hand request; the plates' sparks (`0x3d85a8`: the particle burst `0x345d88` has no port).
@@ -513,8 +514,6 @@ const WEAPON_8: i32 = 0x2a;
 /// 7 and 8 their weapons (`0x264a74[0x139586 / 0x139592 · 0xe0]`: here the items had, inferred).
 pub fn on_menu(game: &crate::game::GameState, n: i32) -> bool {
     let Some(c) = CHALLENGES.get(n as usize) else { return false };
-    // The port's, until the bosses 0x09f8 / 0x0a44 are: a challenge with a boss wave could never end.
-    if c.waves.iter().any(|w| w.bosses != [0, 0]) { return false; }
     if 0 < n && wins(game, c.needs) == 0 { return false; }
     if 0xb < n && !game.challenge { return false; }
     let had = |i: i32| game.items.get(i as usize).is_some_and(|&b| b != 0);
@@ -651,6 +650,7 @@ fn pool_all(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         match w.mobys[f].o_class {
             super::fighters::C9CA => super::fighters::pool_09ca(w, f, ctx),
             super::fighters::C3B | super::fighters::C3E | super::fighters::B22 => super::fighters::pool(w, f, ctx),
+            super::bosses::C9F8 | super::bosses::CA44 => super::bosses::pool(w, f, ctx),
             _ => {}
         }
     }
@@ -687,7 +687,7 @@ fn count_out(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
     let (mut n, mut life) = (0, 0.0);
     for f in group(w, id, pv::ENEMIES) {
         let x = &w.mobys[f];
-        if x.state >= 0x80 || x.state == 1 || x.update.is_none() { continue; }
+        if x.state >= 0x80 || x.state == 1 { continue; }
         if is_fighter_or_boss(x.o_class) {
             n += 1;
             life += x.pv_f(0x20);
@@ -710,8 +710,7 @@ fn score(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let (mut n, mut life) = (0, 0.0);
     for f in group(w, id, pv::ENEMIES) {
         let x = &w.mobys[f];
-        // The port's: a class without its update yet (the bosses) is no fighter out.
-        if x.state >= 0x80 || x.state == 1 || x.update.is_none() || !is_fighter_or_boss(x.o_class) { continue; }
+        if x.state >= 0x80 || x.state == 1 || !is_fighter_or_boss(x.o_class) { continue; }
         life += x.pv_f(0x20);
         if 0.0 < x.pv_f(0x20) || matches!(x.o_class, 0x09f8 | 0x0a44) { n += 1; }
     }
@@ -865,7 +864,8 @@ fn keep_in(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         match x.o_class {
             super::fighters::C9CA => super::fighters::die_09ca_pub(w, f, ctx),
             super::fighters::B22 | super::fighters::C3B | super::fighters::C3E => {
-                crate::moby::bolts::drop(w, f, 0, -1, ctx);
+                // `0x3fd7e8`: `0x31ee88(m, 0, 3)` whatever it is passed.
+                crate::moby::bolts::drop(w, f, 0, 3, ctx);
                 super::fighters::pool(w, f, ctx);
             }
             _ => {}
@@ -1109,10 +1109,8 @@ fn challenge_hud(w: &MobyWorld, id: usize) -> ChallengeHud {
     let m = &w.mobys[id];
     let (challenge, wave) = (m.pv_s(pv::CHALLENGE), m.pv_s(pv::WAVE));
     let sent: i32 = (0..6).map(|k| m.pv_i(pv::SPAWNED + 4 * k)).sum();
-    let boss = ai::link(m, pv::BOSS).and_then(|b| w.mobys.get(b)).filter(|b| b.mode & ai::AI != 0).map(|b| {
-        let h = ai::health(b);
-        (b.o_class, b.pv_f(h) / b.pv_s(h + 4) as f32)
-    });
+    // The boss's health over its most (its pvars' `+0x20` / `+0x24`).
+    let boss = ai::link(m, pv::BOSS).and_then(|b| w.mobys.get(b)).map(|b| (b.o_class, b.pv_f(0x20) / b.pv_s(0x24) as f32));
     ChallengeHud {
         challenge,
         wave,
@@ -1532,7 +1530,7 @@ fn fight(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     // Sending fighters: after a second (or at once with a boss), the round's spawner, the wave's fighters into it
     // (0x0c3e, 0x0b22, 0x0c3b, 0x09ca), then its doors opened.
     if let Some(wave) = wave_of(w, id) {
-        if 0x3c < w.mobys[id].state_ticks || wave.bosses[0] != 0 {
+        if 0x3c < w.mobys[id].state_ticks || wave.bosses != [0, 0] {
             gates_reset(w, id);
             gate_pick(w, id, ctx, wave);
             let mut sent = false;
@@ -1544,6 +1542,8 @@ fn fight(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     }
                 }
             }
+            // `0x3fc148..0x3fc364`: the wave's bosses (crate::moby::classes::bosses), the announcer's line.
+            if let Some(n) = super::bosses::send_wave_bosses(w, id, ctx, wave.bosses) { say(w, id, n as i32); }
             if sent { open_gates(w, id, ctx); }
         }
     }

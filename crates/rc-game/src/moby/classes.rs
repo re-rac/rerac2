@@ -5,6 +5,7 @@ pub mod arena;
 pub mod area_switch;
 pub mod beast;
 pub mod bolt;
+pub mod bosses;
 pub mod carriers;
 pub mod chute;
 pub mod crate_;
@@ -106,6 +107,9 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         fighters::C9CA => Some(fighters::update_09ca),
         fighters::B22 => Some(fighters::update_0b22),
         fighters::SHIELD => Some(fighters::update_shield),
+        bosses::C9F8 => Some(bosses::update_09f8),
+        bosses::CA44 => Some(bosses::update_0a44),
+        bosses::SHOT => Some(bosses::update_shot),
         0x0e93 => Some(maktar::update_0e93),
         maktar::NODE => Some(maktar::update_0c82),
         0x0c81 => Some(maktar::update_0c81),

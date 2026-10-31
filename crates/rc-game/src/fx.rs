@@ -20,6 +20,8 @@
 //! | `0x3e90c8` | Maktar's slot machine 0x0a9c drawn | its reels (crate::moby::classes::maktar::draw_0a9c) |
 //! | `0x402bc8` | the keeper's shot 0x0b5a flying | its glow and streak ([`halo`], [`streak`]; crate::moby::classes::keeper::draw_shot) |
 //! | `0x38e4c8` | the Tractor Beam holding | its beam ([`crate::moby::classes::tractor::draw`]) |
+//! | `0x3d7858` / `0x3dc2d0` | Maktar's arena bosses 0x09f8 / 0x0a44 | their lights (crate::moby::classes::bosses) |
+//! | `0x423e10` | 0x0a44's shot 0x0d08 (the first list) | its glow and sparks (crate::moby::classes::bosses::draw_shot) |
 //! | `0x4137d0` | the space fights' laser 0xffa | a streak ([`crate::ship::draw_laser`]) |
 //!
 //! Before them, the frame's blob shadows (`0x2e7ab0`, crate::shadows: FX 0, ALPHA 0x44) go first into the same quads.
@@ -269,6 +271,9 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::fighters::MASTER => crate::moby::classes::arena::draw_lamps(w, id, cam, out),
         crate::moby::classes::arena::COLUMN => crate::moby::classes::arena::draw_column(w, id, cam, out),
         crate::moby::classes::fighters::C3B => crate::moby::classes::fighters::draw_0c3b(w, id, &mut game.rng, cam, out),
+        crate::moby::classes::bosses::C9F8 => crate::moby::classes::bosses::draw_09f8(w, host, id, cam, out),
+        crate::moby::classes::bosses::CA44 => crate::moby::classes::bosses::draw_0a44(w, host, id, cam, out),
+        crate::moby::classes::bosses::SHOT => crate::moby::classes::bosses::draw_shot(w, id, &mut game.rng, cam, out),
         crate::moby::classes::keeper::SHOT => crate::moby::classes::keeper::draw_shot(w, id, &mut game.rng, cam, out),
         crate::moby::classes::teleport::CLASS => crate::moby::classes::teleport::draw(w, id, &host.camera_rows(), out),
         0x00bc => crate::moby::classes::tractor::draw(w, id, cam, -0.3 * (game.frame % 27) as f32, out),
