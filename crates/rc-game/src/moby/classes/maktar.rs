@@ -17,6 +17,9 @@
 //!   0x0c1b ([`update_0c1b`]); the lock 0x0c81 ([`update_0c81`]), its four nodes dead, hooks its group: the conveyor
 //!   bridge 0x0ab0 ([`update_0ab0`]) unfolds and carries Ratchet on its belt surfaces 0x0aaf.
 //!
+//! * 0x0a9c (`0x3e82e0`): the slot machines: a wrench hit for 10 bolts spins their reels; the payouts ([`update_0a9c`],
+//!   the reels [`draw_0a9c`]).
+//!
 //! Not ported (the lock puzzle): the catapult's draw `0x3eae18` and its aiming camera.
 //!
 //! Not ported: 0x0adf's lift (`0x3ece68`, its update when the cuboid's z scale is 2: up and down to Ratchet's level
@@ -586,6 +589,14 @@ pub struct Globals {
     pub speed: f32,
     /// The cuboids' matrices (`0x1b368c`), copied as the belts and the power nodes read them for their draws.
     pub cuboids: Vec<(i32, [[f32; 4]; 4])>,
+    /// `0x139647`: the slot machines' plays (a save byte in the game, at most 127; here for the level's load).
+    pub plays: u8,
+    /// `0x1a7a81`: the jackpot's message shown (a save flag in the game; here for the level's load).
+    pub jackpot: bool,
+    /// `0x1b08fc` / `0x1b090c` moved: the jackpot's odds raised (past 36 plays, once).
+    pub odds_raised: bool,
+    /// `$gp+0x193c` spent: the bolts the broken machines have thrown (of 300).
+    pub coins_out: i32,
 }
 
 /// `$gp+0x1d2c`: the beam's pulse, degrees a second.
@@ -1466,4 +1477,282 @@ pub fn update_1259(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     w.rebuild(id, ctx.host);
     w.changed = true;
+}
+
+/// `0x1b08f8`: the slot machine's odds in a thousand — nothing, bolts, it blows up, ammo, nanotech, the jackpot (past
+/// 36 plays 40 move from the bolts to the jackpot, once).
+const SLOT_ODDS: [i32; 6] = [260, 370, 120, 150, 105, 5];
+/// `0x2a5470`: the symbols (1..5) round each reel.
+const REELS: [[i32; 9]; 3] = [[1, 2, 3, 1, 2, 4, 1, 2, 5], [3, 2, 1, 4, 5, 3, 2, 1, 4], [1, 4, 3, 1, 2, 1, 2, 3, 5]];
+/// `0x1b09c0`: each symbol's FX texture.
+const SYMBOL_FX: [usize; 6] = [0, 0x42, 0x45, 0x43, 0x44, 0x41];
+/// `0x2a53b0`: each reel's window in the machine's frame: its top edge (two corners), then its bottom edge.
+const REEL_QUADS: [[[f32; 3]; 4]; 3] = [
+    [[0.91, 0.1, 3.05], [0.91, 0.5, 3.05], [1.37, 0.1, 2.25], [1.37, 0.5, 2.25]],
+    [[0.91, 0.55, 3.05], [0.91, 0.95, 3.05], [1.37, 0.55, 2.25], [1.37, 0.95, 2.25]],
+    [[0.91, 1.0, 3.05], [0.91, 1.4, 3.05], [1.37, 1.0, 2.25], [1.37, 1.4, 2.25]],
+];
+/// A symbol's height on the reel's window (0..1) and its inverse.
+const SYMBOL_H: f32 = 0.430_941_58;
+const SYMBOL_ST: f32 = 2.320_500_1;
+
+/// 0x0a9c (`0x3e82e0`), a slot machine. Its pvars: `+0x54` its spin's sound, `+0x58` the enemies' spawn list, `+0x5c`
+/// the result, the reels' places `+0x60..0x68` (in symbols, 0..9), timers `+0x6c..0x74`, states `+0x78..0x80`
+/// (1 spinning, 2 stopping, 0 stopped), speeds `+0x84..0x8c` and symbols to stop on `+0x90..0x98`; `+0xa4` it blew up.
+/// * 0: its speeds `randf(6, 12)` a second, mirrored one time in two (mode 0x8000), hittable (0x4000); then 1.
+/// * 1: a wrench hit with 10 bolts or more takes 10 and spins it (2, [`slot_spin`]).
+/// * 2: its sequence 1 (a play counted: past 36, once, the jackpot's odds raised); from its frame 10 its looped
+///   sound 1; at its end sequence 0 and the reels run (3, [`slot_reels`]); then the payout (4, [`slot_pay`]).
+/// * 5: blown up or broken: its sound 0, its debris ([`slot_debris`]); blown up, a blast 1.5 up (a sphere of 4 doing
+///   2 damage, flags 0x810001; the burst of size 1.5) — then it is deleted.
+///
+/// A hit with the flags 0x10000 for more than 2 from anything but the wrench (and not Ratchet) breaks it (5, counted).
+/// Its reels draw while it is drawn ([`draw_0a9c`]). Not ported: the enemies a blow-up wakes (`+0x58`: two of the
+/// spawn list `0x1fc060`'s waiting mobys (state 13) at (0.5, ±0.45, 0), facing Ratchet, `0x3d0110` / `0x3d02c8`),
+/// the HUD's bolt count shown for 240 ticks (`0x3119f0`), the jackpot's level sound 1 and flag `0x1a903c`.
+pub fn update_0a9c(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    if w.mobys[id].drawn != 0 { w.register_draw(id); }
+    if w.mobys[id].pvars.len() < 0xa8 { w.mobys[id].pvars.resize(0xa8, 0); }
+    match w.mobys[id].state {
+        0 => {
+            w.mobys[id].set_state(1, -1);
+            let m = &mut w.mobys[id];
+            m.set_pv_f(0x20, 3.0);
+            m.set_pv_s(0x24, 3);
+            m.set_pv_f(0x30, 1.0);
+            for o in [0x60, 0xa4, 0x68, 0x64] { m.set_pv_i(o, 0); }
+            // The game finds its sound by the handle's owner (`0x1886e8`); the port's handles have none, so none here.
+            m.set_pv_i(0x54, -1);
+            for k in 0..3 {
+                let v = ctx.game.rng.randf(6.0, 12.0) * 0.016_666_668;
+                w.mobys[id].set_pv_f(0x84 + 4 * k, v);
+            }
+            let flip = ctx.game.rng.randi(2) != 0;
+            let m = &mut w.mobys[id];
+            if flip { m.mode |= mode::MIRROR } else { m.mode &= !mode::MIRROR }
+            m.mode |= mode::LINE;
+        }
+        2 => {
+            if w.mobys[id].first() {
+                if ctx.host.anim(&w.mobys[id]).is_some_and(|a| a.seq_b != 1) { ctx.host.set_anim(&w.mobys[id], 1, 0, 1); }
+                let g = &mut w.maktar;
+                g.plays = (g.plays + 1).min(0x7f);
+                if 0x24 < g.plays && !g.odds_raised { g.odds_raised = true; }
+            }
+            if let Some(a) = ctx.host.anim(&w.mobys[id]).filter(|a| a.seq_b == 1) {
+                if a.flags & 2 == 0 {
+                    if crate::moby::ai::reached(w, id, ctx, 10.0) && !ctx.host.sound_playing(w.mobys[id].pv_i(0x54)) {
+                        let h = ctx.host.play_sound(&w.mobys[id], 1, 4);
+                        w.mobys[id].set_pv_i(0x54, h);
+                    }
+                } else {
+                    ctx.host.set_anim(&w.mobys[id], 0, 0, 1);
+                    w.mobys[id].set_state(3, -1);
+                }
+            }
+        }
+        3 => slot_reels(w, id),
+        4 => {
+            if w.mobys[id].first() {
+                w.mobys[id].set_pv_i(0x50, 0x3c);
+                let h = w.mobys[id].pv_i(0x54);
+                if ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
+                w.mobys[id].set_pv_i(0x54, -1);
+            }
+            slot_pay(w, id, ctx);
+        }
+        5 => {
+            let h = w.mobys[id].pv_i(0x54);
+            if ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
+            w.mobys[id].set_pv_i(0x54, -1);
+            ctx.host.set_anim(&w.mobys[id], 0, 0, 0);
+            ctx.host.play_sound(&w.mobys[id], 0, 0);
+            slot_debris(w, id, ctx);
+            let m = &mut w.mobys[id];
+            m.mode = m.mode & !mode::LINE | mode::NO_UPDATE;
+            if m.pv_i(0xa4) != 0 {
+                use crate::moby::hits::HitTemplate;
+                let at = add_v(through(&m.rows, [0.0, 0.0, 1.5]), m.pos);
+                let mut t = HitTemplate::new(2.0, Some(id), 0x81_0001, [0.0; 4]);
+                t.kind = (m.o_class as u16 as u32) << 16 | 0x102;
+                w.sphere_hit(ctx.scene, at, 4.0, 0x10, Some(id), Some(&t));
+                let pos = w.mobys[id].pos;
+                crate::moby::blast::burst(w, ctx, pos, &crate::moby::blast::Blast { size: 1.5, bursts: [0x19, 0x14, 0x14], puffs: 0x14, streaks: 0x2d, light: false, shake: true });
+            }
+            w.delete(id);
+            return;
+        }
+        _ => {}
+    }
+    // The hit (`0x322040(m, 0x10000, 0)`).
+    if let Some(h) = w.hit_message(id).filter(|h| h.tmpl.flags & 0x10000 != 0) {
+        let class = h.tmpl.source.and_then(|s| w.mobys.get(s)).map(|s| s.o_class);
+        if class.is_some_and(|c| c != 0 && c != 0x47) {
+            if 2.0 < h.tmpl.damage {
+                w.maktar.left -= 1;
+                w.mobys[id].set_state(5, -1);
+            }
+        } else if class == Some(0x47) && w.mobys[id].state == 1 && 9 < ctx.game.bolts {
+            ctx.game.bolts -= 10;
+            slot_spin(w, id, ctx);
+            w.mobys[id].set_state(2, -1);
+        }
+    }
+    w.mobys[id].hit_slot = -1;
+}
+
+fn add_v(a: [f32; 3], b: [f32; 3]) -> [f32; 3] { [a[0] + b[0], a[1] + b[1], a[2] + b[2]] }
+
+/// `0x3e8f68`: the spin's result by the odds (`randi(1000)`; the nanotech with Ratchet's health full and the jackpot
+/// in the first 4 plays become bolts), each reel to stop on its symbol; nothing: three random symbols not all one.
+fn slot_spin(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let mut odds = SLOT_ODDS;
+    if w.maktar.odds_raised { odds[1] -= 40; odds[5] += 40; }
+    let mut r = ctx.game.rng.randi(1000);
+    let mut out = 0;
+    for (k, o) in odds.iter().enumerate() {
+        r -= o;
+        if r < 0 { out = k as i32; break; }
+    }
+    if out == 4 && ctx.hero.hp == ctx.game.max_health { out = 1; }
+    if w.maktar.plays < 4 && out == 5 { out = 1; }
+    let m = &mut w.mobys[id];
+    m.set_pv_i(0x5c, out);
+    for k in 0..3 { m.set_pv_i(0x90 + 4 * k, out); }
+    if out == 0 {
+        let rng = &mut ctx.game.rng;
+        let (a, b) = (rng.rand_range(1, 5), rng.rand_range(1, 5));
+        let mut c = rng.rand_range(1, 5);
+        while a == b && c == a { c = rng.rand_range(1, 5); }
+        let m = &mut w.mobys[id];
+        m.set_pv_i(0x90, a);
+        m.set_pv_i(0x94, b);
+        m.set_pv_i(0x98, c);
+    }
+}
+
+/// `0x3e8b18`, state 3: at its start the reels spin for 50, 100 and 180 ticks (mirrored, 180, 100 and 50); each runs
+/// back by its speed (wrapping at 0 by 9), then stops once its symbol is in the middle less than 0.2 past; all three
+/// stopped, the payout (4).
+fn slot_reels(w: &mut MobyWorld, id: usize) {
+    let m = &mut w.mobys[id];
+    if m.first() {
+        let mirrored = m.mode & mode::MIRROR != 0;
+        m.set_pv_i(0x6c, if mirrored { 0xb4 } else { 0x32 });
+        m.set_pv_i(0x70, 100);
+        m.set_pv_i(0x74, if mirrored { 0x32 } else { 0xb4 });
+        for k in 0..3 { m.set_pv_i(0x78 + 4 * k, 1); }
+    }
+    for k in 0..3 {
+        let st = m.pv_i(0x78 + 4 * k);
+        if st == 1 || st == 2 {
+            let mut p = m.pv_f(0x60 + 4 * k) - m.pv_f(0x84 + 4 * k);
+            if p < 0.0 { p += 9.0; }
+            m.set_pv_f(0x60 + 4 * k, p);
+            if st == 1 {
+                let mut t = m.pv_i(0x6c + 4 * k);
+                if crate::moby::countdown(&mut t) { m.set_pv_i(0x78 + 4 * k, 2); }
+                m.set_pv_i(0x6c + 4 * k, t);
+            } else if REELS[k][(p + 9.0) as i32 as usize % 9] == m.pv_i(0x90 + 4 * k) && p - (p as i32 as f32) < 0.2 {
+                m.set_pv_i(0x78 + 4 * k, 0);
+            }
+        }
+        if (0..3).all(|j| m.pv_i(0x78 + 4 * j) == 0) { m.set_state(4, -1); }
+    }
+}
+
+/// `0x3e8d50`, state 4: back to 1 and the payout at (3, 0, 2) in its frame plus a random way across (`1 − r²` long, r in 0..1): bolts (15..65,
+/// `0x326ee8`), it blows up (5, counted), an ammo pickup thrown at 0.35 of its speed (`0x31ead8` / `0x3ed9a8`), a
+/// nanotech cluster (`0x3a9bf0`) or the jackpot (300 bolts; the first time its message 0x1233); each but the blow-up
+/// with its sound 2, nothing with its sound 3.
+fn slot_pay(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    w.mobys[id].set_state(1, -1);
+    // `0x31fce0(1)`: a heading, then `0x31fc10(1)` its length (`1 − r²`, r 12 bits).
+    let a = ctx.game.rng.rand_angle();
+    let r12 = ((ctx.game.rng.rand() >> 16) & 0xfff) as f32 * 0.000_244_140_62;
+    let r = 1.0 - r12 * r12;
+    let m = &w.mobys[id];
+    let at = add_v(add_v(through(&m.rows, [3.0, 0.0, 2.0]), m.pos), [a.cos() * r, a.sin() * r, 0.0]);
+    let out = m.pv_i(0x5c);
+    if out != 2 { ctx.host.play_sound(&w.mobys[id], if (1..=5).contains(&out) { 2 } else { 3 }, 0x20); }
+    match out {
+        1 => crate::moby::bolts::spawn(w, id, 0.0, 0xf, 0x41, 3, 4, ctx),
+        2 => {
+            w.mobys[id].set_pv_i(0xa4, 1);
+            w.maktar.left -= 1;
+            w.mobys[id].set_state(5, -1);
+        }
+        3 => {
+            if let (Some(item), _) = crate::moby::classes::pickup::pick(ctx) {
+                if let Some(p) = crate::moby::classes::pickup::spawn(w, ctx, at, item, None) {
+                    let v = w.mobys[p].pv_v(crate::moby::shards::VEL);
+                    w.mobys[p].set_pv_v(crate::moby::shards::VEL, v.map(|x| x * 0.35));
+                }
+            }
+        }
+        4 => { crate::moby::classes::nanotech::create_at(w, at, 0); }
+        5 => {
+            if !w.maktar.jackpot {
+                w.maktar.jackpot = true;
+                ctx.game.prompt.announce(0x1233, -1);
+            }
+            ctx.game.bolts += 300;
+        }
+        _ => {}
+    }
+}
+
+/// `0x3e88e0`: the debris classes 0xca5..0xca9 thrown whole (crate::moby::shards::spawn_whole: at `randf(1, 4)`
+/// forward, `randf_signed(1, 3)` across and `randf(4, 9)` up a second through its rows, spinning 90..180°/s, gravity
+/// 15..25), then while the machines' 300 bolts last five 5-bolts 1.5 up its frame (`0x38abb0`), thrown the same way.
+fn slot_debris(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let throw = |w: &MobyWorld, ctx: &mut Ctx| {
+        let rng = &mut ctx.game.rng;
+        let v = [rng.randf(1.0, 4.0) * 0.016_666_668, rng.randf_signed(1.0, 3.0) * 0.016_666_668, rng.randf(4.0, 9.0) * 0.016_666_668];
+        through(&w.mobys[id].rows, v)
+    };
+    for class in 0x0ca5..0x0caa {
+        let vel = throw(w, ctx);
+        let spin = ctx.game.rng.randf(90.0, 180.0);
+        let gravity = ctx.game.rng.randf(15.0, 25.0);
+        let (pos, rot) = (w.mobys[id].pos, w.mobys[id].rot);
+        crate::moby::shards::spawn_whole(w, ctx, class, Some(id), pos, rot, spin, gravity, vel, 0xff);
+    }
+    let at = add_v(through(&w.mobys[id].rows, [0.0, 0.0, 1.5]), w.mobys[id].pos);
+    for _ in 0..5 {
+        if 300 - w.maktar.coins_out < 1 { return; }
+        let vel = throw(w, ctx);
+        crate::moby::bolts::create_bolt(w, id, at, vel, 0, 5, ctx);
+        w.maktar.coins_out += 5;
+    }
+}
+
+/// `0x3e90c8`, the reels' draw: on each reel's window ([`REEL_QUADS`]) the three symbols about its place `+0x60..`
+/// (each [`SYMBOL_H`] of the window, cut to 0.1..0.9 with its texture), the symbol's FX texture ([`SYMBOL_FX`]),
+/// flipped across when mirrored, coloured 0x7f7f7f7f. Its ALPHA (0x8000000000) writes the texels as they are; here
+/// 0x44 at the colour's alpha.
+pub fn draw_0a9c(w: &MobyWorld, id: usize, out: &mut Vec<crate::fx::FxQuad>) {
+    let m = &w.mobys[id];
+    let (u0, u1) = if m.mode & mode::MIRROR != 0 { (1.0, 0.0) } else { (0.0, 1.0) };
+    let lerp = |a: [f32; 3], b: [f32; 3], t: f32| -> [f32; 3] { std::array::from_fn(|j| a[j] + (b[j] - a[j]) * t) };
+    let world = |v: [f32; 3]| add_v(through(&m.rows, v), m.pos);
+    for (k, q) in REEL_QUADS.iter().enumerate() {
+        let f = m.pv_f(0x60 + 4 * k) + 0.15;
+        for i in 0..3 {
+            let mut t0 = ((f as i32) as f32 - f) * SYMBOL_H + i as f32 * SYMBOL_H;
+            let mut t1 = t0 + SYMBOL_H;
+            let sym = REELS[k][((f + i as f32) - 1.0 + 9.0) as i32 as usize % 9];
+            if t1 < 0.1 || 0.9 < t0 { continue; }
+            let (mut v0, mut v1) = (0.0, 1.0);
+            if t0 < 0.1 {
+                v0 = (0.1 - t0) * SYMBOL_ST;
+                t0 = 0.1;
+            } else if 0.9 < t1 {
+                v1 = (0.9 - t1) * SYMBOL_ST + 1.0;
+                t1 = 0.9;
+            }
+            let corners = [world(lerp(q[0], q[2], t0)), world(lerp(q[1], q[3], t0)), world(lerp(q[0], q[2], t1)), world(lerp(q[1], q[3], t1))];
+            out.push(crate::fx::FxQuad { fx: SYMBOL_FX[sym as usize], additive: false, corners, st: [[u0, v0], [u1, v0], [u0, v1], [u1, v1]], rgba: [0x7f7f_7f7f; 4] });
+        }
+    }
 }

@@ -200,6 +200,24 @@ pub fn create(w: &mut MobyWorld, crate_: usize, kind: u8) -> Option<usize> {
     Some(id)
 }
 
+/// `0x3a9bf0(pos, kind)` (L02, the slot machines' payout): a cluster of its own at `pos` (its `+0xb8` itself, so free
+/// at once), hidden, no collision, update distance 64.
+pub fn create_at(w: &mut MobyWorld, pos: V3, kind: u8) -> Option<usize> {
+    let id = w.create(CLASS);
+    let m = &mut w.mobys[id];
+    m.update = Some(update);
+    m.mode &= !crate::moby::mode::NO_UPDATE;
+    m.update_dist = 0x40;
+    m.state = 0;
+    m.parent = None;
+    m.set_pv_b(pv::KIND, kind);
+    m.has_collision = false;
+    m.mode |= 0x41;
+    m.pos = pos;
+    w.changed = true;
+    Some(id)
+}
+
 /// `0x3a0800`.
 pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     match w.mobys[id].state {

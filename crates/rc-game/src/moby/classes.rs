@@ -100,6 +100,7 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x0aa4 => Some(maktar::update_0aa4),
         0x12cf => Some(maktar::update_12cf),
         0x1259 => Some(maktar::update_1259),
+        0x0a9c => Some(maktar::update_0a9c),
         0x132d => Some(props::update_132d),
         0x0919 => Some(props::update_0919),
         0x0c8c => Some(props::update_0c8c),

@@ -77,3 +77,5 @@ L00:00326b28	rain_land	weather	has	L	a drop landing: ring or splash (L01 0x31c77
 L00:0031e100	random_points	moby	has	L	points in a moby's collision primitives (rc_game::moby::shards::random_points; kinds 1 and 3)
 L00:0033d400	exhaust	particles	has	L	the type-0x4a puff riding a moby (L25 0x349c48): rc_game::particles::exhaust; its descriptor is the caller's (EXHAUST_DESCS holds L25's)
 L00:00320538	explosion	breakfx	has	L	the general explosion 0x320538 (L02 0x324930): rc_game::moby::blast::explode (the colour shift only 0)
+H:8eedb32af261910a	spawn_list_find	enemy	missing	L	a waiting member (state 13) of spawn list n (0x1fc060[n]; L02 0x3d0110): G-ENM-004
+H:4b834f7216002e92	spawn_list_wake	enemy	missing	L	wakes a waiting moby at a place facing a point (state 14, its AI target +0x1a0; L02 0x3d02c8): G-ENM-004

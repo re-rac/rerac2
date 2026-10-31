@@ -516,6 +516,7 @@ impl Mobys {
                 kind: (c.class.header.ty as u16 | (c.class.header.mode_bits2 as u16) << 8) as i16,
                 pieces: c.class.pieces.iter().map(|p| p.as_ref().map(|p| (p.centre, p.points.clone()))).collect(),
                 segments: c.class.pieces.iter().map(|p| p.as_ref().and_then(|p| p.segment).map(|s| [s[0].0, s[1].0])).collect(),
+                coll_points: blobs.collision.iter().find(|(o, _)| *o == c.o_class as i32).map_or(Vec::new(), |(_, b)| b.vertices.iter().take(0x20).map(|v| [v[0] as f32, v[1] as f32, v[2] as f32]).collect()),
                 // Class byte 0x0f: its shadow proxy (rc_game::shadow_volumes).
                 shadow: blobs.blobs.get(&c.o_class).and_then(|b| rc_formats::moby_shadow::ShadowBlock::of_class(b).ok().flatten()).map(std::sync::Arc::new),
                 reactions: m

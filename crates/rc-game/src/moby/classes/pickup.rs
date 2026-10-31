@@ -26,7 +26,7 @@ fn excluded(i: usize) -> bool { matches!(i, 0x1f | 0x2d | 0x3d | 0x4d) }
 
 /// `0x31aa10`: an item Ratchet has that takes ammo, one not full first (each as likely; else any of them), and how many
 /// pickups (two one time in five). `None` with none (the crate's own type then stands; not on Aranos).
-fn pick(ctx: &mut Ctx) -> (Option<usize>, i32) {
+pub(crate) fn pick(ctx: &mut Ctx) -> (Option<usize>, i32) {
     let items = &ctx.level.items;
     let g = &mut *ctx.game;
     let max = |i: usize| items.get(i).map_or(0, |r| r.max_ammo as i32);

@@ -127,6 +127,9 @@ pub struct ClassInfo {
     pub pieces: Vec<Option<(V3, Vec<V3>)>>,
     /// The break pieces' segments (the ends, 1/1024 of the moby's scale; shard mode 1, crate::moby::shards), by piece.
     pub segments: Vec<Option<[V3; 2]>>,
+    /// The collision blob's vertices (class header 0x10, model units; at most 32, as `0x2e08a8` reads them): the points
+    /// of a whole-moby break piece (shard mode 0, crate::moby::shards).
+    pub coll_points: Vec<V3>,
     /// Class header byte 0x0f ≠ 0: its shadow proxy (rc_formats::moby_shadow; crate::shadow_volumes).
     pub shadow: Option<std::sync::Arc<rc_formats::moby_shadow::ShadowBlock>>,
 }

@@ -103,6 +103,8 @@ Then two more stale tags (same day): `0x31fa50` is the enemy framework's reactio
 
 Then the platform block (crate::moby::platform), the TNT crate 505 (registered at last: the census counted it ported through its unit U9, so check `update_for` when a unit reads ported), Maktar's lamp 0x0e93 and its lock puzzle (the bomb 0x09c8, the catapult 0x0aa6, the walls 0x0c1b, the power nodes 0x0c82, the lock 0x0c81, the conveyor bridge 0x0ab0; same day): 813 unported class-levels / 9,231 created, 153 ported units; cheap 270 / 4,571, missing 57 / 543, partly 54 / 2,020, unknown 181 / 2,097. What is left missing is mostly the level chunks (banks 2 / 3, G-LVL-007): on Maktar chunk 1 is the arena, switched to only by the arena master 0x0b59 (U141, 5,518 words, dialogue and items too).
 
+Then Maktar's slot machines 0x0a9c (2026-10-31, rc_game::moby::classes::maktar `update_0a9c` / `draw_0a9c`) with shard mode 0 (the whole moby thrown, its points the collision blob's vertices: rc_game::moby::shards::spawn_whole) and the nanotech cluster made free (`0x3a9bf0`): 807 unported class-levels / 9,178 created, 157 ported units; cheap 270 / 4,571, missing 58 / 568, partly 51 / 1,993, unknown 179 / 2,046. The spawn lists of waiting enemies (`0x3d0110` / `0x3d02c8`, G-ENM-004) are tagged missing.
+
 Missing systems now (`systems.tsv`, every unit calling the system, not only the blocked; status as the ranking reads
 it):
 

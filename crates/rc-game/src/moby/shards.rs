@@ -25,8 +25,8 @@
 //! their count, `+0x5d` the mode (2), `+0x5e` the sound (0xff none).
 //!
 //! The contacts test the level's mesh with the port's segment query, as `0x2e2248` tests the triangles `0x2df8d8`
-//! gathers. Not ported: the gravity frames (`0x1a8ff0`), the other modes (0 and 3 the whole moby, 4 / 5), mode 1's
-//! segments on joints.
+//! gathers. Mode 0 ([`spawn_whole`]) throws the whole moby. Not ported: the gravity frames (`0x1a8ff0`), the other
+//! modes (3 the whole moby as a ball, 4 / 5), mode 1's segments on joints.
 
 use super::{mode, Ctx, MobyWorld};
 use crate::hero::physics::{add, dot, len, scale, set_len, sub, V3};
@@ -132,6 +132,14 @@ pub fn spawn_shard(w: &mut MobyWorld, ctx: &mut Ctx, o_class: i16, src: Option<u
     spawn(w, ctx, o_class, src, pos, rot, rows, spin, gravity, piece, vel, sound, 2)
 }
 
+/// [`spawn_shard`] in mode 0 (`0x2dbff8`'s): the whole moby (every piece drawn), its pivot and radius the bounding
+/// sphere of its sequence (`0x318028`'s, back into its frame), its points its collision blob's vertices (`0x2e08a8`:
+/// at most 32, [`ClassInfo::coll_points`](super::ClassInfo::coll_points)); it ticks as mode 2 does.
+#[allow(clippy::too_many_arguments)]
+pub fn spawn_whole(w: &mut MobyWorld, ctx: &mut Ctx, o_class: i16, src: Option<usize>, pos: V3, rot: V3, spin: f32, gravity: f32, vel: V3, sound: u8) -> Option<usize> {
+    spawn(w, ctx, o_class, src, pos, rot, None, spin, gravity, 0, vel, sound, 0)
+}
+
 /// [`spawn_shard`] in mode 1 (`0x2dbff8`'s): the piece a ball about its segment's middle (`0x311b50`), half the
 /// segment across; no points.
 #[allow(clippy::too_many_arguments)]
@@ -143,7 +151,10 @@ pub fn spawn_ball(w: &mut MobyWorld, ctx: &mut Ctx, o_class: i16, src: Option<us
 fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, o_class: i16, src: Option<usize>, pos: V3, rot: V3, rows: Option<[V3; 3]>, spin: f32, gravity: f32, piece: u8, vel: V3, sound: u8, body: u8) -> Option<usize> {
     let info = w.class(o_class)?;
     let class_scale = info.scale;
-    let (centre, n, radius) = if body == 1 {
+    let (centre, n, radius) = if body == 0 {
+        // Set from the sphere once the moby exists.
+        ([0.0; 3], info.coll_points.len(), 0.0)
+    } else if body == 1 {
         let [a, b] = (*info.segments.get(piece as usize)?)?;
         let mid = scale(add(a, b), 0.5);
         (mid, 0, len(sub(mid, a)))
@@ -170,7 +181,8 @@ fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, o_class: i16, src: Option<usize>, pos
     (m.pos, m.rot, m.scale) = (pos, rot, sc);
     m.rows = rows.unwrap_or_else(|| crate::hero::physics::euler_rows(rot));
     (m.light, m.ambient) = (light, ambient);
-    m.mode = (m.mode & !0x20) | mode::KEEP_ROWS | (src_mode & 0x800) | mode::NO_MATRIX;
+    // `+0x64` its update (`0x3a6370`) whatever its class: a class without one would leave it mode 2.
+    m.mode = (m.mode & !(0x20 | mode::NO_UPDATE)) | mode::KEEP_ROWS | (src_mode & 0x800) | mode::NO_MATRIX;
     m.has_collision = false;
     (m.drawn, m.draw_dist, m.update_dist) = (1, 0x1ff, 0xff);
     m.pvars.resize(BLOCK.max(m.pvars.len()), 0);
@@ -189,8 +201,14 @@ fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, o_class: i16, src: Option<usize>, pos
     m.pvars[COUNT] = 0;
     m.pvars[MODE] = body;
     m.pvars[SOUND] = sound;
-    m.piece = Some(piece);
-    // The pivot: the piece's centre in the moby's frame (`0x311cf0`, then `0x326248`).
+    m.piece = (body != 0).then_some(piece);
+    // The pivot: the piece's centre in the moby's frame (`0x311cf0`, then `0x326248`); mode 0 its sequence's sphere.
+    let (centre, radius) = if body == 0 {
+        ctx.host.sequence_sphere(&w.mobys[id]).map_or(([0.0; 3], 0.0), |s| ([s[0], s[1], s[2]], s[3]))
+    } else {
+        (centre, radius)
+    };
+    let m = &mut w.mobys[id];
     let k = sc * 0.000_976_562_5;
     m.set_pv_v(PIVOT, scale(centre, k));
     m.set_pv_f(RADIUS, radius * k);
@@ -198,10 +216,13 @@ fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, o_class: i16, src: Option<usize>, pos
     Some(id)
 }
 
-/// The piece's points in its frame (`0x311cf0`'s list, scaled).
+/// The piece's points in its frame (`0x311cf0`'s list, scaled; mode 0 the collision blob's vertices, `0x2e08a8`).
 fn points(w: &MobyWorld, id: usize) -> Vec<V3> {
     let m = &w.mobys[id];
     let k = m.scale * 0.000_976_562_5;
+    if m.pvars[MODE] == 0 {
+        return w.class(m.o_class).map_or(Vec::new(), |c| c.coll_points.iter().map(|&q| scale(q, k)).collect());
+    }
     let piece = m.pv_s(PIECE).max(0) as usize;
     w.class(m.o_class).and_then(|c| c.pieces.get(piece)).and_then(Option::as_ref).map(|(_, p)| p.iter().map(|&q| scale(q, k)).collect()).unwrap_or_default()
 }
