@@ -34,7 +34,7 @@
 //!
 //! Not ported: the bosses 0x09f8 / 0x0a44 (the challenges with a boss wave, 2, 4, 6, 9, 11, 12 and 13, are kept off the
 //! menu until they are: they could not end), the crowd 0x0e96 and its cheers (`0x3fb028`, `0x42e670`), the announcer's speech (`0x401d98`, its
-//! remarks `0x401e68` / `0x402090`), the wipe (`0x401a20`), the win's screen
+//! remarks `0x401e68` / `0x402090`), the restart's path straight into the wipe (`0x1a7904` = 2), the win's screen
 //! (`0x400e10`), the menu's arrows (`0x3ff388`) and its vendor (□, `0x332158(5)`), the
 //! music (`0x335928`), the level's sounds, the challenges' weapon lock (`0x18b6f4`) and the fixed held items of 7 / 8 /
 //! 13 beyond the hand request; the plates' sparks (`0x3d85a8`: the particle burst `0x345d88` has no port).
@@ -593,6 +593,7 @@ mod pv {
     pub const WINDOW: usize = 0x11e;
     pub const CHALLENGE: usize = 0x120;
     pub const WAVE: usize = 0x122;
+    pub const WIPE: usize = 0x124;
     pub const SAID: usize = 0x1d0;
 }
 
@@ -977,6 +978,7 @@ pub const MIDDLE_AT: usize = 0x240;
 pub fn update_master(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if let Some((p, _)) = cuboid_at(ctx, w, id, pv::MIDDLE) { w.mobys[id].set_pv_v(MIDDLE_AT, p); }
     let fighting = w.mobys[id].state == 8;
+    ctx.game.arena_wipe = None;
     match w.mobys[id].state {
         0 => {
             reset_master(w, id);
@@ -1180,7 +1182,7 @@ pub fn draw_hud(h: &ChallengeHud, text: &dyn Fn(u32) -> Vec<u8>, fonts: [(&[rc_f
         if let Some(frame) = frame {
             // `0x3ffd90(fraction)`: the bar, red to yellow to green.
             let f = fraction.max(0.0);
-            let width = ((BOSS_BAR[2] - BOSS_BAR[0]) * f).round();
+            let width = ((BOSS_BAR[2] - BOSS_BAR[0]) * f) as i32 as f32;
             let c = if 0.5 < f {
                 crate::hud::lerp_rgba(f + f - 1.0, BOSS_BAR_COLOURS[1], BOSS_BAR_COLOURS[0])
             } else {
@@ -1205,7 +1207,16 @@ fn enter(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     match w.mobys[id].timer {
         0 => {
-            if w.mobys[id].state_ticks < 0x1f { return; }
+            // The fade to black, a twentieth a tick.
+            let t = w.mobys[id].state_ticks;
+            if t < 0x1f {
+                let f = t as u16 as f32 * 0.05;
+                ctx.game.fade_black = if f < 1.0 { f } else { 1.0 };
+                return;
+            }
+            // The wipe from the screen's full height (`0x401a20`, [`draw_wipe`]).
+            w.mobys[id].set_pv_s(pv::WIPE, crate::gui::SCREEN_H as i16);
+            wipe_tick(w, id, ctx);
             ctx.game.switch_chunk(1);
             if let Some((p, r)) = cuboid_at(ctx, w, id, pv::ENTRY) {
                 ctx.hero.teleport(p, r);
@@ -1217,6 +1228,10 @@ fn enter(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             w.mobys[id].timer = 2;
         }
         2 => {
+            // Through the wipe, the black fade off.
+            let h = wipe_tick(w, id, ctx);
+            ctx.game.fade_black = 0.0;
+            if 0 < h { return; }
             if ctx.game.flags[5] == 0 {
                 ctx.game.flags[5] = 1;
                 w.mobys[id].timer = 1;
@@ -1246,6 +1261,54 @@ fn enter(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         _ => {}
+    }
+}
+
+/// The wipe's registration for this tick: its draw ([`draw_wipe`]) lowers `+0x124` by its step (to 0) and draws
+/// that; returns the height before.
+fn wipe_tick(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> i16 {
+    let before = w.mobys[id].pv_s(pv::WIPE);
+    let h = (before as u16).wrapping_sub(WIPE_STEP) as i16;
+    let h = if h < 0 { 0 } else { h };
+    w.mobys[id].set_pv_s(pv::WIPE, h);
+    ctx.game.arena_wipe = Some(h);
+    before
+}
+
+/// `$gp+0x2534..+0x2550` (the wipe `0x401a20`): the curtain's colour, the flash's (its alpha by the square of the
+/// curtain's height over the screen's) and its draws, the step a frame, the edge's most height and its overhang.
+const WIPE_CURTAIN: u32 = 0xff00_0000;
+const WIPE_FLASH: u32 = 0xffff_ffff;
+const WIPE_FLASHES: usize = 4;
+const WIPE_STEP: u16 = 2;
+const WIPE_EDGE: i32 = 150;
+const WIPE_OVERHANG: i32 = 100;
+/// The wipe's edge: FX texture 0x10, its 32 × 32 texels.
+pub const WIPE_FX: u16 = 0x10;
+
+/// `0x401a20(m)` (the master, first list, entering the arena): the flash over the screen ([`WIPE_FLASHES`] times),
+/// the black curtain over its top `h` rows, and its edge (FX 0x10, `edge` its texture slot) across the curtain's
+/// bottom, overhanging both sides, as tall as the screen opened (at most 150) and centred on the curtain's edge.
+///
+/// Not ported: the edge quad's colour (`0x2ebee8`'s stack arguments; neutral 0x80808080 here) and the draw's GS states
+/// (`0x384178`).
+pub fn draw_wipe(h: i16, edge: Option<usize>, out: &mut Vec<crate::gui::Quad>) {
+    use crate::gui::{rect, Quad, Tex, SCREEN_H, SCREEN_W};
+    let (sw, sh) = (SCREEN_W as i32, SCREEN_H as i32);
+    let h = h as i32;
+    let f = h as f32 / sh as f32;
+    // An alpha past 0x80 on the GS is a blend factor past 1 with the colour clamped: on pure white or black sources it
+    // comes to the same as 0x80, which the HUD layer's blend takes (it does not clamp).
+    let gs = |w: u32| { let mut c = w.to_le_bytes(); c[3] = c[3].min(0x80); c };
+    let a = (f * f * (WIPE_FLASH >> 24) as f32) as u32;
+    let flash = gs((WIPE_FLASH & 0xff_ffff) | a << 24);
+    for _ in 0..WIPE_FLASHES { rect(out, 0, sh, 0, sw, flash); }
+    rect(out, 0, h, 0, sw, gs(WIPE_CURTAIN));
+    if let Some(slot) = edge {
+        let tall = (sh - h).min(WIPE_EDGE);
+        let (x, y, wd) = (-WIPE_OVERHANG, h - (tall >> 1), sw + WIPE_OVERHANG * 2);
+        let (l, t, r, b) = (x as f32, y as f32, (x + wd) as f32, (y + tall) as f32);
+        out.push(Quad { pos: [[l, t], [r, t], [l, b], [r, b]], uv: [[0.0, 0.0], [32.0, 0.0], [0.0, 32.0], [32.0, 32.0]], tex: Tex::Slot(slot), rgba: [0x80; 4] });
     }
 }
 

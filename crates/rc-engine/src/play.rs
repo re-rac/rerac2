@@ -1926,10 +1926,10 @@ fn draw_hud(
             }
             Err(e) => eprintln!("play: no HUD icons ({e:#})"),
         }
-        // The markers' FX textures (the Lancer's reticle), the space fights' HUD's (rc_game::ship) and font 3 (FX
-        // texture 3: the arena's counters, rc_game::moby::classes::arena::draw_hud).
+        // The markers' FX textures (the Lancer's reticle), the space fights' HUD's (rc_game::ship), font 3 (FX
+        // texture 3: the arena's counters, rc_game::moby::classes::arena::draw_hud) and the arena wipe's edge.
         let mut fx = std::collections::HashMap::new();
-        for id in [0x26u16, rc_game::moby::classes::arena::FONT_3].into_iter().chain(rc_game::ship::HUD_FX) {
+        for id in [0x26u16, rc_game::moby::classes::arena::FONT_3, rc_game::moby::classes::arena::WIPE_FX].into_iter().chain(rc_game::ship::HUD_FX) {
             if let Some(t) = level.0.particles.textures.as_ref().and_then(|t| t.fx_textures.get(id as usize)).and_then(Option::as_ref) {
                 fx.insert(id, (textures.len(), [t.width as f32, t.height as f32]));
                 // The HUD's atlas holds the GS's bytes (0x80 = 1.0); the FX textures' alpha is decoded to 0..0xff (their
@@ -1962,6 +1962,10 @@ fn draw_hud(
     };
     let p: &mut Play = p;
     let mut quads = Vec::new();
+    // The arena's wipe (a first-list draw: under the HUD).
+    if let Some(h) = p.game.arena_wipe {
+        rc_game::moby::classes::arena::draw_wipe(h, hud.fx.get(&rc_game::moby::classes::arena::WIPE_FX).map(|&(i, _)| i), &mut quads);
+    }
     if let Some(pic) = p.movie_picture.take() { hud.layer.write(&mut images, crate::front_end::MOVIE, &pic); }
     if let (Some(m), Some(c)) = (p.pause.as_ref(), card.as_deref()) {
         // The page loop's picture (`0x2ccc18`): the stopped game darkened, then the pages.
@@ -2162,6 +2166,13 @@ fn draw_hud(
     }
     // Under water the screen's tint (`0x2e6658`'s last pass: `0x1ad8a0..a3`, rc_game::fog), before the scene fade.
     if p.game.underwater && !movie { rc_game::gui::fill(&mut quads, rc_game::fog::UnderwaterLook::default().tint); }
+    // The screen's fades to black and to white (`0x2e9b68`: each past 1 held at 1, drawn at `ftoi(fade · 128)`).
+    for (f, rgb) in [(&mut p.game.fade_black, 0u8), (&mut p.game.fade_white, 0xff)] {
+        if 0.0 < *f {
+            if 1.0 < *f { *f = 1.0; }
+            rc_game::gui::fill(&mut quads, [rgb, rgb, rgb, (*f * 128.0) as i32 as u8]);
+        }
+    }
     // The fade into and out of a scene (`0x1b1860`, 1 black).
     let fade = if movie { 0.0 } else { p.game.scenes.fade.clamp(0.0, 1.0) };
     if 0.0 < fade { rc_game::gui::fill(&mut quads, [0, 0, 0, (fade * 128.0) as u8]); }
