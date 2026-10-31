@@ -10,6 +10,10 @@
 //! (`OcclBits::visible`) before any frustum or distance test, as `TfragProc`, `TieProc` and `MobyProc` do.
 //! Shrubs never consult it.
 //!
+//! On a level in chunks (R&C2's variant planes: Oozla, Maktar) the tfrags take their words from a table of all the
+//! chunks' tfrag mappings (`rc_formats::occlusion::chunk_tfrag_bits`, L02 `0x3080a0`), at the load and again at every
+//! chunk switch (crate::chunk_switch).
+//!
 //! Environment:
 //! - `RC_OCCL=0`: mode off (every mask bit set, everything passes).
 //! - `RC_OCCL=1`: freeze. The mask is built once, from the starting camera, then kept while the camera
@@ -44,7 +48,14 @@ pub fn load(core: &LevelCore, core_data: &[u8], gameplay: &[u8], tfrags: &[Tfrag
     let maps = maps.filter(|_| grid.is_some());
     let headers: Vec<_> = tfrags.iter().map(|t| t.header).collect();
     let tie_keys: Vec<i32> = ties.iter().map(|t| t.occlusion_index).collect();
-    let objects = occlusion::resolve_level_occlusion(maps.as_ref(), &headers, &tie_keys, mobys);
+    // A level in chunks (its variant planes, `0x1caa8c`): the tfrags through the chunk table, by the tfrag block's +0x0c.
+    let chunked = !rc_formats::disc::gameplay::variant_planes(gameplay).unwrap_or_default().is_empty();
+    let chunked = if chunked {
+        Some(rc_formats::tfrag::parse_tfrag_block_header(rc_formats::tfrag::tfrag_block(core, core_data)?)?.unknown_c)
+    } else {
+        None
+    };
+    let objects = occlusion::resolve_level_occlusion(maps.as_ref(), &headers, chunked, &tie_keys, mobys);
     let loader_mode = if maps.is_some() { OcclusionMode::Active } else { OcclusionMode::Off };
     Ok(LevelOcclusionData { grid, objects, loader_mode })
 }
@@ -124,10 +135,13 @@ fn report(level: &LoadedLevel, mode: OcclusionMode, freeze: bool) {
     let mapped = |v: &[occlusion::OcclBits]| v.iter().filter(|b| **b != occlusion::OcclBits::ALWAYS).count();
     match &d.grid {
         Some(g) => println!(
-            "occlusion: {} cells, {} masks{}; mapped tfrags {}/{}, ties {}/{}, mobys {}/{}{}; mode {:?}{}",
+            "occlusion: {} cells, {} masks{}; mapped tfrags {}/{}, ties {}/{}, mobys {}/{}{}{}; mode {:?}{}",
             g.cells.len(), g.masks.len(), if g.octants.is_some() { ", octant override" } else { "" },
             mapped(&o.tfrag), o.tfrag.len(), mapped(&o.tie), o.tie.len(),
             mapped(&o.moby), o.moby.len(), if o.tfrag_out_of_date { "; tfrag mappings out of date" } else { "" },
+            o.chunk_table.as_ref().map_or(String::new(), |t| format!(
+                "; chunk tfrag table {} entries ({} past the mask)", t.len(), t.iter().filter(|b| !b.visible(&[0xff; MASK_BYTES])).count()
+            )),
             mode, if freeze { " (RC_OCCL=1: frozen after the first frame)" } else { "" }
         ),
         None => println!("occlusion: none in this level; everything visible"),

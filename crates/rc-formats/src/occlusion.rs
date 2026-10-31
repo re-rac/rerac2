@@ -214,8 +214,12 @@ pub struct LevelOcclusion {
     pub tie: Vec<OcclBits>,
     /// Per static gameplay moby instance, runtime moby +0x36.
     pub moby: Vec<OcclBits>,
-    /// Tfrag count or any header byte 0x3d disagreed: all tfrags always visible ("occlusion out of date on tfrag").
+    /// Tfrag count or any header byte 0x3d disagreed (on a level in chunks: the mapping count and the tfrag block's
+    /// word `+0x0c`): all tfrags always visible ("occlusion out of date on tfrag").
     pub tfrag_out_of_date: bool,
+    /// On a level in chunks (R&C2, [`chunk_tfrag_table`]): the table `0x1caa94` the chunks' tfrags take their words
+    /// from ([`chunk_tfrag_bits`]); `None` on any other level, or when the mappings are out of date.
+    pub chunk_table: Option<Vec<OcclBits>>,
     /// Ties / occlusion-culled mobys with no mapping ("occlusion out of date on ties/mobys (%d / %d)").
     pub ties_not_found: usize,
     pub mobys_not_found: usize,
@@ -228,6 +232,28 @@ pub(crate) fn resolve_tfrag_bits(maps: &OcclusionMappings, tfrags: &[TfragHeader
         || tfrags.iter().zip(&maps.tfrag).any(|(t, m)| t.tri_count as u32 != m.occlusion_id as u32);
     let bits = if stale { vec![OcclBits::ALWAYS; tfrags.len()] } else { maps.tfrag.iter().map(|m| OcclBits::from_bit(m.bit_index)).collect() };
     (bits, stale)
+}
+
+/// R&C2's tfrags on a level in chunks, one with variant planes (L02 `0x305380` at `0x30795c..0x30798c` and
+/// `0x307bbc..0x307c18`): the mappings are good when their count is the tfrag block's word `+0x0c` (`0x304df8` keeps it
+/// at `0x1caa98`; the result is the flag `0x1caa9c`), and then mapping `i`'s word goes to entry `i` of the table
+/// `0x1caa94`: no key compared, and a bit of -1 is not special-cased (unlike the ties' and mobys' [`word`]). `None`:
+/// out of date (the loader writes 0x7f80 to every tfrag then).
+pub(crate) fn chunk_tfrag_table(maps: &OcclusionMappings, expected: u32) -> Option<Vec<OcclBits>> {
+    (maps.tfrag.len() as u32 == expected).then(|| maps.tfrag.iter().map(|m| OcclBits::from_bit(m.bit_index)).collect())
+}
+
+/// `0x3080a0`, run after the occlusion load on a level in chunks and at every chunk switch (`0x3082e0`): each tfrag's
+/// word is the [`chunk_tfrag_table`] entry at its header's `+0x3a` (read as an s16), every one 0x7f80 when the table
+/// is out of date. An index outside the table (never in retail; the game would read past it) is always visible.
+pub fn chunk_tfrag_bits(table: Option<&[OcclBits]>, tfrags: &[TfragHeader]) -> Vec<OcclBits> {
+    tfrags
+        .iter()
+        .map(|t| {
+            let entry = table.and_then(|tb| usize::try_from(t.occl_index as i16).ok().and_then(|i| tb.get(i).copied()));
+            entry.unwrap_or(OcclBits::ALWAYS)
+        })
+        .collect()
 }
 
 /// The word an object takes from its table entry (R&C2's loader, L02 `0x307b40` / `0x307d10`): the entry read
@@ -278,18 +304,29 @@ pub(crate) fn resolve_moby_bits(maps: &OcclusionMappings, mobys: &[MobyInstance]
     (bits, missing)
 }
 
-/// All three resolutions. `maps == None` (no grid or no mappings) = the loader's "no occlusion" path.
-pub fn resolve_level_occlusion(maps: Option<&OcclusionMappings>, tfrags: &[TfragHeader], tie_occlusion_index: &[i32], mobys: &[MobyInstance]) -> LevelOcclusion {
+/// All three resolutions. `maps == None` (no grid or no mappings) = the loader's "no occlusion" path. `chunked`: on a
+/// level in chunks (variant planes, `0x1caa8c` ≠ 0), the tfrag block's word `+0x0c`; the tfrags then go through
+/// [`chunk_tfrag_table`] and [`chunk_tfrag_bits`] instead of [`resolve_tfrag_bits`].
+pub fn resolve_level_occlusion(maps: Option<&OcclusionMappings>, tfrags: &[TfragHeader], chunked: Option<u32>, tie_occlusion_index: &[i32], mobys: &[MobyInstance]) -> LevelOcclusion {
     let Some(maps) = maps else {
         return LevelOcclusion {
             tfrag: vec![OcclBits::ALWAYS; tfrags.len()], tie: vec![OcclBits::ALWAYS; tie_occlusion_index.len()],
             moby: vec![OcclBits::ALWAYS; mobys.len()], ..Default::default()
         };
     };
-    let (tfrag, tfrag_out_of_date) = resolve_tfrag_bits(maps, tfrags);
+    let (tfrag, tfrag_out_of_date, chunk_table) = match chunked {
+        None => {
+            let (bits, stale) = resolve_tfrag_bits(maps, tfrags);
+            (bits, stale, None)
+        }
+        Some(expected) => {
+            let table = chunk_tfrag_table(maps, expected);
+            (chunk_tfrag_bits(table.as_deref(), tfrags), table.is_none(), table)
+        }
+    };
     let (tie, ties_not_found) = resolve_tie_bits(maps, tie_occlusion_index);
     let (moby, mobys_not_found) = resolve_moby_bits(maps, mobys);
-    LevelOcclusion { tfrag, tie, moby, tfrag_out_of_date, ties_not_found, mobys_not_found }
+    LevelOcclusion { tfrag, tie, moby, tfrag_out_of_date, chunk_table, ties_not_found, mobys_not_found }
 }
 
 /// `DAT_0016c4f4`: the debug menu's "occlusion" item (`off` / `freeze` / `active`). The level loader sets
@@ -452,6 +489,13 @@ mod tests {
         // A bit of -1 (Maktar's arena) is always visible; a later mapping of an id wins.
         let maps2 = OcclusionMappings { tie: vec![rec(-1, 3), rec(5, 4), rec(6, 4)], ..Default::default() };
         assert_eq!(resolve_tie_bits(&maps2, &[3, 4]), (vec![OcclBits::ALWAYS, OcclBits::from_bit(6)], 0));
+        // A level in chunks: mapping i is table entry i when the count is the block's +0x0c; a tfrag takes entry +0x3a.
+        let table = chunk_tfrag_table(&maps, 2).unwrap();
+        assert_eq!(table, vec![OcclBits::from_bit(3), OcclBits::from_bit(4)]);
+        assert_eq!(chunk_tfrag_table(&maps, 3), None);
+        t[0].occl_index = 1; t[1].occl_index = 0xffff;
+        assert_eq!(chunk_tfrag_bits(Some(&table), &t), vec![OcclBits::from_bit(4), OcclBits::ALWAYS]);
+        assert_eq!(chunk_tfrag_bits(None, &t), vec![OcclBits::ALWAYS; 2]);
         let mut m = [MobyInstance::zeroed(); 3];
         m[0].spawn_id = 42; m[1].spawn_id = 42; m[1].occlusion = 1; m[2].spawn_id = 7;
         assert_eq!(resolve_moby_bits(&maps, &m), (vec![OcclBits::from_bit(9), OcclBits::ALWAYS, OcclBits::ALWAYS], 1));

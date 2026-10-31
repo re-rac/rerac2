@@ -239,6 +239,8 @@ struct ShrubCull {
     d: f32,
     f: f32,
     variant: u8,
+    /// Hidden by the level (the runtime shrub's `+0x16` bit 0: crate::chunk_switch).
+    hidden: bool,
 }
 
 /// World units of slack for the CPU test (camera `Transform` of the current `Update`, not the rendered one).
@@ -263,7 +265,7 @@ fn cull_system(
     let scale = gfx.detail.lod_scale();
     for (c, mut vis) in &mut q {
         let z = (c.centre - eye).dot(fwd);
-        let mut show = z <= c.d + CULL_MARGIN;
+        let mut show = !c.hidden && z <= c.d + CULL_MARGIN;
         let f = detail_fade(c.f, c.d, scale);
         if f >= 0.0 {
             show &= z < f + 8.0 + CULL_MARGIN;
@@ -502,6 +504,16 @@ impl ShrubSway {
         for s in self.instances.iter_mut().filter(|s| s.0 as usize == ii) { s.2 = [m[3][0], m[3][1], m[3][2]]; }
     }
 
+    /// Instance `ii` hidden (or shown again) by the level: the runtime shrub's `+0x16` bit 0 (crate::chunk_switch), its
+    /// mesh and its billboard ([`crate::shrub_billboard::BillboardRecords`]) both.
+    pub fn set_hidden(&mut self, commands: &mut Commands, ii: usize, hidden: bool) {
+        for (e, cull) in self.entities.get_mut(ii).into_iter().flatten() {
+            if cull.hidden == hidden { continue; }
+            cull.hidden = hidden;
+            commands.entity(*e).insert(*cull);
+        }
+    }
+
     /// The moved instances' records to the GPU.
     pub fn flush(&mut self, buffers: &mut Assets<ShaderBuffer>) {
         if !std::mem::take(&mut self.records_dirty) { return; }
@@ -609,7 +621,7 @@ fn spawn_shrubs_on(
         let normals = shrubs.class_of[ii].map_or(&[][..], |ci| &shrubs.classes[ci].class.normals[..]);
         write_record(&mut bytes, &model, centre, d, origin, f, &shrubs.palettes[ii], normals);
         models.push(model);
-        culls.push(ShrubCull { centre, d, f, variant: 0 });
+        culls.push(ShrubCull { centre, d, f, variant: 0, hidden: false });
     }
     // In the main world too: the game's movers rewrite the records (`ShrubSway::move_instance`).
     let inst_buffer = buffers.add(ShaderBuffer::new(&bytes, RenderAssetUsages::default()));

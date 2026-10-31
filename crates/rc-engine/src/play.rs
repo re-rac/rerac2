@@ -787,8 +787,9 @@ fn tick(
         for &ii in &mobys.left_out { o.set_hidden(ii, true); }
         for m in &mobys.world.mobys {
             let Some(ii) = m.instance else { continue };
-            // A piece shown draws through the created mobys' slots (crate::mobys::CreatedDraw) instead.
-            let hidden = m.state >= 0x80 || m.mode & 1 != 0 || m.piece.is_some();
+            // A piece shown draws through the created mobys' slots (crate::mobys::CreatedDraw) instead. MobyProc skips
+            // mode & 0x81 (L02 `0x31d4cc`; 0x80: the other chunk's, crate::chunk_switch, or the puzzle's mode 7).
+            let hidden = m.state >= 0x80 || m.mode & 0x81 != 0 || m.piece.is_some();
             if m.update.is_some() || m.drive {
                 o.drive(ii, m.pos, m.rows, m.scale, crate::mobys::moby_lights(&lv.mobys, m.rows, m.light, m.ambient).as_ref(), hidden);
                 o.game_look(ii, m.alpha, m.mode, m.glow, m.draw_dist, m.shine);
@@ -1763,8 +1764,9 @@ fn scene_tick(p: &mut Play, lv: &mut crate::level_load::LoadedLevel, commands: &
         for &ii in &mobys.left_out { o.set_hidden(ii, true); }
         for m in &mobys.world.mobys {
             let Some(ii) = m.instance else { continue };
-            // A piece shown draws through the created mobys' slots (crate::mobys::CreatedDraw) instead.
-            let hidden = m.state >= 0x80 || m.mode & 1 != 0 || m.piece.is_some();
+            // A piece shown draws through the created mobys' slots (crate::mobys::CreatedDraw) instead. MobyProc skips
+            // mode & 0x81 (L02 `0x31d4cc`; 0x80: the other chunk's, crate::chunk_switch, or the puzzle's mode 7).
+            let hidden = m.state >= 0x80 || m.mode & 0x81 != 0 || m.piece.is_some();
             if m.update.is_some() || m.drive {
                 o.drive(ii, m.pos, m.rows, m.scale, crate::mobys::moby_lights(&lv.mobys, m.rows, m.light, m.ambient).as_ref(), hidden);
                 o.game_look(ii, m.alpha, m.mode, m.glow, m.draw_dist, m.shine);

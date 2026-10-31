@@ -126,7 +126,38 @@ pub struct ShrubBillboardPlugin;
 
 impl Plugin for ShrubBillboardPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(MaterialPlugin::<BillboardMaterial>::default()).add_systems(crate::level_switch::LevelStartup, spawn_system);
+        app.add_plugins(MaterialPlugin::<BillboardMaterial>::default())
+            .add_systems(crate::level_switch::LevelStartup, spawn_system)
+            .add_systems(crate::level_switch::LevelUnload, crate::level_switch::remove::<BillboardRecords>);
+    }
+}
+
+/// The level's billboard records (the play world's, not the title world's) and, per shrub instance, its record, so
+/// the level can hide the instances' billboards ([`BillboardRecords::set_hidden`]).
+#[derive(Resource)]
+pub struct BillboardRecords {
+    buffer: Handle<ShaderBuffer>,
+    bytes: Vec<u8>,
+    /// Per shrub instance: its record index and its draw distance D.
+    record: Vec<Option<(usize, f32)>>,
+}
+
+/// Byte offset of D (`centre.w`) in a record.
+const RECORD_D: usize = 0x1c;
+/// Bytes per record ([`write_record`]).
+const RECORD_BYTES: usize = 0x40;
+
+impl BillboardRecords {
+    /// The billboards of the shrub instances `hidden` flags (by instance) hidden (D below any depth: the shader never
+    /// lists them) or shown again (their D).
+    pub fn set_hidden(&mut self, hidden: &[bool], buffers: &mut Assets<ShaderBuffer>) {
+        for (ii, &h) in hidden.iter().enumerate() {
+            let Some(Some((r, d))) = self.record.get(ii).copied() else { continue };
+            let v: f32 = if h { -1.0e30 } else { d };
+            let at = r * RECORD_BYTES + RECORD_D;
+            self.bytes[at..at + 4].copy_from_slice(&v.to_le_bytes());
+        }
+        crate::asset_write::set_buffer(buffers, &self.buffer, &self.bytes);
     }
 }
 
@@ -192,6 +223,7 @@ pub(crate) fn spawn_billboards(
     let mut n_records = 0u32;
     let mut draws = Vec::new();
     let mut no_texture = 0;
+    let mut record = vec![None; shrubs.instances.len()];
     for (ci, c) in shrubs.classes.iter().enumerate() {
         let (Some(bb), Some(f)) = (c.class.billboard, billboard_f(c)) else { continue };
         if c.class.header.mode_bits & 1 != 0 { continue; }
@@ -209,6 +241,7 @@ pub(crate) fn spawn_billboards(
             let d = crate::shrub_render::runtime_draw_distance(c, inst);
             let extent = billboard_extent(&bb, c.class.header.scale, packed_column_lengths(&inst.matrix));
             write_record(&mut bytes, t, f, game_to_bevy([s[0], s[1], s[2]]), d, extent, average_colour(&shrubs.palettes[ii]));
+            record[ii] = Some((n_records as usize, d));
             let origin = game_to_bevy(t);
             centroid += origin;
             let base = pos.len() as u32;
@@ -236,7 +269,10 @@ pub(crate) fn spawn_billboards(
     }
 
     // Pass 2: three draws per class sharing the record buffer.
-    let instances = buffers.add(ShaderBuffer::new(&bytes, RenderAssetUsages::RENDER_WORLD));
+    // The play world's records stay in the main world too, for BillboardRecords::set_hidden.
+    let usage = if layer.is_none() { RenderAssetUsages::default() } else { RenderAssetUsages::RENDER_WORLD };
+    let instances = buffers.add(ShaderBuffer::new(&bytes, usage));
+    if layer.is_none() { commands.insert_resource(BillboardRecords { buffer: instances.clone(), bytes: bytes.clone(), record }); }
     for d in &draws {
         for variant in 0..3u8 {
             let params = BillboardParams { misc: Vec4::new(variant as f32, d.mxl as f32, d.k, crate::game_camera::NEAR) };

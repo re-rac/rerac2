@@ -20,7 +20,8 @@ pub struct TfragBlockHeader {
     /// 0x08: LOD base distance L in world units (retail 12..32). The level-load tfrag init (boot 0x2040e0 /
     /// level01 0x255470) sets the LOD switch distances to 6L, 4L, 2L; see [`TfragBlockHeader::lod_distances`].
     pub unknown_8: f32,
-    /// 0x0c: unknown word, preserved.
+    /// 0x0c: R&C2: the tfrag occlusion mappings the block expects on a level in chunks (L02 `0x304df8` keeps it at
+    /// `0x1caa98`; `crate::occlusion::chunk_tfrag_table`).
     pub unknown_c: u32,
 }
 const _: () = assert!(std::mem::size_of::<TfragBlockHeader>() == 0x10);
