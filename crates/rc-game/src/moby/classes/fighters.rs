@@ -61,6 +61,23 @@ fn turn_slot(class: i16) -> Option<usize> {
     }
 }
 
+/// The four fighters and the two bosses (the master counts them).
+pub const FIGHTERS_AND_BOSSES: [i16; 6] = [C9CA, B22, C3B, C3E, 0x09f8, 0x0a44];
+
+/// A fighter back to the pool (`0x40e8c8`, `0x40d0c8`, `0x3f2e58`; the gladiator's [`pool_09ca`]).
+pub fn pool(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    match w.mobys[id].o_class {
+        C3E => pool_0c3e(w, id, ctx),
+        C3B => pool_0c3b(w, id, ctx),
+        B22 => pool_0b22(w, id, ctx),
+        C9CA => pool_09ca(w, id, ctx),
+        _ => {}
+    }
+}
+
+/// `0x3d39e0(m, 0, 0)`: the gladiator dead with its bolts, faded back to the pool.
+pub fn die_09ca_pub(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) { die_09ca(w, id, ctx, false, false) }
+
 /// The spawner's hand-over (`0x3d8e68`): each class's start.
 pub fn start(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     match w.mobys[id].o_class {
@@ -318,7 +335,7 @@ pub fn update_0c3e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 w.mobys[id].timer = 1;
             } else if m.timer == 1 {
                 let floor_box = master(w, id).map_or(-1, |ms| w.mobys[ms].pv_i(0x84));
-                if ctx.level.in_cuboid(floor_box, w.mobys[id].pos) { w.mobys[id].set_state(7, 3); }
+                if ctx.level.in_cylinder(floor_box, w.mobys[id].pos) { w.mobys[id].set_state(7, 3); }
                 if let Some(p) = mid { go(w, id, ctx, p); }
             }
         }
@@ -777,7 +794,7 @@ pub fn update_0c3b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             } else if w.mobys[id].timer == 1 {
                 if let Some(ms) = master(w, id) {
                     let floor_box = w.mobys[ms].pv_i(0x84);
-                    if ctx.level.in_cuboid(floor_box, w.mobys[id].pos) {
+                    if ctx.level.in_cylinder(floor_box, w.mobys[id].pos) {
                         w.mobys[id].set_state(4, 2);
                         w.mobys[id].set_pv_i(0x13c, -1);
                     }
@@ -1409,7 +1426,7 @@ pub fn update_09ca(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             } else if w.mobys[id].timer == 1 {
                 if let Some(ms) = master(w, id) {
                     let floor_box = w.mobys[ms].pv_i(0x84);
-                    if ctx.level.in_cuboid(floor_box, w.mobys[id].pos) {
+                    if ctx.level.in_cylinder(floor_box, w.mobys[id].pos) {
                         w.mobys[id].set_state(4, 2);
                         w.mobys[id].set_pv_i(0x13c, -1);
                     }
@@ -1822,7 +1839,7 @@ pub fn update_0b22(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             } else if w.mobys[id].timer == 1 {
                 if let Some(ms) = master(w, id) {
                     let floor_box = w.mobys[ms].pv_i(0x84);
-                    if ctx.level.in_cuboid(floor_box, w.mobys[id].pos) {
+                    if ctx.level.in_cylinder(floor_box, w.mobys[id].pos) {
                         w.mobys[id].set_state(4, 2);
                         w.mobys[id].set_pv_i(0x14c, -1);
                     }

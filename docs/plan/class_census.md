@@ -107,6 +107,8 @@ Then Maktar's slot machines 0x0a9c (2026-10-31, rc_game::moby::classes::maktar `
 
 Then Maktar's creature keeper 0x09c5 (2026-10-31, U117, rc_game::moby::classes::keeper) with its homing shot 0x0b5a (`0x402450`, drawn by rc_game::fx::halo / streak) and the groups' waiting mobys (`0x3d0110` / `0x3d02c8`, critter::waiting / wake): 806 unported class-levels / 9,153 created, 160 ported units; cheap 270 / 4,571, missing 57 / 543, partly 51 / 1,993, unknown 179 / 2,046.
 
+Then Maktar's arena (2026-10-31; the level's chunk 1, through the chunk switch): its master 0x0b59 (U141, rc_game::moby::classes::arena: the desk, the entry, the challenge menu on the big screen, the fourteen challenges' waves, the results, the way back; the wins in the save's flag bytes `0x1395b8..`), the spawners 0x0a15 (U123), the floor plates 0x0a03 (U122), the flame columns 0x0b89 (U144), the crate lifts 0x0ccc (U154), and its four fighters (rc_game::moby::classes::fighters): the spinning flier 0x0c3e (U148), the flame robot 0x0c3b (U147), the gladiator 0x09ca with its shield 0x09d8 (U120) and the bladed robot 0x0b22 (U139). Left: the bosses 0x09f8 / 0x0a44 (U121 / U125; their challenges are off the menu until then, G-ENM-005), the crowd 0x0e96 (U159), the arena's HUD and announcer (G-UI-002, G-AUD-003).
+
 Missing systems now (`systems.tsv`, every unit calling the system, not only the blocked; status as the ranking reads
 it):
 

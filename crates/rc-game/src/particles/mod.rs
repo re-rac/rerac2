@@ -380,13 +380,16 @@ pub const EXHAUST: u8 = 0x4a;
 
 /// The exhaust puffs' descriptors (L25 `$gp+0xba8`, `+0xbb8`, `+0xbc8` the fighter's, `+0xc10`, `+0xc20`, `+0xc30` the
 /// gunship's; read live): the colour at the start and at the end, the size's range and least (in thousandths), the life.
-pub const EXHAUST_DESCS: [(u32, u32, i16, i16, i32); 6] = [
+pub const EXHAUST_DESCS: [(u32, u32, i16, i16, i32); 8] = [
     (0xcf00_00ff, 0x0000_00cf, -20, 60, 10),
     (0x6000_ffff, 0x0000_0080, -20, 60, 12),
     (0xefff_7f4f, 0x00ff_0000, -40, 40, 8),
     (0xcfff_0000, 0x00cf_0000, -20, 60, 10),
     (0x6000_ffff, 0x0000_0080, -20, 60, 12),
     (0xefff_7f4f, 0x00ff_0000, -40, 40, 8),
+    // Maktar's arena columns 0x0b89 (L02 `$gp+0x27d0`, `+0x27e0`).
+    (0xaaff_8020, 0x00cf_6000, -400, 600, 5),
+    (0xffff_ffaa, 0x22ff_0000, -50, 200, 5),
 ];
 
 /// `0x349c48(moby, pos, vel, desc, 1)` (L00 `0x33d400`, the same code on every level): an exhaust puff (type 0x4a) at

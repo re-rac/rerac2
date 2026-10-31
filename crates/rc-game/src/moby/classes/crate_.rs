@@ -162,6 +162,24 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.clear_hit(id);
 }
 
+/// `0x3a8468` (L02): a broken crate back — shown, a target, resting (state 1), its collision, `+0x100` 0, a nanotech
+/// crate's cluster made again, its drops 0 (Maktar's arena's crate lifts, crate::moby::classes::arena).
+pub fn restore(w: &mut MobyWorld, id: usize) {
+    let class = w.mobys[id].o_class;
+    let m = &mut w.mobys[id];
+    m.mode = (m.mode & 0xffbe) | mode::TARGET;
+    m.state = 1;
+    m.has_collision = true;
+    m.drawn = 1;
+    m.set_pv_i(0x100, 0);
+    if let Some(kind) = match class { 0x1f5 => Some(0), 0x200 => Some(1), _ => None } {
+        let c = super::nanotech::create(w, id, kind);
+        w.mobys[id].set_pv_i(0xfc, c.map_or(0, |c| c as i32));
+    }
+    w.mobys[id].drops = 0;
+    w.changed = true;
+}
+
 /// `+0x38..+0x3f` (the light word and the ambient) kept at `+0x68`[0xb8] while the fuse flashes.
 fn save_colour(m: &mut crate::moby::Moby) {
     m.set_pv_i(0xb8, m.light as i32);

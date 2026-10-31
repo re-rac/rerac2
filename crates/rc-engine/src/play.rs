@@ -2100,6 +2100,7 @@ fn draw_hud(
         {
             let texts = |id: u32| rc_formats::strings::find_index(&p.texts, id as i32).map(|i| p.texts[i].text.clone()).unwrap_or_else(|| a.strings.get(id).to_vec());
             p.game.prompt.draw(&texts, &a.glyphs_2, &mut quads);
+            if let Some(m) = p.game.arena_menu.as_ref() { rc_game::moby::classes::arena::draw_menu(m, &texts, &a.glyphs_2, &mut quads); }
             if let (Some(v), Some(m)) = (p.vendor.menu.as_ref(), p.mobys.as_ref()) { v.draw(&p.game, &m.level.items, a, &icon, &texts, &mut quads); }
         }
         if p.glyphs.is_none() { p.glyphs = Some(Box::new(a.glyphs)); }

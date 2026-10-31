@@ -28,6 +28,8 @@ fn blank_save_round_trips_through_the_game_state() {
     g.load(&s);
     println!("blank save: level {}, bolts {}, health limit {}, items had {:?}", g.level, g.bolts, g.max_health,
         g.items.iter().enumerate().filter(|(_, &b)| b != 0).map(|(i, _)| i).collect::<Vec<_>>());
+    // The flag bytes (Maktar's arena keeps its wins there) are one chunk's, so they are kept.
+    assert!(s.bytes(rc_game::save::Scope::Global, 0x1395b8, rc_game::game::FLAGS_LEN).is_some());
     g.store(&mut s);
     assert_eq!(s.to_file().to_bytes(s.max()), template);
 }

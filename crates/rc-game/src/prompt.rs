@@ -40,6 +40,9 @@ pub struct Prompt {
     pub show: i32,
     /// The widget shows a message of its own (`0x30efb8` → `0x42f690`: "You got the … Armor!"), outside the lease.
     pub message: bool,
+    /// A message made of two texts with a number between (`sprintf("%s %d %s")` then `0x30efb8`: Maktar's arena's
+    /// "… 12 …"), shown in place of `text`.
+    pub count: Option<(u32, i32, u32)>,
 }
 
 impl Prompt {
@@ -85,6 +88,13 @@ impl Prompt {
     pub fn announce(&mut self, text: u32, ticks: i32) {
         self.show_text(text, ticks);
         self.message = true;
+        self.count = None;
+    }
+
+    /// [`Self::announce`] of `"{a} {n} {b}"`.
+    pub fn announce_count(&mut self, a: u32, n: i32, b: u32, ticks: i32) {
+        self.announce(a, ticks);
+        self.count = Some((a, n, b));
     }
 
     /// `0x327950`: the hold counts down (the owner freed at 0), the frames since.
@@ -107,8 +117,12 @@ impl Prompt {
     /// The widget's text, centred at [`AT`] in font 2 (`0x42ed58`'s font argument), texture slot 2.
     pub fn draw(&self, text: &dyn Fn(u32) -> Vec<u8>, glyphs: &[Glyph; 256], out: &mut Vec<Quad>) {
         if !(self.shown() || self.message) || self.show <= 0 { return; }
-        let t = text(self.text);
-        let t = t.split(|&c| c == 0).next().unwrap_or(&[]);
+        let first = |id: u32| { let t = text(id); t.split(|&c| c == 0).next().unwrap_or(&[]).to_vec() };
+        let t = match self.count {
+            Some((a, n, b)) if self.message && a == self.text => [first(a), format!(" {n} ").into_bytes(), first(b)].concat(),
+            _ => first(self.text),
+        };
+        let t = &t[..];
         let w = gui::text_width(glyphs, t, 1.0);
         gui::text(out, glyphs, 2, t, AT[0] - (w >> 1) as f32, AT[1], 1.0, COLOUR.to_le_bytes());
     }

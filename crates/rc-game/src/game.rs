@@ -212,7 +212,15 @@ pub struct GameState {
     pub platinum_found: i32,
     /// `0x19b278 + 4·level + k`: platinum bolt k of the level found (crate::moby::classes::platinum).
     pub platinum: Vec<u8>,
+    /// `0x1395b8..`: the game's flag bytes (the save keeps them; `0x139647` / `0x139648` are the slot machines' plays
+    /// and [`Self::platinum_spent`]). Maktar's arena keeps its wins here (`0x1395b8 + 0x31..`, crate::moby::classes::arena).
+    pub flags: Vec<u8>,
+    /// Maktar's arena menu while it is up (crate::moby::classes::arena; the engine draws it).
+    pub arena_menu: Option<crate::moby::classes::arena::Menu>,
 }
+
+/// The flag bytes `0x1395b8..0x139658` ([`GameState::flags`]).
+pub const FLAGS_LEN: usize = 0xa0;
 
 /// `0x2621e0`: the health levels, the XP / 32 to the next (each gives one health), −1 ends.
 const HP_LEVELS: [i16; 66] = [
@@ -229,7 +237,7 @@ impl Default for GameState {
             clank: false, thruster: false, boots: false, charge_boots: false, grind_boots: false, nanotech: [false; 10], level_xp: [0; 2], death_z: None, boss_bar: None, boss_icon: 0, shadow: Default::default(), water_base: 0.0, water_z: 0.0, water_scroll: [[0.0; 2]; 2], water_cam: [0.0; 3], missions: vec![0; 0x200], mission_area: 0, cam_tweaks: Default::default(), shakes: Default::default(), uid_pending: vec![0; 0x800], uid_dead: vec![0; 0x800], mission_table: vec![0; 0x100],
             mission_xp: vec![0; 0x30], mission_bolts: vec![0; 0x30], checkpoint: None, checkpoint_bits: Vec::new(), last_checkpoint: None, messages: Vec::new(), help_state: 0, help_req: None, help_counts: vec![0; 0x100], help_shift: 0, help_shift_ticks: 0, help_aux: vec![0; 0x100], help_last: vec![0; 0x100], help_levels: vec![0; 0x100], help_queue: Vec::new(), hint_flags: [0; 3], no_item_area: false, variant: 0, chunk_request: None, items: vec![0; 0x40], quick_select: vec![0; 28], planets: vec![0; 0x1c], travel: Default::default(), ring: [0; 8], ammo: vec![0; 0x50], held: 0, wrench_out: false, trail_phase: 0.0, view_far: 1024.0, sky: Default::default(), markers: Vec::new(), scenes_seen: vec![false; 0x100], scenes: Default::default(), cameras: Default::default(), ship_parts: Vec::new(), underwater: false, fog: Default::default(), area_ask: Vec::new(), area_hero: Vec::new(), next_level: None, next_level_save: false, bolt_help_done: false, space_bolts: 0, space_bolts_shown: 0, rider_hits: 0, rider_hint: false, store_left: 0, store_done: false, play_time: 0, visited: vec![0; 0x1c],
             stock: [0xff; crate::vendor::STOCK_SLOTS], challenge: false, rac1_weapons: 0, vendor_open: None, vendor_phase: [0.0; 3], vendor_beam: [0.0; 2], prompt: Default::default(),
-            armor: 0, armor_offer: 0, mods_available: [0; 0x38], mods_bought: [0; 0x38], platinum_spent: 0, platinum_found: 0, platinum: vec![0; 0x70],
+            armor: 0, armor_offer: 0, mods_available: [0; 0x38], mods_bought: [0; 0x38], platinum_spent: 0, platinum_found: 0, platinum: vec![0; 0x70], flags: vec![0; FLAGS_LEN], arena_menu: None,
         }
     }
 }
