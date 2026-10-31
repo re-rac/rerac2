@@ -457,12 +457,12 @@ pub fn advance(s: &mut AnimState, class: &MobyAnimClass) -> bool {
 /// keeps the snapshot frame next to the state and passes it to [`evaluate_with_snapshot`].
 pub const SNAPSHOT_SEQ: u8 = 0xff;
 
-/// `fun_00212ed8` (L01 0x26c5a8), the hard cut: A = B = `seq`; A.index = `frame` if `frame` < frame
+/// `fun_00212ed8` (L01 0x26c5a8; L02 `0x31f5e0`), the hard cut: A = B = `seq`; A.index = `frame` if `frame` < frame
 /// count, else count − 1; B.index = A.index + 1 clamped to count − 1 (not wrapped; count 0 gives 0);
 /// rate = frame A's own rate word (the sequence's rate override is not consulted here); flag bit 1
 /// cleared; t and speed kept. Returns false, changing nothing, when the class has no sequence `seq` (the
 /// game would dereference a null pointer).
-pub(crate) fn hard_cut(s: &mut AnimState, class: &MobyAnimClass, seq: u8, frame: i32) -> bool {
+pub fn hard_cut(s: &mut AnimState, class: &MobyAnimClass, seq: u8, frame: i32) -> bool {
     let Some(q) = class.sequence(seq) else { return false };
     let fc = q.header.frame_count as i32;
     let a = if frame < fc { frame } else { fc - 1 } as u8;

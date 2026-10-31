@@ -15,7 +15,7 @@
 //!
 //! Not ported: the shadow call while near the camera (`0x321db0`).
 
-use crate::hero::physics::{add, add_rot, dist, scale, set_len, sub, sub_rot, V3};
+use crate::hero::physics::{add, add_rot, dist, dist2, scale, set_len, sub, sub_rot, V3};
 use crate::moby::{ai, mode, Ctx, MobyWorld};
 use super::props::{seq, wrapped};
 
@@ -297,7 +297,9 @@ pub fn update_0c3e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     senses_0c3e(w, id, ctx);
     if w.mobys[id].state == 1 { return; }
     let tgt = target_0c3e(w, id, ctx);
-    let d = dist(w.mobys[id].pos, tgt);
+    // `0x2f2f50`: the xy distance (as are the path's nearest point and its 2 to the next; out of view the ball is held
+    // at the floor while its path height is 1 to 3 above it).
+    let d = dist2(w.mobys[id].pos, tgt);
     if w.mobys[id].sub_state == 4 {
         // Knocked away: it falls until it lands (or, in the air, one tick in 30), its blow on what it lands on.
         let old = w.mobys[id].pos;
@@ -356,9 +358,9 @@ pub fn update_0c3e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 // The nearest point (of all but the last).
                 let pos = w.mobys[id].pos;
                 let mut best = 0;
-                let mut near = pts.first().map_or(0.0, |p| dist(pos, [p[0], p[1], p[2]]));
+                let mut near = pts.first().map_or(0.0, |p| dist2(pos, [p[0], p[1], p[2]]));
                 for (k, p) in pts.iter().enumerate().take((n - 1).max(0) as usize) {
-                    let dk = dist(pos, [p[0], p[1], p[2]]);
+                    let dk = dist2(pos, [p[0], p[1], p[2]]);
                     if dk < near { near = dk; best = k; }
                 }
                 w.mobys[id].set_pv_i(0x194, best as i32);
@@ -370,7 +372,7 @@ pub fn update_0c3e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 let m = &mut w.mobys[id];
                 let step = set_len(sub(goal, m.pos), m.pv_f(0x198));
                 m.pos = add(m.pos, step);
-                let near = dist(m.pos, goal) < 2.0;
+                let near = dist2(m.pos, goal) < 2.0;
                 let mut i = m.pv_i(0x194);
                 if m.pv_s(0x1b4) == 0 {
                     if near { i += 1; }

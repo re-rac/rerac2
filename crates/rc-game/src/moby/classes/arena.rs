@@ -804,11 +804,14 @@ fn leave(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     ctx.game.arena_menu = None;
 }
 
-/// `0x3fe240(m, n)`: challenge `n` won — the first win of the first challenge (its own line), else the bolts and
-/// XP (`0x3fe398`, `0x3fe4a8`); its win counted.
+/// `0x3fe240(m, n)`: challenge `n` won — the first win of the first challenge (its own line and the Electrolyzer,
+/// `0x2f8668(0x26)`; its `0x326bd0(0x26)` leaves the item asked for as it was, so only the slots of the other kinds
+/// would change), else the bolts and XP (`0x3fe398`, `0x3fe4a8`); its win counted. Not ported: the autosave after
+/// (`0x311738(0, -1)`).
 fn reward(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, n: i32) {
     if n == 0 && wins(ctx.game, 0) == 0 {
         say(w, id, 7);
+        ctx.game.get_item(super::electrolyzer::ITEM);
     } else {
         let line = match n { 6 => 8, 0xb => 9, _ => 2 + ctx.game.rng.randi(5) };
         say(w, id, line);

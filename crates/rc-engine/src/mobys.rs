@@ -265,18 +265,27 @@ impl MobyHost for Host<'_> {
 
     fn anim(&self, m: &Moby) -> Option<AnimState> { self.state_of(m).map(|s| s.1) }
 
+    /// `0x31f6b8(m, seq, frame, blend)` (L02): a blend of `blend` ticks to the frame; under one tick the hard cut
+    /// (`0x31f5e0`, rc_formats::moby_anim::hard_cut: on the frame at once, t and speed kept), so a moby stopped right
+    /// after shows the frame (the arena's scene props open a spawner so).
     fn set_anim(&mut self, m: &Moby, seq: u8, frame: u8, blend: u8) {
         let lv = self.lv;
         self.drop_stale(m);
         self.spawn_created(m);
         if let Some(c) = self.created.get_mut(&m.index) {
-            if let Some(ac) = lv.anim.get(c.class) { moby_anim::set_sequence(&mut c.state, ac, seq, frame as i32, blend as i32, &mut c.snapshot); }
+            if let Some(ac) = lv.anim.get(c.class) {
+                if blend < 1 { moby_anim::hard_cut(&mut c.state, ac, seq, frame as i32); } else { moby_anim::set_sequence(&mut c.state, ac, seq, frame as i32, blend as i32, &mut c.snapshot); }
+            }
             return;
         }
         let Some(k) = self.placed_index(m) else { return };
         let Some(a) = self.anim.as_deref_mut() else { return };
         let Some(i) = a.instances.get_mut(k) else { return };
         let Some(ac) = lv.anim.get(i.class) else { return };
+        if blend < 1 {
+            moby_anim::hard_cut(&mut i.state, ac, seq, frame as i32);
+            return;
+        }
         let mut snap = a.snapshots.get(k).cloned().flatten();
         moby_anim::set_sequence(&mut i.state, ac, seq, frame as i32, blend as i32, &mut snap);
         if let Some(s) = a.snapshots.get_mut(k) { *s = snap; }
