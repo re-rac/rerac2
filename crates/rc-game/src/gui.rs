@@ -161,7 +161,9 @@ pub fn text_width(glyphs: &[Glyph; 256], text: &[u8], scale: f32) -> i32 {
 
 /// `FUN_0027fcb0(x, y, scale, colour, text, …, texture slot, glyphs)`: one 16×16 cell per character (16·scale
 /// square) at `(x, y + y offset·scale)`, then `x += advance·scale`. Characters 8..15 are colour codes (no change
-/// while the colour table is off, `0x1b15e8`); below 0x20 the pad icons, 24×16, drawn grey (the colour's average);
+/// while the colour table is off, `0x1b15e8`); below 0x20 the pad icons, 24×16, drawn grey (the colour's average:
+/// the in-game loop `0x2ed170` does the same, alpha kept, so a colour with alpha above 0x80 draws them with a fragment
+/// alpha above 1, as the letters: rc-engine's `hud_render::Part`);
 /// 0x80..0xa7 draw the accent of character + 0x40 first, offset by its advance and y offset; a character with
 /// advance 0 is not drawn.
 #[allow(clippy::too_many_arguments)]

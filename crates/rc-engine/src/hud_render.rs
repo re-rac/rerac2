@@ -22,7 +22,8 @@
 //! multiple of it near the frame's height (High resolution, [`size_layers`]: the primitives cover the same game
 //! pixels, sampled finer, as an emulator's upscaled render draws them; the scissor stays in game pixels). Blending there runs in display bytes / 255 without clamping, premultiplied
 //! (the target keeps `Σ Cs·As` in RGB and the coverage in A). The result is composited onto the frame by a Bevy UI
-//! node ([`HudComposite`], `UiMaterial`) on the frame's 4:3 box, sampled as the HUD option says (crate::graphics:
+//! node ([`HudComposite`], `UiMaterial`) on the frame's 4:3 box (its pixels with a coverage above 1, a fragment
+//! alpha over 0x80, by two more nodes: [`Part`]), sampled as the HUD option says (crate::graphics:
 //! Original bilinear half a pixel to the left, as the game's display copy and the TV showed the 512×416 picture,
 //! crate::aa_blit; Sharp pixels nearest). The composite mixes in linear light on the sRGB target (exact where the
 //! coverage is 0 or 1; the GS mixes display bytes), the difference the world passes also accept (gs_state.rs).
@@ -217,25 +218,73 @@ impl Material2d for HudMaterial {
     }
 }
 
+/// The GS blend `(Cs − Cd)·As + Cd` with As above 1 (a fragment alpha over 0x80: text in a colour whose alpha is above
+/// 0x80 on the font's opaque texels, e.g. the Electrolyzer's lines in 0x88ffffff and the arena menu's in 0x90ffffff,
+/// `A = At·Af >> 7`): `P − Cd·k` with P = `Cs·As` and k = `As − 1`, clamped once at the end. The layer keeps such
+/// alphas (a float target); the frame's 8-bit target clamps a fragment to 1 before its blend, so the
+/// [`Part::UpToOne`] node takes the layer's pixels up to 1 (hud.wgsl `composite` discards the rest) and two more
+/// nodes over the same image the ones above (`composite_over_sub` / `composite_over_out`): X = clamp(Cd·k −
+/// max(P − 1, 0)) ([`OVER_SUB_BLEND`]), then clamp(min(P, 1) − X) ([`OVER_OUT_BLEND`]). Without them those pixels were
+/// not drawn at all: the frame showed through the font's opaque texels (the pad icons' discs, the letters' tops).
+const OVER_SUB_BLEND: BlendState = BlendState {
+    color: BlendComponent { src_factor: BlendFactor::One, dst_factor: BlendFactor::SrcAlpha, operation: BlendOperation::ReverseSubtract },
+    alpha: BlendComponent { src_factor: BlendFactor::Zero, dst_factor: BlendFactor::One, operation: BlendOperation::Add },
+};
+
+/// The second node's blend: `src − dst` ([`OVER_SUB_BLEND`]).
+const OVER_OUT_BLEND: BlendState = BlendState {
+    color: BlendComponent { src_factor: BlendFactor::One, dst_factor: BlendFactor::One, operation: BlendOperation::Subtract },
+    alpha: BlendComponent { src_factor: BlendFactor::Zero, dst_factor: BlendFactor::One, operation: BlendOperation::Add },
+};
+
+/// Which of a layer's pixels a composite node draws ([`OVER_SUB_BLEND`]).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum Part {
+    /// Coverage up to 1 (hud.wgsl `composite`).
+    #[default]
+    UpToOne,
+    /// Coverage above 1, first node (`composite_over_sub`).
+    OverSub,
+    /// Coverage above 1, second node (`composite_over_out`).
+    OverOut,
+}
+
+/// Pipeline key of [`HudComposite`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct HudCompositeKey {
+    part: Part,
+}
+
+impl From<&HudComposite> for HudCompositeKey {
+    fn from(m: &HudComposite) -> Self { HudCompositeKey { part: m.part } }
+}
+
 /// The UI node that puts the 512×416 HUD image on the main camera (premultiplied → straight alpha), scaled as the
-/// HUD option says ([`scaling`]).
+/// HUD option says ([`scaling`]); a layer has three, one per [`Part`].
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
+#[bind_group_data(HudCompositeKey)]
 pub struct HudComposite {
     #[texture(0)]
     pub image: Handle<Image>,
     #[uniform(1)]
     pub scaling: Vec4,
+    pub part: Part,
 }
 
 impl UiMaterial for HudComposite {
     fn fragment_shader() -> ShaderRef { SHADER_PATH.into() }
 
-    fn specialize(descriptor: &mut RenderPipelineDescriptor, _key: UiMaterialKey<Self>) {
+    fn specialize(descriptor: &mut RenderPipelineDescriptor, key: UiMaterialKey<Self>) {
+        // Premultiplied: the additive draws (coverage 0) add (hud.wgsl `composite`).
+        let (entry, blend) = match key.bind_group_data.part {
+            Part::UpToOne => ("composite", BlendState::PREMULTIPLIED_ALPHA_BLENDING),
+            Part::OverSub => ("composite_over_sub", OVER_SUB_BLEND),
+            Part::OverOut => ("composite_over_out", OVER_OUT_BLEND),
+        };
         if let Some(f) = descriptor.fragment.as_mut() {
-            f.entry_point = Some("composite".into());
+            f.entry_point = Some(entry.into());
             f.shader_defs.push(ShaderDefVal::Bool("HUD_COMPOSITE".into(), true));
-            // Premultiplied: the additive draws (coverage 0) add (hud.wgsl `composite`).
-            for t in f.targets.iter_mut().flatten() { t.blend = Some(BlendState::PREMULTIPLIED_ALPHA_BLENDING); }
+            for t in f.targets.iter_mut().flatten() { t.blend = Some(blend); }
         }
         descriptor.vertex.shader_defs.push(ShaderDefVal::Bool("HUD_COMPOSITE".into(), true));
     }
@@ -356,10 +405,21 @@ impl Layer {
         let composite = commands.spawn((
             Node { position_type: PositionType::Absolute, ..default() },
             crate::display::UiBoxed,
-            MaterialNode(composites.add(HudComposite { image: target, scaling })),
+            MaterialNode(composites.add(HudComposite { image: target.clone(), scaling, part: Part::UpToOne })),
             UiTargetCamera(ui_camera),
             Name::new("2d layer composite"),
         )).id();
+        // Its pixels with an alpha above 1, right after it, in two nodes in this order ([`OVER_SUB_BLEND`]); they go
+        // with it (children).
+        for (part, z) in [(Part::OverSub, -2), (Part::OverOut, -1)] {
+            commands.spawn((
+                Node { position_type: PositionType::Absolute, left: Val::Px(0.0), top: Val::Px(0.0), width: Val::Percent(100.0), height: Val::Percent(100.0), ..default() },
+                MaterialNode(composites.add(HudComposite { image: target.clone(), scaling, part })),
+                ZIndex(z),
+                ChildOf(composite),
+                Name::new("2d layer composite (alpha above 1)"),
+            ));
+        }
         Layer { atlas: atlas_handle, mesh, frames: atlas.frames, entities: [camera, prims, composite] }
     }
 

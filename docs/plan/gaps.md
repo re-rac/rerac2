@@ -150,7 +150,7 @@ under `crates/` shortened to `<crate>/src/...`, or the doc §. *Seen*: whether a
 | G-UI-006 | **Pause menu and in-level menus**: the mode system, the page menus, Options, the menu text and models | every level | — | R&C2's code not mapped yet; R&C1's port: `menus/`, `menu_render.rs`, `menu_models.rs`, `text_render.rs` (porting_from_rac1.md) | yes |
 | G-UI-007 | **The map**: the map files, the fog mask and its writer, the saved mask | the pause menu | — | R&C2's code not mapped yet; R&C1's port: `map.rs`, `map/` (porting_from_rac1.md) | yes |
 | G-UI-008 | **Cheats**: the cheat bytes, the in-game entry, the mirror mode | the menus, the camera | — | R&C2's code not mapped yet; R&C1's port: `cheats.rs`, `mirror_render.rs` (porting_from_rac1.md) | minor |
-| G-UI-009 | **Pad icons in fonts 1 and 3**: the characters 0x10..0x13 (✕ ○ △ □; e.g. the arena menu's "select" 0x2dd5 ends in 0x10) draw as the same plain circle, while font 2's show their symbols; the glyph places differ (u 0 / 72 / 48 / 24, v 96) and R&C2's in-game text (`0x2ed170`) draws them 24 × 16 in the text's colour (no grey); FX textures 1 / 2 (in-game slots 1 / 2) give the same circle. Cause not found | the arena menu, the Electrolyzer's lines, any font-1 / font-3 label with a pad icon | — | gui.rs (`text`) | yes |
+| G-UI-009 | ~~**Pad icons in fonts 1 and 3** drawn as plain circles~~ closed 2026-10-31: not the icons — the HUD layer dropped every 2D pixel whose alpha came past 0x80 (fonts 1 / 3 in 0x90ffffff / 0x88ffffff), its over-1 composites (R&C1's `composite_over_sub` / `_out`) not ported; now in crate hud_render | the arena menu, the Electrolyzer's lines, any 2D draw with an alpha past 0x80 | — | hud_render.rs | yes |
 
 ## Scenes (CUT)
 

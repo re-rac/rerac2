@@ -1293,7 +1293,7 @@ pub fn draw_wipe(h: i16, edge: Option<usize>, out: &mut Vec<crate::gui::Quad>) {
     let h = h as i32;
     let f = h as f32 / sh as f32;
     // An alpha past 0x80 on the GS is a blend factor past 1 with the colour clamped: on pure white or black sources it
-    // comes to the same as 0x80, which the HUD layer's blend takes (it does not clamp).
+    // comes to the same as 0x80.
     let gs = |w: u32| { let mut c = w.to_le_bytes(); c[3] = c[3].min(0x80); c };
     let a = (f * f * (WIPE_FLASH >> 24) as f32) as u32;
     let flash = gs((WIPE_FLASH & 0xff_ffff) | a << 24);
