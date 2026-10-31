@@ -76,7 +76,7 @@ under `crates/` shortened to `<crate>/src/...`, or the doc §. *Seen*: whether a
 | G-CLS-006 | **Ratchet / ship queries**: direction `0x326448`, distance `0x326820` (the ship mode `0x1a8ff4`, `0x1a9000`) | 20 units | partly: 3 / 27 | census | yes |
 | G-CLS-007 | **Attachments leftovers**: the carrier's joint frames (`0x3245b0`), the offset moby `+0x40`, the shrubs' sphere and scale, the ties' update `0x36c068` | carriers | — | attach.rs:8 | minor |
 | G-CLS-008 | **Talk records** `0x139a34 + 0x10·i` through the level's talk list (`0x1c5d20` from `0x28ead0[level]`; marked by `0x325980(0x3259d8(moby))`) | Oozla's Tractor Beam seller 0x0ace; the missions' conditions 4 / 5 (crate::travel::missions) | — | rc-game/src/moby/classes/oozla.rs (`update_0ace`); rc-game/src/travel/missions.rs | no |
-| G-CLS-009 | **The item-0x26 puzzle** 0x0896 (L02 `0x3c3b80`, U114, about 3,178 words; on 8 levels): its group's 0x0a24 / 0x0a55 / 0x0873, game mode 7 (`0x1a8f00`), its own script camera, draws, prompt 0x130f | Maktar (2 placed) and 7 other levels | 1 unit | rc_game::moby::classes::maktar (survey 2026-10-31) | yes |
+| G-CLS-009 | ~~**The Electrolyzer puzzle** 0x0896 (L02 `0x3c3b80`, item 0x26)~~ closed 2026-10-31: rc_game::moby::classes::electrolyzer, game mode 7 (crate puzzle_view). Left: the item's class streaming (`0x309da0`), the failure's flash 0x13a0 and particle 0x2d, the music, the level camera 12 / 13's moby block (`0x457450`), the win path untested | Maktar (2) and 7 other levels | — | electrolyzer.rs | yes |
 | G-CLS-010 | **Maktar arena's scene props** 0x0f15 (L02 `0x43a3c8`, U161): in a scene (`0x1a8f00` = 2), by the scene's phase `0x1be230` (0, 1, 6), the master's moat and lamps drawn (`0x4014f0` / `0x401c20`), its own draws `0x43a0d8` / `0x43a360`, the master's score set to 100 and its mode \| 2 (phase 6), moby `+4` set to sequence 1 frame 7 and moved 2 back along its second row (and back after) | the arena's welcome and first-win scenes | 1 unit | rc_game::moby::classes::arena | minor |
 
 ## Levels (LVL)
@@ -149,6 +149,7 @@ under `crates/` shortened to `<crate>/src/...`, or the doc §. *Seen*: whether a
 | G-UI-006 | **Pause menu and in-level menus**: the mode system, the page menus, Options, the menu text and models | every level | — | R&C2's code not mapped yet; R&C1's port: `menus/`, `menu_render.rs`, `menu_models.rs`, `text_render.rs` (porting_from_rac1.md) | yes |
 | G-UI-007 | **The map**: the map files, the fog mask and its writer, the saved mask | the pause menu | — | R&C2's code not mapped yet; R&C1's port: `map.rs`, `map/` (porting_from_rac1.md) | yes |
 | G-UI-008 | **Cheats**: the cheat bytes, the in-game entry, the mirror mode | the menus, the camera | — | R&C2's code not mapped yet; R&C1's port: `cheats.rs`, `mirror_render.rs` (porting_from_rac1.md) | minor |
+| G-UI-009 | **Pad icons in fonts 1 and 3**: the characters 0x10..0x13 (✕ ○ △ □; e.g. the arena menu's "select" 0x2dd5 ends in 0x10) draw as the same plain circle, while font 2's show their symbols; the glyph places differ (u 0 / 72 / 48 / 24, v 96) and R&C2's in-game text (`0x2ed170`) draws them 24 × 16 in the text's colour (no grey); FX textures 1 / 2 (in-game slots 1 / 2) give the same circle. Cause not found | the arena menu, the Electrolyzer's lines, any font-1 / font-3 label with a pad icon | — | gui.rs (`text`) | yes |
 
 ## Scenes (CUT)
 

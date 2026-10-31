@@ -45,6 +45,7 @@ impl Plugin for PlayPlugin {
             .add_systems(PreUpdate, (input_map::sample_system, switch_camera).chain().after(bevy::input::InputSystems))
             .add_systems(FixedUpdate, (game_fog, tick, pause_tick).chain().after(crate::card::CardStep))
             .add_systems(Update, (draw_created, draw_hud, move_instances, ship_screen.after(draw_created), crate::overlay_mobys::assign_layers.after(draw_created)))
+            .add_systems(Update, crate::puzzle_view::apply)
             .add_systems(PostUpdate, draw_canopy.before(bevy::asset::AssetEventSystems))
             .add_systems(PostUpdate, draw_shots.before(bevy::asset::AssetEventSystems))
             .add_systems(PostUpdate, occlusion_mode.before(crate::occlusion::OcclusionSet))
@@ -490,6 +491,12 @@ fn tick(
             p.ticks += 1;
             return;
         }
+        // The Electrolyzer's screen (`0x3784e8`, rc_game::moby::classes::electrolyzer): its frame alone.
+        rc_game::moby::classes::electrolyzer::MODE => {
+            puzzle_frame(p, &level.0, occl.as_deref_mut(), anim.as_deref_mut(), parts.as_deref_mut().map(|s| &mut s.sys), audio.as_deref_mut());
+            p.ticks += 1;
+            return;
+        }
         _ => {}
     }
     // The ship mode (rc_game::travel): △ at the hatch of the last tick starts the take-off (`0x3706f0`'s `0x1b1a60`
@@ -563,6 +570,10 @@ fn tick(
     }
     // `0x327950`: the action prompt's lease (rc_game::prompt), not in state 0x1c.
     if p.hero.state != 0x1c { p.game.prompt.tick(); }
+    // The Electrolyzer's puzzles write the light bank's set 14 at their start (`0x1c8600`).
+    if let Some(s) = p.game.puzzle.light.take() {
+        if let Some(l) = level.0.mobys.lighting.as_mut() { l.bank.set_dir_light(rc_game::vendor::LIGHT_SET, s); }
+    }
     let lv = &level.0;
     let Some(coll) = lv.collision.as_ref() else { return };
     // `0x2d6258`: the health limit from the XP and the nanotech.
@@ -954,7 +965,7 @@ fn tick(
         Some((mut pos, mut rows)) => {
             p.game.shakes.apply(&mut pos, &mut rows);
             // The fly-by's FOV is its own (`0x1bd2f0`); the script camera keeps the play's.
-            let tan = if p.game.cameras.current_class() == rc_game::cameras::CLASS_FLYBY { p.game.cameras.tan } else { play_camera::GAME_TAN_HALF_FOV };
+            let tan = if p.game.cameras.current_class() == rc_game::cameras::CLASS_FLYBY { p.game.cameras.tan } else { p.game.puzzle.tan.unwrap_or(play_camera::GAME_TAN_HALF_FOV) };
             (PlayView { view: scene_view(&rc_game::scene_camera::SceneCamera { eye: pos, rows, tan_half_fov: tan, cut: false }), tan_half_fov: tan, far }, rows[0])
         }
         None => {
@@ -1011,9 +1022,85 @@ fn scene_audio_frame(p: &Play, audio: Option<&mut crate::audio_out::AudioOut>) {
     out.push_frame();
 }
 
+/// The game's mode 7 (`0x3784e8`, rc_game::moby::classes::electrolyzer): the background black (`0x2f5120(0, 0, 0)`;
+/// crate::puzzle_view hides the sky, tfrags, ties and shrubs), the particles (`0x337c68`), the update of the moby the
+/// mode was asked for (`0x1ac140`) alone, the sounds (`0x366bc8`) and the help panel (`0x2f9608`); no Ratchet, no
+/// camera update (the view stays where the script camera left it), no draw callbacks but its own (`0x377cd8`); the
+/// mobys drawn as they are, those with mode 0x80 hidden (Ratchet's too).
+fn puzzle_frame(p: &mut Play, lv: &crate::level_load::LoadedLevel, occl: Option<&mut MobyOcclusion>, mut anim: Option<&mut MobyAnim>, mut parts: Option<&mut rc_game::particles::Particles>, audio: Option<&mut crate::audio_out::AudioOut>) {
+    let Some(coll) = lv.collision.as_ref() else { return };
+    let class = &lv.mobys.anim[p.class];
+    let hero_view = rc_game::hero::anim::AnimCtl::view(&p.anim.ctl(class));
+    let Some(mobys) = p.mobys.as_mut() else { return };
+    (p.fx_quads_first, p.fx_quads) = (Vec::new(), Vec::new());
+    p.game.markers.clear();
+    if let Some(s) = parts.as_deref_mut() {
+        let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, coll: Some(coll), rain: mobys.world.weather.aux(&mobys.level, &p.game) };
+        rc_game::particles::update_parts(s, &mobys.world, p.camera.pos, p.hero.pos, &mut p.game.rng, &aux);
+    }
+    let id = usize::try_from(p.game.scenes.arg.0).ok().filter(|&i| mobys.world.mobys.get(i).is_some_and(|m| m.state < 0x80 && m.o_class == rc_game::moby::classes::electrolyzer::CLASS));
+    if let Some(id) = id {
+        // The puzzle reads the pad as the hero's tick would have.
+        p.hero.items.pressed = p.pad.pressed;
+        p.hero.items.held = p.pad.held;
+        let mods = p.hero.posture.modifiers(&mobys.hero_targets);
+        let hl = mobys.hero_layers(&p.hero.layers);
+        let pose = crate::mobys::HeroPose { class: p.class, state: &p.anim.state, snapshot: p.anim.snapshot.as_ref(), pos: p.hero.pos, rows: p.hero.rows, scale: p.scale, mods: &mods, layers: &hl };
+        let mut audio = audio;
+        let sound = audio.as_deref_mut().map(|o| crate::mobys::HostSound { system: o.system(), listener: listener(&p.camera), tick: p.ticks, loops: &mut mobys.loop_slots });
+        let mut host = crate::mobys::Host { lv: &lv.mobys, occl: occl.as_deref(), anim: anim.as_deref_mut(), created: &mut mobys.created, hero: Some(pose), hero_chains: &mobys.hero_chains, chains: Some(&mobys.chains), camera: p.camera.pos, camera_rows: p.camera.rows, sound };
+        let scene = crate::mobys::scene_of(&mobys.snap, &mobys.coll, &mobys.cache);
+        let mut ctx = rc_game::moby::Ctx { host: &mut host, hero: &mut p.hero, game: &mut p.game, coll: Some(coll), scene: scene.as_ref(), hero_moby: mobys.hero_moby, hero_view, level: &mobys.level, parts: parts.as_deref_mut(), view: None };
+        rc_game::moby::classes::electrolyzer::update(&mut mobys.world, id, &mut ctx);
+        drop(ctx);
+        drop(host);
+        // Not left for the next play frame's moby loop (which reads the hero tick's pad of the tick before).
+        (p.hero.items.pressed, p.hero.items.held) = (0, 0);
+        if mobys.world.changed {
+            let host = crate::mobys::Host { lv: &lv.mobys, occl: occl.as_deref(), anim: anim.as_deref_mut(), created: &mut mobys.created, hero: None, hero_chains: &[], chains: Some(&mobys.chains), camera: p.camera.pos, camera_rows: p.camera.rows, sound: None };
+            mobys.snap = Some(crate::mobys::take_snapshot(&mobys.world, &mobys.coll, &host));
+            mobys.world.changed = false;
+        }
+        // The sound step, heard from the camera as it stands.
+        if let Some(out) = audio {
+            let input = rc_game::audio::FrameInput { listener: listener(&p.camera), hero_pos: p.hero.pos };
+            let world = &mobys.world;
+            let owner = |id: u32| world.mobys.get(id as usize).filter(|m| m.state < 0x80).map(|m| m.pos);
+            out.external = true;
+            let (sys, buf) = out.parts();
+            sys.underwater = false;
+            let mut rng = sys.rng;
+            sys.game_frame_with(&input, p.ticks as u32 + 1, &mut rng, &owner);
+            sys.rng = rng;
+            sys.render(rc_game::audio::SAMPLES_PER_FRAME, buf);
+            out.push_frame();
+        }
+    }
+    if let Some(o) = occl {
+        for &ii in &mobys.left_out { o.set_hidden(ii, true); }
+        for m in &mobys.world.mobys {
+            let Some(ii) = m.instance else { continue };
+            let hidden = m.state >= 0x80 || m.mode & 0x81 != 0 || m.piece.is_some();
+            if m.update.is_some() || m.drive {
+                o.drive(ii, m.pos, m.rows, m.scale, crate::mobys::moby_lights(&lv.mobys, m.rows, m.light, m.ambient).as_ref(), hidden);
+                o.game_look(ii, m.alpha, m.mode, m.glow, m.draw_dist, m.shine);
+            } else {
+                o.set_hidden(ii, hidden);
+            }
+        }
+        o.drive(p.instance, p.hero.pos, p.hero.rows, p.scale, None, true);
+    }
+    // The help panel (`0x2f9608` runs in modes 0 and 7).
+    p.help.tick(&mut p.game, p.pad.pressed & rc_game::pad::button::TRIANGLE != 0, &p.texts);
+}
+
 /// `0x32c858`'s changes (rc_game::scene): a scene's end and start, a movie's start.
 fn mode_changes(p: &mut Play, lv: &mut crate::level_load::LoadedLevel) {
-    for c in p.game.scenes.switch(p.hero.hp) {
+    let was = p.game.scenes.mode;
+    let changes = p.game.scenes.switch(p.hero.hp);
+    // Into and out of the Electrolyzer's mode 7 (`0x3609b0` / `0x360a50`): the mobys hidden, then shown.
+    if let Some(m) = p.mobys.as_mut() { rc_game::moby::classes::electrolyzer::mode_switched(&mut m.world, was, p.game.scenes.mode); }
+    for c in changes {
         match c {
             rc_game::scene::Change::EndedScene => {
                 end_scene(p, lv);
@@ -2122,6 +2209,13 @@ fn draw_hud(
                 quads.extend(text);
             }
             if let (Some(v), Some(m)) = (p.vendor.menu.as_ref(), p.mobys.as_ref()) { v.draw(&p.game, &m.level.items, a, &icon, &texts, &mut quads); }
+            // The Electrolyzer's screen (`0x3c58e0`): its frame's sprites and its lines.
+            if let (Some(h), Some(&(font_3, _))) = (p.game.puzzle.hud.as_ref(), hud.fx.get(&rc_game::moby::classes::arena::FONT_3)) {
+                let (mut draws, mut text) = (Vec::new(), Vec::new());
+                rc_game::moby::classes::electrolyzer::draw_hud(h, &texts, (&a.glyphs_3, font_3), &mut draws, &mut text);
+                quads.extend(rc_game::hud::quads(&draws, &a.sprites, &a.glyphs, &icon, rc_game::gui::MENU_TAN));
+                quads.extend(text);
+            }
         }
         if p.glyphs.is_none() { p.glyphs = Some(Box::new(a.glyphs)); }
         p.boxes.draw(&mut quads, &a.glyphs, &a.sprites);

@@ -60,6 +60,7 @@ mod level_wad;
 mod mobys;
 mod overlay_mobys;
 mod play;
+mod puzzle_view;
 mod vendor_play;
 mod clock;
 

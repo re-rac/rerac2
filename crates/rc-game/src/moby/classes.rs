@@ -12,6 +12,7 @@ pub mod crate_;
 pub mod critter;
 pub mod dropship;
 pub mod dynamo;
+pub mod electrolyzer;
 pub mod flower;
 pub mod flyer;
 pub mod debris;
@@ -194,6 +195,7 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x0873 => Some(maktar::update_0873),
         0x0a24 => Some(maktar::update_0a24),
         0x0a55 => Some(maktar::update_0a55),
+        electrolyzer::CLASS => Some(electrolyzer::update),
         0x0a4b => Some(maktar::update_0a4b),
         0x0adf => Some(maktar::update_0adf),
         0x0aab | 0x0aac => Some(maktar::update_0aab),

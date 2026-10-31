@@ -33,9 +33,10 @@
 //! save's flag bytes), the scenes' end callback `0x405ec0` on the Jamming Array; 0x0c8f's debug prints and
 //! `0x18c0d6` = 1 as Ratchet boards.
 //!
-//! Not ported (no visible effect here, or a missing system): 0x0896 (`0x3c3b80`, two, levels 2, 3, 4, 9, 12, 17, 20,
-//! 21: a puzzle with the item 0x26 — its group's 0x0a24 / 0x0a55 / 0x0873, the game's mode 7, its own camera and
-//! draws; 3178 words, its own job); 0x0af3 (`0x3efea8`, four: a camera guide along its path `+0`, every placed one has −1 and deletes
+//! The Electrolyzer's puzzle 0x0896 (`0x3c3b80`, two here) is crate::moby::classes::electrolyzer: its group's
+//! 0x0873 / 0x0a24 / 0x0a55 are its pieces, pulses and balls (their starts here, the rest its).
+//!
+//! Not ported (no visible effect here, or a missing system): 0x0af3 (`0x3efea8`, four: a camera guide along its path `+0`, every placed one has −1 and deletes
 //! itself on its first tick); 0x0b25 (`0x3f6820`: the area above z 420 — the tfrags and shrubs below or above it
 //! moved out `0x2ee5a0`, and within 150 of (500, 200, 500) the gravity frames `0x1a8ff0` (G-LVL-003), the no-item
 //! area, its music; its tie group's 32 instances turned while in view; a texture's scroll); 0x0f15 (`0x43a3c8`: in the
@@ -98,7 +99,7 @@ fn path_start(ctx: &Ctx, i: i32) -> Option<[f32; 3]> {
 
 /// 0x0a24 (`0x3d90f0`): on its first tick update distance 0x80, pvars `+0x0c` −1.0, `+0x14` 0, at the first point of
 /// its path `+4`, state 1. The game also keeps the pvars of its moby `+0` at `+8` and the path's address at `+0x18`
-/// (here the indices at `+0` / `+4` stand for them; no ported class reads them).
+/// (here the indices at `+0` / `+4` stand for them; crate::moby::classes::electrolyzer reads them).
 pub fn update_0a24(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].state != 0 { return; }
     let at = path_start(ctx, w.mobys[id].pv_i(4));
