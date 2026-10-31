@@ -68,6 +68,8 @@ module that reads it: `grep -rn '"RC_' crates/` lists them all.
 | `RC_OCCL_STATS` | `1`: print occlusion cell and cull counts, at most once a second |
 | `RC_HERO_AT` | `x,y,z[,yaw]`: place Ratchet there at the level load, before the hero init's ground snap (debug) |
 | `RC_SCENES` | `0`: the level's scenes count as seen (no arrival scene; headless runs) |
+| `RC_GIVE_ITEMS` | `a,b,…` (item ids): those items had at the start, their ammo full, the last in the hand (the inspect overlay's repro line writes it; crate::play) |
+| `RC_DEBUG_HUD` | `1`: the inspect overlay (crate::debug_hud): F3 shows / hides a column of live data over the HUD, F4 cycles its pages (Player: position, facing, state, speed, ground, camera, the moby looked at, the scene; Mobys: labels `id C<class> S<state>` over the mobys within 15 of Ratchet, the looked-at moby's place, mode, distances, piece, health and first 64 pvar bytes; Sound: the busy sound slots), F8 prints a repro line (`RC_LEVEL`, `RC_SCENES=0`, `RC_HERO_AT`, `RC_GIVE_ITEMS`), copies it to the clipboard and shows it 5 s. `show`, `mobys` or `sound`: shown from the start on that page (headless captures) |
 | `RC_PLAY_TRACE` | `1`: one line per gameplay tick with Ratchet's state, position, velocity and the camera (`tick …`, crate::play) |
 | `RC_PLAY_SCRIPT` | Scripted pad input by tick, e.g. `0-120:stick 0 -1, 60:press X+R1, 200-201:rstick 1 0` (crate::input_map) |
 | `RC_MOBY_TRACE` | `0ce9,0340`: trace those classes' mobys (hex class numbers); `RC_MOBY_TRACE_EVERY=n` every n ticks, `RC_MOBY_PV=0,10` the pvar words (hex offsets) |
