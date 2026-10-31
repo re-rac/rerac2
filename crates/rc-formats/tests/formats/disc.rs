@@ -189,3 +189,21 @@ fn height_maps() {
     // The three levels that place the weather (class 0x0578).
     if !seen.is_empty() { assert_eq!(seen, [1, 15, 19]); }
 }
+
+/// Maktar's two chunks (the resort, the arena) parse as tfrags and collision; chunk 0 is the core's own world.
+#[test]
+fn maktar_chunks() {
+    use rc_formats::disc::level::{LevelWad, Lump};
+    let Some(file) = read("G/LEVEL2.WAD") else { eprintln!("skipped: no disc data"); return };
+    let w = LevelWad::parse(&file).unwrap();
+    let core_data = rc_formats::wad::decompress(w.lump(Lump::CoreData).unwrap().unwrap()).unwrap();
+    let core = rc_formats::level::parse_level_core(w.lump(Lump::CoreIndex).unwrap().unwrap(), core_data.len()).unwrap();
+    let core_tfrags = rc_formats::tfrag::parse_level_tfrags(&core, &core_data).unwrap();
+    let c0 = w.chunk(0).unwrap().expect("chunk 0");
+    let c1 = w.chunk(1).unwrap().expect("chunk 1");
+    eprintln!("core {} tfrags; chunk 0 {} tfrags {} cells; chunk 1 {} tfrags {} cells", core_tfrags.len(), c0.tfrags.len(), c0.collision.cells.len(), c1.tfrags.len(), c1.collision.cells.len());
+    assert_eq!(c0.tfrags.len(), core_tfrags.len());
+    assert!(!c1.tfrags.is_empty());
+    assert!(w.chunk(2).unwrap().is_none());
+}
+

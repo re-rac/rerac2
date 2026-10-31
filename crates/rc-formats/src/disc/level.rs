@@ -11,7 +11,7 @@ use std::ops::Range;
 /// chunks (Oozla) has each chunk's data at +0x30 + 8k (`0x150808`, the chunk switch `0x2f9bd8`) and its sound bank at
 /// +0x48 + 8k (`0x150820`): chunk k's bank is bank handle k + 1 (`0x32e4a0` / `0x323ca0`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Part { Data = 0, CoreBank = 1, Gameplay = 2, Occlusion = 3, ChunkBank0 = 7, ChunkBank1 = 8, ChunkBank2 = 9 }
+pub enum Part { Data = 0, CoreBank = 1, Gameplay = 2, Occlusion = 3, Chunk0 = 4, Chunk1 = 5, Chunk2 = 6, ChunkBank0 = 7, ChunkBank1 = 8, ChunkBank2 = 9 }
 
 /// The flight's arrival pictures of a planet ([`LevelWad::planet_pictures`]): the planet seen from space (the quad
 /// the ship flies toward) and its name as a picture per language (English first).
@@ -37,6 +37,12 @@ pub enum Lump {
     /// WAD-compressed (the core index's `assets_compressed_size`).
     CoreData = 9,
     Transition = 10,
+}
+
+/// A level chunk's world ([`LevelWad::chunk`]): its tfrags and its collision.
+pub struct Chunk {
+    pub tfrags: Vec<crate::tfrag::Tfrag>,
+    pub collision: crate::collision::Collision,
 }
 
 pub struct LevelWad<'a> {
@@ -67,6 +73,23 @@ impl<'a> LevelWad<'a> {
     }
 
     pub fn part_bytes(&self, p: Part) -> Result<Option<&'a [u8]>> { Ok(self.part(p)?.map(|r| &self.file[r])) }
+
+    /// Chunk `k`'s world (the chunk switch, L01 `0x2f9bd8` / L02 `0x3082e0`): its part (`+0x30 + 8k`) starts with the
+    /// offsets of two WAD-compressed blocks, the tfrags and the collision, which the switch decompresses over the
+    /// level's (`0x313878`) and sets up (`0x304df8`, `0x3050e0`). `None` for a chunk the level does not have.
+    pub fn chunk(&self, k: usize) -> Result<Option<Chunk>> {
+        let p = match k { 0 => Part::Chunk0, 1 => Part::Chunk1, 2 => Part::Chunk2, _ => return Ok(None) };
+        let Some(bytes) = self.part_bytes(p)? else { return Ok(None) };
+        let b = Buf(bytes);
+        let (t, c) = (b.u32(0)? as usize, b.u32(4)? as usize);
+        let blob = |o: usize| -> Result<Vec<u8>> {
+            let Some(src) = bytes.get(o..) else { return invalid(format!("chunk {k}: block at {o:#x} past its part")) };
+            crate::wad::decompress(src)
+        };
+        let tfrags = crate::tfrag::parse_tfrags(&blob(t)?)?;
+        let collision = crate::collision::parse_collision_block(&blob(c)?)?;
+        Ok(Some(Chunk { tfrags, collision }))
+    }
 
     /// The planet's arrival pictures (the flight's variant 4, `0x363360` / `0x3630a8`): the loader `0x304420` reads
     /// the destination's data part (the boot's `0x294310`: the level header's `+0x10` / `+0x14` plus the file's disc
