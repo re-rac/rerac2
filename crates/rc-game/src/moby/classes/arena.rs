@@ -34,8 +34,7 @@
 //!
 //! Not ported: the bosses 0x09f8 / 0x0a44 (the challenges with a boss wave, 2, 4, 6, 9, 11, 12 and 13, are kept off the
 //! menu until they are: they could not end), the crowd 0x0e96 and its cheers (`0x3fb028`, `0x42e670`), the announcer's speech (`0x401d98`, its
-//! remarks `0x401e68` / `0x402090`), the restart's path straight into the wipe (`0x1a7904` = 2), the win's screen
-//! (`0x400e10`), the menu's arrows (`0x3ff388`) and its vendor (□, `0x332158(5)`), the
+//! remarks `0x401e68` / `0x402090`), the restart's path straight into the wipe (`0x1a7904` = 2), the menu's arrows (`0x3ff388`) and its vendor (□, `0x332158(5)`), the
 //! music (`0x335928`), the level's sounds, the challenges' weapon lock (`0x18b6f4`) and the fixed held items of 7 / 8 /
 //! 13 beyond the hand request; the plates' sparks (`0x3d85a8`: the particle burst `0x345d88` has no port).
 
@@ -979,6 +978,7 @@ pub fn update_master(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if let Some((p, _)) = cuboid_at(ctx, w, id, pv::MIDDLE) { w.mobys[id].set_pv_v(MIDDLE_AT, p); }
     let fighting = w.mobys[id].state == 8;
     ctx.game.arena_wipe = None;
+    ctx.game.arena_results = None;
     match w.mobys[id].state {
         0 => {
             reset_master(w, id);
@@ -1032,8 +1032,10 @@ pub fn update_master(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         6 => {
-            // After a win: ✕ the menu at the next challenge, △ back to the resort.
+            // After a win: its screen ([`draw_results`]); ✕ the menu at the next challenge, △ back to the resort.
             if ctx.hero.state != 0x6f { ctx.hero.request_state(0x6f, true); }
+            let m = &w.mobys[id];
+            ctx.game.arena_results = Some(Results { first: m.pv_s(pv::SELECTED) == 0 && wins(ctx.game, 0) < 2, prize: m.pv_i(pv::PRIZE) });
             let pressed = ctx.hero.items.pressed;
             if pressed & crate::pad::button::CROSS != 0 {
                 w.mobys[id].set_state(7, -1);
@@ -1121,6 +1123,30 @@ fn challenge_hud(w: &MobyWorld, id: usize) -> ChallengeHud {
     }
 }
 
+/// What the win's screen (`0x400e10`) shows: the first challenge's first win (its own line) or the prize (`+0x110`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Results {
+    pub first: bool,
+    pub prize: i32,
+}
+
+/// `0x400e10` (the master's draw after a win, on the big screen): the title 0x2ddb (font 1 at 1.1, (180, 93)), the
+/// first win's line 0x2ddc or the prize (`"%s %d %s"`: 0x2df8, the bolts, 0x2df4) in font 3 centred on (260, 135),
+/// and 0x2ddd in font 1 centred on (250, 160), in the box 10..500 × 125..200 (`$gp+0x2468..+0x24b8`; the title's x
+/// by language, the first's here), all `0x90ffffff`. Not ported: the menu's arrows under it (`0x3ff388(m, 0)`).
+pub fn draw_results(r: &Results, text: &dyn Fn(u32) -> Vec<u8>, fonts: [(&[rc_formats::disc::boot::Glyph; 256], usize); 3], out: &mut Vec<crate::gui::Quad>) {
+    use crate::gui::text_box::{CENTRE, MIDDLE};
+    let first = |id: u32| { let t = text(id); t.split(|&c| c == 0).next().unwrap_or(&[]).to_vec() };
+    let colour = 0x90ff_ffffu32.to_le_bytes();
+    let (g1, s1) = fonts[0];
+    crate::gui::text(out, g1, s1, &first(0x2ddb), 180.0, 93.0, 1.1, colour);
+    let boxed = |x: i32, y: i32| crate::gui::TextBox { top: 125, bottom: 200, left: 10, right: 500, x, y, line: 16, flags: CENTRE | MIDDLE, ..Default::default() };
+    let line = if r.first { first(0x2ddc) } else { [first(0x2df8), format!(" {} ", r.prize).into_bytes(), first(0x2df4)].concat() };
+    let (g3, s3) = fonts[2];
+    crate::gui::text_in_box(out, g3, s3, &mut boxed(260, 135), &line, colour);
+    crate::gui::text_in_box(out, g1, s1, &mut boxed(250, 160), &first(0x2ddd), colour);
+}
+
 /// The HUD's font 3: FX texture 3, its glyphs the boot's `0x264250` (crate::front_end::Assets::glyphs_3).
 pub const FONT_3: u16 = 3;
 /// `$gp+0x2368`: the HUD's text colour.
@@ -1133,10 +1159,11 @@ const BOSS_PICTURE: u32 = 0x8080_8080;
 const BOSS_BAR: [f32; 4] = [74.0, 388.0, 191.0, 400.0];
 const BOSS_BAR_COLOURS: [u32; 3] = [0x8000_aa00, 0x8000_aaaa, 0x8000_00aa];
 
-/// A text box of the HUD (`0x2ee560(box, top, bottom, left, right, x, y, 0, 0)`), the first layout's (`$gp+0x2368..`;
-/// the second, for the languages past the second, is not ported).
+/// A text box of the HUD (`0x2ee560(box, top, bottom, left, right, x, y, 0, 3)`: centred on `x` and on `y`), the first
+/// layout's (`$gp+0x2368..`; the second, for the languages past the second, is not ported).
 fn hud_box(top: i32, bottom: i32, left: i32, right: i32, x: i32, y: i32) -> crate::gui::TextBox {
-    crate::gui::TextBox { top, bottom, left, right, x, y, ..Default::default() }
+    use crate::gui::text_box::{CENTRE, MIDDLE};
+    crate::gui::TextBox { top, bottom, left, right, x, y, flags: CENTRE | MIDDLE, ..Default::default() }
 }
 
 /// `0x3ffee0` (the master, first list, in a challenge): the panels along the screen's bottom. A timed challenge

@@ -2113,6 +2113,9 @@ fn draw_hud(
                 quads.extend(rc_game::hud::quads(&draws, &a.sprites, &a.glyphs, &icon, rc_game::gui::MENU_TAN));
                 quads.extend(text);
             }
+            if let (Some(r), Some(&(font_3, _))) = (p.game.arena_results.as_ref(), hud.fx.get(&rc_game::moby::classes::arena::FONT_3)) {
+                rc_game::moby::classes::arena::draw_results(r, &texts, [(&a.glyphs, 1), (&a.glyphs_2, 2), (&a.glyphs_3, font_3)], &mut quads);
+            }
             if let (Some(v), Some(m)) = (p.vendor.menu.as_ref(), p.mobys.as_ref()) { v.draw(&p.game, &m.level.items, a, &icon, &texts, &mut quads); }
         }
         if p.glyphs.is_none() { p.glyphs = Some(Box::new(a.glyphs)); }
