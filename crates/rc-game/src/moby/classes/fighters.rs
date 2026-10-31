@@ -308,7 +308,7 @@ pub fn update_0c3e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.pos = add(m.pos, v);
         let new = m.pos;
         let landed = w.coll_line(ctx, old, new, 0, Some(id)).is_some()
-            || ctx.scene.is_some_and(|sc| !crate::collision::coll_sphere_mobys(sc, new, 0.3, crate::collision::QueryFlags(4), Some(id)).is_empty())
+            || ctx.coll.is_some_and(|c| crate::collision::coll_sphere_m(c, ctx.scene, new, 0.3, crate::collision::QueryFlags(4), Some(id)).is_some())
             || ctx.game.rng.randi(0x1e) == 0;
         if landed {
             let dmg = w.mobys[id].pv_b(0x34) as f32 * 3.0;
@@ -462,9 +462,11 @@ pub fn update_0c3e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
     }
     if mid.is_some() && w.mobys[id].pos[2] <= floor + 0.4 {
-        // Skimming the floor: held at 0.3 above it (in view only on the floor), with a splash.
-        let skim = w.mobys[id].drawn == 0
-            || ctx.scene.is_some_and(|sc| !crate::collision::coll_sphere_mobys(sc, w.mobys[id].pos, 0.3, crate::collision::QueryFlags(6), None).is_empty());
+        // Skimming the floor: held at 0.3 above it (in view, only when its sphere touches the floor or a moby), with
+        // a splash.
+        // `0x2e2e70(0.3, pos, 6, 0)`: the sphere query (the world, then the mobys).
+        let q = ctx.coll.and_then(|c| crate::collision::coll_sphere_m(c, ctx.scene, w.mobys[id].pos, 0.3, crate::collision::QueryFlags(6), None));
+        let skim = w.mobys[id].drawn == 0 || q.is_some();
         if skim {
             let m = &mut w.mobys[id];
             m.set_pv_f(MV + 0xa8, f32::from_bits(0x3c88_8889));
