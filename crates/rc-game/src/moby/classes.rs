@@ -9,6 +9,7 @@ pub mod carriers;
 pub mod chute;
 pub mod crate_;
 pub mod critter;
+pub mod dropship;
 pub mod dynamo;
 pub mod flower;
 pub mod flyer;
@@ -45,9 +46,10 @@ pub mod wrench;
 use super::UpdateFn;
 
 /// The port of `o_class`'s update (`None`: not ported, the moby gets mode 2 like a class without one).
-/// The ported classes without a model that are only created at run time (the space fights' laser), added to every
-/// level's class table as the overlay's table holds them.
-pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS];
+/// The ported classes without a model that are only created at run time (the space fights' laser, the teleport-in
+/// carrier: its model-less update, `0x315530`'s table `0x1ddfa0`, is in 18 overlays from level 2 to 21, not Aranos's,
+/// where none of its callers runs), added to every level's class table as the overlay's table holds them.
+pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS];
 
 pub fn update_for(o_class: i16) -> Option<UpdateFn> {
     match o_class {
@@ -132,6 +134,7 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x0578 => Some(weather::update),
         teleport::CLASS => Some(teleport::update),
         critter::CLASS => Some(critter::update),
+        dropship::CLASS => Some(dropship::update),
         c if flock::CLASSES.contains(&c) => Some(flock::update),
         0x0ca0 => Some(oozla::update_0ca0),
         0x046f => Some(oozla::update_046f),

@@ -179,7 +179,7 @@ fn set_up(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// `0x34ad68(t, path, closed, &pos, &rot)`: the place `t` (in points) along the path: the point between its point
 /// `⌊t⌋` and the next, an open path held at its last segment; facing along the way there, eased into the next segment
 /// (yaw from its xy, pitch down by its climb).
-fn follow(path: &[[f32; 4]], closed: bool, t: f32, pos: &mut V3, rot: &mut V3) {
+pub(crate) fn follow(path: &[[f32; 4]], closed: bool, t: f32, pos: &mut V3, rot: &mut V3) {
     let n = path.len() as i32;
     let mut i = t as i32;
     let end = !closed && n - 2 <= i;

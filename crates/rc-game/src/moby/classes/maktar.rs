@@ -434,9 +434,9 @@ pub fn update_0c82(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => {}
     }
     let m = &mut w.mobys[id];
-    let a = add_rot(m.pv_f(4), 0.058_178_3);
+    let a = add_rot(m.pv_f(4), f32::from_bits(0x3d6e_4bb0));
     m.set_pv_f(4, a);
-    m.set_pv_f(0x14, add_rot(m.pv_f(0x14), -0.104_719_76));
+    m.set_pv_f(0x14, add_rot(m.pv_f(0x14), f32::from_bits(0xbdd6_7752)));
     m.pos[2] = a.sin() * 0.5 + m.pv_f(8);
     let mut s = m.pv_f(0x10) - 0.066_666_67;
     if 1.0 < s { s -= 1.0 } else if s < -1.0 { s += 1.0 }
@@ -555,11 +555,11 @@ pub fn update_0c81(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let p = w.mobys[id].pos;
         if !ctx.view.is_some_and(|v| v.culled(80.0, [p[0], p[1], p[2], 1.0])) {
             let m = &mut w.mobys[id];
-            m.set_pv_f(0x2c, add_rot(m.pv_f(0x2c), 0.040_725_4));
+            m.set_pv_f(0x2c, add_rot(m.pv_f(0x2c), f32::from_bits(0x3d26_ce95)));
             let wrap = |x: f32| if 1.0 < x { x - 1.0 } else { x };
             m.set_pv_f(0x28, wrap(m.pv_f(0x28) + 0.020_833_334));
-            m.set_pv_f(0x20, wrap(m.pv_f(0x20) + 0.011_1));
-            m.set_pv_f(0x24, wrap(m.pv_f(0x24) + 0.011_1));
+            m.set_pv_f(0x20, wrap(m.pv_f(0x20) + f32::from_bits(0x3c35_dcc7)));
+            m.set_pv_f(0x24, wrap(m.pv_f(0x24) + f32::from_bits(0x3c35_dcc7)));
             w.register_draw(id);
         }
         let m = &mut w.mobys[id];
@@ -963,7 +963,7 @@ pub fn update_09c8(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if m.drawn != 0 {
         let a = add_rot(m.rot[1], 0.026_179_94);
         m.rot[1] = a;
-        m.rot[2] = add_rot(a, 0.015_126_4);
+        m.rot[2] = add_rot(a, 0.015_126_189);
         m.glow = if state != 1 {
             let p = add_rot(m.pv_f(0xd8), 0.209_439_51);
             m.set_pv_f(0xd8, p);
