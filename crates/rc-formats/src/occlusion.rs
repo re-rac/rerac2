@@ -216,8 +216,6 @@ pub struct LevelOcclusion {
     pub moby: Vec<OcclBits>,
     /// Tfrag count or any header byte 0x3d disagreed: all tfrags always visible ("occlusion out of date on tfrag").
     pub tfrag_out_of_date: bool,
-    /// Ties took the positional path (counts equal and every `(s16)` key equal).
-    pub ties_positional: bool,
     /// Ties / occlusion-culled mobys with no mapping ("occlusion out of date on ties/mobys (%d / %d)").
     pub ties_not_found: usize,
     pub mobys_not_found: usize,
@@ -232,36 +230,50 @@ pub(crate) fn resolve_tfrag_bits(maps: &OcclusionMappings, tfrags: &[TfragHeader
     (bits, stale)
 }
 
-/// Ties: positional when the counts match and every `(s16)` occlusion_index equals `(s16)` occlusion_id;
-/// otherwise each tie takes the first mapping whose `occlusion_id` (u32) equals its u16 occlusion_index,
-/// or always visible. Returns (bits, positional, not_found).
-pub(crate) fn resolve_tie_bits(maps: &OcclusionMappings, occlusion_index: &[i32]) -> (Vec<OcclBits>, bool, usize) {
-    let positional = maps.tie.len() == occlusion_index.len()
-        && occlusion_index.iter().zip(&maps.tie).all(|(&o, m)| o as i16 == m.occlusion_id as i16);
-    if positional { return (maps.tie.iter().map(|m| OcclBits::from_bit(m.bit_index)).collect(), true, 0); }
+/// The word an object takes from its table entry (R&C2's loader, L02 `0x307b40` / `0x307d10`): the entry read
+/// back as an s16; a negative one (an id with no mapping, or a mapping whose bit is -1, as the arena's ties on
+/// Maktar have) always visible.
+fn word(entry: Option<i32>) -> OcclBits {
+    match entry.map(|b| b as u16 as i16) {
+        Some(b) if 0 <= b => OcclBits::from_bit(b as i32),
+        _ => OcclBits::ALWAYS,
+    }
+}
+
+/// Ties (L02 `0x307c6c..0x307d4c`): a table over the occlusion ids below 0x4000, each tie mapping writing its bit
+/// at its id (a later mapping wins); a tie with a u16 occlusion_index below 0x4000 takes its entry ([`word`]),
+/// any other is always visible. Returns (bits, not_found).
+pub(crate) fn resolve_tie_bits(maps: &OcclusionMappings, occlusion_index: &[i32]) -> (Vec<OcclBits>, usize) {
+    let mut table = std::collections::HashMap::new();
+    for m in maps.tie.iter().filter(|m| (m.occlusion_id as u32) < 0x4000) { table.insert(m.occlusion_id as u32, m.bit_index); }
     let mut missing = 0;
     let bits = occlusion_index.iter().map(|&o| {
         let key = o as u16 as u32;
-        match maps.tie.iter().find(|m| m.occlusion_id as u32 == key) {
-            Some(m) => OcclBits::from_bit(m.bit_index),
-            None => { missing += 1; OcclBits::ALWAYS }
-        }
+        if 0x4000 <= key { return OcclBits::ALWAYS; }
+        let e = table.get(&key).copied();
+        if e.is_none() { missing += 1; }
+        word(e)
     }).collect();
-    (bits, false, missing)
+    (bits, missing)
 }
 
-/// Mobys: an instance takes part only when its gameplay `occlusion` word is 0 (otherwise moby+0x36 = 0x7f80);
-/// it takes the first mapping whose `occlusion_id` equals its `(s16)` spawn id (instance +0x0c, moby+0xb2),
-/// or always visible. Mobys spawned later start at 0x7f80 (`InitMobyInstance`). Returns (bits, not_found).
+/// Mobys: an instance takes part only when its gameplay `occlusion` word is 0 (otherwise moby+0x36 = 0x7f80).
+/// The loader (L02 `0x307a74..0x307b7c`) fills a table over the ids -0x4000..0x3fff from the moby mappings (a
+/// later mapping wins); a moby whose `(s16)` spawn id (instance +0x0c, moby+0xb2) is in that range takes its entry
+/// ([`word`]), any other is always visible. Mobys spawned later start at 0x7f80 (`InitMobyInstance`). Returns
+/// (bits, not_found).
 pub(crate) fn resolve_moby_bits(maps: &OcclusionMappings, mobys: &[MobyInstance]) -> (Vec<OcclBits>, usize) {
+    let in_range = |k: i32| (k + 0x4000) as u32 <= 0x7fff;
+    let mut table = std::collections::HashMap::new();
+    for m in maps.moby.iter().filter(|m| in_range(m.occlusion_id)) { table.insert(m.occlusion_id, m.bit_index); }
     let mut missing = 0;
     let bits = mobys.iter().map(|mb| {
         if mb.occlusion != 0 { return OcclBits::ALWAYS; }
         let key = mb.spawn_id as i16 as i32;
-        match maps.moby.iter().find(|m| m.occlusion_id == key) {
-            Some(m) => OcclBits::from_bit(m.bit_index),
-            None => { missing += 1; OcclBits::ALWAYS }
-        }
+        if !in_range(key) { return OcclBits::ALWAYS; }
+        let e = table.get(&key).copied();
+        if e.is_none() { missing += 1; }
+        word(e)
     }).collect();
     (bits, missing)
 }
@@ -275,9 +287,9 @@ pub fn resolve_level_occlusion(maps: Option<&OcclusionMappings>, tfrags: &[Tfrag
         };
     };
     let (tfrag, tfrag_out_of_date) = resolve_tfrag_bits(maps, tfrags);
-    let (tie, ties_positional, ties_not_found) = resolve_tie_bits(maps, tie_occlusion_index);
+    let (tie, ties_not_found) = resolve_tie_bits(maps, tie_occlusion_index);
     let (moby, mobys_not_found) = resolve_moby_bits(maps, mobys);
-    LevelOcclusion { tfrag, tie, moby, tfrag_out_of_date, ties_positional, ties_not_found, mobys_not_found }
+    LevelOcclusion { tfrag, tie, moby, tfrag_out_of_date, ties_not_found, mobys_not_found }
 }
 
 /// `DAT_0016c4f4`: the debug menu's "occlusion" item (`off` / `freeze` / `active`). The level loader sets
@@ -435,8 +447,11 @@ mod tests {
         assert_eq!(resolve_tfrag_bits(&maps, &t), (vec![OcclBits::from_bit(3), OcclBits::from_bit(4)], false));
         t[1].tri_count = 21;
         assert_eq!(resolve_tfrag_bits(&maps, &t), (vec![OcclBits::ALWAYS; 2], true));
-        assert_eq!(resolve_tie_bits(&maps, &[1, 2]), (vec![OcclBits::from_bit(7), OcclBits::from_bit(8)], true, 0));
-        assert_eq!(resolve_tie_bits(&maps, &[2, 5]), (vec![OcclBits::from_bit(8), OcclBits::ALWAYS], false, 1));
+        assert_eq!(resolve_tie_bits(&maps, &[1, 2]), (vec![OcclBits::from_bit(7), OcclBits::from_bit(8)], 0));
+        assert_eq!(resolve_tie_bits(&maps, &[2, 5]), (vec![OcclBits::from_bit(8), OcclBits::ALWAYS], 1));
+        // A bit of -1 (Maktar's arena) is always visible; a later mapping of an id wins.
+        let maps2 = OcclusionMappings { tie: vec![rec(-1, 3), rec(5, 4), rec(6, 4)], ..Default::default() };
+        assert_eq!(resolve_tie_bits(&maps2, &[3, 4]), (vec![OcclBits::ALWAYS, OcclBits::from_bit(6)], 0));
         let mut m = [MobyInstance::zeroed(); 3];
         m[0].spawn_id = 42; m[1].spawn_id = 42; m[1].occlusion = 1; m[2].spawn_id = 7;
         assert_eq!(resolve_moby_bits(&maps, &m), (vec![OcclBits::from_bit(9), OcclBits::ALWAYS, OcclBits::ALWAYS], 1));

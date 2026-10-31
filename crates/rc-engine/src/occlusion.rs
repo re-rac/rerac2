@@ -124,9 +124,9 @@ fn report(level: &LoadedLevel, mode: OcclusionMode, freeze: bool) {
     let mapped = |v: &[occlusion::OcclBits]| v.iter().filter(|b| **b != occlusion::OcclBits::ALWAYS).count();
     match &d.grid {
         Some(g) => println!(
-            "occlusion: {} cells, {} masks{}; mapped tfrags {}/{}, ties {}/{}{}, mobys {}/{}{}; mode {:?}{}",
+            "occlusion: {} cells, {} masks{}; mapped tfrags {}/{}, ties {}/{}, mobys {}/{}{}; mode {:?}{}",
             g.cells.len(), g.masks.len(), if g.octants.is_some() { ", octant override" } else { "" },
-            mapped(&o.tfrag), o.tfrag.len(), mapped(&o.tie), o.tie.len(), if o.ties_positional { " (positional)" } else { "" },
+            mapped(&o.tfrag), o.tfrag.len(), mapped(&o.tie), o.tie.len(),
             mapped(&o.moby), o.moby.len(), if o.tfrag_out_of_date { "; tfrag mappings out of date" } else { "" },
             mode, if freeze { " (RC_OCCL=1: frozen after the first frame)" } else { "" }
         ),
