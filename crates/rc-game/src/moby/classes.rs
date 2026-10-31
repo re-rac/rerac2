@@ -39,6 +39,7 @@ pub mod smash;
 pub mod spawn_point;
 pub mod teleport;
 pub mod tie_lights;
+pub mod telepad;
 pub mod maktar;
 pub mod tractor;
 pub mod vendor;
@@ -197,6 +198,11 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x0adf => Some(maktar::update_0adf),
         0x0aab | 0x0aac => Some(maktar::update_0aab),
         0x0d0d => Some(maktar::update_0d0d),
+        0x0c51 => Some(maktar::update_0c51),
+        0x0bf6 => Some(maktar::update_0bf6),
+        0x0c8f => Some(maktar::update_0c8f),
+        0x0a57 => Some(maktar::update_0a57),
+        telepad::CLASS => Some(telepad::update),
         crate::ship::LASER_CLASS => Some(crate::ship::update_laser),
         space::FIGHTER | space::GUNSHIP => Some(space::update_fighter),
         crate::ship::MISSION_CLASS => Some(crate::ship::update_mission),

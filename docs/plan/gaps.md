@@ -76,6 +76,7 @@ under `crates/` shortened to `<crate>/src/...`, or the doc §. *Seen*: whether a
 | G-CLS-006 | **Ratchet / ship queries**: direction `0x326448`, distance `0x326820` (the ship mode `0x1a8ff4`, `0x1a9000`) | 20 units | partly: 3 / 27 | census | yes |
 | G-CLS-007 | **Attachments leftovers**: the carrier's joint frames (`0x3245b0`), the offset moby `+0x40`, the shrubs' sphere and scale, the ties' update `0x36c068` | carriers | — | attach.rs:8 | minor |
 | G-CLS-008 | **Talk records** `0x139a34 + 0x10·i` through the level's talk list (`0x1c5d20` from `0x28ead0[level]`; marked by `0x325980(0x3259d8(moby))`) | Oozla's Tractor Beam seller 0x0ace; the missions' conditions 4 / 5 (crate::travel::missions) | — | rc-game/src/moby/classes/oozla.rs (`update_0ace`); rc-game/src/travel/missions.rs | no |
+| G-CLS-009 | **The item-0x26 puzzle** 0x0896 (L02 `0x3c3b80`, U114, about 3,178 words; on 8 levels): its group's 0x0a24 / 0x0a55 / 0x0873, game mode 7 (`0x1a8f00`), its own script camera, draws, prompt 0x130f | Maktar (2 placed) and 7 other levels | 1 unit | rc_game::moby::classes::maktar (survey 2026-10-31) | yes |
 
 ## Levels (LVL)
 
@@ -83,7 +84,7 @@ under `crates/` shortened to `<crate>/src/...`, or the doc §. *Seen*: whether a
 |---|---|---|---|---|---|
 | G-LVL-001 | ~~**Level variant regions**~~ closed 2026-10-29: `0x321a78` = rc_game::level::LevelData::in_variant over the variant planes (level settings, `rc_formats::disc::gameplay::variant_planes`; planes, not boxes: Oozla z 100 down, Maktar z 420 up). The variant itself changes only with the chunk switch (G-LVL-007) | 14 units | 14 / 1,186 (7 / 841) | rc-game/src/level.rs | yes |
 | G-LVL-002 | **Level streaming and change steps** `0x304200` | 16 units | partly | census | yes |
-| G-LVL-003 | **Gravity frames** (`$gp − 0x6000`, `0x18c0e3`, `0x1a8ff0`): R&C2's gravity surfaces and walkways | Ratchet (physics, walk, melee, ledge, posture), aim, AI, shards, wrench, particles | — | physics.rs:26, 404; ai.rs:30; aim.rs:10; shards.rs:26; wrench.rs:15 | yes |
+| G-LVL-003 | **Gravity frames** (`$gp − 0x6000`, `0x18c0e3`, `0x1a8ff0`): R&C2's gravity surfaces and walkways | Ratchet (physics, walk, melee, ledge, posture), aim, AI, shards, wrench, particles; Maktar's upper area 0x0b25 (L02 `0x3f6820`, within 150 of (500, 200, 500)) | — | physics.rs:26, 404; ai.rs:30; aim.rs:10; shards.rs:26; wrench.rs:15 | yes |
 | G-LVL-004 | **Sliding floors and ice** (the drag `0x18a890`, `0x2b96a0`) | Ratchet's walk, jump, melee | — | physics.rs:467; walk.rs:17; jump.rs:28; melee.rs:12 | yes |
 | G-LVL-005 | **Platform carry**: the platform block system is ported (crate::moby::platform: `0x322028`, writer `0x322668`, readers `0x3222a8` / `0x3221c8` / `0x322058` / `0x3223e8` / `0x322570`; the lifts 0x0ac1 / 0x0ac2 / 0x0aca and the floaters write theirs; the bolts ride them). Left: Ratchet's own read (`0x2b4a08` and the others; crate::moby::carry_hero stands in, yaw only), the crates and nanotech clusters on movers, the parked ship's parts' block (`0x361050`) | Ratchet, the crates, the nanotech crate, 2 units | 2 / 50 | platform.rs; crate_.rs; nanotech.rs | yes |
 | G-LVL-006 | **Space travel** and the level end's autosave `0x30d658` | Aranos's last trigger (to Oozla) | — | props.rs:1239; game.rs:146; bringup.md §6 | yes |
@@ -161,6 +162,7 @@ under `crates/` shortened to `<crate>/src/...`, or the doc §. *Seen*: whether a
 |---|---|---|---|---|---|
 | G-SAV-001 | **The save-slot page** between New Game and the level, the autosave `0x30d658`, the level name | the front end, the level end | — | front_end.rs:314; game.rs:146; props.rs:526, 1239 | yes |
 | G-SAV-002 | **Memory card and the persistent game state**: the card driver, the save block, the save paths | the save-slot page, the autosave, the Options | — | R&C2's code not mapped yet; R&C1's port: `memcard.rs`, `game_state.rs`, `saves.rs` (porting_from_rac1.md) | yes |
+| G-SAV-003 | **Flag bytes past 0x139658**: GameState::flags covers `0x1395b8..0x139658` (0xa0); the save's bytes after it are not mapped, so flags there (Maktar's return banner `0x13965d`) are not kept | the Jamming Array ship 0x0bf6's banner shows on every return | — | game.rs:235 (`FLAGS_LEN`); maktar.rs (`update_0bf6`) | minor |
 
 ## Needs triage
 

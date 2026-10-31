@@ -20,7 +20,27 @@
 //! * 0x0a9c (`0x3e82e0`): the slot machines: a wrench hit for 10 bolts spins their reels; the payouts ([`update_0a9c`],
 //!   the reels [`draw_0a9c`]).
 //!
+//! * 0x0c51 (`0x4112c8`): Ratchet in its cuboid, the scenes that give Endako (planet 3) ([`update_0c51`]).
+//! * 0x0bf6 (`0x405b58`): the ship to the Jamming Array and back ([`update_0bf6`]).
+//! * 0x0c8f (`0x414498`): the hover car between two ends, the ride faded to black ([`update_0c8f`]).
+//! * 0x0a57 (`0x3dd4a8`): the footsteps' dust on surface 10 ([`update_0a57`], crate::particles::dust).
+//! * The teleporter pad 0x0c60 is crate::moby::classes::telepad.
+//!
 //! Not ported (the lock puzzle): the catapult's draw `0x3eae18` and its aiming camera.
+//!
+//! Not ported (the rides): 0x0bf6's hero word `0x18a032` = 2 on the prompt (no reader found), its `0x152c26` = 1 on the
+//! return from the Jamming Array (a ship-mode byte), the flag `0x13965d` that shows Barlow's banner only once (past the
+//! save's flag bytes), the scenes' end callback `0x405ec0` on the Jamming Array; 0x0c8f's debug prints and
+//! `0x18c0d6` = 1 as Ratchet boards.
+//!
+//! Not ported (no visible effect here, or a missing system): 0x0896 (`0x3c3b80`, two, levels 2, 3, 4, 9, 12, 17, 20,
+//! 21: a puzzle with the item 0x26 — its group's 0x0a24 / 0x0a55 / 0x0873, the game's mode 7, its own camera and
+//! draws; 3178 words, its own job); 0x0af3 (`0x3efea8`, four: a camera guide along its path `+0`, every placed one has −1 and deletes
+//! itself on its first tick); 0x0b25 (`0x3f6820`: the area above z 420 — the tfrags and shrubs below or above it
+//! moved out `0x2ee5a0`, and within 150 of (500, 200, 500) the gravity frames `0x1a8ff0` (G-LVL-003), the no-item
+//! area, its music; its tie group's 32 instances turned while in view; a texture's scroll); 0x0f15 (`0x43a3c8`: in the
+//! scenes, the arena master's moat and lamps drawn for it and the moby `+4` moved 2 along its second row; the
+//! master's draws are crate::moby::classes::arena's).
 //!
 //! Not ported: 0x0adf's lift (`0x3ece68`, its update when the cuboid's z scale is 2: up and down to Ratchet's level
 //! as he rides it); 0x0e96 (`0x4301b0`, the arena crowd: it waits for its controller past state 1, cheers by the
@@ -1770,4 +1790,387 @@ pub fn draw_0a9c(w: &MobyWorld, id: usize, out: &mut Vec<crate::fx::FxQuad>) {
             out.push(crate::fx::FxQuad { fx: SYMBOL_FX[sym as usize], additive: false, corners, st: [[u0, v0], [u1, v0], [u0, v1], [u1, v1]], rgba: [0x7f7f_7f7f; 4] });
         }
     }
+}
+
+/// The level's mission `mission` done (`0x19b2e8 + level·16`, bit 7).
+fn mission_done(g: &crate::game::GameState, level: i32, mission: i32) -> bool {
+    usize::try_from(mission).ok().and_then(|k| g.missions.get(level.max(0) as usize * 0x10 + k)).is_some_and(|b| b & 0x80 != 0)
+}
+
+/// The flag byte `0x1395b8 + k` (crate::game::GameState::flags).
+fn flag(g: &crate::game::GameState, k: usize) -> u8 { g.flags.get(k).copied().unwrap_or(0) }
+fn set_flag(g: &mut crate::game::GameState, k: usize, v: u8) {
+    if let Some(b) = g.flags.get_mut(k) { *b = v; }
+}
+
+/// `0x2bd368(pos, rot, state, 1)`: Ratchet put at `pos` facing `rot`, in `state`.
+fn place_hero(ctx: &mut Ctx, pos: [f32; 3], rot: [f32; 3], state: i32) {
+    ctx.hero.teleport(pos, rot);
+    ctx.hero.request_state(state, true);
+}
+
+/// The local point of `p` in moby `id`'s frame (`0x32a6a0(m, out, v, 0)`: through its rows' transpose).
+fn local_of(w: &MobyWorld, id: usize, p: [f32; 3]) -> [f32; 3] {
+    let m = &w.mobys[id];
+    let d = [p[0] - m.pos[0], p[1] - m.pos[1], p[2] - m.pos[2]];
+    std::array::from_fn(|k| d[0] * m.rows[k][0] + d[1] * m.rows[k][1] + d[2] * m.rows[k][2])
+}
+
+/// 0x0c51 (`0x4112c8`): the scenes that give Endako. Until the planet 3 is unlocked (`0x1a7bd3`) and while its flag
+/// `0x1395bc` is clear, Ratchet in its cuboid `+0x0c` (`0x325c50`) queues the scene 0x2d (refused, it tries again),
+/// the movie 3 and the scene 0x2e (`0x2f8e70`), starts them (`0x2f8fb8`) and sets the flag (2); once the scenes are
+/// over (`0x379338`) the planet 3 is unlocked (`0x326b28`) with its banner (`0x3296d0(3)`: the message box), 3.
+pub fn update_0c51(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    match w.mobys[id].state {
+        0 => w.mobys[id].set_state(1, -1),
+        1 => {
+            let g = &mut *ctx.game;
+            if g.planets.get(3).is_some_and(|&b| b != 0) || flag(g, 4) != 0 { return; }
+            if !ctx.level.in_cuboid(w.mobys[id].pv_i(0xc), ctx.hero.pos) { return; }
+            if !g.scenes.queue.push(0x2d) { return; }
+            g.scenes.queue.push(3);
+            g.scenes.queue.push(0x2e);
+            g.scenes.start_queue(ctx.hero.hp);
+            set_flag(g, 4, 1);
+            w.mobys[id].set_state(2, -1);
+        }
+        2 => {
+            if ctx.game.scenes.in_scene() { return; }
+            ctx.game.unlock_planet(3);
+            crate::travel::new_planet_banner(ctx.game, 3);
+            w.mobys[id].set_state(3, -1);
+        }
+        _ => {}
+    }
+}
+
+/// 0x0bf6 (`0x405b58`; the same class on the Jamming Array, level 0x1a): the ship to the Jamming Array and back. At
+/// its start it plays its sequence 2, keeps its place (`+0x20`, `+0x30`) and whether its mission is done (`+0x1e`;
+/// done, it hooks the moby `+4`); on Maktar, back from the Jamming Array (the flag `0x139629` = 0x1a, set to 1),
+/// Ratchet is put at the cuboid `+0x14` with the placed view `+0x10` reset (`0x328648`) and made the checkpoint
+/// (`0x360b18`), with Barlow (planet 4) unlocked its banner. Ratchet grounded on it and more than 0.6 under it in its
+/// frame gets the prompt (owner 8: on the Jamming Array 0x1303, else 0x131f with the mission done or 0x1302); △ makes
+/// the checkpoint and leaves for the other level (`0x2f9080(level, 1)`; to the Jamming Array the flag `0x1395b9`
+/// set). On the Jamming Array, its mission done and Barlow not yet unlocked, it queues the scene 0xa7, the movie 4
+/// and the scene 0xa8, starts them, clears the no-item area (`0x18c310`), unlocks Barlow (`0x326b28(4)`) and stops
+/// (3).
+pub fn update_0bf6(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let level = ctx.game.level;
+    match w.mobys[id].state {
+        0 => {
+            super::props::set_seq(w, id, ctx, 2, 0, 1);
+            let done = mission_done(ctx.game, level, w.mobys[id].mission as i32);
+            let m = &mut w.mobys[id];
+            m.set_state(1, -1);
+            m.alpha = 0xff;
+            if level == 0x1a { m.draw_dist = 0xff; }
+            let (p, r) = (m.pos, m.rot);
+            m.set_pv_v(0x20, p);
+            m.set_pv_v(0x30, r);
+            m.set_pv_s(0x1e, done as i16);
+            let hook = m.pv_i(4);
+            if done && hook != 0 {
+                if let Some(h) = usize::try_from(hook).ok().and_then(|h| w.mobys.get_mut(h)) { h.once |= 4; }
+            }
+            if level == 2 && flag(ctx.game, 0x71) == 0x1a {
+                set_flag(ctx.game, 0x71, 1);
+                let (at, view) = (w.mobys[id].pv_i(0x14), w.mobys[id].pv_i(0x10));
+                if let Some((p, r)) = ctx.level.cuboid_place(at) {
+                    place_hero(ctx, p, r, 0);
+                    if view != -1 { ctx.game.cameras.reset_placed(view); }
+                }
+                let (p, r) = (ctx.hero.pos, ctx.hero.rot);
+                ctx.game.save_checkpoint(p, r);
+                // The flag `0x13965d` (past the save's flag bytes, not kept): the banner each return.
+                if ctx.game.planets.get(4).is_some_and(|&b| b != 0) { crate::travel::new_planet_banner(ctx.game, 4); }
+            }
+        }
+        1 => {}
+        _ => return,
+    }
+    if ctx.hero.ground_moby == Some(id) && ctx.hero.grounded_ticks != 0 && local_of(w, id, ctx.hero.pos)[2] < -0.6 {
+        let (text, to) = if level == 0x1a {
+            (0x1303, 2)
+        } else if mission_done(ctx.game, level, w.mobys[id].mission as i32) {
+            (0x131f, 0x1a)
+        } else {
+            (0x1302, 0x1a)
+        };
+        ctx.game.prompt.request(8, text, 1);
+        if ctx.hero.items.pressed & crate::pad::button::TRIANGLE != 0 {
+            let (p, r) = (ctx.hero.pos, ctx.hero.rot);
+            ctx.game.save_checkpoint(p, r);
+            ctx.game.go_to_level(to, true);
+            if to == 0x1a { set_flag(ctx.game, 1, 1); }
+        }
+    }
+    let g = &mut *ctx.game;
+    if level == 0x1a && mission_done(g, 0x1a, w.mobys[id].mission as i32) && g.planets.get(4).is_some_and(|&b| b == 0) && g.scenes.queue.push(0xa7) {
+        g.scenes.queue.push(4);
+        g.scenes.queue.push(0xa8);
+        g.scenes.start_queue(ctx.hero.hp);
+        g.no_item_area = false;
+        g.unlock_planet(4);
+        w.mobys[id].set_state(3, -1);
+    }
+}
+
+/// 0x0c8f's pvars: the ends' cuboids `+0x7c` / `+0x80`, Ratchet's places at them `+0x60` / `+0x64` and their placed
+/// views `+0x68` / `+0x6c` (by the end `+0xbc`), the mission `+0x78`, the hum `+0x84`, its base place `+0x90` /
+/// `+0xa0`, the bob's phases `+0xb0..+0xb8`, the speed `+0xcc`.
+const CAR_END: usize = 0xbc;
+const CAR_BASE: usize = 0x90;
+const CAR_BASE_ROT: usize = 0xa0;
+const CAR_SPEED: usize = 0xcc;
+const CAR_HUM: usize = 0x84;
+/// `$gp+0x2ca0` / `+0x2ca4`: the top speed (a second) and the gain (a second²).
+const CAR_TOP: f32 = 5.0;
+const CAR_GAIN: f32 = 7.0;
+/// `$gp+0x2cb0`: the bumpers 2 to each side (y mirrored) of this point in its frame.
+const CAR_BUMPER: [f32; 3] = [-3.0, 2.0, 0.5];
+/// Where Ratchet walks to on boarding, in its frame.
+const CAR_SEAT: [f32; 3] = [-1.2, 0.0, -0.69];
+/// `$gp+0x2cc4..+0x2cd8`: the bob — the roll 0.01 at 61°/s, the pitch 0.05 at 83°/s, the height 0.25 at 100°/s.
+const CAR_BOB: [(f32, f32); 3] = [(61.0, 0.01), (83.0, 0.05), (100.0, 0.25)];
+const DEG_TICK: f32 = 0.000_290_888_25;
+
+/// 0x0c8f's end `e` (0 / 1): its cuboid's place for the base (`+0x7c + 4e`).
+fn car_end(w: &mut MobyWorld, id: usize, ctx: &Ctx, e: i32) {
+    if let Some((p, r)) = ctx.level.cuboid_place(w.mobys[id].pv_i(0x7c + 4 * e as usize)) {
+        let m = &mut w.mobys[id];
+        m.set_pv_v(CAR_BASE, p);
+        m.set_pv_v(CAR_BASE_ROT, r);
+    }
+}
+
+/// `0x414e78`: at its base, bobbing ([`CAR_BOB`]: each phase on by its rate, the sine's share added).
+fn car_bob(w: &mut MobyWorld, id: usize) {
+    use crate::hero::physics::add_rot;
+    let m = &mut w.mobys[id];
+    m.pos = m.pv_v(CAR_BASE);
+    m.rot = m.pv_v(CAR_BASE_ROT);
+    let b = add_rot(m.pv_f(0xb8), CAR_BOB[0].0 * DEG_TICK);
+    m.set_pv_f(0xb8, b);
+    m.rot[0] += CAR_BOB[0].1 * b.sin();
+    let b = add_rot(m.pv_f(0xb4), CAR_BOB[1].0 * DEG_TICK);
+    m.set_pv_f(0xb4, b);
+    m.rot[1] += CAR_BOB[1].1 * b.sin();
+    let b = add_rot(m.pv_f(0xb0), CAR_BOB[2].0 * DEG_TICK);
+    m.set_pv_f(0xb0, b);
+    m.pos[2] += CAR_BOB[2].1 * b.sin();
+}
+
+/// 0x0c8f (`0x414498`, two): the hover car between two ends (the cuboids `+0x7c` / `+0x80`). With a mission `+0x78`
+/// it is gone once the item 0x26 is had (`0x1a7b26`), and waits hidden (4) for the mission, then shows when out of
+/// view (`0x2f4008(64, its sphere)`). Waiting (1), every 64th frame it moves to the end nearer Ratchet (across); with
+/// Ratchet grounded on it, more than 0.6 under it in its frame, he stands still (0x6f) and it goes (2): the script
+/// camera at the view (snapping), he walks to its seat ([`CAR_SEAT`]), its sound 1 and its sequence 0; it speeds
+/// along its first row ([`CAR_TOP`] / [`CAR_GAIN`], flat), its bumpers hitting what is in the way, the camera rising
+/// a sixtieth a tick turned toward him (0.75° / 1.5° a tick); from tick 45 he stands still again, its hum loops, and
+/// from tick 121 the screen fades to black (1/30 a tick). Black: he is put at the other end's place (`+0x60`, 0.9 back
+/// along its first row) and walks to its middle, the camera behind him with the end's placed view reset (`+0x68`),
+/// the hum stopped, sequence 2; the fade back (3), then 1. Drawn, it bobs ([`car_bob`]); it carries Ratchet
+/// (`0x326a60`).
+pub fn update_0c8f(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    use crate::hero::physics::{add, approach, approach_angle, atan2, dist2, set_len};
+    use crate::script_camera::{MODE_SNAP, RELEASE_CUT_BEHIND};
+    let (old, old_yaw) = (w.mobys[id].pos, w.mobys[id].rot[2]);
+    let gate = w.mobys[id].pv_i(0x78);
+    let had = ctx.game.items.get(0x26).is_some_and(|&b| b != 0);
+    let solid = w.class(w.mobys[id].o_class).is_some_and(|c| c.has_collision);
+    match w.mobys[id].state {
+        0 => {
+            let m = &mut w.mobys[id];
+            m.alpha = 0xff;
+            m.set_pv_i(CAR_HUM, -1);
+            if m.pv_i(0x7c) == -1 || m.pv_i(0x80) == -1 {
+                w.delete(id);
+                return;
+            }
+            if gate == -1 {
+                m.set_state(1, -1);
+            } else {
+                if had {
+                    w.delete(id);
+                    return;
+                }
+                m.has_collision = false;
+                m.mode = (m.mode & !mode::TARGET) | 0x41;
+                m.set_state(4, -1);
+                w.changed = true;
+            }
+            super::props::set_seq(w, id, ctx, 2, 0, 1);
+            car_end(w, id, ctx, 0);
+        }
+        1 => {
+            if gate != -1 && had {
+                w.delete(id);
+                return;
+            }
+            if ctx.hero.ground_moby == Some(id) && ctx.hero.grounded_ticks != 0 {
+                if local_of(w, id, ctx.hero.pos)[2] < -0.6 {
+                    ctx.hero.request_state(0x6f, true);
+                    w.mobys[id].set_state(2, -1);
+                }
+            } else if ctx.game.frame & 0x3f == 0 {
+                let cur = w.mobys[id].pv_i(CAR_END);
+                let other = (cur + 1) & 1;
+                let at = |e: i32| ctx.level.cuboid_place(w.mobys[id].pv_i(0x7c + 4 * e as usize)).map(|(p, _)| dist2(ctx.hero.pos, p));
+                if let (Some(a), Some(b)) = (at(other), at(cur)) {
+                    if a < b {
+                        w.mobys[id].set_pv_i(CAR_END, other);
+                        car_end(w, id, ctx, other);
+                        let m = &mut w.mobys[id];
+                        m.pos = m.pv_v(CAR_BASE);
+                        m.rot = m.pv_v(CAR_BASE_ROT);
+                    }
+                }
+            }
+        }
+        2 => 'ride: {
+            if ctx.hero.grounded_ticks == 0 {
+                ctx.game.cameras.camera_script2(RELEASE_CUT_BEHIND, ctx.hero);
+                break 'ride;
+            }
+            if w.mobys[id].first() {
+                let (vp, ve) = ctx.game.cameras.view_euler();
+                ctx.game.cameras.camera_script(vp, ve, MODE_SNAP, 0, false, ctx.hero);
+                let m = &w.mobys[id];
+                let seat = add(through(&m.rows, CAR_SEAT), m.pos);
+                ctx.hero.script_walk_to(m.rot[2], seat, false);
+                ctx.host.play_sound(&w.mobys[id], 1, 0);
+                if super::props::seq(w, id, ctx) != 0 { ctx.host.set_anim(&w.mobys[id], 0, 0, 0x2d); }
+            }
+            let m = &mut w.mobys[id];
+            let mut v = m.pv_f(CAR_SPEED);
+            approach(CAR_TOP * 0.016_666_668, CAR_GAIN * 0.000_277_777_78, &mut v);
+            m.set_pv_f(CAR_SPEED, v);
+            let mut step = set_len(m.rows[0], v);
+            step[2] = 0.0;
+            m.set_pv_v(CAR_BASE, add(m.pv_v(CAR_BASE), step));
+            for side in [1.0, -1.0] {
+                let m = &w.mobys[id];
+                let at = add(through(&m.rows, [CAR_BUMPER[0], CAR_BUMPER[1] * side, CAR_BUMPER[2]]), m.pos);
+                crate::moby::ai::attack_sphere(w, id, ctx, 1.0, 1.0, 1.0, at, 0x10000, 0, 1, 0);
+            }
+            // The camera: where the view is, a sixtieth higher, turned toward Ratchet.
+            let (vp, mut e) = ctx.game.cameras.view_euler();
+            let eye = [vp[0], vp[1], vp[2] + 0.016_666_668];
+            let h = ctx.hero.pos;
+            let up = atan2(dist2(eye, h), h[2] - eye[2]);
+            approach_angle(-up, f32::from_bits(0x3c56_7752), &mut e[1], 0);
+            approach_angle(atan2(h[0] - eye[0], h[1] - eye[1]), f32::from_bits(0x3cd6_7752), &mut e[2], 0);
+            ctx.game.cameras.camera_script_targets(Some(eye), Some(e));
+            let m = &mut w.mobys[id];
+            let t = m.state_ticks;
+            m.state_ticks = t.wrapping_add(1);
+            if (t as u16) < 0x79 {
+                if m.state_ticks == 0x2d { ctx.hero.request_state(0x6f, true); }
+                let hum = w.mobys[id].pv_i(CAR_HUM);
+                if !ctx.host.sound_playing(hum) {
+                    let hum = ctx.host.play_sound(&w.mobys[id], 0, 4);
+                    w.mobys[id].set_pv_i(CAR_HUM, hum);
+                }
+            } else {
+                approach(1.0, f32::from_bits(0x3d08_8889), &mut ctx.game.fade_black);
+            }
+            if ctx.game.fade_black < 1.0 { break 'ride; }
+            // Black: off at the other end.
+            ctx.hero.request_state(0, true);
+            let hum = w.mobys[id].pv_i(CAR_HUM);
+            if hum != -1 { ctx.host.stop_sound(hum); }
+            w.mobys[id].set_pv_i(CAR_HUM, -1);
+            ctx.host.set_anim(&w.mobys[id], 2, 0, 0);
+            w.mobys[id].set_state(3, -1);
+            let e = (w.mobys[id].pv_i(CAR_END) + 1) & 1;
+            w.mobys[id].set_pv_i(CAR_END, e);
+            car_end(w, id, ctx, e);
+            let k = 4 * e as usize;
+            let c = usize::try_from(w.mobys[id].pv_i(0x60 + k)).ok().and_then(|i| ctx.level.cuboids.get(i)).copied();
+            if let Some(c) = c {
+                let mid = [c.matrix[3][0], c.matrix[3][1], c.matrix[3][2]];
+                let at = add(mid, [c.matrix[0][0] * -0.9, c.matrix[0][1] * -0.9, c.matrix[0][2] * -0.9]);
+                let rot = [c.extra[0], c.extra[1], c.extra[2]];
+                place_hero(ctx, at, rot, 0);
+                ctx.hero.script_walk_to(c.extra[2], mid, true);
+            }
+            ctx.game.cameras.camera_script2(RELEASE_CUT_BEHIND, ctx.hero);
+            ctx.game.cameras.reset_placed(w.mobys[id].pv_i(0x68 + k));
+            car_bob(w, id);
+        }
+        3 => {
+            approach(0.0, f32::from_bits(0x3d08_8889), &mut ctx.game.fade_black);
+            if ctx.game.fade_black <= 0.0 {
+                let m = &mut w.mobys[id];
+                m.set_pv_f(CAR_SPEED, 0.0);
+                m.set_state(1, -1);
+            }
+        }
+        4 => {
+            if mission_done(ctx.game, ctx.game.level, gate) {
+                let b = w.mobys[id].bsphere;
+                let s = [b[0] / 1024.0, b[1] / 1024.0, b[2] / 1024.0, b[3]];
+                if ctx.view.is_none_or(|v| v.culled(64.0, s)) {
+                    let m = &mut w.mobys[id];
+                    m.mode = (m.mode & !0x41) | mode::TARGET;
+                    m.has_collision = solid;
+                    m.set_state(1, -1);
+                    w.changed = true;
+                }
+            }
+        }
+        _ => {}
+    }
+    if w.mobys[id].drawn != 0 { car_bob(w, id); }
+    let m = &w.mobys[id];
+    carry_hero(ctx, id, old, old_yaw, m.pos, m.rot[2]);
+}
+
+/// 0x0a57 (`0x3dd4a8`): the footsteps' dust. At its start (`0x1a7b02` clear: `0x18c31c` = 1, which the port's
+/// physics derives from Clank) 1; then each tick [`footstep_dust`]. Not ported: Ratchet in its cuboid `+0` sets the
+/// hero word `0x18a03a` = 5 (`0x325c50`; no reader found).
+pub fn update_0a57(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    match w.mobys[id].state {
+        0 => {
+            let m = &mut w.mobys[id];
+            m.alpha = 0xff;
+            m.set_state(1, -1);
+        }
+        1 => footstep_dust(w, ctx),
+        _ => {}
+    }
+}
+
+/// `0x3dd540`: on surface 10 (`0x18b2b0`) and grounded, a foot down — at the walk's start (state 2, its timer 1:
+/// either foot, `randi(2)`), or with no blend running (`0x18aa4c`) the walk's (3) key times 49.5 / 17.0 or the run's
+/// (4) 12.5 / 1.0 passed this tick (`0x2b6fa0`; the right foot when its time passed, else the left) — leaves a dust
+/// puff (crate::particles::dust: `randf(1, 1.5)` big, growing 5250 a tick) at the foot's joint (0x16 + foot,
+/// `0x3168e0`) 0.15 ahead along his yaw, 0.04 above the ground under it (`0x321020`).
+fn footstep_dust(w: &MobyWorld, ctx: &mut Ctx) {
+    let h = &*ctx.hero;
+    if h.surface != 10 || h.grounded_ticks == 0 { return; }
+    let v = ctx.hero_view;
+    let passed = |f: f32| f < v.frame && v.frame - f <= v.frame_step;
+    let foot = if h.timer == 1 && h.state == 2 {
+        ctx.game.rng.randi(2)
+    } else {
+        let (l, r) = match v.seq_b {
+            3 if !v.blending() => (49.5, 17.0),
+            4 if !v.blending() => (12.5, 1.0),
+            _ => return,
+        };
+        let left = passed(l);
+        if passed(r) { 1 } else if left { 0 } else { return }
+    };
+    let Some(hm) = ctx.hero_moby.and_then(|i| w.mobys.get(i)) else { return };
+    let Some(mut p) = ctx.host.joint(hm, 0x16 + foot as usize) else { return };
+    let yaw = ctx.hero.rot[2];
+    p[0] += yaw.cos() * 0.15;
+    p[1] += yaw.sin() * 0.15;
+    let z = crate::moby::ground_under(ctx, p);
+    let size = ctx.game.rng.randf(1.0, 1.5);
+    // No ground under it (the original takes the line's end): no puff here.
+    let Some(z) = z else { return };
+    p[2] = z + 0.04;
+    if let Some(sys) = ctx.parts.as_deref_mut() { crate::particles::dust::dust(sys, &mut ctx.game.rng, size, 5250.0, p, None); }
 }

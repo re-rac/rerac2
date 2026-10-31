@@ -26,11 +26,13 @@
 //! | 0x22, 0x23, 0x2d, 0x2e | [`water`] | [`water`] | the water: bubbles, drops, rings and the bow spray (the hero's swim effects) |
 //! | 0, 1 | [`rain`] | [`rain`] | the rain's drops and splashes (crate::moby::classes::weather) |
 //! | 0x5b | [`cinder`] (L02 `0x3468b8`) | (L02 `0x346a30`) | the big explosion's cinders: embers that keep their size (crate::moby::classes::explosion) |
+//! | 0x42 | [`dust`] (L02 `0x342ed8`, L00 `0x33c390`) | (L02 `0x343040`) | dust puffs: drifting, growing, fading (Maktar's footsteps, crate::moby::classes::maktar::update_0a57) |
 //!
 //! Any other type kills itself on its first update. The gravity direction (`0x18a0e0`) is (0, 0, −1): normal gravity.
 //! Not ported: the gravity-boots bend of the positions (`0x380e08`, `+0x1c` = 2).
 
 pub mod cinder;
+pub mod dust;
 mod pool;
 pub mod rain;
 pub mod type23;
@@ -1081,6 +1083,7 @@ pub fn update_parts(sys: &mut Particles, mobys: &crate::moby::MobyWorld, cam: [f
             BILLOW => update_billow(sys, i, cam, rng),
             EMBER => update_ember(sys, i, rng, mobys.frame),
             cinder::CINDER => cinder::update(sys, i, rng, mobys.frame),
+            dust::DUST => dust::update(sys, i),
             FLARE => update_flare(sys, i),
             rain::DROP => rain::update_drop(sys, i, &aux.rain),
             rain::SPLASH => rain::update_splash(sys, i),
