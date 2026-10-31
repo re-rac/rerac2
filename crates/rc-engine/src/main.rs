@@ -22,6 +22,7 @@
 //!   `sound` shown from the start on that page), crate::debug_hud; `RC_GIVE_ITEMS=a,b,…` the items had at the start,
 //!   the last in the hand, crate::play
 
+mod chunk_switch;
 mod crash_log;
 mod debug_hud;
 mod asset_write;
@@ -148,6 +149,8 @@ fn main() -> anyhow::Result<()> {
     .add_plugins(draw_stats::DrawStatsPlugin)
     // The inspect overlay, only with `RC_DEBUG_HUD`.
     .add_plugins(debug_hud::DebugHudPlugin)
+    // The level chunk switch (Maktar's arena).
+    .add_plugins(chunk_switch::ChunkSwitchPlugin)
     // MSAA of the world cameras (default off; `RenderSettings` can change it at run time).
     .add_plugins(render_settings::RenderSettingsPlugin)
     .add_plugins((MaterialPlugin::<TfragMaterial>::default(), FlyCamPlugin, game_camera::GameCameraPlugin { fog: level.fog }))

@@ -112,9 +112,10 @@ fn update(
     ties: Option<ResMut<crate::tie_lod::TieLodState>>,
     shrubs: Option<ResMut<crate::shrub_render::ShrubSway>>,
     play: Option<Res<crate::play::Play>>,
+    chunk: Res<crate::chunk_switch::ChunkGeneration>,
 ) {
-    // A runtime level change (crate::level_switch): the new level's lights.
-    if generation.is_changed() { *state = None; }
+    // A runtime level change (crate::level_switch) or chunk switch (crate::chunk_switch): the new world's lists.
+    if generation.is_changed() || chunk.is_changed() { *state = None; }
     let w = state.get_or_insert_with(|| setup(&level, &assets));
     // The game's point lights (rc_game::moby::MobyWorld::point_lights); none without a running game.
     let none = PointLights::default();

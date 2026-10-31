@@ -198,6 +198,21 @@ pub fn hud(root: &Path, index: u32) -> Result<rc_formats::hud::Hud> {
     Ok(rc_formats::hud::parse_hud(header, [&banks[0], &banks[1], &banks[2], &banks[3], &banks[4]])?)
 }
 
+/// Level `index`'s chunk `k` world (rc_formats::disc::level::LevelWad::chunk): its tfrags, lit as the load lights
+/// the core's (`0x36b4f0`), and its collision. `None` for a chunk the level does not have.
+pub fn chunk_world(root: &Path, index: u32, k: usize) -> Result<Option<(Vec<tfrag::Tfrag>, rc_formats::collision::Collision)>> {
+    let name = file_name(index);
+    let file = crate::disc_source::read(root, &name)?;
+    let wad = LevelWad::parse(&file).with_context(|| name.clone())?;
+    let Some(chunk) = wad.chunk(k).with_context(|| format!("{name}: chunk {k}"))? else { return Ok(None) };
+    let gameplay = rc_formats::wad::decompress(wad.part_bytes(Part::Gameplay)?.context("no gameplay part")?).context("decompressing the gameplay file")?;
+    let mut tfrags = chunk.tfrags;
+    if let Some(l) = crate::moby_light::load(root, &gameplay).context("loading the light bank")? {
+        for t in &mut tfrags { t.rgba = rc_formats::tfrag_light::light_tfrag(t, &l.bank, &l.table); }
+    }
+    Ok(Some((tfrags, chunk.collision)))
+}
+
 pub fn load(root: &Path, index: u32) -> Result<LoadedLevel> {
     let mut t = LoadTimings::default();
     let t0 = Instant::now();
