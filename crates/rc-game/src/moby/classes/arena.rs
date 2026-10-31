@@ -33,7 +33,7 @@
 //! * **The flame columns 0x0b89** ([`update_column`]) and **the crate lifts 0x0ccc** ([`update_lift`]).
 //!
 //! Not ported: the bosses 0x09f8 / 0x0a44 (the challenges with a boss wave, 2, 4, 6, 9, 11, 12 and 13, are kept off the
-//! menu until they are: they could not end), the crowd 0x0e96 and its cheers (`0x3fb028`, `0x42e670`), the announcer's speech (`0x401d98`, its
+//! menu until they are: they could not end), the crowd's cheers (`0x3fb028`, `0x42e670`: their classes 0x0b58 / 0x0e79), the announcer's speech (`0x401d98`, its
 //! remarks `0x401e68` / `0x402090`), the restart's path straight into the wipe (`0x1a7904` = 2), the menu's arrows (`0x3ff388`) and its vendor (□, `0x332158(5)`), the
 //! music (`0x335928`), the level's sounds, the challenges' weapon lock (`0x18b6f4`) and the fixed held items of 7 / 8 /
 //! 13 beyond the hand request; the plates' sparks (`0x3d85a8`: the particle burst `0x345d88` has no port).
@@ -1120,6 +1120,79 @@ fn challenge_hud(w: &MobyWorld, id: usize) -> ChallengeHud {
         ticks: m.pv_i(pv::TICKS),
         count: wave as i32 * 15 + sent - m.pv_i(pv::ALIVE),
         boss,
+    }
+}
+
+/// The crowd's class.
+pub const CROWD: i16 = 0x0e96;
+/// `$gp+0x3470..+0x3480`: the crowd's score levels (below 2 the wave, under 3 calm again, above 4 cheering), the
+/// wave's round (frames) and its width either side (4°).
+const CROWD_LEVELS: [f32; 3] = [2.0, 3.0, 4.0];
+const WAVE_FRAMES: i32 = 600;
+const WAVE_WIDTH: f32 = f32::from_bits(0x3d8e_fa36);
+
+/// 0x0e96 (`0x4301b0`): one of the crowd in the stands (60 placed), following its master's score (`+0x6c` of the
+/// moby its `+0x0` names) while the master is past its state 1: in view (`0x2f4008(255, its place, 5)`) its draw
+/// distance 0xff and it acts, else 0 and it waits. **1** sitting (sequence 0 / 1 at random on sitting down): a score
+/// above 4, one tick in 60, it cheers (**2**: sequence 2 / 3, back to 1 one tick in 60 under 3); under 2, one tick in
+/// 60, the wave (**3**): round the arena's middle (500, 600) once every 600 frames, it stands (sequence 4) while the
+/// wave or its opposite is within 4° of it, else sits on; back to 1 one tick in 60 above 3.
+pub fn update_crowd(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let master = usize::try_from(w.mobys[id].pv_i(0)).ok().filter(|&ms| w.mobys.get(ms).is_some_and(|m| 1 < m.state));
+    let Some(ms) = master else { return };
+    let p = w.mobys[id].pos;
+    if ctx.view.is_some_and(|v| v.culled(255.0, [p[0], p[1], p[2], 5.0])) {
+        w.mobys[id].draw_dist = 0;
+        return;
+    }
+    w.mobys[id].draw_dist = 0xff;
+    // `0x430570`: the start.
+    if w.mobys[id].state == 0 {
+        w.mobys[id].set_state(1, -1);
+        let s = if ctx.game.rng.randi(2) == 0 { 1 } else { 0 };
+        set_seq(w, id, ctx, s, 0, 10);
+    }
+    let score = w.mobys[ms].pv_f(pv::SCORE);
+    let sit_again = |w: &MobyWorld, ctx: &mut Ctx| {
+        // Each sitting sequence's end: another at random (two draws, as the original).
+        let now = super::props::seq(w, id, ctx) as i32;
+        if now != ctx.game.rng.randi(2) {
+            let s = ctx.game.rng.randi(2) as u8;
+            ctx.host.set_anim(&w.mobys[id], s, 0, 10);
+        }
+    };
+    match w.mobys[id].state {
+        1 => {
+            if w.mobys[id].first() { sit_again(w, ctx); }
+            if CROWD_LEVELS[2] < score && ctx.game.rng.randi(0x3c) == 0 {
+                w.mobys[id].set_state(2, -1);
+            } else if score < CROWD_LEVELS[0] && ctx.game.rng.randi(0x3c) == 0 {
+                w.mobys[id].set_state(3, -1);
+            }
+        }
+        2 => {
+            if w.mobys[id].first() {
+                let now = super::props::seq(w, id, ctx) as i32;
+                if now != ctx.game.rng.randi(2) + 2 {
+                    let s = ctx.game.rng.randi(2) as u8 + 2;
+                    ctx.host.set_anim(&w.mobys[id], s, 0, 10);
+                }
+                return;
+            }
+            if score < CROWD_LEVELS[1] && ctx.game.rng.randi(0x3c) == 0 { w.mobys[id].set_state(1, -1); }
+        }
+        3 => {
+            let wave = ((ctx.game.frame % WAVE_FRAMES) as f32 * -std::f32::consts::TAU) / WAVE_FRAMES as f32 + std::f32::consts::PI;
+            let me = atan2(p[0] - 500.0, p[1] - 600.0);
+            let near = |a: f32| crate::hero::physics::rot_dist(me, a) < WAVE_WIDTH;
+            if near(wave) || near(add_rot(wave, std::f32::consts::PI)) {
+                set_seq(w, id, ctx, 4, 0, 10);
+            } else if wrapped(w, id, ctx) {
+                sit_again(w, ctx);
+            }
+            if CROWD_LEVELS[1] < score && ctx.game.rng.randi(0x3c) == 0 { w.mobys[id].set_state(1, -1); }
+        }
+        _ => {}
     }
 }
 
