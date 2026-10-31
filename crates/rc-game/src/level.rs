@@ -21,6 +21,9 @@ pub struct LevelData {
     pub items: Vec<rc_formats::disc::menu_tables::ItemRecord>,
     /// The variant planes (`0x1c92e0` / `0x1c9300`: a point and a normal each; [`LevelData::in_variant`]).
     pub variant_planes: Vec<([f32; 3], [f32; 3])>,
+    /// Maktar's arena challenges, read from the level's overlay at load (crate::moby::classes::arena::read_challenges;
+    /// the engine sets them; empty on a level without them).
+    pub arena: Vec<crate::moby::classes::arena::Challenge>,
     /// The height map the rain stops on (core header `+0xa4`; the engine sets it from the core).
     pub height_map: Option<rc_formats::height_map::HeightMap>,
 }
@@ -38,6 +41,7 @@ impl LevelData {
             areas: g::areas(gameplay).map_err(|e| eprintln!("level: areas: {e}")).unwrap_or_default(),
             light_regions: g::light_regions(gameplay).map_err(|e| eprintln!("level: light regions: {e}")).unwrap_or_default(),
             items: Vec::new(),
+            arena: Vec::new(),
             variant_planes: g::variant_planes(gameplay).map_err(|e| eprintln!("level: variant planes: {e}")).unwrap_or_default(),
             height_map: None,
         }

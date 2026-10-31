@@ -13,7 +13,7 @@
 //!   **4 / 5** (5 after a win: its reward, [`prize`]) the fighters pooled, the columns and plates down, Ratchet frozen
 //!   at the middle, the script camera moving to the big screen → **7** the menu ([`Menu`], [`draw_menu`]: ← / → the
 //!   challenges open, [`on_menu`]; ✕ starts one, △ back to the resort) or **6** the win's screen (✕ the menu at the
-//!   next challenge). **8** the challenge: the waves of [`CHALLENGES`] — each its fighters sent out through the
+//!   next challenge). **8** the challenge: the waves of the level's challenge table ([`read_challenges`], `$gp+0x2160`) — each its fighters sent out through the
 //!   spawners (the round's spawner far from Ratchet; then its doors opened), its columns and plates up and its crates
 //!   lifted; a wave is over with all sent and none left; every fourth tick the two gladiators or bladed robots nearest
 //!   Ratchet get the turns; a fighter that leaves the arena dies, Ratchet leaving it dies. Lost (time out in 3 / 5,
@@ -340,156 +340,47 @@ pub struct Wave {
     pub x13: u8,
 }
 
-/// One challenge (`$gp+0x2160[n]`): its waves, the challenge whose win opens it (−1 none), the bolts and the XP
-/// (×32) its first win pays (each later win a third, at least 500 bolts and 5 XP).
-#[derive(Clone, Copy, Debug)]
+/// One challenge (`$gp+0x2160[n]`, 0x18 bytes `{i32 waves, u32 → waves, i32 needs, i32 bolts, i32 xp, 0}`): its waves,
+/// the challenge whose win opens it (−1 none), the bolts and the XP (×32) its first win pays (each later win a third,
+/// at least 500 bolts and 5 XP).
+#[derive(Clone, Debug)]
 pub struct Challenge {
     pub needs: i32,
     pub bolts: i32,
     pub xp: i32,
-    pub waves: &'static [Wave],
+    pub waves: Vec<Wave>,
 }
 
-/// The fourteen challenges (L02 `0x1b1150` → `0x1b1578..0x1b16c8`; the waves at `0x2a56f8..` and `0x1b16c8..`).
-pub static CHALLENGES: [Challenge; 14] = [
-    // 0: 6 waves, after challenge -1
-    Challenge { needs: -1, bolts: 5000, xp: 1, waves: &[
-        Wave { fighters: [5, 0, 0, 0], plates: 0, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 1, x13: 0 },
-        Wave { fighters: [0, 5, 0, 0], plates: 0, b89: 0, crates: [1, 0], bosses: [0, 0], spawners: 2, x13: 0 },
-        Wave { fighters: [0, 0, 0, 15], plates: 0, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [8, 0, 0, 0], plates: 0, b89: 6, crates: [1, 0], bosses: [0, 0], spawners: 2, x13: 0 },
-        Wave { fighters: [0, 0, 4, 0], plates: 6, b89: 6, crates: [1, 3], bosses: [0, 0], spawners: 2, x13: 0 },
-        Wave { fighters: [3, 3, 0, 3], plates: 12, b89: 6, crates: [1, 3], bosses: [0, 0], spawners: 3, x13: 0 },
-    ]},
-    // 1: 5 waves, after challenge 0
-    Challenge { needs: 0, bolts: 1500, xp: 1, waves: &[
-        Wave { fighters: [4, 4, 0, 0], plates: 6, b89: 6, crates: [0, 3], bosses: [0, 0], spawners: 2, x13: 0 },
-        Wave { fighters: [0, 0, 0, 16], plates: 6, b89: 6, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 0, 4, 10], plates: 12, b89: 6, crates: [0, 3], bosses: [0, 0], spawners: 4, x13: 0 },
-        Wave { fighters: [0, 8, 0, 10], plates: 12, b89: 6, crates: [0, 3], bosses: [0, 0], spawners: 4, x13: 0 },
-        Wave { fighters: [4, 0, 4, 0], plates: 12, b89: 6, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-    ]},
-    // 2: 1 waves, after challenge 0
-    Challenge { needs: 0, bolts: 4000, xp: 1, waves: &[
-        Wave { fighters: [0, 0, 0, 0], plates: 0, b89: 0, crates: [0, 6], bosses: [1, 0], spawners: 0, x13: 0 },
-    ]},
-    // 3: 2 waves, after challenge 0
-    Challenge { needs: 0, bolts: 1500, xp: 1, waves: &[
-        Wave { fighters: [5, 5, 0, 5], plates: 0, b89: 0, crates: [0, 6], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 0, 5, 10], plates: 0, b89: 0, crates: [0, 6], bosses: [0, 0], spawners: 6, x13: 0 },
-    ]},
-    // 4: 1 waves, after challenge 2
-    Challenge { needs: 2, bolts: 5000, xp: 1, waves: &[
-        Wave { fighters: [0, 0, 0, 0], plates: 0, b89: 0, crates: [0, 6], bosses: [0, 1], spawners: 0, x13: 0 },
-    ]},
-    // 5: 4 waves, after challenge 3
-    Challenge { needs: 3, bolts: 2000, xp: 1, waves: &[
-        Wave { fighters: [5, 0, 0, 10], plates: 0, b89: 0, crates: [0, 6], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 5, 0, 10], plates: 0, b89: 0, crates: [0, 6], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [2, 3, 0, 10], plates: 0, b89: 0, crates: [0, 6], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 0, 5, 10], plates: 0, b89: 0, crates: [0, 6], bosses: [0, 0], spawners: 6, x13: 0 },
-    ]},
-    // 6: 10 waves, after challenge 4
-    Challenge { needs: 4, bolts: 3000, xp: 1, waves: &[
-        Wave { fighters: [8, 0, 0, 0], plates: 0, b89: 6, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [4, 4, 0, 0], plates: 6, b89: 6, crates: [0, 3], bosses: [0, 0], spawners: 4, x13: 0 },
-        Wave { fighters: [0, 4, 2, 6], plates: 6, b89: 6, crates: [0, 3], bosses: [0, 0], spawners: 4, x13: 0 },
-        Wave { fighters: [4, 4, 0, 0], plates: 6, b89: 6, crates: [0, 3], bosses: [0, 0], spawners: 4, x13: 0 },
-        Wave { fighters: [0, 8, 0, 6], plates: 6, b89: 6, crates: [0, 3], bosses: [0, 0], spawners: 4, x13: 0 },
-        Wave { fighters: [2, 4, 2, 0], plates: 0, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 4, x13: 0 },
-        Wave { fighters: [0, 8, 0, 0], plates: 0, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 2, x13: 0 },
-        Wave { fighters: [0, 0, 0, 16], plates: 6, b89: 6, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [2, 0, 4, 10], plates: 6, b89: 6, crates: [0, 3], bosses: [0, 0], spawners: 4, x13: 0 },
-        Wave { fighters: [0, 0, 0, 0], plates: 0, b89: 0, crates: [0, 3], bosses: [1, 0], spawners: 0, x13: 0 },
-    ]},
-    // 7: 15 waves, after challenge 1
-    Challenge { needs: 1, bolts: 1500, xp: 1, waves: &[
-        Wave { fighters: [6, 0, 0, 0], plates: 0, b89: 0, crates: [6, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 6, 0, 0], plates: 0, b89: 0, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 0, 4, 0], plates: 0, b89: 0, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 0, 0, 10], plates: 0, b89: 0, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [4, 2, 0, 0], plates: 0, b89: 0, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 4, 2, 0], plates: 0, b89: 0, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [4, 0, 2, 0], plates: 0, b89: 0, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 0, 0, 16], plates: 0, b89: 0, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [3, 3, 2, 0], plates: 0, b89: 0, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [6, 0, 0, 8], plates: 0, b89: 0, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 6, 0, 8], plates: 0, b89: 0, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 0, 4, 8], plates: 0, b89: 0, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [4, 2, 0, 8], plates: 0, b89: 0, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 4, 2, 8], plates: 0, b89: 0, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [4, 0, 2, 8], plates: 0, b89: 0, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-    ]},
-    // 8: 4 waves, after challenge 7
-    Challenge { needs: 7, bolts: 2000, xp: 1, waves: &[
-        Wave { fighters: [0, 5, 0, 0], plates: 0, b89: 0, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [3, 3, 0, 3], plates: 0, b89: 0, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 0, 6, 0], plates: 0, b89: 0, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [4, 3, 0, 6], plates: 0, b89: 0, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-    ]},
-    // 9: 1 waves, after challenge 6
-    Challenge { needs: 6, bolts: 6000, xp: 1, waves: &[
-        Wave { fighters: [0, 0, 0, 0], plates: 12, b89: 0, crates: [0, 12], bosses: [1, 1], spawners: 0, x13: 0 },
-    ]},
-    // 10: 20 waves, after challenge 5
-    Challenge { needs: 5, bolts: 2000, xp: 1, waves: &[
-        Wave { fighters: [8, 0, 0, 0], plates: 0, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [4, 4, 0, 0], plates: 0, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 0, 6, 10], plates: 0, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 8, 0, 0], plates: 0, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [4, 0, 4, 10], plates: 6, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [2, 2, 2, 0], plates: 0, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 8, 0, 0], plates: 0, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 0, 0, 16], plates: 0, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [2, 2, 4, 10], plates: 0, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [6, 0, 2, 0], plates: 0, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 4, 4, 0], plates: 0, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [4, 0, 0, 12], plates: 0, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 6, 0, 0], plates: 0, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [4, 0, 4, 10], plates: 0, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 4, 2, 10], plates: 0, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [4, 4, 0, 0], plates: 0, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 8, 0, 10], plates: 6, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [6, 0, 3, 0], plates: 6, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 8, 0, 0], plates: 12, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 0, 0, 16], plates: 12, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-    ]},
-    // 11: 16 waves, after challenge 10
-    Challenge { needs: 10, bolts: 7000, xp: 1, waves: &[
-        Wave { fighters: [4, 0, 4, 0], plates: 6, b89: 6, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 0, 0, 16], plates: 6, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 2, 4, 0], plates: 6, b89: 6, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 6, 0, 8], plates: 6, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [4, 4, 0, 0], plates: 6, b89: 6, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 0, 0, 0], plates: 0, b89: 0, crates: [0, 6], bosses: [1, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 4, 0, 12], plates: 12, b89: 6, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 0, 4, 12], plates: 12, b89: 6, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [8, 0, 0, 0], plates: 12, b89: 6, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 8, 0, 0], plates: 12, b89: 6, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 0, 0, 0], plates: 0, b89: 0, crates: [0, 6], bosses: [0, 1], spawners: 6, x13: 0 },
-        Wave { fighters: [4, 4, 0, 0], plates: 6, b89: 6, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 0, 4, 12], plates: 12, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 0, 0, 16], plates: 12, b89: 0, crates: [0, 3], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 0, 0, 8], plates: 12, b89: 0, crates: [0, 6], bosses: [1, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 0, 0, 8], plates: 12, b89: 0, crates: [0, 6], bosses: [0, 1], spawners: 6, x13: 0 },
-    ]},
-    // 12: 1 waves, after challenge 0
-    Challenge { needs: 0, bolts: 6000, xp: 1, waves: &[
-        Wave { fighters: [0, 0, 0, 0], plates: 0, b89: 0, crates: [0, 0], bosses: [1, 0], spawners: 0, x13: 0 },
-    ]},
-    // 13: 9 waves, after challenge 12
-    Challenge { needs: 12, bolts: 9000, xp: 1, waves: &[
-        Wave { fighters: [0, 0, 0, 16], plates: 12, b89: 0, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 0, 4, 0], plates: 0, b89: 6, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [6, 0, 0, 8], plates: 6, b89: 6, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 8, 0, 0], plates: 6, b89: 6, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [4, 0, 4, 4], plates: 12, b89: 6, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 4, 4, 0], plates: 12, b89: 6, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [3, 0, 0, 12], plates: 0, b89: 0, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [2, 2, 2, 0], plates: 0, b89: 0, crates: [0, 0], bosses: [0, 0], spawners: 6, x13: 0 },
-        Wave { fighters: [0, 0, 0, 16], plates: 12, b89: 0, crates: [0, 0], bosses: [1, 0], spawners: 6, x13: 0 },
-    ]},
-];
+/// `$gp+0x2160`: the challenges' table, 14 pointers to their records (Maktar's overlay; L02 `0x1b1150`).
+pub const CHALLENGE_TABLE: u32 = 0x1aef_f0 + 0x2160;
+pub const CHALLENGE_COUNT: usize = 14;
+
+/// The challenges as the level's overlay holds them ([`CHALLENGE_TABLE`]; `read(address, length)` its bytes): the
+/// data the master plays, read at load (crate::level::LevelData::arena) rather than kept in the port, so a level's
+/// own table (or a mod's) is the one played. None when the table or a record is not there.
+pub fn read_challenges(read: &dyn Fn(u32, usize) -> Option<Vec<u8>>) -> Option<Vec<Challenge>> {
+    let word = |b: &[u8], o: usize| i32::from_le_bytes(b[o..o + 4].try_into().unwrap());
+    let half = |b: &[u8], o: usize| i16::from_le_bytes(b[o..o + 2].try_into().unwrap());
+    let table = read(CHALLENGE_TABLE, 4 * CHALLENGE_COUNT)?;
+    (0..CHALLENGE_COUNT).map(|n| {
+        let rec = read(word(&table, 4 * n) as u32, 0x18)?;
+        let count = usize::try_from(word(&rec, 0)).ok().filter(|&c| c <= 0x40)?;
+        let waves = read(word(&rec, 4) as u32, 0x14 * count)?;
+        let waves = (0..count).map(|k| {
+            let w = &waves[0x14 * k..0x14 * (k + 1)];
+            Wave {
+                fighters: std::array::from_fn(|i| half(w, 2 * i)),
+                plates: half(w, 8),
+                b89: half(w, 0xa),
+                crates: [half(w, 0xc), half(w, 0xe)],
+                bosses: [w[0x10], w[0x11]],
+                spawners: w[0x12],
+                x13: w[0x13],
+            }
+        }).collect();
+        Some(Challenge { needs: word(&rec, 8), bolts: word(&rec, 0xc), xp: word(&rec, 0x10), waves })
+    }).collect()
+}
 
 /// `0x3fb110(n)`: challenge `n`'s win count in the flags (`0x1395b8 + k`).
 pub fn win_flag(n: i32) -> Option<usize> {
@@ -513,8 +404,8 @@ const WEAPON_8: i32 = 0x2a;
 
 /// Whether challenge `n` is on the menu (`0x3fee58`'s test): the challenge before it won; from 12 the challenge mode;
 /// 7 and 8 their weapons (`0x264a74[0x139586 / 0x139592 · 0xe0]`: here the items had, inferred).
-pub fn on_menu(game: &crate::game::GameState, n: i32) -> bool {
-    let Some(c) = CHALLENGES.get(n as usize) else { return false };
+pub fn on_menu(cs: &[Challenge], game: &crate::game::GameState, n: i32) -> bool {
+    let Some(c) = cs.get(n as usize) else { return false };
     if 0 < n && wins(game, c.needs) == 0 { return false; }
     if 0xb < n && !game.challenge { return false; }
     let had = |i: i32| game.items.get(i as usize).is_some_and(|&b| b != 0);
@@ -525,8 +416,8 @@ pub fn on_menu(game: &crate::game::GameState, n: i32) -> bool {
 
 /// `0x3fe398(n)`: the bolts a win of `n` pays — its prize, a third less for each win before (×0.3), at least 500; ten
 /// times that in the challenge mode.
-pub fn prize(game: &crate::game::GameState, n: i32) -> i32 {
-    let base = CHALLENGES.get(n as usize).map_or(0, |c| c.bolts) as f32;
+pub fn prize(cs: &[Challenge], game: &crate::game::GameState, n: i32) -> i32 {
+    let base = cs.get(n as usize).map_or(0, |c| c.bolts) as f32;
     let mut f = base;
     for _ in 0..wins(game, n) { f *= 0.3; }
     let mut v = base;
@@ -536,8 +427,8 @@ pub fn prize(game: &crate::game::GameState, n: i32) -> i32 {
 }
 
 /// `0x3fe4a8(n)`: the XP a win of `n` pays (its XP, a third for each win before, at least 5; ×32).
-fn xp(game: &crate::game::GameState, n: i32) -> i32 {
-    let base = CHALLENGES.get(n as usize).map_or(0, |c| c.xp) as f32;
+fn xp(cs: &[Challenge], game: &crate::game::GameState, n: i32) -> i32 {
+    let base = cs.get(n as usize).map_or(0, |c| c.xp) as f32;
     let mut f = base;
     for _ in 0..wins(game, n) { f *= 0.33333; }
     let mut v = base;
@@ -760,9 +651,9 @@ fn wave_over(w: &MobyWorld, id: usize, wave: &Wave) -> bool {
     done && m.pv_i(pv::ALIVE) == 0
 }
 
-fn wave_of(w: &MobyWorld, id: usize) -> Option<&'static Wave> {
+fn wave_of(w: &MobyWorld, id: usize, cs: &[Challenge]) -> Option<Wave> {
     let m = &w.mobys[id];
-    CHALLENGES.get(m.pv_s(pv::CHALLENGE) as usize).and_then(|c| c.waves.get(m.pv_s(pv::WAVE) as usize))
+    cs.get(m.pv_s(pv::CHALLENGE) as usize).and_then(|c| c.waves.get(m.pv_s(pv::WAVE) as usize)).copied()
 }
 
 fn gate(w: &MobyWorld, id: usize) -> Option<usize> {
@@ -919,8 +810,8 @@ fn reward(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, n: i32) {
     } else {
         let line = match n { 6 => 8, 0xb => 9, _ => 2 + ctx.game.rng.randi(5) };
         say(w, id, line);
-        ctx.game.xp += xp(ctx.game, n);
-        let b = prize(ctx.game, n);
+        ctx.game.xp += xp(&ctx.level.arena, ctx.game, n);
+        let b = prize(&ctx.level.arena, ctx.game, n);
         w.mobys[id].set_pv_i(pv::PRIZE, b);
         ctx.game.bolt_bank += b;
         ctx.game.show_bolts = Some(0x168);
@@ -959,8 +850,8 @@ fn lift_crates(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, wave: &Wave) {
 
 /// `0x3fdab8`/`0x3fd808` for a wave and its crates (the start of a wave).
 fn wave_start(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let Some(wave) = wave_of(w, id) else { return };
-    lift_crates(w, id, ctx, wave);
+    let Some(wave) = wave_of(w, id, &ctx.level.arena) else { return };
+    lift_crates(w, id, ctx, &wave);
     raise_group(w, id, pv::B89, wave.b89 as i32);
     raise_group(w, id, pv::PLATES, wave.plates as i32);
 }
@@ -1045,7 +936,7 @@ pub fn update_master(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if pressed & crate::pad::button::CROSS != 0 {
                 w.mobys[id].set_state(7, -1);
                 let sel = w.mobys[id].pv_s(pv::SELECTED) as i32;
-                if let Some(n) = (sel + 1..0xe).find(|&n| on_menu(ctx.game, n)) { w.mobys[id].set_pv_s(pv::SELECTED, n as i16); }
+                if let Some(n) = (sel + 1..0xe).find(|&n| on_menu(&ctx.level.arena, ctx.game, n)) { w.mobys[id].set_pv_s(pv::SELECTED, n as i16); }
             } else if pressed & crate::pad::button::TRIANGLE != 0 {
                 leave(w, id, ctx);
             }
@@ -1090,7 +981,7 @@ pub fn update_master(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if s == 8 || (s == 5 && w.mobys[id].state_ticks < 0xb4) || s == 10 || s == 0xb { w.register_draw_first(id); }
     if 1 < s { w.register_draw(id); }
     // The challenge's HUD (`0x3ffee0`, registered on the first list by the challenge's tick).
-    ctx.game.arena_hud = fighting.then(|| challenge_hud(w, id));
+    ctx.game.arena_hud = fighting.then(|| challenge_hud(w, id, &ctx.level.arena));
     let m = &mut w.mobys[id];
     if m.state_ticks != -1 { m.state_ticks = m.state_ticks.wrapping_add(1); }
 }
@@ -1110,7 +1001,7 @@ pub struct ChallengeHud {
     pub boss: Option<(i16, f32)>,
 }
 
-fn challenge_hud(w: &MobyWorld, id: usize) -> ChallengeHud {
+fn challenge_hud(w: &MobyWorld, id: usize, cs: &[Challenge]) -> ChallengeHud {
     let m = &w.mobys[id];
     let (challenge, wave) = (m.pv_s(pv::CHALLENGE), m.pv_s(pv::WAVE));
     let sent: i32 = (0..6).map(|k| m.pv_i(pv::SPAWNED + 4 * k)).sum();
@@ -1119,7 +1010,7 @@ fn challenge_hud(w: &MobyWorld, id: usize) -> ChallengeHud {
     ChallengeHud {
         challenge,
         wave,
-        waves: CHALLENGES.get(challenge as usize).map_or(0, |c| c.waves.len() as i16),
+        waves: cs.get(challenge as usize).map_or(0, |c| c.waves.len() as i16),
         ticks: m.pv_i(pv::TICKS),
         count: wave as i32 * 15 + sent - m.pv_i(pv::ALIVE),
         boss,
@@ -1434,7 +1325,7 @@ fn menu(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let right = held & crate::pad::button::RIGHT != 0 && (pressed & crate::pad::button::RIGHT != 0 || rep == 0);
     let left = held & crate::pad::button::LEFT != 0 && (pressed & crate::pad::button::LEFT != 0 || rep == 0);
     if right || left {
-        let next = if right { (sel + 1..0xe).find(|&n| on_menu(ctx.game, n)) } else { (0..sel).rev().find(|&n| on_menu(ctx.game, n)).or(Some(0)) };
+        let next = if right { (sel + 1..0xe).find(|&n| on_menu(&ctx.level.arena, ctx.game, n)) } else { (0..sel).rev().find(|&n| on_menu(&ctx.level.arena, ctx.game, n)).or(Some(0)) };
         if let Some(n) = next.filter(|&n| n != sel) {
             w.mobys[id].set_pv_s(pv::SELECTED, n as i16);
         }
@@ -1446,14 +1337,14 @@ fn menu(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let sel = w.mobys[id].pv_s(pv::SELECTED) as i32;
     ctx.game.arena_menu = Some(Menu {
         selected: sel,
-        prize: (sel != 0 || wins(ctx.game, 0) != 0).then(|| prize(ctx.game, sel)),
+        prize: (sel != 0 || wins(ctx.game, 0) != 0).then(|| prize(&ctx.level.arena, ctx.game, sel)),
         wins: wins(ctx.game, sel),
         prev: sel != 0,
-        next: (sel + 1..0xe).any(|n| on_menu(ctx.game, n)),
+        next: (sel + 1..0xe).any(|n| on_menu(&ctx.level.arena, ctx.game, n)),
         held: ctx.hero.items.held,
         frame: ctx.game.frame,
     });
-    if pressed & crate::pad::button::CROSS != 0 && on_menu(ctx.game, sel) {
+    if pressed & crate::pad::button::CROSS != 0 && on_menu(&ctx.level.arena, ctx.game, sel) {
         ctx.game.flags[0x3c] = sel as u8;
         let m = &mut w.mobys[id];
         m.set_pv_s(pv::CHALLENGE, sel as i16);
@@ -1489,14 +1380,15 @@ fn fight(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         ctx.hero.hp = ctx.game.max_health;
     }
     score(w, id, ctx);
-    let wave = wave_of(w, id);
-    if wave.is_some_and(|wv| wave_over(w, id, wv)) {
+    let wave = wave_of(w, id, &ctx.level.arena);
+    if wave.is_some_and(|wv| wave_over(w, id, &wv)) {
+        let waves = ctx.level.arena.get(ch as usize).map_or(0, |c| c.waves.len() as i16);
         let m = &mut w.mobys[id];
         m.set_pv_s(pv::WAVE, m.pv_s(pv::WAVE) + 1);
         for k in 0..6 { m.set_pv_i(pv::SPAWNED + 4 * k, 0); }
         m.set_pv_i(pv::ALIVE, 0);
         m.set_pv_i(pv::BOSS, 0);
-        if CHALLENGES[ch as usize].waves.len() as i16 <= m.pv_s(pv::WAVE) {
+        if waves <= m.pv_s(pv::WAVE) {
             if ch == 0 && wins(ctx.game, 0) == 0 { m.set_state(0xb, -1); } else { m.set_state(5, -1); }
             m.set_pv_s(pv::SELECTED, ch as i16);
             return;
@@ -1537,10 +1429,10 @@ fn fight(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     // Sending fighters: after a second (or at once with a boss), the round's spawner, the wave's fighters into it
     // (0x0c3e, 0x0b22, 0x0c3b, 0x09ca), then its doors opened.
-    if let Some(wave) = wave_of(w, id) {
+    if let Some(wave) = wave_of(w, id, &ctx.level.arena) {
         if 0x3c < w.mobys[id].state_ticks || wave.bosses != [0, 0] {
             gates_reset(w, id);
-            gate_pick(w, id, ctx, wave);
+            gate_pick(w, id, ctx, &wave);
             let mut sent = false;
             if gate(w, id).is_some_and(|g| ready(w, g)) {
                 for (k, class) in [(3, 0x0c3e), (1, 0x0b22), (2, 0x0c3b), (0, 0x09ca)] {
