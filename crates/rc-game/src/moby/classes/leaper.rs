@@ -722,8 +722,14 @@ fn bank(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         _ => {}
     }
+    // Out of the bank's sub-state (a bite started this tick) or going home / walking off: no charge decision; with
+    // Ratchet as the target the goal follows him (`0x3b7820`).
     let state = w.mobys[id].state;
-    if matches!(state, 4 | 6 | 7) {
+    if w.mobys[id].sub_state != 3 || matches!(state, 4 | 6 | 7) {
+        if target(w, id).is_some_and(|(t, _)| Some(t) == ctx.hero_moby) {
+            let p = ctx.hero.pos;
+            w.mobys[id].set_pv_v(0x2e0, p);
+        }
         approach_check(w, id, ctx);
         return;
     }
