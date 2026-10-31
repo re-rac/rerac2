@@ -231,17 +231,17 @@ pub fn callbacks(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut
     let mut first = Vec::new();
     // The ship's shadow (`0x361af8`, a first-list callback; crate::travel).
     crate::travel::draw_ship_shadow(game, view, &mut first);
-    for id in w.draws_first.clone() { one(w, host, game, hero_state, view, cam, id, &mut first); }
+    for id in w.draws_first.clone() { one(w, host, game, hero_state, view, cam, id, true, &mut first); }
     let mut out = Vec::new();
     // The blob shadows first (`0x2e7ab0` runs before the callbacks' list, `0x2e7970`).
     crate::shadows::draw(&w.shadows, &mut out);
-    for id in w.draws.clone() { one(w, host, game, hero_state, view, cam, id, &mut out); }
+    for id in w.draws.clone() { one(w, host, game, hero_state, view, cam, id, false, &mut out); }
     Lists { first, second: out }
 }
 
 /// One registered callback (the class's).
 #[allow(clippy::too_many_arguments)]
-fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, hero_state: i32, view: &crate::particles::BSphereView, cam: V3, id: usize, out: &mut Vec<FxQuad>) {
+fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, hero_state: i32, view: &crate::particles::BSphereView, cam: V3, id: usize, first: bool, out: &mut Vec<FxQuad>) {
     use crate::moby::classes::tie_lights;
     if w.mobys.get(id).is_none_or(|m| 0x80 <= m.state) { return; }
     match w.mobys[id].o_class {
@@ -262,6 +262,11 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::maktar::NODE => crate::moby::classes::maktar::draw_0c82(w, id, cam, out),
         0x0c81 => crate::moby::classes::maktar::draw_0c81(w, id, cam, out),
         0x0a9c => crate::moby::classes::maktar::draw_0a9c(w, id, out),
+        crate::moby::classes::fighters::MASTER if first => {
+            let mid = w.mobys[id].pv_v(crate::moby::classes::arena::MIDDLE_AT);
+            crate::moby::classes::arena::draw_moat(w, id, mid, &mut game.rng, cam, out);
+        }
+        crate::moby::classes::fighters::MASTER => crate::moby::classes::arena::draw_lamps(w, id, cam, out),
         crate::moby::classes::arena::COLUMN => crate::moby::classes::arena::draw_column(w, id, cam, out),
         crate::moby::classes::fighters::C3B => crate::moby::classes::fighters::draw_0c3b(w, id, &mut game.rng, cam, out),
         crate::moby::classes::keeper::SHOT => crate::moby::classes::keeper::draw_shot(w, id, &mut game.rng, cam, out),

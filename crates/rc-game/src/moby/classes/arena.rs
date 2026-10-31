@@ -18,7 +18,8 @@
 //!   lifted; a wave is over with all sent and none left; every fourth tick the two gladiators or bladed robots nearest
 //!   Ratchet get the turns; a fighter that leaves the arena dies, Ratchet leaving it dies. Lost (time out in 3 / 5,
 //!   out of shots in 7 / 8, hurt in 12 / 13): its message and **10**, then the overview. **0xb** the first win's scene.
-//!   The wins count in the save's flag bytes (`0x1395b8 + 0x31..`, [`win_flag`]).
+//!   The wins count in the save's flag bytes (`0x1395b8 + 0x31..`, [`win_flag`]). It draws the moat's energy
+//!   ([`draw_moat`], the arena's floor there is a plain dark texture) and the lamps' glows ([`draw_lamps`]).
 //! * **The spawners 0x0a15** (`0x3d8898`, six in the rim wall, the master's group `+0x44`): each holds up to three
 //!   fighters (`+0x10` / `+0x14` / `+0x18`, [`attach`]) and, opened by the master ([`open`]), slides back 2 along its
 //!   second row over 19 ticks, plays its sequence 1 and lets them out ([`release`]), waits 90 ticks, plays 2 and 3 and
@@ -33,7 +34,7 @@
 //!
 //! Not ported: the bosses 0x09f8 / 0x0a44 (the challenges with a boss wave, 2, 4, 6, 9, 11, 12 and 13, are kept off the
 //! menu until they are: they could not end), the crowd 0x0e96 and its cheers (`0x3fb028`, `0x42e670`), the announcer's speech (`0x401d98`, its
-//! remarks `0x401e68` / `0x402090`), the HUD of a challenge (`0x4014f0`), the wipe (`0x401a20`), the win's screen
+//! remarks `0x401e68` / `0x402090`), the wipe (`0x401a20`), the win's screen
 //! (`0x400e10`), the wave's banner (`0x3ffee0`), the menu's arrows (`0x3ff388`) and its vendor (□, `0x332158(5)`), the
 //! music (`0x335928`), the level's sounds, the challenges' weapon lock (`0x18b6f4`) and the fixed held items of 7 / 8 /
 //! 13 beyond the hand request; the plates' sparks (`0x3d85a8`: the particle burst `0x345d88` has no port).
@@ -852,13 +853,15 @@ fn deal_turns(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
     }
 }
 
-/// `0x3fdd68`: a fighter out of the arena (outside the cuboids `+0x80` and `+0x7c`) dies; Ratchet out of `+0x7c` dies.
+/// `0x3fdd68`: a fighter in the moat (the cylinder `+0x80`) or out of the arena (the cylinder `+0x7c`) dies; Ratchet
+/// out of the arena dies (in the moat he only burns: its surface).
 fn keep_in(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let (keep, arena) = (w.mobys[id].pv_i(pv::KEEP), w.mobys[id].pv_i(pv::ARENA));
     for f in group(w, id, pv::ENEMIES) {
         let x = &w.mobys[f];
         if x.state >= 0x80 || x.state < 3 || x.mode & mode::NO_UPDATE != 0 { continue; }
-        if ctx.level.in_cylinder(keep, x.pos) || ctx.level.in_cylinder(arena, x.pos) { continue; }
+        // In the moat (`+0x80`) or out of the arena (`+0x7c`) it dies.
+        if !ctx.level.in_cylinder(keep, x.pos) && ctx.level.in_cylinder(arena, x.pos) { continue; }
         match x.o_class {
             super::fighters::C9CA => super::fighters::die_09ca_pub(w, f, ctx),
             super::fighters::B22 | super::fighters::C3B | super::fighters::C3E => {
@@ -966,8 +969,13 @@ fn fail_kills(w: &MobyWorld, id: usize) -> i32 {
 /// The challenge lost (its message shown, `0x313098`): state 10.
 fn lose(w: &mut MobyWorld, id: usize) { w.mobys[id].set_state(10, -1); }
 
+/// The port's: the arena's middle (the cuboid `+0x88`'s place) kept for the moat's draw ([`draw_moat`] reads it as
+/// `0x3fd638` does).
+pub const MIDDLE_AT: usize = 0x240;
+
 /// 0x0b59 (`0x3fb1b0`), Maktar's arena master (module docs).
 pub fn update_master(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    if let Some((p, _)) = cuboid_at(ctx, w, id, pv::MIDDLE) { w.mobys[id].set_pv_v(MIDDLE_AT, p); }
     match w.mobys[id].state {
         0 => {
             reset_master(w, id);
@@ -1066,6 +1074,11 @@ pub fn update_master(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         _ => {}
     }
+    // The moat (`0x4014f0`) in a challenge, its first three seconds after a win, its lost state and the first win's;
+    // the lamps' glows (`0x401c20`) past the desk.
+    let s = w.mobys[id].state;
+    if s == 8 || (s == 5 && w.mobys[id].state_ticks < 0xb4) || s == 10 || s == 0xb { w.register_draw_first(id); }
+    if 1 < s { w.register_draw(id); }
     let m = &mut w.mobys[id];
     if m.state_ticks != -1 { m.state_ticks = m.state_ticks.wrapping_add(1); }
 }
@@ -1524,5 +1537,74 @@ pub fn draw_menu(m: &Menu, text: &dyn Fn(u32) -> Vec<u8>, glyphs: &[rc_formats::
     if m.next { crate::gui::text(out, glyphs, 2, &first(0x2dd7), 305.0, 208.0, 1.0, colour); }
     for (id, x) in [(0x2dd5, 75.0), (0x2dd9, 210.0), (0x2dd8, 380.0)] {
         crate::gui::text(out, glyphs, 2, &first(id), x, 95.0, 1.0, colour);
+    }
+}
+
+/// `$gp+0x24d0..+0x2530` (the moat's draw `0x4014f0`): 50 streaks from 55 to 22 about the arena's middle, 4 under
+/// it; the scroll a tick (its texture's s, `+0xe0`) and the turn (`+0xdc`, 0° a second here); the streak's colour
+/// (alpha `randf(0, 1)` of 0x88) and its wide glow's, their half widths 1 and 2; the outer end's two glows
+/// (`randf(3, 7)`: half of it in `0x807070` at alpha `0x50..0x60`, FX 0x31; 0.7 of it in `0x802020` at `8..0x16`, FX 0xb).
+const MOAT_STREAKS: usize = 50;
+const MOAT_RADII: (f32, f32) = (55.0, 22.0);
+const MOAT_DROP: f32 = 4.0;
+const MOAT_SCROLL: f32 = 0.15;
+const MOAT_COLOURS: (u32, u32) = (0x88ff_7040, 0x10ff_0000);
+
+/// `0x4014f0` (the master, first list; in a challenge, after one and in its lost state): the moat — the streaks of
+/// energy across it (FX 0x17, scrolling, added) with a wider faint one each (FX 0x2b) and the glows at their outer
+/// ends; the scroll moves on.
+pub fn draw_moat(w: &mut MobyWorld, id: usize, middle: V3, rng: &mut crate::rng::Rng, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
+    use crate::hero::physics::cross;
+    let m = &w.mobys[id];
+    let step = std::f32::consts::TAU / MOAT_STREAKS as f32;
+    let mut a = m.pv_f(0xdc);
+    let sc = m.pv_f(0xe0);
+    let z = middle[2] - MOAT_DROP;
+    let st = [[-3.0 + sc, 0.0], [-3.0 + sc, 1.0], [3.0 + sc, 0.0], [3.0 + sc, 1.0]];
+    for _ in 0..MOAT_STREAKS {
+        let (c, s) = (a.cos(), a.sin());
+        let outer = [middle[0] + MOAT_RADII.0 * c, middle[1] + MOAT_RADII.0 * s, z];
+        let inner = [middle[0] + MOAT_RADII.1 * c, middle[1] + MOAT_RADII.1 * s, z];
+        let d = sub(outer, inner);
+        let ao = cross(sub(outer, cam), d);
+        let ai = cross(sub(inner, cam), d);
+        for (k, (half, fx, rgb)) in [(1.0, 0x17, MOAT_COLOURS.0), (2.0, 0x2b, MOAT_COLOURS.1)].into_iter().enumerate() {
+            let (po, pi) = (set_len(ao, half), set_len(ai, half));
+            let rgba = if k == 0 { (rgb & 0xff_ffff) | ((rng.randf(0.0, 1.0) * (rgb >> 24) as f32) as u32) << 24 } else { rgb };
+            out.push(crate::fx::FxQuad { fx, additive: true, corners: [sub(outer, po), add(outer, po), sub(inner, pi), add(inner, pi)], st, rgba: [rgba; 4] });
+        }
+        let size = rng.randf(3.0, 7.0);
+        let alpha = rng.rand_range(0x50, 0x60) as u32;
+        let roll = rng.rand_angle();
+        crate::fx::sprite(out, size * 0.5, 0.0, roll, outer, cam, 0x31, 0x0080_7070 | alpha << 24, true);
+        let alpha = rng.rand_range(8, 0x16) as u32;
+        let roll = rng.rand_angle();
+        crate::fx::sprite(out, size * 0.7, 0.0, roll, outer, cam, 0xb, 0x0080_2020 | alpha << 24, true);
+        a = add_rot(a, step);
+    }
+    let m = &mut w.mobys[id];
+    let mut sc = m.pv_f(0xe0) + MOAT_SCROLL;
+    if 1.0 < sc { sc -= 2.0; }
+    if sc < -1.0 { sc += 2.0; }
+    m.set_pv_f(0xe0, sc);
+}
+
+/// `0x401c20` (the master, second list, past its state 1): a glow on each lamp of its tie group `+0x104`, 3 below it
+/// in its rows, when its face (−third row) is turned toward the camera by more than 60°: size 3 pushed 1 toward the
+/// camera (`0x32bbe0`, FX 0xb), from `0xff8020` to `0x88ff8020` by the square of how far past.
+pub fn draw_lamps(w: &MobyWorld, id: usize, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
+    let g = w.mobys[id].pv_i(0x104);
+    let Some(list) = usize::try_from(g).ok().and_then(|g| w.tie_groups.get(g)) else { return };
+    for &i in list {
+        let Some(t) = w.ties.get(i as usize) else { continue };
+        let r = [[t[0][0], t[0][1], t[0][2]], [t[1][0], t[1][1], t[1][2]], [t[2][0], t[2][1], t[2][2]]];
+        let p = add([t[3][0], t[3][1], t[3][2]], [-3.0 * r[2][0], -3.0 * r[2][1], -3.0 * r[2][2]]);
+        let to_cam = set_len(sub(cam, p), 1.0);
+        let face = [-r[2][0], -r[2][1], -r[2][2]];
+        let f = crate::hero::physics::dot(to_cam, face);
+        if f <= 0.5 { continue; }
+        let k = (f - 0.5) * 2.0;
+        let rgba = crate::hud::lerp_rgba(k * k, 0x00ff_8020, 0x88ff_8020);
+        crate::fx::sprite(out, 3.0, 1.0, 0.0, p, cam, 0xb, rgba, true);
     }
 }

@@ -137,7 +137,7 @@ under `crates/` shortened to `<crate>/src/...`, or the doc §. *Seen*: whether a
 | ID | System | Consumers | Census | Sources | Seen |
 |---|---|---|---|---|---|
 | G-UI-001 | (2026-10-30: the lease `0x327a28` is rc_game::prompt; the census tag caught up) **The message / prompt slot** `0x327a28` / `0x327ae0` (`0x1a8fb0` / `0x1a8fb4`), with the help log `0x2f6538`, the slot's time and level bits (`0x18c95c` / `0x18c960`) | help, 38 units | 38 / 249 (20 / 78) | help.rs:18; census | yes |
-| G-UI-002 | **HUD leftovers**: the weapon's experience bar (sprite 5, `0x139868`), the low-ammo pulse, the quick select ring, the vendor, PAL's sizes; Maktar's arena's (L02: its challenge HUD `0x4014f0`, the wipe `0x401a20`, the win's screen `0x400e10`, the wave's banner `0x3ffee0`, the menu's arrow pictures `0x3ff388`, its vendor on □ `0x332158(5)`) | HUD; Maktar's arena | — | hud.rs:32 | yes |
+| G-UI-002 | **HUD leftovers**: the weapon's experience bar (sprite 5, `0x139868`), the low-ammo pulse, the quick select ring, the vendor, PAL's sizes; Maktar's arena's (L02: the wipe `0x401a20`, the win's screen `0x400e10`, the wave's banner `0x3ffee0`, the menu's arrow pictures `0x3ff388`, its vendor on □ `0x332158(5)`) | HUD; Maktar's arena | — | hud.rs:32 | yes |
 | G-UI-003 | **Help leftovers**: the multi-page help `0x27d800`, the shake offset `0x27d808`, PAL's height | help | — | help.rs:18 | minor |
 | G-UI-004 | **Subtitles** in other languages and the attract-mode list | scenes | — | scene.rs:27; bringup.md §6 | yes |
 | G-UI-005 | **Pad rumble** `0x2d6d60` | Lancer, 1 unit | 1 / 15 (1 / 15) | lancer.rs:20 | yes |
