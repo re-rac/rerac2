@@ -273,8 +273,9 @@ L00:003175f8	FUN_003175f8	moby	has	cite
 boot:001163a0	FUN_001163a0	rng	has	cite
 L00:0033f940	FUN_0033f940	particles	has	cite
 L00:002d6cc8	FUN_002d6cc8	hero	has	cite
-H:4b834f7216002e92	spawn_list_wake	enemy	missing	L
-H:8eedb32af261910a	spawn_list_find	enemy	missing	L
+H:4b834f7216002e92	group_wake	moby	has	L
+H:8eedb32af261910a	group_waiting	moby	has	L
+L00:0032df58	mark_fence	enemy	has	L
 L00:0032ea38	speech	dialogue	missing	cite
 L00:0039e530	FUN_0039e530	moby	has	cite
 L00:002ee160	FUN_002ee160	math	trivial	range

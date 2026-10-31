@@ -1507,9 +1507,9 @@ const SYMBOL_ST: f32 = 2.320_500_1;
 ///   2 damage, flags 0x810001; the burst of size 1.5) — then it is deleted.
 ///
 /// A hit with the flags 0x10000 for more than 2 from anything but the wrench (and not Ratchet) breaks it (5, counted).
-/// Its reels draw while it is drawn ([`draw_0a9c`]). Not ported: the enemies a blow-up wakes (`+0x58`: two of the
-/// spawn list `0x1fc060`'s waiting mobys (state 13) at (0.5, ±0.45, 0), facing Ratchet, `0x3d0110` / `0x3d02c8`),
-/// the HUD's bolt count shown for 240 ticks (`0x3119f0`), the jackpot's level sound 1 and flag `0x1a903c`.
+/// Blown up, two creatures of its group `+0x58` waiting (state 13) drop out at (0.5, ∓0.45, 0) in its frame facing
+/// Ratchet (crate::moby::classes::critter::waiting / wake). Its reels draw while it is drawn ([`draw_0a9c`]). Not
+/// ported: the HUD's bolt count shown for 240 ticks (`0x3119f0`), the jackpot's level sound 1 and flag `0x1a903c`.
 pub fn update_0a9c(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].drawn != 0 { w.register_draw(id); }
     if w.mobys[id].pvars.len() < 0xa8 { w.mobys[id].pvars.resize(0xa8, 0); }
@@ -1578,6 +1578,19 @@ pub fn update_0a9c(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 w.sphere_hit(ctx.scene, at, 4.0, 0x10, Some(id), Some(&t));
                 let pos = w.mobys[id].pos;
                 crate::moby::blast::burst(w, ctx, pos, &crate::moby::blast::Blast { size: 1.5, bursts: [0x19, 0x14, 0x14], puffs: 0x14, streaks: 0x2d, light: false, shake: true });
+                // Two of its group `+0x58`'s waiting creatures woken at (0.5, ∓0.45, 0) in its frame, facing Ratchet.
+                let group = w.mobys[id].pv_i(0x58);
+                if group != 0 {
+                    for i in 0..2 {
+                        let Some(c) = crate::moby::classes::critter::waiting(w, group) else { continue };
+                        let m = &w.mobys[id];
+                        let at = add_v(through(&m.rows, [0.5, i as f32 * 0.9 - 0.45, 0.0]), m.pos);
+                        crate::moby::classes::critter::wake(w, c, ctx, at, [0.0; 3]);
+                        let hero = ctx.hero.pos;
+                        let c = &mut w.mobys[c];
+                        c.rot[2] = crate::hero::physics::atan2(hero[0] - c.pos[0], hero[1] - c.pos[1]);
+                    }
+                }
             }
             w.delete(id);
             return;

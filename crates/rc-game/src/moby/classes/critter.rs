@@ -58,6 +58,33 @@ fn group(w: &MobyWorld, id: usize) -> Vec<usize> {
     usize::try_from(w.mobys[id].group).ok().and_then(|g| w.groups.get(g)).cloned().unwrap_or_default()
 }
 
+/// `0x3d0110(n)`: the first member of moby group `n` waiting (state 13: a hidden 0x0a4e kept for its drop).
+pub fn waiting(w: &MobyWorld, n: i32) -> Option<usize> {
+    let g = usize::try_from(n).ok().filter(|&g| g != 0xff)?;
+    w.groups.get(g)?.iter().copied().find(|&i| w.mobys.get(i).is_some_and(|m| m.state == 0xd))
+}
+
+/// `0x3d02c8(m, pos, vel)`: a waiting moby (state 13) woken at `pos`: shown and solid again (mode `& ~0x41 | 0x1000`,
+/// its class's collision), the drop ([`DROP`]) facing along `vel`, marked out of its fence unless inside it
+/// (crate::moby::ai::mark_fence), its velocity `vel` (`+0x1a0`), `+0x120` / `+0x124` 0, options `|= 0x11`.
+pub fn wake(w: &mut MobyWorld, id: usize, ctx: &Ctx, pos: V3, vel: V3) {
+    if w.mobys[id].state != 0xd { return; }
+    let solid = w.class(w.mobys[id].o_class).is_some_and(|c| c.has_collision);
+    let m = &mut w.mobys[id];
+    m.mode = (m.mode & !0x41) | 0x1000;
+    m.has_collision = solid;
+    m.set_state(DROP, -1);
+    m.pos = pos;
+    m.rot[2] = atan2(vel[0], vel[1]);
+    ai::mark_fence(w, id, ctx, MV);
+    let m = &mut w.mobys[id];
+    m.set_pv_v(MV + 0xa0, vel);
+    m.set_pv_i(MV + 0x20, 0);
+    m.set_pv_i(MV + 0x24, 0);
+    m.set_pv_i(MV + 0x38, m.pv_i(MV + 0x38) | 0x11);
+    w.changed = true;
+}
+
 /// `0x3cff00`: its group's living 0x0a4e alarmed (`+0x316`).
 fn alarm(w: &mut MobyWorld, id: usize) {
     for m in group(w, id) {

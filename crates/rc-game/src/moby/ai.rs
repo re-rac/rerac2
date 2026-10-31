@@ -264,6 +264,16 @@ pub fn fence(points: &[[f32; 4]], r: f32, p: V3) -> Option<V3> {
     moved.then_some(q)
 }
 
+/// `0x32df58(m)` (L02 `0x334a00`): with a fence path (`+0x3c`), the moby marked out of it (`+0x9c` |= 1, no push
+/// in) unless it stands inside the path's polygon clear of its walls (by its radius `+0`).
+pub fn mark_fence(w: &mut MobyWorld, id: usize, ctx: &Ctx, o: usize) {
+    let m = &mut w.mobys[id];
+    let path = m.pv_i(o + 0x3c);
+    let Some(pts) = usize::try_from(path).ok().and_then(|p| ctx.level.paths.get(p)) else { return };
+    if ctx.level.in_polygon(path, m.pos) && fence(pts, m.pv_f(o), m.pos).is_none() { return; }
+    m.set_pv_i(o + 0x9c, m.pv_i(o + 0x9c) | 1);
+}
+
 /// `0x32da88(m, block)`: kept inside its fence path (`+0x3c`, unless out of it: `+0x9c` & 1).
 fn keep_in(w: &mut MobyWorld, id: usize, ctx: &Ctx) -> bool {
     let m = &w.mobys[id];
