@@ -2105,7 +2105,6 @@ fn draw_hud(
         {
             let texts = |id: u32| rc_formats::strings::find_index(&p.texts, id as i32).map(|i| p.texts[i].text.clone()).unwrap_or_else(|| a.strings.get(id).to_vec());
             p.game.prompt.draw(&texts, &a.glyphs_2, &mut quads);
-            if let Some(m) = p.game.arena_menu.as_ref() { rc_game::moby::classes::arena::draw_menu(m, &texts, &a.glyphs_2, &mut quads); }
             // The arena's challenge HUD: its panels (GUI sprites) under its counters (fonts 1, 2 and 3).
             if let (Some(h), Some(&(font_3, _))) = (p.game.arena_hud.as_ref(), hud.fx.get(&rc_game::moby::classes::arena::FONT_3)) {
                 let (mut draws, mut text) = (Vec::new(), Vec::new());
@@ -2113,8 +2112,14 @@ fn draw_hud(
                 quads.extend(rc_game::hud::quads(&draws, &a.sprites, &a.glyphs, &icon, rc_game::gui::MENU_TAN));
                 quads.extend(text);
             }
-            if let (Some(r), Some(&(font_3, _))) = (p.game.arena_results.as_ref(), hud.fx.get(&rc_game::moby::classes::arena::FONT_3)) {
-                rc_game::moby::classes::arena::draw_results(r, &texts, [(&a.glyphs, 1), (&a.glyphs_2, 2), (&a.glyphs_3, font_3)], &mut quads);
+            // The big screen's menu and win screen: the panel's sprites under their text.
+            if let Some(&(font_3, _)) = hud.fx.get(&rc_game::moby::classes::arena::FONT_3) {
+                let fonts = [(&a.glyphs, 1), (&a.glyphs_2, 2), (&a.glyphs_3, font_3)];
+                let (mut draws, mut text) = (Vec::new(), Vec::new());
+                if let Some(m) = p.game.arena_menu.as_ref() { rc_game::moby::classes::arena::draw_menu(m, &texts, fonts, &mut draws, &mut text); }
+                if let Some(r) = p.game.arena_results.as_ref() { rc_game::moby::classes::arena::draw_results(r, &texts, fonts, &mut draws, &mut text); }
+                quads.extend(rc_game::hud::quads(&draws, &a.sprites, &a.glyphs, &icon, rc_game::gui::MENU_TAN));
+                quads.extend(text);
             }
             if let (Some(v), Some(m)) = (p.vendor.menu.as_ref(), p.mobys.as_ref()) { v.draw(&p.game, &m.level.items, a, &icon, &texts, &mut quads); }
         }

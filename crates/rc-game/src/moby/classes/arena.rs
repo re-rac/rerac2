@@ -36,7 +36,7 @@
 //!
 //! Not ported: the Spiderbot Glove bots' end at a challenge's end and on Ratchet's warps (`0x3fb028(1, −1)` /
 //! `0x42e670(1, −1)`: classes 0x0b58 / 0x0e79, no glove in the port, G-WPN-009), the announcer's speech (`0x401d98`, its
-//! remarks `0x401e68` / `0x402090`), the restart's path straight into the wipe (`0x1a7904` = 2), the menu's arrows (`0x3ff388`) and its vendor (□, `0x332158(5)`), the
+//! remarks `0x401e68` / `0x402090`), the restart's path straight into the wipe (`0x1a7904` = 2), the menu's vendor (□, `0x332158(5)`), the
 //! music (`0x335928`), the level's sounds, the challenges' weapon lock (`0x18b6f4`) and the fixed held items of 7 / 8 /
 //! 13 beyond the hand request; the plates' sparks (`0x3d85a8`: the particle burst `0x345d88` has no port).
 
@@ -555,6 +555,9 @@ pub struct Menu {
     /// A challenge before / after it on the menu.
     pub prev: bool,
     pub next: bool,
+    /// The pad's held buttons (the arrows lit while their way is held) and the frame (their pulse).
+    pub held: u32,
+    pub frame: i32,
 }
 
 /// The master's pvars (the module's docs).
@@ -621,7 +624,8 @@ fn group(w: &MobyWorld, id: usize, off: usize) -> Vec<usize> {
 }
 
 /// The placed moby of instance `i` (the master keeps moby indices).
-fn placed(w: &MobyWorld, i: i32) -> Option<usize> { usize::try_from(i).ok().and_then(|i| w.mobys.iter().position(|m| m.instance == Some(i))) }
+/// A moby the master's pvars name (`+0x108`, `+0x10c`): the loader made them runtime indices (crate::moby's spawn).
+fn placed(w: &MobyWorld, i: i32) -> Option<usize> { usize::try_from(i).ok().filter(|&i| w.mobys.get(i).is_some_and(|m| m.state < 0x80)) }
 
 fn cuboid_at(ctx: &Ctx, w: &MobyWorld, id: usize, off: usize) -> Option<(V3, V3)> { ctx.level.cuboid_place(w.mobys[id].pv_i(off)) }
 
@@ -1205,9 +1209,10 @@ pub struct Results {
 /// `0x400e10` (the master's draw after a win, on the big screen): the title 0x2ddb (font 1 at 1.1, (180, 93)), the
 /// first win's line 0x2ddc or the prize (`"%s %d %s"`: 0x2df8, the bolts, 0x2df4) in font 3 centred on (260, 135),
 /// and 0x2ddd in font 1 centred on (250, 160), in the box 10..500 × 125..200 (`$gp+0x2468..+0x24b8`; the title's x
-/// by language, the first's here), all `0x90ffffff`. Not ported: the menu's arrows under it (`0x3ff388(m, 0)`).
-pub fn draw_results(r: &Results, text: &dyn Fn(u32) -> Vec<u8>, fonts: [(&[rc_formats::disc::boot::Glyph; 256], usize); 3], out: &mut Vec<crate::gui::Quad>) {
+/// by language, the first's here), all `0x90ffffff`, on the panel ([`draw_panel`], no arrows).
+pub fn draw_results(r: &Results, text: &dyn Fn(u32) -> Vec<u8>, fonts: [(&[rc_formats::disc::boot::Glyph; 256], usize); 3], draws: &mut Vec<crate::hud::Draw>, out: &mut Vec<crate::gui::Quad>) {
     use crate::gui::text_box::{CENTRE, MIDDLE};
+    draw_panel(None, draws);
     let first = |id: u32| { let t = text(id); t.split(|&c| c == 0).next().unwrap_or(&[]).to_vec() };
     let colour = 0x90ff_ffffu32.to_le_bytes();
     let (g1, s1) = fonts[0];
@@ -1445,6 +1450,8 @@ fn menu(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         wins: wins(ctx.game, sel),
         prev: sel != 0,
         next: (sel + 1..0xe).any(|n| on_menu(ctx.game, n)),
+        held: ctx.hero.items.held,
+        frame: ctx.game.frame,
     });
     if pressed & crate::pad::button::CROSS != 0 && on_menu(ctx.game, sel) {
         ctx.game.flags[0x3c] = sel as u8;
@@ -1790,29 +1797,60 @@ pub fn update_lift(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     set_seq(w, id, ctx, 0, 0, 7);
 }
 
-/// `0x3ff808` (the menu's draw, font 2, `0x90ffffff`): the challenge's name centred at (250, 150) at 1.2, its prize
-/// ("%s %d %s": 0x2dda, the bolts, 0x2df4) at (90, 184), its wins ("%s %d": 0x2dd4) at (275, 184), the buttons' labels
-/// at the top (0x2dd5 at 75, 0x2dd9 at 210, 0x2dd8 at 380; y 95) and the arrows' (0x2dd6 at 166 with one before, 0x2dd7
-/// at 305 with one after; y 208). Not ported: the arrows' pictures and their pulse (`0x3ff388`), the other languages'
-/// places of the labels (`$gp+0x22a8`, `+0x22f0`, `+0x2318`), the name's box wrapping (`0x2ee560`).
-pub fn draw_menu(m: &Menu, text: &dyn Fn(u32) -> Vec<u8>, glyphs: &[rc_formats::disc::boot::Glyph; 256], out: &mut Vec<crate::gui::Quad>) {
+/// `$gp+0x2230..+0x225c` (`0x3ff388`): the big screen's panel (GUI sprites 0x49 back / 0x48 outline at (255, 210), 1.2
+/// wide) and the menu's arrows (0x4b the previous at (339, 210), 0x4a the next at (168, 210)), pulsing between the
+/// panel's colours every 50 frames, `0x80dddddd` while their way (← / →) is held.
+const PANEL: [f32; 2] = [255.0, 210.0];
+const PANEL_WIDE: f32 = 1.2;
+const PANEL_COLOURS: (u32, u32) = (0x80dd_dddd, 0x6544_2d00);
+const ARROWS: [[f32; 2]; 2] = [[339.0, 210.0], [168.0, 210.0]];
+const ARROW_HELD: u32 = 0x80dd_dddd;
+
+/// `0x3ff388(m, arrows)`: the panel, and with `arrows` the menu's (previous / next, when there is one).
+fn draw_panel(arrows: Option<&Menu>, draws: &mut Vec<crate::hud::Draw>) {
+    use crate::hud::Draw;
+    for (id, colour) in [(0x49, PANEL_COLOURS.1), (0x48, PANEL_COLOURS.0)] {
+        draws.push(Draw::Sprite { id, pos: PANEL, scale: [PANEL_WIDE, 1.0], frame: 0.0, colour });
+    }
+    let Some(m) = arrows else { return };
+    let k = m.frame.rem_euclid(0x32);
+    let t = if k < 0x19 { k as f32 * 0.04 } else { 1.0 - (k - 0x19) as f32 * 0.04 };
+    let pulse = crate::hud::lerp_rgba(t, PANEL_COLOURS.0, PANEL_COLOURS.1);
+    let lit = |button: u32| if m.held & button != 0 { ARROW_HELD } else { pulse };
+    if m.prev {
+        draws.push(Draw::Sprite { id: 0x4b, pos: ARROWS[0], scale: [PANEL_WIDE, 1.0], frame: 0.0, colour: lit(crate::pad::button::LEFT) });
+    }
+    if m.next {
+        draws.push(Draw::Sprite { id: 0x4a, pos: ARROWS[1], scale: [PANEL_WIDE, 1.0], frame: 0.0, colour: lit(crate::pad::button::RIGHT) });
+    }
+}
+
+/// `0x3ff808` (the menu's draw, all `0x90ffffff`, `$gp+0x2260..+0x2334`): the panel and its arrows ([`draw_panel`]); the
+/// challenge's name in font 3 centred in the box 10..460 × 125..185 on (250, 150); its prize ("%s %d %s": 0x2dda, the
+/// bolts, 0x2df4; font 2 at (90, 184)) and wins ("%s %d": 0x2dd4; font 2 at (275, 184)); in font 1 "previous" 0x2dd6 at
+/// (166, 208), "next" 0x2dd7 at (305, 208), and the buttons' labels 0x2dd5 at (75, 95), 0x2dd9 at (210, 95), 0x2dd8 at
+/// (380, 95) (the first layout's places; the other languages' are not ported). A prize of 10,000 or more prints the
+/// label alone (the original's format there has no number for its `%d`).
+pub fn draw_menu(m: &Menu, text: &dyn Fn(u32) -> Vec<u8>, fonts: [(&[rc_formats::disc::boot::Glyph; 256], usize); 3], draws: &mut Vec<crate::hud::Draw>, out: &mut Vec<crate::gui::Quad>) {
+    use crate::gui::text_box::{CENTRE, MIDDLE};
+    draw_panel(Some(m), draws);
     let colour = 0x90ff_ffffu32.to_le_bytes();
     let first = |id: u32| { let t = text(id); t.split(|&c| c == 0).next().unwrap_or(&[]).to_vec() };
-    let name = first(challenge_name(m.selected));
-    let w = crate::gui::text_width(glyphs, &name, 1.2);
-    crate::gui::text(out, glyphs, 2, &name, 250.0 - (w >> 1) as f32, 150.0, 1.2, colour);
+    let [(g1, s1), (g2, s2), (g3, s3)] = fonts;
+    let mut name = crate::gui::TextBox { top: 125, bottom: 185, left: 10, right: 460, x: 250, y: 150, line: 20, flags: CENTRE | MIDDLE, ..Default::default() };
+    crate::gui::text_in_box(out, g3, s3, &mut name, &first(challenge_name(m.selected)), colour);
     if let Some(p) = m.prize {
         let t = if p < 10000 { [first(0x2dda), format!(" {p} ").into_bytes(), first(0x2df4)].concat() } else { first(0x2dda) };
-        crate::gui::text(out, glyphs, 2, &t, 90.0, 184.0, 1.0, colour);
+        crate::gui::text(out, g2, s2, &t, 90.0, 184.0, 1.0, colour);
     }
     if m.wins != 0 {
         let t = [first(0x2dd4), format!(" {}", m.wins).into_bytes()].concat();
-        crate::gui::text(out, glyphs, 2, &t, 275.0, 184.0, 1.0, colour);
+        crate::gui::text(out, g2, s2, &t, 275.0, 184.0, 1.0, colour);
     }
-    if m.prev { crate::gui::text(out, glyphs, 2, &first(0x2dd6), 166.0, 208.0, 1.0, colour); }
-    if m.next { crate::gui::text(out, glyphs, 2, &first(0x2dd7), 305.0, 208.0, 1.0, colour); }
+    if m.prev { crate::gui::text(out, g1, s1, &first(0x2dd6), 166.0, 208.0, 1.0, colour); }
+    if m.next { crate::gui::text(out, g1, s1, &first(0x2dd7), 305.0, 208.0, 1.0, colour); }
     for (id, x) in [(0x2dd5, 75.0), (0x2dd9, 210.0), (0x2dd8, 380.0)] {
-        crate::gui::text(out, glyphs, 2, &first(id), x, 95.0, 1.0, colour);
+        crate::gui::text(out, g1, s1, &first(id), x, 95.0, 1.0, colour);
     }
 }
 
