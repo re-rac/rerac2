@@ -899,7 +899,7 @@ fn let_next_up(w: &mut MobyWorld, id: usize) {
 
 /// `0x3253f0(m, part, joint, 0)`: the part at the joint's frame (its rows made unit), its animation advanced
 /// (`0x313420`: it is out of the moby loop), shown as `m` is.
-fn place_part(w: &mut MobyWorld, id: usize, p: usize, joint: usize, ctx: &mut Ctx) {
+pub(super) fn place_part(w: &mut MobyWorld, id: usize, p: usize, joint: usize, ctx: &mut Ctx) {
     let Some((r, t)) = ctx.host.joint_matrix(&w.mobys[id], joint) else { return };
     ctx.host.advance(&w.mobys[p]);
     let hidden = w.mobys[id].mode & 1 != 0;
@@ -912,8 +912,11 @@ fn place_part(w: &mut MobyWorld, id: usize, p: usize, joint: usize, ctx: &mut Ct
 
 /// `0x3dbed0(on, owner + at, 0, 2)`: the two parts made (`0x32a748`: at `on`, its draw distance; scaled 0.75) at its
 /// joints, kept in `owner`'s pvars at `at` / `at + 4`.
-pub(super) fn make_parts(w: &mut MobyWorld, on: usize, owner: usize, at: usize, ctx: &mut Ctx) {
-    for (k, j) in PART_JOINTS.into_iter().enumerate() {
+pub(super) fn make_parts(w: &mut MobyWorld, on: usize, owner: usize, at: usize, ctx: &mut Ctx) { make_parts_on(w, on, owner, at, PART_JOINTS, ctx) }
+
+/// [`make_parts`] at other joints (the arena's 0x0b22: `0x3f61f8(m, +0x4c0, 0, 1)`).
+pub(super) fn make_parts_on(w: &mut MobyWorld, on: usize, owner: usize, at: usize, joints: [usize; 2], ctx: &mut Ctx) {
+    for (k, j) in joints.into_iter().enumerate() {
         let id = on;
         let (pos, rot, dd) = (w.mobys[id].pos, w.mobys[id].rot, w.mobys[id].draw_dist);
         let p = w.create(PART);
@@ -934,7 +937,7 @@ pub(super) fn make_parts(w: &mut MobyWorld, on: usize, owner: usize, at: usize, 
 }
 
 /// The parts (`owner`'s `at` / `at + 4`) that are still there.
-fn parts(w: &MobyWorld, owner: usize, at: usize) -> [Option<usize>; 2] {
+pub(super) fn parts(w: &MobyWorld, owner: usize, at: usize) -> [Option<usize>; 2] {
     [0, 1].map(|k| ai::link(&w.mobys[owner], at + 4 * k).filter(|&p| w.mobys.get(p).is_some_and(|m| m.state < 0x80 && m.o_class == PART)))
 }
 

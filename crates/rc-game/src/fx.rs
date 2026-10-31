@@ -247,7 +247,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
     match w.mobys[id].o_class {
         0x0ce9 => tie_lights::draw(w, id, view, cam, out),
         0x0b0a => draw_0b0a(w, id, &mut game.rng, cam, out),
-        0x0b0b => draw_0b0b(w, host, id, &mut game.rng, cam, out),
+        0x0b0b | 0x0b22 => draw_0b0b(w, host, id, &mut game.rng, cam, out),
         crate::moby::classes::shot::SHOT_CLASS => crate::moby::classes::shot::draw_trail(&mut w.mobys[id], cam, &mut game.trail_phase, out),
         crate::moby::classes::nanotech::CLASS => crate::moby::classes::nanotech::draw(w, id, cam, out),
         crate::moby::classes::gravity_bomb::HAND_CLASS => crate::moby::classes::gravity_bomb::draw_marker(w, id, hero_state, game.frame, out),

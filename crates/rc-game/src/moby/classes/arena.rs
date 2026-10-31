@@ -14,7 +14,7 @@
 //! Not ported: the plates' sparks (`0x3d85a8`: one in 60 ticks, the particle burst `0x345d88` of `$gp+0x1380` 0.75
 //! toward the camera; the burst has no port).
 
-use crate::hero::physics::{add, atan2, dist2, scale, set_len, sub, V3};
+use crate::hero::physics::{add, atan2, dist2, set_len, sub, V3};
 use crate::moby::attach::{angles_of, rows_of, turn, Carrier, Kind, Member};
 use crate::moby::hits::HitTemplate;
 use crate::moby::{ai, mode, Ctx, MobyWorld};
@@ -92,7 +92,7 @@ pub fn update_spawner(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if seq_of(w, id, ctx) != 0 { ctx.host.set_anim(&w.mobys[id], 0, 0, 0); }
             ctx.host.set_anim_speed(&w.mobys[id], 0.0);
             let m = &mut w.mobys[id];
-            m.pos = add(m.pos, scale(m.rows[1], 2.0));
+            m.pos = add(m.pos, set_len(m.rows[1], 2.0));
             let home = m.pos;
             m.set_pv_v(0, home);
             if w.class(FRAME).is_none() { return; }
@@ -117,7 +117,7 @@ pub fn update_spawner(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if !done {
                 let k = if s == 1 { 2.0 } else { -2.0 } / SLIDE as f32;
                 let m = &mut w.mobys[id];
-                m.pos = add(m.pos, scale(m.rows[1], k));
+                m.pos = add(m.pos, set_len(m.rows[1], k));
             }
             if wrapped(w, id, ctx) {
                 ctx.host.set_anim_speed(&w.mobys[id], 0.0);

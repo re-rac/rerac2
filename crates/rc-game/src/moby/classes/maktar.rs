@@ -589,6 +589,8 @@ pub struct Globals {
     pub speed: f32,
     /// The cuboids' matrices (`0x1b368c`), copied as the belts and the power nodes read them for their draws.
     pub cuboids: Vec<(i32, [[f32; 4]; 4])>,
+    /// `$gp+0x1118`: the arena gladiators' (0x09ca) count of swing ends at exactly 4 from their target.
+    pub combo: i32,
     /// `0x139647`: the slot machines' plays (a save byte in the game, at most 127; here for the level's load).
     pub plays: u8,
     /// `0x1a7a81`: the jackpot's message shown (a save flag in the game; here for the level's load).
