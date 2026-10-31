@@ -66,35 +66,39 @@ impl MobyWorld {
         if let Some(m) = self.mobys.get_mut(id) { m.hit_slot = -1; }
     }
 
-    /// The delivery `0x2e14b0` does per moby: only mobys with mode 0x4000; a current record of its own that does at
-    /// least `t.damage` takes `t.flags` and stays; else the next slot gets the record.
+    /// The delivery `0x2e14b0` does per moby (L02 `0x2e4a48`): only mobys with mode 0x4000; then [`Self::merge_hit`].
     pub fn deliver_hit(&mut self, id: usize, t: &HitTemplate, point: [f32; 4]) {
         let Some(m) = self.mobys.get(id) else { return };
         if m.mode & mode::LINE == 0 { return; }
-        if let Ok(slot) = usize::try_from(m.hit_slot) {
+        self.merge_hit(id, t, point);
+    }
+
+    /// A line query's delivery (`0x2de878` with a template, L02 `0x2e1e10`): the moby the line hit gets the record
+    /// whatever its mode (L02's kernel also wants mode 0x4000: not ported for the line's callers); then [`Self::merge_hit`].
+    pub fn deliver_hit_any(&mut self, id: usize, t: &HitTemplate, point: [f32; 4]) {
+        if self.mobys.get(id).is_none() { return; }
+        self.merge_hit(id, t, point);
+    }
+
+    /// The merge both deliveries do: a current record of the moby's own whose damage is at least the new one's (the
+    /// two compared as the words they are, `rec − new ≥ 0`) takes the new flags and stays; else the next slot gets
+    /// the record, with the old record's flags kept in it. So a weak hit (the Lancer's 0.5) on a moby already holding
+    /// a strong one this frame (a fighter's 1.0 bump) is not lost: its flags turn that record into a hit.
+    fn merge_hit(&mut self, id: usize, t: &HitTemplate, point: [f32; 4]) {
+        let mut kept = 0;
+        if let Ok(slot) = usize::try_from(self.mobys[id].hit_slot) {
             if let Some(r) = self.hits.records.get_mut(slot).filter(|r| r.target == id) {
-                if r.tmpl.damage >= t.damage {
+                kept = r.tmpl.flags;
+                if 0 <= (r.tmpl.damage.to_bits() as i32).wrapping_sub(t.damage.to_bits() as i32) {
                     r.tmpl.flags |= t.flags;
                     return;
                 }
             }
         }
         let slot = self.hits.next;
-        self.hits.records[slot] = HitRecord { point, tmpl: *t, target: id };
-        self.mobys[id].hit_slot = slot as i8;
-        self.hits.next = (slot + 1) & (HIT_RECORDS - 1);
-    }
-
-    /// A line query's delivery (`0x2de878` with a template): the moby the line hit gets the record whatever its mode.
-    pub fn deliver_hit_any(&mut self, id: usize, t: &HitTemplate, point: [f32; 4]) {
-        let Some(m) = self.mobys.get(id) else { return };
-        if let Ok(slot) = usize::try_from(m.hit_slot) {
-            if let Some(r) = self.hits.records.get(slot).filter(|r| r.target == id) {
-                if t.damage < r.tmpl.damage { return; }
-            }
-        }
-        let slot = self.hits.next;
-        self.hits.records[slot] = HitRecord { point, tmpl: *t, target: id };
+        let mut tmpl = *t;
+        tmpl.flags |= kept;
+        self.hits.records[slot] = HitRecord { point, tmpl, target: id };
         self.mobys[id].hit_slot = slot as i8;
         self.hits.next = (slot + 1) & (HIT_RECORDS - 1);
     }

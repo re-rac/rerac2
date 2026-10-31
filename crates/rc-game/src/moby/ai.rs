@@ -670,11 +670,18 @@ fn reaction(w: &MobyWorld, id: usize, ctx: &mut Ctx, kind: u8) -> Option<(u8, Re
     Some((s as u8, Reaction { kind, brake: r.brake * kk, across: r.across * k, up: r.up * k, g_up: r.g_up * kk, g_down: r.g_down * kk, key_a: r.key_a, key_b: r.key_b }))
 }
 
-/// `0x31dd48(m, hit)`: the damage a hit does — none for the same hitter again within 10 ticks (60 for the kind 9), a
-/// new hitter's weapon kept; under 1 on a moby of at most 1 health, 1; the hit's flag 0x100000 into the reaction's
-/// `+0x18`.
-pub(crate) fn damage_of(m: &mut Moby, hit: Option<&super::hits::HitRecord>, wrench: bool) -> f32 {
-    let h = health(m);
+/// `0x31dd48(m, hit)` (L02 `0x3220a0`): the damage a hit does — none for the same hitter again within 10 ticks (60
+/// for the kind 9, which keeps its count), a new hitter's weapon kept; a last hitter deleted or dying (state 0xfe /
+/// 0xfd) is forgotten first, so a shot whose slot the next one takes does not count as it; under 1 on a moby of at
+/// most 1 health, 1; the hit's flag 0x100000 into the reaction's `+0x18`.
+pub(crate) fn damage_of(w: &mut MobyWorld, id: usize, hit: Option<&super::hits::HitRecord>, wrench: bool) -> f32 {
+    let h = health(&w.mobys[id]);
+    if link(&w.mobys[id], h + 0x18).and_then(|s| w.mobys.get(s)).is_some_and(|s| s.state == 0xfe || s.state == 0xfd) {
+        let m = &mut w.mobys[id];
+        m.set_pv_s(h + 0x1c, 0);
+        m.set_pv_i(h + 0x18, 0);
+    }
+    let m = &mut w.mobys[id];
     let mut t = m.pv_s(h + 0x1c);
     if t != 0 {
         t += 1;
@@ -689,12 +696,12 @@ pub(crate) fn damage_of(m: &mut Moby, hit: Option<&super::hits::HitRecord>, wren
     if let Some(src) = hit.tmpl.source {
         if link(m, h + 0x18) == Some(src) {
             let ticks = m.pv_s(h + 0x1c);
-            if hit.tmpl.kind & 0xff == 9 {
-                if ticks < 0x3c { dmg = 0.0; }
-            } else if ticks < 10 {
+            if hit.tmpl.kind & 0xff == 9 && ticks < 0x3c {
                 dmg = 0.0;
+            } else {
+                if ticks < 10 && hit.tmpl.kind & 0xff != 9 { dmg = 0.0; }
+                m.set_pv_s(h + 0x1c, 1);
             }
-            m.set_pv_s(h + 0x1c, 1);
         } else {
             set_link(m, h + 0x18, Some(src));
             // `0x3228f8`: the hitter's item (the wrench: 10; the classes with their own kinds are not on Aranos).
@@ -918,7 +925,7 @@ fn damage_tick(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, flag: bool) -> i32 {
         if flag { hr.tmpl.damage *= m.pv_f(r + 0xac); }
     }
     let wrench = hit.and_then(|h| h.tmpl.source).and_then(|s| w.mobys.get(s)).is_some_and(|s| s.o_class == crate::hero::items::WRENCH_CLASS);
-    let mut dmg = damage_of(&mut w.mobys[id], hit.as_ref(), wrench);
+    let mut dmg = damage_of(w, id, hit.as_ref(), wrench);
     w.clear_hit(id);
     let m = &mut w.mobys[id];
     let hp = m.pv_f(h) - dmg;

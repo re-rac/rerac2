@@ -208,7 +208,7 @@ fn senses_0c3e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if src.o_class == super::arena::PLATE || (w.mobys[id].drawn == 0 && src.o_class == 0x0b89) { h.tmpl.damage = 0.0; }
         }
     }
-    let dmg = ai::damage_of(&mut w.mobys[id], hit.as_ref(), false);
+    let dmg = ai::damage_of(w, id, hit.as_ref(), false);
     w.clear_hit(id);
     if dmg != 0.0 {
         let h = hit.expect("damage without a hit");

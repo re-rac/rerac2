@@ -136,8 +136,8 @@ fn take_hit(w: &mut MobyWorld, id: usize, ctx: &Ctx, apply: u8) -> Option<(f32, 
     let rec = if m.pv_s(HP + 6) < 1 { hit } else { None };
     let wrench = rec.and_then(|h| h.tmpl.source).and_then(|s| w.mobys.get(s)).is_some_and(|s| s.o_class == crate::hero::items::WRENCH_CLASS);
     let source = rec.and_then(|h| h.tmpl.source);
+    let dmg = ai::damage_of(w, id, rec.as_ref(), wrench);
     let m = &mut w.mobys[id];
-    let dmg = ai::damage_of(m, rec.as_ref(), wrench);
     let _ = ctx;
     if rec.is_some() && 0.0 < dmg && apply != 0 {
         if apply == 1 {
