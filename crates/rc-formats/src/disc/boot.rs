@@ -8,6 +8,8 @@ use crate::buf::{invalid, Buf, Result};
 pub const GLYPHS: u32 = 0x263b10;
 /// The glyph table of the font in texture slot 2 (`FUN_0027fc28`: "Press START", the subtitles).
 pub const GLYPHS_2: u32 = 0x263eb0;
+/// The glyph table of the font in texture slot 3 (the in-game HUD's FX texture 3: the arena's counters, `0x2ee4f0`).
+pub const GLYPHS_3: u32 = 0x264250;
 /// The main menu's definition (`FUN_002d63b0` → `FUN_00342dc0(gui, 0x261520)`).
 pub const MAIN_MENU: u32 = 0x261520;
 /// The front end's Options page rows (`0x2d6508`).

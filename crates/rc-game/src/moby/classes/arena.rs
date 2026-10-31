@@ -35,7 +35,7 @@
 //! Not ported: the bosses 0x09f8 / 0x0a44 (the challenges with a boss wave, 2, 4, 6, 9, 11, 12 and 13, are kept off the
 //! menu until they are: they could not end), the crowd 0x0e96 and its cheers (`0x3fb028`, `0x42e670`), the announcer's speech (`0x401d98`, its
 //! remarks `0x401e68` / `0x402090`), the wipe (`0x401a20`), the win's screen
-//! (`0x400e10`), the wave's banner (`0x3ffee0`), the menu's arrows (`0x3ff388`) and its vendor (□, `0x332158(5)`), the
+//! (`0x400e10`), the menu's arrows (`0x3ff388`) and its vendor (□, `0x332158(5)`), the
 //! music (`0x335928`), the level's sounds, the challenges' weapon lock (`0x18b6f4`) and the fixed held items of 7 / 8 /
 //! 13 beyond the hand request; the plates' sparks (`0x3d85a8`: the particle burst `0x345d88` has no port).
 
@@ -976,6 +976,7 @@ pub const MIDDLE_AT: usize = 0x240;
 /// 0x0b59 (`0x3fb1b0`), Maktar's arena master (module docs).
 pub fn update_master(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if let Some((p, _)) = cuboid_at(ctx, w, id, pv::MIDDLE) { w.mobys[id].set_pv_v(MIDDLE_AT, p); }
+    let fighting = w.mobys[id].state == 8;
     match w.mobys[id].state {
         0 => {
             reset_master(w, id);
@@ -1079,8 +1080,119 @@ pub fn update_master(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let s = w.mobys[id].state;
     if s == 8 || (s == 5 && w.mobys[id].state_ticks < 0xb4) || s == 10 || s == 0xb { w.register_draw_first(id); }
     if 1 < s { w.register_draw(id); }
+    // The challenge's HUD (`0x3ffee0`, registered on the first list by the challenge's tick).
+    ctx.game.arena_hud = fighting.then(|| challenge_hud(w, id));
     let m = &mut w.mobys[id];
     if m.state_ticks != -1 { m.state_ticks = m.state_ticks.wrapping_add(1); }
+}
+
+/// What the challenge's HUD (`0x3ffee0`) reads from the master.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ChallengeHud {
+    pub challenge: i16,
+    /// `+0x122` and the challenge's wave count.
+    pub wave: i16,
+    pub waves: i16,
+    /// `+0xd4`: the challenge's ticks.
+    pub ticks: i32,
+    /// The timed challenges' count: 15 a wave past, the wave's sent (`+0x90..+0xa4`) less those alive (`+0x60`).
+    pub count: i32,
+    /// The boss (`+0xd0`): its class and its health over its most.
+    pub boss: Option<(i16, f32)>,
+}
+
+fn challenge_hud(w: &MobyWorld, id: usize) -> ChallengeHud {
+    let m = &w.mobys[id];
+    let (challenge, wave) = (m.pv_s(pv::CHALLENGE), m.pv_s(pv::WAVE));
+    let sent: i32 = (0..6).map(|k| m.pv_i(pv::SPAWNED + 4 * k)).sum();
+    let boss = ai::link(m, pv::BOSS).and_then(|b| w.mobys.get(b)).filter(|b| b.mode & ai::AI != 0).map(|b| {
+        let h = ai::health(b);
+        (b.o_class, b.pv_f(h) / b.pv_s(h + 4) as f32)
+    });
+    ChallengeHud {
+        challenge,
+        wave,
+        waves: CHALLENGES.get(challenge as usize).map_or(0, |c| c.waves.len() as i16),
+        ticks: m.pv_i(pv::TICKS),
+        count: wave as i32 * 15 + sent - m.pv_i(pv::ALIVE),
+        boss,
+    }
+}
+
+/// The HUD's font 3: FX texture 3, its glyphs the boot's `0x264250` (crate::front_end::Assets::glyphs_3).
+pub const FONT_3: u16 = 3;
+/// `$gp+0x2368`: the HUD's text colour.
+const HUD_TEXT: u32 = 0x80f0_f0f0;
+/// `$gp+0x2454` / `+0x2450`: the panels' back and outline colours; `+0x2420` the boss's picture's.
+const PANEL_BACK: u32 = 0x6044_2d00;
+const PANEL_LINE: u32 = 0x55f0_c070;
+const BOSS_PICTURE: u32 = 0x8080_8080;
+/// `$gp+0x2340..+0x2360` (`0x3ffd90`): the boss bar's left, top, right and bottom, its colours (full, half, empty).
+const BOSS_BAR: [f32; 4] = [74.0, 388.0, 191.0, 400.0];
+const BOSS_BAR_COLOURS: [u32; 3] = [0x8000_aa00, 0x8000_aaaa, 0x8000_00aa];
+
+/// A text box of the HUD (`0x2ee560(box, top, bottom, left, right, x, y, 0, 0)`), the first layout's (`$gp+0x2368..`;
+/// the second, for the languages past the second, is not ported).
+fn hud_box(top: i32, bottom: i32, left: i32, right: i32, x: i32, y: i32) -> crate::gui::TextBox {
+    crate::gui::TextBox { top, bottom, left, right, x, y, ..Default::default() }
+}
+
+/// `0x3ffee0` (the master, first list, in a challenge): the panels along the screen's bottom. A timed challenge
+/// (3 / 5) shows its seconds left on the right (30 / 60 less the elapsed, font 3, with "time" 0x2df9 in font 2) and
+/// its count on the left (font 3, with 0x2df7 in font 1); challenge 12 its seconds left of 120 only (font 1 from
+/// 100); the others the wave of their count on the right (`"%2d/%2d"`, font 3, with 0x2df6 in font 1) and, with a
+/// boss, its bar and picture on the left (0x09f8 frame 2, 0x0a44 frame 1). The panels are the GUI sprites 0x4c / 0x4d
+/// (0x4e / 0x4f for the wave's), the right one mirrored. `fonts`: the glyphs and texture slot of fonts 1, 2 and 3.
+///
+/// Not ported: the draw's depth word (`0x1beab0` = 0.62 while it draws) and its GS state (`0x384420`, `0x384178`),
+/// PAL's screen scale (`0x1b3e04`) and the bar's PAL offset (`$gp+0x2350`).
+pub fn draw_hud(h: &ChallengeHud, text: &dyn Fn(u32) -> Vec<u8>, fonts: [(&[rc_formats::disc::boot::Glyph; 256], usize); 3], draws: &mut Vec<crate::hud::Draw>, out: &mut Vec<crate::gui::Quad>) {
+    use crate::hud::Draw;
+    let first = |id: u32| { let t = text(id); t.split(|&c| c == 0).next().unwrap_or(&[]).to_vec() };
+    let colour = HUD_TEXT.to_le_bytes();
+    let mut print = |font: usize, mut b: crate::gui::TextBox, t: &[u8]| {
+        let (g, slot) = fonts[font - 1];
+        crate::gui::text_in_box(out, g, slot, &mut b, t, colour);
+    };
+    let panel = |draws: &mut Vec<Draw>, ids: [u32; 2], x: f32, sx: f32| {
+        for (id, colour) in [(ids[0], PANEL_BACK), (ids[1], PANEL_LINE)] {
+            draws.push(Draw::Sprite { id, pos: [x, 407.0], scale: [sx, 1.0], frame: 0.0, colour });
+        }
+    };
+    let (seconds, timed) = match h.challenge { 3 => (30, true), 5 => (60, true), 0xc => (120, false), _ => (0, false) };
+    if h.challenge == 3 || h.challenge == 5 || h.challenge == 0xc {
+        let left = seconds - h.ticks / 60;
+        panel(draws, [0x4c, 0x4d], 502.0, -1.0);
+        let font = if h.challenge == 0xc && 100 <= left { 1 } else { 3 };
+        print(font, hud_box(380, 400, 430, 500, 474, 380), left.to_string().as_bytes());
+        print(2, hud_box(380, 400, 330, 430, 380, 384), &first(0x2df9));
+        if timed {
+            panel(draws, [0x4c, 0x4d], 10.0, 1.0);
+            print(3, hud_box(380, 400, 25, 70, 40, 380), h.count.to_string().as_bytes());
+            print(1, hud_box(380, 400, 70, 200, 130, 384), &first(0x2df7));
+        }
+        return;
+    }
+    if let Some((class, fraction)) = h.boss {
+        panel(draws, [0x4c, 0x4d], 10.0, 1.0);
+        draws.push(Draw::Sprite { id: 0x50, pos: [12.0, 407.0], scale: [1.0, 1.0], frame: 0.0, colour: PANEL_LINE });
+        let frame = match class { 0x09f8 => Some(2.0), 0x0a44 => Some(1.0), _ => None };
+        if let Some(frame) = frame {
+            // `0x3ffd90(fraction)`: the bar, red to yellow to green.
+            let f = fraction.max(0.0);
+            let width = ((BOSS_BAR[2] - BOSS_BAR[0]) * f).round();
+            let c = if 0.5 < f {
+                crate::hud::lerp_rgba(f + f - 1.0, BOSS_BAR_COLOURS[1], BOSS_BAR_COLOURS[0])
+            } else {
+                crate::hud::lerp_rgba(f + f, BOSS_BAR_COLOURS[2], BOSS_BAR_COLOURS[1])
+            };
+            draws.push(Draw::Bar { pos: [BOSS_BAR[0], BOSS_BAR[1]], size: [width, BOSS_BAR[3] - BOSS_BAR[1]], colours: [c, c] });
+            draws.push(Draw::Sprite { id: 0x51, pos: [10.0, 406.0], scale: [1.0, 1.0], frame, colour: BOSS_PICTURE });
+        }
+    }
+    panel(draws, [0x4e, 0x4f], 502.0, -1.0);
+    print(3, hud_box(380, 400, 420, 500, 457, 380), format!("{:2}/{:2}", h.wave + 1, h.waves).as_bytes());
+    print(1, hud_box(380, 400, 320, 420, 360, 384), &first(0x2df6));
 }
 
 /// State 2: through the wipe into the arena — chunk 1, Ratchet at the entry cuboid `+0x8c`, the checkpoint, the

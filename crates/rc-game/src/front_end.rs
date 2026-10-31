@@ -53,6 +53,8 @@ pub struct Assets {
     /// Texture slot 1's glyphs (the menus) and slot 2's ("Press START").
     pub glyphs: [Glyph; 256],
     pub glyphs_2: [Glyph; 256],
+    /// Slot 3's (the in-game HUD's FX texture 3).
+    pub glyphs_3: [Glyph; 256],
     pub strings: Strings,
     pub main_menu: Vec<MenuRow>,
     /// The Options page's rows (`0x261570`).
@@ -382,7 +384,7 @@ mod tests {
 
     fn assets() -> Assets {
         let row = |text| MenuRow { scale: 1.0, text, kind: 4, target: 0 };
-        Assets { glyphs: [Glyph::default(); 256], glyphs_2: [Glyph::default(); 256], strings: Strings::default(), main_menu: vec![row(1), row(2), row(3)], options_menu: Vec::new(), sprites: HashMap::new() }
+        Assets { glyphs: [Glyph::default(); 256], glyphs_2: [Glyph::default(); 256], glyphs_3: [Glyph::default(); 256], strings: Strings::default(), main_menu: vec![row(1), row(2), row(3)], options_menu: Vec::new(), sprites: HashMap::new() }
     }
 
     /// Runs until the front end asks for a movie; returns the frames it took.

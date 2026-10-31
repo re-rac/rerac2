@@ -27,7 +27,7 @@ use crate::hud_render::{self, Hud2d, HudComposite, HudMaterial, Layer, Tex};
 use anyhow::{Context, Result};
 use bevy::input::mouse::AccumulatedMouseMotion;
 use bevy::prelude::*;
-use rc_formats::disc::boot::{BootElf, GLYPHS, GLYPHS_2, MAIN_MENU, OPTIONS_MENU};
+use rc_formats::disc::boot::{BootElf, GLYPHS, GLYPHS_2, GLYPHS_3, MAIN_MENU, OPTIONS_MENU};
 use rc_formats::disc::front_end::FrontEnd as Blob;
 use rc_formats::disc::toc::{self, Toc, MISC_FRONT_END, MOVIE_FILES};
 use rc_formats::disc::{gui_sprite, Picture};
@@ -75,7 +75,7 @@ impl Data {
         let sprites = gui_sprite::parse(hud.get(block.bytes()).context("HUD.WAD: the GUI block is past the file")?)?;
         let elf = read("SCUS_972.68")?;
         let boot = BootElf::parse(&elf)?;
-        let assets = FrontAssets { glyphs: boot.glyphs(GLYPHS)?, glyphs_2: boot.glyphs(GLYPHS_2)?, strings: blob.strings(0)?, main_menu: boot.menu(MAIN_MENU)?, options_menu: boot.menu(OPTIONS_MENU)?, sprites };
+        let assets = FrontAssets { glyphs: boot.glyphs(GLYPHS)?, glyphs_2: boot.glyphs(GLYPHS_2)?, glyphs_3: boot.glyphs(GLYPHS_3)?, strings: blob.strings(0)?, main_menu: boot.menu(MAIN_MENU)?, options_menu: boot.menu(OPTIONS_MENU)?, sprites };
         // The frame buffer's pictures are opaque; the texture set keeps its own alpha.
         let opaque = |p: Picture| { let mut rgba = p.rgba; rgba.chunks_mut(4).for_each(|c| c[3] = 0x80); Texture { width: p.width, height: p.height, rgba } };
         let mut textures: Vec<Texture> = blob.textures()?.into_iter().map(|p| Texture { width: p.width, height: p.height, rgba: p.rgba }).collect();
