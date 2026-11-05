@@ -49,8 +49,7 @@
 //! group's 32 instances turned while in view (`0x3f6900` / `0x3f6a48`) and a texture's scroll (`0x3f6c30`). 0x0f15,
 //! the arena's scene props, is crate::moby::classes::arena's.
 //!
-//! Not ported: 0x0adf's lift (`0x3ece68`, its update when the cuboid's z scale is 2: up and down to Ratchet's level
-//! as he rides it); 0x0e96 (`0x4301b0`, the arena crowd: it waits for its controller past state 1, cheers by the
+//! Not ported: 0x0e96 (`0x4301b0`, the arena crowd: it waits for its controller past state 1, cheers by the
 //! controller's pvars `+0x6c` and waves about (500, 600); the controller is not ported); 0x0ccc
 //! (`0x417bf0`, moves a moby another class links in); 0x000b (`0x396448`, the ship's pad: its hologram 0x477 and the
 //! △ prompt that starts the travel, the main dev's progression), 0x12cf (`0x38b458`, that count).
@@ -188,7 +187,7 @@ pub fn update_0a4b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) { probe_near(w, 
 /// cuboid's frame (the inverse `+0x40` of its offset from the cuboid; x at `+0x74`, z at `+0x7c`), its phase from
 /// `+0x64` (`p·2π − π` at `+0x68`), pvars `+0x5c` |= 0x10 (state 2); then it swings along the frame's y, `0.25·sin`
 /// of the phase stepping 60°/s (`$gp+0x1d88` / `$gp+0x1d8c`), with its looped sound 0 (handle `+0x80`), carrying
-/// Ratchet (`0x326a60`, the block `+0x20`). A cuboid with a z scale of 2 makes it the lift (not ported: it stays).
+/// Ratchet (`0x326a60`, the block `+0x20`). A cuboid with a z scale of 2 makes it the lift ([`update_lift`]).
 pub fn update_0adf(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let (old, old_yaw) = (w.mobys[id].pos, w.mobys[id].rot[2]);
     let c = w.mobys[id].pv_i(0x60);
@@ -196,9 +195,9 @@ pub fn update_0adf(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         if w.mobys[id].state == 0 { w.mobys[id].set_state(3, -1); }
         return;
     };
+    if (v.matrix[2][2] - 2.0).abs() < 0.01 { return update_lift(w, id, ctx, &v); }
     match w.mobys[id].state {
         0 => {
-            if (v.matrix[2][2] - 2.0).abs() < 0.01 { return; }
             let m = &mut w.mobys[id];
             m.set_pv_i(0x5c, m.pv_i(0x5c) | 0x10);
             let d: [f32; 3] = std::array::from_fn(|k| m.pos[k] - v.matrix[3][k]);
@@ -224,6 +223,74 @@ pub fn update_0adf(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.pos = std::array::from_fn(|k| l[0] * v.matrix[0][k] + l[1] * v.matrix[1][k] + l[2] * v.matrix[2][k] + v.matrix[3][k]);
         }
         _ => {}
+    }
+    let m = &w.mobys[id];
+    carry_hero(ctx, id, old, old_yaw, m.pos, m.rot[2]);
+}
+
+/// `0x3ece68`: 0x0adf as the lift, between its home height (`+0x70`, kept at its start; state 1) and its cuboid's
+/// (`+0x68` = 1 heads there). Within 2 of where it heads: Ratchet landing on it (his ground moby, on the ground) sends
+/// it to the other end once (`+0x84` held until he leaves it or is 0.2 above it); else Ratchet within 4 of the other
+/// end's height and 24 across (`0x2f2f50`) calls it. Its z eased (`0x323170`: 7/3600, 14/3600, at most 0.5; speed
+/// `+0x6c`) to the end's height; up to the cuboid it goes 0.15 past it with Ratchet not under it and it not above the
+/// camera, else 3 past (5 for 0xbf5) with Ratchet in the cuboid or the camera over it (within 1 in its frame), braking
+/// by 28/3600. Its looped sound 0 (handle `+0x80`) while it moves faster than 0.01; Ratchet carried.
+fn update_lift(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, v: &crate::level::Volume) {
+    let (old, old_yaw) = (w.mobys[id].pos, w.mobys[id].rot[2]);
+    let m = &mut w.mobys[id];
+    if m.state == 0 {
+        let pos = m.pos;
+        m.set_pv_v(0x70, pos);
+        m.set_pv_i(0x80, -1);
+        m.set_state(1, -1);
+    } else if m.state == 1 {
+        let (home, z) = (m.pv_f(0x78), m.pos[2]);
+        let mut t = if m.pv_i(0x68) == 0 { home } else { v.matrix[3][2] };
+        if (t - z).abs() < 2.0 {
+            let h = &*ctx.hero;
+            let on = h.ground_moby == Some(id);
+            if on && h.grounded_ticks != 0 {
+                if m.pv_i(0x84) == 0 { m.set_pv_i(0x68, (m.pv_i(0x68) + 1) & 1); }
+                m.set_pv_i(0x84, 1);
+            } else {
+                if !on || 0.2 < h.height { m.set_pv_i(0x84, 0); }
+                let (to, end) = if m.pv_i(0x68) == 0 { (1, v.matrix[3][2]) } else { (0, home) };
+                let across = ((h.pos[0] - m.pos[0]).powi(2) + (h.pos[1] - m.pos[1]).powi(2)).sqrt();
+                if (h.pos[2] - end).abs() < 4.0 && across < 24.0 { m.set_pv_i(0x68, to); }
+            }
+        }
+        let mut brake = 14.0;
+        if m.pv_i(0x68) != 0 {
+            let cam = ctx.host.camera_pos();
+            if z - 1.0 <= ctx.hero.pos[2] && z <= cam[2] {
+                t += 0.15;
+            } else {
+                brake = 28.0;
+                let d: [f32; 3] = std::array::from_fn(|k| cam[k] - v.matrix[3][k]);
+                let l: [f32; 2] = std::array::from_fn(|k| d[0] * v.inverse[0][k] + d[1] * v.inverse[1][k] + d[2] * v.inverse[2][k]);
+                let inside = ctx.level.in_cuboid(m.pv_i(0x60), ctx.hero.pos);
+                if inside || (l[0].abs() < 1.0 && l[1].abs() < 1.0) { t += if m.o_class == 0x0bf5 { 5.0 } else { 3.0 }; }
+            }
+        }
+        let (mut z, mut s) = (z, m.pv_f(0x6c));
+        crate::hero::physics::ease(t, 7.0 * 0.000_277_777_78, brake * 0.000_277_777_78, 0.5, &mut z, &mut s);
+        if (z - t).abs() <= s {
+            z = t;
+            s = 0.0;
+        }
+        m.pos[2] = z;
+        m.set_pv_f(0x6c, s);
+        w.changed = true;
+    }
+    let handle = w.mobys[id].pv_i(0x80);
+    if 0.01 < w.mobys[id].pv_f(0x6c).abs() {
+        if !ctx.host.sound_playing(handle) {
+            let h = ctx.host.play_sound(&w.mobys[id], 0, 4);
+            w.mobys[id].set_pv_i(0x80, h);
+        }
+    } else {
+        if handle != -1 && ctx.host.sound_playing(handle) { ctx.host.stop_sound(handle); }
+        w.mobys[id].set_pv_i(0x80, -1);
     }
     let m = &w.mobys[id];
     carry_hero(ctx, id, old, old_yaw, m.pos, m.rot[2]);
