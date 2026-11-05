@@ -1180,7 +1180,9 @@ fn tick(
                 p.ship = Some(f);
             }
         }
-        let heard = listener(&p.camera);
+        // Its sounds are heard from its view as the last tick left it (the follow camera has just moved on, back at
+        // Ratchet, who waits far off).
+        let heard = p.ship.as_ref().map_or_else(|| listener(&p.camera), |f| rc_game::audio::voices::Listener { pos: f.pos, rows: f.rows, underwater: false, water_height: 0.0 });
         if let Some(f) = p.ship.as_mut() {
             let sound = audio.as_deref_mut().map(|o| crate::mobys::HostSound { system: o.system(), listener: heard, tick: p.ticks, loops: &mut mobys.loop_slots });
             let mut host = crate::mobys::Host { lv: &lv.mobys, occl: occl.as_deref(), anim: anim.as_deref_mut(), created: &mut mobys.created, hero: None, hero_chains: &[], chains: Some(&mobys.chains), camera: f.pos, camera_rows: f.rows, sound };
