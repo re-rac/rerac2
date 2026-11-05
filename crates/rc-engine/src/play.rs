@@ -768,8 +768,10 @@ fn tick(
         return;
     }
     // Start (level 00 `0x3706f0`: mode 3 kind 1, after the level's first 8 frames, not while dying or in a vehicle's
-    // states 0x6f / 0x31).
-    if p.pad.pressed & rc_game::pad::button::START != 0 && 7 < p.game.frame && !matches!(p.hero.state, 0x6f | 0x31) {
+    // states 0x6f / 0x31; 0x31 is let through on the space levels 5, 10, 15 and 25, `0x2e9c80`, where the ship's
+    // camera holds him in it).
+    let space = matches!(p.game.level, 5 | 10 | 15 | 25);
+    if p.pad.pressed & rc_game::pad::button::START != 0 && 7 < p.game.frame && p.hero.state != 0x6f && (p.hero.state != 0x31 || space) {
         // Its sound 0x12 (`0x360750(0x12, 0, 0)` at `0x370a20`).
         let (m, o) = rc_game::menus::Menus::pause(0);
         if let rc_game::menus::Out::Sound(n) = o { p.game.level_sounds.push(n as i32); }
@@ -1112,7 +1114,9 @@ fn tick(
                 p.ship = Some(f);
             }
         }
-        let heard = listener(&p.camera);
+        // Its sounds are heard from its view as the last tick left it (the follow camera has just moved on, back at
+        // Ratchet, who waits far off).
+        let heard = p.ship.as_ref().map_or_else(|| listener(&p.camera), |f| rc_game::audio::voices::Listener { pos: f.pos, rows: f.rows, underwater: false, water_height: 0.0 });
         if let Some(f) = p.ship.as_mut() {
             let sound = audio.as_deref_mut().map(|o| crate::mobys::HostSound { system: o.system(), listener: heard, tick: p.ticks, loops: &mut mobys.loop_slots });
             let mut host = crate::mobys::Host { lv: &lv.mobys, occl: occl.as_deref(), anim: anim.as_deref_mut(), created: &mut mobys.created, hero: None, hero_chains: &[], chains: Some(&mobys.chains), camera: f.pos, camera_rows: f.rows, sound };
