@@ -1194,8 +1194,9 @@ pub fn update_0c1b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 ///   it into its cup 2 up, a tenth of a unit toward Ratchet ([`catapult_pull`]); the beam letting go or Ratchet more
 ///   than 15 across off, the beam drops it and it fires (3) at `(10 + 2·max(0, d − 4))/60` a tick (d Ratchet's
 ///   distance), its sound 0.
-/// * 3: the bomb flies off at 25° along its yaw away from Ratchet, its velocity's change at most 100/3600 a tick
-///   (`0x3ea400`); once past the catapult it is unhooked and launched ([`launch_bomb`]) (1).
+/// * 3: the bomb flies off at 25° (the critter 0x09bc at 20°, `$gp+0x1be0`) along its yaw away from Ratchet, its
+///   velocity's change at most 100/3600 a tick (`0x3ea400`); once past the catapult it is unhooked and launched
+///   ([`launch_bomb`]; the critter: crate::moby::classes::maktar_pads::launch, `0x3cc300`) (1).
 ///
 /// While it turns faster than ¼° a tick its sound 1 loops. Not ported: its draw `0x3eae18`, the camera while aiming
 /// (`0x451ee0`, `0x451bb0`, `0x451af8`). (The critter 0x09bc and its pads 0x0a61 are another puzzle:
@@ -1252,7 +1253,7 @@ pub fn update_0aa6(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             w.mobys[id].state_ticks = w.mobys[id].state_ticks.wrapping_add(1);
             if let Some(v) = catapult_fly(w, id, b, ctx) {
                 w.mobys[b].once &= !4;
-                launch_bomb(w, b, v);
+                if w.mobys[b].o_class == super::maktar_pads::CRITTER { super::maktar_pads::launch(w, b, v) } else { launch_bomb(w, b, v) }
                 w.mobys[id].set_state(1, -1);
             }
         }
@@ -1305,7 +1306,8 @@ fn catapult_fly(w: &mut MobyWorld, id: usize, b: usize, ctx: &Ctx) -> Option<cra
     let mut yaw = m.rot[2];
     let h = ctx.hero.pos;
     if sub_rot(yaw, atan2(h[0] - m.pos[0], h[1] - m.pos[1])).abs() < std::f32::consts::FRAC_PI_2 { yaw = add_rot(yaw, std::f32::consts::PI); }
-    let (s, pitch) = (m.pv_f(0x44), 25.0f32.to_radians());
+    let pitch = if w.mobys[b].o_class == BOMB { 25.0f32 } else { 20.0 };
+    let (s, pitch) = (m.pv_f(0x44), pitch.to_radians());
     let want = [yaw.cos() * s * pitch.cos(), yaw.sin() * s * pitch.cos(), pitch.sin() * s];
     let mut v = m.pv_v(0x10);
     let mut dv = sub(want, v);

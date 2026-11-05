@@ -37,6 +37,7 @@
 //!   (`0x32af70(0.7, 0.5, 0.1, m, +0x140, +0x394)`) and makes its sound; hooked (`+0xbe` bit 2) 6; let go, the run (3,
 //!   sub 0).
 //! * **6**: sequence 0xd, it faces Ratchet and makes its sound.
+//! * **7**, the fall: a catapult's launch ([`launch`]); see [`fall`].
 //! * Its sound (`0x3cc5e8`): class sound 1 every `rand_range(30, 180)` ticks (`+0x3b4`, at once when dragged).
 //!
 //! **A pad** (`0x3e2fa8`; pvars `[0]` the critter, `[1]` / `[2]` the doors, `[5]` a moby gone once it is done, `[6]` /
@@ -56,7 +57,7 @@
 //! * **4**: the fade toward 0; out, its uid counted (`0x19b4a8`), 5.
 //!
 //! Not ported: the critter's walk to Ratchet (4: sequence 5, turns at 0.2° and at most 12° a tick, walk accel 0.0022,
-//! most 7/60, until within 6) and its fall (7): no code enters either; its aim joint (`+0x9c`, the framework's joint
+//! most 7/60, until within 6): no code enters it; the word `0x18ca6c` the catapult's launch sets; its aim joint (`+0x9c`, the framework's joint
 //! aims are not ported); the 32 frames' turn is the slot's index (the original's, its address `>> 8`, counts from the
 //! moby table's base). Of the pads: their draw (`0x3e36b8`, rings of effect quads by `[6]` / `[7]` / `[8]` / `[0xa]` / `[0xb]`), the voice line `[0x12]` taken even with the dialogue
 //! busy (here only when free), the dialogue's start `0x3354e0` (`0x1a641a` = 3).
@@ -281,6 +282,7 @@ pub fn update_critter(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             face_hero(w, id, ctx);
             chirp(w, id, ctx);
         }
+        7 => fall(w, id, ctx),
         _ => {}
     }
     let m = &mut w.mobys[id];
@@ -301,6 +303,55 @@ pub fn update_critter(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     let m = &mut w.mobys[id];
     m.state_ticks = m.state_ticks.wrapping_add(1);
+}
+
+/// `0x3cc300(m, v)`: a catapult's launch (crate::moby::classes::maktar::update_0aa6) — falling (7) at `v` a tick.
+pub fn launch(w: &mut MobyWorld, id: usize, v: V3) {
+    let m = &mut w.mobys[id];
+    m.set_state(7, -1);
+    m.set_pv_v(FALL, v);
+}
+
+/// The fall's velocity (a tick).
+const FALL: usize = 0xf0;
+
+/// 7, the fall (`0x3cba00`): it moves by its velocity `+0xf0`, gravity `$gp+0x1054` (15/3600 a tick²), and makes its
+/// sound; in its cuboid `+0x398` the velocity at most 1/60 across (`0x2f30a8`, z kept). Its sphere (½, ½ up,
+/// `0x2e2e70`) meeting anything puts it where the query pushed it, and moving into the face it bounces off it at half
+/// speed (`0x2f31c8`: the velocity mirrored about the face's normal, halved); on a floor (the normal's z 0.95 or more)
+/// it stands: a target again, idle (1), still, its drag block's place there and its velocity cleared.
+fn fall(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    use crate::hero::physics::{len2, scale, set_len2, unit};
+    let m = &mut w.mobys[id];
+    let mut v = m.pv_v(FALL);
+    m.pos = add(m.pos, v);
+    v[2] -= 15.0 * 0.000_277_777_78;
+    m.set_pv_v(FALL, v);
+    chirp(w, id, ctx);
+    let m = &mut w.mobys[id];
+    if ctx.level.in_cuboid(m.pv_i(0x398), m.pos) {
+        let v = m.pv_v(FALL);
+        m.set_pv_v(FALL, set_len2(v, len2(v).min(1.0 / 60.0)));
+    }
+    let p = m.pos;
+    let hit = ctx.coll.and_then(|c| crate::collision::coll_sphere_m(c, ctx.scene, [p[0], p[1], p[2] + 0.5], 0.5, crate::collision::QueryFlags(0), Some(id)));
+    let Some(hit) = hit else { return };
+    let m = &mut w.mobys[id];
+    if let Some(c) = hit.pushed_centre { m.pos = [c[0], c[1], c[2] - 0.5]; }
+    let n = unit(hit.normal);
+    let mut v = m.pv_v(FALL);
+    let d = dot(n, v);
+    if d < 0.0 { v = scale(sub(v, scale(n, 2.0 * d)), 0.5); }
+    m.set_pv_v(FALL, v);
+    if 0.95 <= n[2] {
+        m.mode |= mode::TARGET;
+        m.set_state(1, 0);
+        m.set_pv_v(FALL, [0.0; 3]);
+        let p = m.pos;
+        m.set_pv_v(DRAG + 0x10, p);
+        m.set_pv_v(DRAG, [0.0; 3]);
+    }
+    w.rebuild(id, &*ctx.host);
 }
 
 /// `$gp+0x1730` / `+0x1734`: the pads' phases' speeds (degrees a second).
