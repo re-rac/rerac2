@@ -714,32 +714,167 @@ fn core_arms_tick(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
 }
 
-/// 0x0b1a of kind 0 (`+0x50`), a captive (`0x3da2e0`): set up from the moby holding it (`+0x54`: sequence 9, or 6
-/// while it holds with `+0xc8`; its lights), then idle; let go (`+0x95` set by its holder) it is counted and gone.
-/// Its other kinds are not ported.
+/// 0x0b1a (`0x3da2e0`), the scientist the swamp's creatures have, by its kind `+0x50`. Its pvars: the moby holding it
+/// or that it rides `+0x54`, a cuboid `+0x58`, a moby gone with it `+0x5c`, `+0x60` (0: gone for good, `0x3d9f30`,
+/// else only counted), its group `+0x64` and its count at the start `+0x68`, its cry's handle `+0x70`.
+/// * **0** the set-up: counted or gone before (`+0x60` set, with a mission) it goes with `+0x5c`; else its scale (the
+///   class's × 1.5 / 1.3 / 1.4 / 1 by kind) and sequence: kind 0 9 (6 while its holder holds with `+0xc8`), 1 2, 2 4,
+///   3 10; its holder's lights; 1.
+/// * **1**, kind 0, a captive (crate::moby::classes::flower's arms): it waits to be let go; kind 1, cornered: it
+///   cowers (sequence 1 or 2 by `randi(3)` at each end, blend 8..15, speed 0.7..1.1) and now and then cries (its sound
+///   0, one in 0x4f); a hit (flags 0x10001) or Ratchet in its cuboid: its cry, sequence 3 (2); kind 2, a group's bait:
+///   it cries now and then (one in 0x59); a hit alarms the group's spitters (`0x3d9c18`: 0x0b2b's `+0x3da`), and a hit
+///   or the group down from its count makes it cry and flee (sequence 0xb, `+0xbc` = 1), then at that sequence's end
+///   sequence 3 (2); kind 3, carried: on its moby `+0x54` (place and angles; that moby gone, it is counted), gone once
+///   Ratchet is in its cuboid, else it cries now and then.
+/// * **2**: at its sequence's end it is gone.
+///
+/// Let go (`+0x95` set by its holder) it is gone. Its cry's handle is dropped once the sound is over. Not ported: the
+/// splashes and dust (`0x3da060`, `0x32f9b8`) and kind 2's burst (`0x3d9c90`), the byte `+0xa8` and kind 3's `+0x98`.
 pub fn update_0b1a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    if w.mobys[id].pv_i(0x50) != 0 { return; }
+    use super::props::{group_alive, set_seq, wrapped};
+    let kind = w.mobys[id].pv_i(0x50);
+    let cry = |w: &mut MobyWorld, ctx: &mut Ctx, id: usize| {
+        let h = ctx.host.play_sound(&w.mobys[id], 0, 0);
+        w.mobys[id].set_pv_i(0x70, h);
+    };
+    let chatter = |w: &mut MobyWorld, ctx: &mut Ctx, id: usize, one_in: i32| {
+        if w.mobys[id].pv_i(0x70) == -1 && ctx.game.rng.randi(one_in) == 0 {
+            let h = ctx.host.play_sound(&w.mobys[id], 0, 0);
+            w.mobys[id].set_pv_i(0x70, h);
+        }
+    };
+    let hit = |w: &mut MobyWorld, id: usize| {
+        let h = w.hit_message(id).is_some_and(|h| h.tmpl.flags & 0x1_0001 != 0);
+        w.clear_hit(id);
+        h
+    };
+    let in_cuboid = |w: &MobyWorld, ctx: &Ctx, id: usize| ctx.level.in_cuboid(w.mobys[id].pv_i(0x58), ctx.hero.pos);
+    // The end of sequence `s` itself (not the one it blends from, whose end flag is still up on the first ticks).
+    let ended = |w: &MobyWorld, ctx: &Ctx, id: usize, s: u8| seq_a(w, id, ctx) == s && super::props::seq(w, id, ctx) == s && wrapped(w, id, ctx);
     match w.mobys[id].state {
         0 => {
-            let m = &mut w.mobys[id];
-            m.draw_dist = 0x3ff;
-            m.update_dist = 0xff;
+            let (uid, mission) = (w.mobys[id].uid, w.mobys[id].mission);
+            if w.mobys[id].pv_i(0x60) != 0 && mission != 0xff {
+                let g = &*ctx.game;
+                if g.uid_dead.get(uid.max(0) as usize).is_some_and(|&d| d != 0) || g.uid_count(uid) != 0 {
+                    if let Some(o) = moby_at(w, w.mobys[id].pv_i(0x5c)) { w.delete(o); }
+                    w.delete(id);
+                    return;
+                }
+            }
+            w.mobys[id].sub_state = 0;
+            w.mobys[id].set_pv_i(0x70, -1);
+            let class_scale = w.class(w.mobys[id].o_class).map_or(1.0, |c| c.scale);
             let holder = moby_at(w, w.mobys[id].pv_i(0x54));
-            let s = match holder {
-                Some(h) if w.mobys[h].pv_i(0xc8) != 0 => 6,
-                Some(_) => 9,
-                None => 9,
+            let (scale, s) = match kind {
+                0 => {
+                    let m = &mut w.mobys[id];
+                    m.draw_dist = 0x3ff;
+                    m.update_dist = 0xff;
+                    (1.5, if holder.is_some_and(|h| w.mobys[h].pv_i(0xc8) != 0) { 6 } else { 9 })
+                }
+                1 => (1.3, 2),
+                2 => {
+                    let g = w.mobys[id].pv_i(0x64);
+                    if g != -1 {
+                        let n = group_alive(w, g) as i32;
+                        w.mobys[id].set_pv_i(0x68, n);
+                    }
+                    (1.4, 4)
+                }
+                3 => (1.0, 10),
+                _ => (1.0, 0xff),
             };
-            ctx.host.set_anim(&w.mobys[id], s, 0, 0);
+            w.mobys[id].scale = class_scale * scale;
+            if s != 0xff { ctx.host.set_anim(&w.mobys[id], s, 0, 0); }
             if let Some(h) = holder { (w.mobys[id].light, w.mobys[id].ambient) = (w.mobys[h].light, w.mobys[h].ambient); }
             w.mobys[id].set_state(1, -1);
+            w.rebuild(id, &*ctx.host);
         }
-        _ => {
-            if w.mobys[id].sub_state != 0 {
-                let (uid, mission) = (w.mobys[id].uid, w.mobys[id].mission);
-                if w.mobys[id].pv_i(0x60) == 0 { ctx.game.uid_gone(uid, mission); }
-                w.delete(id);
+        1 => match kind {
+            0 => chatter(w, ctx, id, 0x59),
+            1 => {
+                chatter(w, ctx, id, 0x4f);
+                if wrapped(w, id, ctx) {
+                    let s = if ctx.game.rng.randi(3) == 0 { 1 } else { 2 };
+                    let blend = ctx.game.rng.rand_range(8, 15) as u8;
+                    set_seq(w, id, ctx, s, 0, blend);
+                    let speed = ctx.game.rng.randf(0.7, 1.1);
+                    ctx.host.set_anim_speed(&w.mobys[id], speed);
+                }
+                if hit(w, id) || in_cuboid(w, ctx, id) {
+                    cry(w, ctx, id);
+                    set_seq(w, id, ctx, 3, 0, 10);
+                    w.mobys[id].set_state(2, -1);
+                }
             }
+            2 => {
+                if w.mobys[id].timer == 0 {
+                    chatter(w, ctx, id, 0x59);
+                    let mut fled = hit(w, id);
+                    let g = w.mobys[id].pv_i(0x64);
+                    if fled {
+                        let members = usize::try_from(g).ok().and_then(|g| w.groups.get(g)).cloned().unwrap_or_default();
+                        for o in members {
+                            let m = &mut w.mobys[o];
+                            if m.state < 0x80 && m.o_class == 0x0b2b { m.set_pv_s(0x3da, 1); }
+                        }
+                    }
+                    let start = w.mobys[id].pv_i(0x68);
+                    if g != -1 && start != 0 && (group_alive(w, g) as i32) < start { fled = true; }
+                    if fled {
+                        cry(w, ctx, id);
+                        set_seq(w, id, ctx, 0xb, 0, 0xf);
+                        w.mobys[id].timer = 1;
+                    }
+                } else if w.mobys[id].timer == 1 && ended(w, ctx, id, 0xb) {
+                    set_seq(w, id, ctx, 3, 0, 0xf);
+                    w.mobys[id].set_state(2, -1);
+                }
+            }
+            3 => {
+                match moby_at(w, w.mobys[id].pv_i(0x54)).filter(|&o| w.mobys[o].state < 0x80) {
+                    Some(o) => {
+                        let (pos, rot) = (w.mobys[o].pos, w.mobys[o].rot);
+                        (w.mobys[id].pos, w.mobys[id].rot) = (pos, rot);
+                        w.rebuild(id, &*ctx.host);
+                    }
+                    None => captive_counted(w, id, ctx),
+                }
+                if in_cuboid(w, ctx, id) {
+                    captive_gone(w, id, ctx);
+                    return;
+                }
+                chatter(w, ctx, id, 0x59);
+            }
+            _ => {}
+        },
+        2 if ended(w, ctx, id, 3) => {
+            captive_gone(w, id, ctx);
+            return;
         }
+        _ => {}
     }
+    let h = w.mobys[id].pv_i(0x70);
+    if h != -1 && !ctx.host.sound_playing(h) { w.mobys[id].set_pv_i(0x70, -1); }
+    if w.mobys[id].state != 0 && w.mobys[id].sub_state != 0 { captive_gone(w, id, ctx); }
+}
+
+/// `0x3d9f30`: the scientist counted (its uid's count) and marked gone since the checkpoint.
+fn captive_counted(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
+    let (uid, mission) = (w.mobys[id].uid, w.mobys[id].mission);
+    if mission == 0xff || uid < 0 { return; }
+    ctx.game.count_uid(uid);
+    ctx.game.uid_gone(uid, mission);
+}
+
+/// The scientist gone: with `+0x60` clear for good ([`captive_counted`]), else its uid counted (with a mission).
+fn captive_gone(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    if w.mobys[id].pv_i(0x60) == 0 {
+        captive_counted(w, id, ctx);
+    } else if w.mobys[id].mission != 0xff {
+        ctx.game.count_uid(w.mobys[id].uid);
+    }
+    w.delete(id);
 }
