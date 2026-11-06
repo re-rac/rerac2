@@ -30,6 +30,13 @@
 //! **The glow** (`0x3d0398`): its colour `+0x78` pulses (12° a tick, `0x80808080` ↔ `0x00202000`); once a frame for
 //! its group each drawn 0x0a4e's joint 0 is kept (`+0x220`) and the group's eyes drawn ([`draw`]).
 //!
+//! **The prison's guard 0x112b** (L14 `0x428bc0`, 23 placed; its senses `0x4297b0`, glow `0x429fe8`, eyes `0x42a180`; the
+//! decomp's `func_US2_L14_00428BC0`) is the same creature with the same tunables (`$gp+0x2820..0x282c`: the speeds 4 /
+//! 4 a second, 8 / 14) and the shared helpers (`0x429be0` / `0x429c38` / `0x429d58` / `0x429ee8` = L02 `0x3cfe08` /
+//! `0x3cfe60` / `0x3cff80` / `0x3d01c8`); its group scans take its own class. It differs in: its senses kill it
+//! (state 0xc) on a floor of surface 1 (`+0x1d8`); its bite does 1 (not its damage byte) and none while its target is
+//! a 0x0964 and the state is under 60 ticks old, and at the bite's end it bites again within 1.25 across of the target.
+//!
 //! Not ported: the gravity frames (`0x3347e8`, level 0x1a's set-up `0x32aba0`), the head's and tail's aims (`0x3286f0`,
 //! `0x32c1d0`; the aim angles are kept at `+0x2c0` / `+0x2c8`), the moby word `+0x9c` (3 / 0xc).
 
@@ -39,6 +46,8 @@ use crate::moby::{ai, Ctx, MobyWorld};
 use super::props::{seq, set_seq, wrapped};
 
 pub const CLASS: i16 = 0x0a4e;
+/// The prison's guard (module docs).
+pub const PRISON: i16 = 0x112b;
 /// The movement block.
 const MV: usize = 0x100;
 /// The target block's point.
@@ -85,11 +94,12 @@ pub fn wake(w: &mut MobyWorld, id: usize, ctx: &Ctx, pos: V3, vel: V3) {
     w.changed = true;
 }
 
-/// `0x3cff00`: its group's living 0x0a4e alarmed (`+0x316`).
+/// `0x3cff00` (L14 `0x429cd8`): its group's living mobys of its class alarmed (`+0x316`).
 fn alarm(w: &mut MobyWorld, id: usize) {
+    let own = w.mobys[id].o_class;
     for m in group(w, id) {
         let x = &mut w.mobys[m];
-        if x.state < 0x80 && x.o_class == CLASS { x.set_pv_s(0x316, 1); }
+        if x.state < 0x80 && x.o_class == own { x.set_pv_s(0x316, 1); }
     }
 }
 
@@ -102,7 +112,7 @@ fn senses(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             return;
         };
         let path = a.lists[0].first().copied().unwrap_or(-1);
-        let class_scale = w.class(CLASS).map_or(1.0, |c| c.scale);
+        let class_scale = w.class(w.mobys[id].o_class).map_or(1.0, |c| c.scale);
         let rng = &mut ctx.game.rng;
         let s = rng.randf(1.0, f32::from_bits(0x3faa_9fbe));
         let weave = rng.randf_signed(18.0, 22.0);
@@ -157,6 +167,8 @@ fn senses(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         alarm(w, id);
         if 4 <= kind { w.mobys[id].set_state(0xc, -1); }
     }
+    let m = &mut w.mobys[id];
+    if m.o_class == PRISON && m.state != 0xc && m.pv_i(MV + 0xd8) == 1 { m.set_state(0xc, -1); }
     if !matches!(w.mobys[id].sub_state, 3 | 4) {
         let area = w.mobys[id].pv_i(0x210);
         let found = ai::find_target(w, id, ctx, 16.0, 0.0, area, None, false);
@@ -269,7 +281,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         0 => {
             let rng = &mut ctx.game.rng;
             if first_sub(&mut w.mobys[id]) {
-                ai::senses(&mut w.mobys[id], 0.005, f32::from_bits(0x3d88_8889), 0.001_745_329_3, 0.418_879);
+                ai::senses(&mut w.mobys[id], 0.005, f32::from_bits(0x3d88_8889), f32::from_bits(0x3be4_c38a), 0.418_879);
                 let t = rng.rand_range(0, 0x1e);
                 let m = &mut w.mobys[id];
                 m.set_pv_f(MV + 0xd0, f32::from_bits(0x3d88_8889));
@@ -449,11 +461,15 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
             let yaw = w.mobys[id].pv_f(0x320);
             face(w, id, yaw);
+            let prison = w.mobys[id].o_class == PRISON;
             if ai::reached(w, id, ctx, 13.0) {
-                let damage = w.mobys[id].pv_b(0x34) as f32;
-                ai::attack_joint(w, id, ctx, 0.75, damage, 1.0, 1, 0x400_0001, 0, 1, 0);
+                let m = &w.mobys[id];
+                let held = prison && ai::link(m, 0x200).and_then(|t| w.mobys.get(t)).is_some_and(|t| t.o_class == 0x0964) && m.state_ticks as u16 <= 59;
+                let damage = if prison { 1.0 } else { m.pv_b(0x34) as f32 };
+                if !held { ai::attack_joint(w, id, ctx, 0.75, damage, 1.0, 1, 0x400_0001, 0, 1, 0); }
             }
             if !wrapped(w, id, ctx) { return; }
+            if prison && dist2(w.mobys[id].pos, w.mobys[id].pv_v(TARGET)) <= 1.25 { return; }
             9
         }
         0xc => {
@@ -522,11 +538,11 @@ fn glow(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let k = p.sin() * 0.5 + 0.5;
     m.set_pv_f(0x32c, k);
     m.glow = lerp_rgba(k, 0x8080_8080, 0x0020_2000);
-    let frame = ctx.game.frame;
+    let (frame, own) = (ctx.game.frame, m.o_class);
     if m.pv_i(0x330) == frame { return; }
     for o in group(w, id) {
         let x = &w.mobys[o];
-        if x.drawn == 0 || x.o_class != CLASS || x.state >= 0x80 { continue; }
+        if x.drawn == 0 || x.o_class != own || x.state >= 0x80 { continue; }
         let Some((rows, at)) = ctx.host.joint_matrix(x, 0) else { continue };
         let x = &mut w.mobys[o];
         for (k, r) in rows.iter().enumerate() { x.set_pv_v(0x220 + 0x10 * k, *r); }
@@ -540,9 +556,10 @@ fn glow(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// `0.2·size` across, 0.08 toward the camera, at `(0.25, 0, 0.1)·size` in its joint 0's frame, its colour the pulse's
 /// way from `0x80602000` to `0x40402000`.
 pub fn draw(w: &MobyWorld, id: usize, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
+    let own = w.mobys[id].o_class;
     for o in group(w, id) {
         let x = &w.mobys[o];
-        if x.drawn == 0 || x.o_class != CLASS || x.state >= 0x80 { continue; }
+        if x.drawn == 0 || x.o_class != own || x.state >= 0x80 { continue; }
         let s = x.pv_f(0x324);
         let rows = [x.pv_v(0x220), x.pv_v(0x230), x.pv_v(0x240)];
         let l = [0.25 * s, 0.0, 0.1 * s];

@@ -3,6 +3,7 @@
 //! asks it after its own.
 
 pub mod props;
+pub mod rappeller;
 pub mod steam;
 
 /// This level's class updates.
@@ -13,6 +14,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         steam::SEQUENCER => Some(steam::update_0b19),
         props::HATCH => Some(props::update_0b11),
         props::FLAP => Some(props::update_0ae7),
+        rappeller::CLASS => Some(rappeller::update_09b4),
+        super::critter::PRISON => Some(super::critter::update),
         _ => None,
     }
 }

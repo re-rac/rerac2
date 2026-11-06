@@ -26,7 +26,8 @@
 //!   * **2**: the pull eases to 1 (0.03 a tick); it flies at Ratchet's chest (0.6 up): its first 180 ticks at 20 a
 //!     second times the pull (90 and a 0.8 reach while he drives, his state 0x31), then twice the pull a tick. It
 //!     shrinks 0.01 of its class's scale a tick while above 0.1 or near. Arrived and shrunk to 1 % — or Ratchet in
-//!     his groups 0x14 / 0x19 or his states 0x39 / 0x6f — it is taken: the formation's sound 3, the formation's uid
+//!     his groups 0x14 / 0x19 or his states 0x39 / 0x6f — it is taken: the formation's sound 3, the crystal count
+//!     `0x1a7a22` up one (crate::game::GameState::crystals), the formation's uid
 //!     marked gone and counted (`0x381e60`'s steps, crate::game::GameState::uid_gone / count_uid), deleted; with no
 //!     formation, crystal or 0x1002 left (`0x436fa0` = L19 `0x42ae68`) skill point 5 (crate::skill_points). Else
 //!     [`glitter`].
@@ -51,10 +52,8 @@
 //! `0x36ebe0` the class sounds, `0x31e320` / `0x31e688` = L00 `0x311320` / `0x311688` (create / delete).
 //!
 //! Not ported: the level's chunk gate (`0x32fb48`: the formation waits while its place is outside the chunk the
-//! level shows, `0x1ca080`; as crate::moby::classes::level08::burrower's); the crystal count `0x1a7a22` (u16) a
-//! crystal taken adds one to (the save keeps it and the pause's items page shows it, crate::menus; the port's game
-//! state has no field for it yet); the reward flag `0x1a903c`; the explosions' direction words (crate::moby::blast
-//! has none).
+//! level shows, `0x1ca080`; as crate::moby::classes::level08::burrower's); the reward flag `0x1a903c`; the
+//! explosions' direction words (crate::moby::blast has none).
 
 use crate::collision::QueryFlags;
 use crate::hero::physics::{add, add_rot, dist2, dot, len, scale, set_len, sub, V3};
@@ -392,6 +391,7 @@ pub fn update_08c4(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// 0x08c4 taken (module docs).
 fn take(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     ctx.host.play_sound_of(&w.mobys[id], CRYSTAL, 3, 0);
+    ctx.game.crystals = ctx.game.crystals.wrapping_add(1);
     if let Some(f) = ai::link(&w.mobys[id], 4).and_then(|f| w.mobys.get(f)) {
         let (uid, mission) = (f.uid, f.mission);
         ctx.game.uid_gone(uid, mission);

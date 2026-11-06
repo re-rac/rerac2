@@ -164,6 +164,7 @@ mod at {
     pub const CHALLENGE: u32 = 0x1a7a12;
     /// The armour worn, the weapon mods on offer and bought (0x38 bytes each), the platinum bolts spent.
     pub const ARMOR: u32 = 0x1a7a20;
+    pub const CRYSTALS: u32 = 0x1a7a22;
     pub const MODS_AVAILABLE: u32 = 0x1a7ac0;
     pub const MODS_BOUGHT: u32 = 0x1a7a88;
     pub const PLATINUM_SPENT: u32 = 0x139648;
@@ -224,6 +225,7 @@ impl GameState {
         if let Some(b) = s.bytes_mut(G, at::STOCK, self.stock.len()) { b.copy_from_slice(&self.stock); }
         s.set_u8(G, at::CHALLENGE, self.challenge as u8);
         if let Some(b) = s.bytes_mut(G, at::ARMOR, 2) { b.copy_from_slice(&self.armor.to_le_bytes()); }
+        if let Some(b) = s.bytes_mut(G, at::CRYSTALS, 2) { b.copy_from_slice(&self.crystals.to_le_bytes()); }
         if let Some(b) = s.bytes_mut(G, at::MODS_AVAILABLE, 0x38) { b.copy_from_slice(&self.mods_available); }
         if let Some(b) = s.bytes_mut(G, at::MODS_BOUGHT, 0x38) { b.copy_from_slice(&self.mods_bought); }
         if let Some(b) = s.bytes_mut(G, at::FLAGS, self.flags.len()) { b.copy_from_slice(&self.flags); }
@@ -293,6 +295,7 @@ impl GameState {
         if let Some(b) = s.bytes(G, at::STOCK, self.stock.len()) { self.stock.copy_from_slice(b); }
         self.challenge = s.u8(G, at::CHALLENGE) != 0;
         if let Some(b) = s.bytes(G, at::ARMOR, 2) { self.armor = i16::from_le_bytes([b[0], b[1]]); }
+        if let Some(b) = s.bytes(G, at::CRYSTALS, 2) { self.crystals = u16::from_le_bytes([b[0], b[1]]); }
         if let Some(b) = s.bytes(G, at::MODS_AVAILABLE, 0x38) { self.mods_available.copy_from_slice(b); }
         if let Some(b) = s.bytes(G, at::MODS_BOUGHT, 0x38) { self.mods_bought.copy_from_slice(b); }
         if let Some(b) = s.bytes(G, at::FLAGS, self.flags.len()) { self.flags.copy_from_slice(b); }

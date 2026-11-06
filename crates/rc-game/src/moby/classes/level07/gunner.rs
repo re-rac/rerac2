@@ -380,8 +380,9 @@ fn toward(from: V3, to: V3, a: f32) -> V3 {
 }
 
 /// `0x3cbba0(damage, maker, vel, at, 0, platform)`: a fireball 0x0b7f at `at` moving `vel` a tick, its maker's light,
-/// a random spin of 12°..36° a tick, alpha 0x5d, its rows kept.
-fn shot(w: &mut MobyWorld, maker: usize, ctx: &mut Ctx, damage: f32, vel: V3, at: V3) {
+/// a random spin of 12°..36° a tick, alpha 0x5d, its rows kept. Shared (L00 `0x3e1118`, L14 `0x3ee518`): also
+/// crate::moby::classes::level14::rappeller's.
+pub(crate) fn shot(w: &mut MobyWorld, maker: usize, ctx: &mut Ctx, damage: f32, vel: V3, at: V3) {
     if w.class(SHOT).is_none() { return; }
     let (light, ambient) = (w.mobys[maker].light, w.mobys[maker].ambient);
     let k = w.create(SHOT);
@@ -425,7 +426,7 @@ pub fn update_0b7f(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.rows = euler_rows([p * 0.5, p * 0.25, p]);
         let (from, vel) = (m.pos, m.pv_v(0));
         let to = add(from, vel);
-        let maker = ai::link(m, 0x10).filter(|&o| w.mobys.get(o).is_some_and(|x| x.o_class == CLASS && x.state < 0x80));
+        let maker = ai::link(m, 0x10).filter(|&o| w.mobys.get(o).is_some_and(|x| x.state < 0x80));
         let met = ctx.coll.and_then(|c| {
             crate::collision::coll_line_m(c, ctx.scene, from, to, crate::collision::QueryFlags(0), Some(id))
                 .or_else(|| crate::collision::coll_sphere_m(c, ctx.scene, from, f32::from_bits(0x3e99_999a), crate::collision::QueryFlags(0), Some(id)))
