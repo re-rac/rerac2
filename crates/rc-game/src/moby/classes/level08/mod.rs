@@ -3,9 +3,11 @@
 //! after its own.
 
 pub mod breakables;
+pub mod burrower;
 pub mod lift;
 pub mod props;
 pub mod seesaw;
+pub mod tabora_ai;
 
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
@@ -13,6 +15,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         breakables::CLASS_12AA | breakables::CLASS_129C | breakables::CLASS_129E => Some(breakables::update_12aa),
         breakables::CLASS_12D0 => Some(breakables::update_12d0),
         breakables::CLASS_129F => Some(breakables::update_129f),
+        burrower::CLASS => Some(burrower::update_0fff),
         props::PLATFORM => Some(props::update_090e),
         props::GLOWING => Some(props::update_0988),
         props::PICKUP => Some(props::update_0e5b),
