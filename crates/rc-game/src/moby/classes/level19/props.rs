@@ -16,8 +16,8 @@
 //!     * it is hidden without collision (2).
 //!
 //! Not ported for 0x11c7: its glow word (`$gp`-relative `0x1b1de0` in v1.01); its rows turned to the ground's
-//! normal (`0x2b0408` with the line's normal `0x1bfec0`); its draw while drawn (`0x423270`); `0x2ab650` on the
-//! piece left; the level's state table `0x21ea30` as a second gone test.
+//! normal (`0x2b0408` with the line's normal `0x1bfec0`); its draw while drawn (`0x423270`); the level's
+//! state table `0x21ea30` as a second gone test.
 
 use crate::moby::{ai, shards, Ctx, MobyWorld};
 
@@ -69,33 +69,17 @@ pub fn update_11c7(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_state(1, 0);
     }
     if w.mobys[id].state != 1 { return; }
-    let hit = w.hit_message(id).filter(|h| h.tmpl.flags & 0x23_0000 != 0);
-    let dmg = ai::damage_of(w, id, hit.as_ref(), false);
+    // The crack and the piece left are 0x096a's too (crate::moby::classes::level08::crystal).
+    let (dmg, _) = crate::moby::classes::level08::crystal::crack(w, id, ctx, 0, 7);
     if 0.0 < dmg {
-        let m = &mut w.mobys[id];
-        let hp = m.pv_f(0x20) - dmg;
-        m.set_pv_f(0x20, hp);
-        for k in 7..10 { m.set_pv_b(0x50 + k, 0xff); }
-        ai::flash_start(m, 0x50);
-        let taken = (m.pv_s(0x24) as f32 - hp) as i32;
-        ctx.host.set_anim(&w.mobys[id], 0, taken.clamp(0, 7) as u8, 0);
         let s = ctx.game.rng.rand_range(0, 2);
-        if 0.0 < hp { ctx.host.play_sound(&w.mobys[id], s, 0); }
+        if 0.0 < w.mobys[id].pv_f(0x20) { ctx.host.play_sound(&w.mobys[id], s, 0); }
     }
     w.clear_hit(id);
     ai::flash(&mut w.mobys[id], 0x50);
     if 0.0 < w.mobys[id].pv_f(0x20) { return; }
     shards::break_into(w, id, ctx, (3.0, 6.0), (3.0, 6.0), 15, [0.0, 0.0, 0.15], 0xff);
-    if w.class(ICE_LEFT).is_some() {
-        let s = w.class(ICE_LEFT).map_or(1.0, |c| c.scale) * 0.65;
-        let n = w.create(ICE_LEFT);
-        let pos = w.mobys[id].pos;
-        let q = &mut w.mobys[n];
-        (q.alpha, q.scale, q.update_dist, q.draw_dist, q.drawn, q.timer, q.pos) = (0x50, s, 0xff, 0xff, 1, 0, pos);
-        q.mode |= 0x800;
-        ai::set_link(q, 4, Some(id));
-        w.changed = true;
-    }
+    crate::moby::classes::level08::crystal::leave(w, id, ctx, ICE_LEFT);
     ctx.host.play_sound(&w.mobys[id], 3, 0);
     let m = &mut w.mobys[id];
     m.set_state(2, -1);

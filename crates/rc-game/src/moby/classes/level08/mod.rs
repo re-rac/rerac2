@@ -5,6 +5,7 @@
 pub mod breakables;
 pub mod breather;
 pub mod burrower;
+pub mod crystal;
 pub mod lift;
 pub mod props;
 pub mod seesaw;
@@ -23,6 +24,11 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         props::PICKUP => Some(props::update_0e5b),
         lift::CLASS => Some(lift::update_0aaa),
         seesaw::CLASS => Some(seesaw::update_090d),
+        crystal::CRYSTAL => Some(crystal::update_096a),
+        crystal::LEFT => Some(crystal::update_08c4),
+        crystal::CARRIER => Some(crystal::update_0e78),
+        // The chips: the same code as Level 12's (`0x3d49b8` = L12 `0x400850`).
+        crystal::CHIP | crystal::CHIP_B => Some(super::level12::debris::update_0d66),
         _ => None,
     }
 }
