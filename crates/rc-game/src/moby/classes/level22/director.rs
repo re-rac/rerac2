@@ -16,9 +16,6 @@ const EVERY: i32 = 1800;
 ///   (the block `0x18b6a8` points at, `0x1b18a0`: its words `+8` and `+0xc`; the hero's level start sets the pointer,
 ///   L22 `0x2a8c34`, and Giant Clank's state 0x5e spends `+0xc`, `0x2d7e18`), the help text 0x9fd in slot 0x54
 ///   (`0x2fac00` = L00 `0x2f5270`) and the wait again. While a count is up the wait stays out and the test runs each tick.
-///
-/// Not ported: Giant Clank (the hero is never him yet, crate::camera), so his counts are never read as empty and the
-/// text never shows.
 pub fn update_133a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &mut w.mobys[id];
     if m.state == 0 {
@@ -36,5 +33,5 @@ pub fn update_133a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
 }
 
-/// Giant Clank's two counts both 0 (`0x18b6a8` → `+8`, `+0xc`): no Giant Clank in the port (above).
-fn giant_clank_empty(_ctx: &Ctx) -> bool { false }
+/// Giant Clank's two counts both 0 (`0x18b6a8` → `+8`, `+0xc`: crate::hero::giant::GiantBlock::counts).
+fn giant_clank_empty(ctx: &Ctx) -> bool { ctx.hero.giant.counts[2] == 0 && ctx.hero.giant.counts[3] == 0 }

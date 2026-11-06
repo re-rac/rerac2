@@ -64,7 +64,7 @@ fn with_z(v: V3, inv: &[V3; 3], rows: &[V3; 3], z: f32) -> V3 {
 }
 
 /// `0x32ae08(rows, up, out)`: the quaternion that turns row 2 toward `up` (module docs).
-fn upright(rows: &[V3; 3], up: V3) -> Q {
+pub fn upright(rows: &[V3; 3], up: V3) -> Q {
     let a = scale(cross(set_len(up, 1.0), rows[2]), 0.5);
     let w = -(1.0 - dot(a, a)).sqrt();
     [a[0], a[1], a[2], w]

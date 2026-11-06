@@ -663,6 +663,8 @@ pub struct MobyWorld {
     pub level19: classes::level19::Globals,
     /// Level 20's boss's globals (classes::level20::boss::Globals).
     pub level20: classes::level20::boss::Globals,
+    /// Level 22's fight's globals (classes::level22::Globals).
+    pub level22: classes::level22::Globals,
     /// Level 16's swinging bridges' swing (classes::level16::drawbridge::Globals).
     pub drawbridge: classes::level16::drawbridge::Globals,
     /// Level 14's electric strands (classes::level14::fence::Globals).

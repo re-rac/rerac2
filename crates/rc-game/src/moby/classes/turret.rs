@@ -1058,7 +1058,7 @@ fn plasma_rows(v: V3) -> [V3; 3] {
 /// 165° off, about `vel × (side × vel)`) by the spring `0x2d7f80(0, angle, k, d, max, &turn)` on the angle (within
 /// `near` and under 90°: k 0.5, d 1).
 #[allow(clippy::too_many_arguments)]
-fn home(k: f32, d: f32, max: f32, near: f32, pos: V3, vel: V3, aim: V3, turn: &mut f32, side: V3) -> V3 {
+pub(crate) fn home(k: f32, d: f32, max: f32, near: f32, pos: V3, vel: V3, aim: V3, turn: &mut f32, side: V3) -> V3 {
     let to = sub(aim, pos);
     let l = len(to);
     if l == 0.0 { return vel; }

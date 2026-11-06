@@ -22,21 +22,33 @@
 //! and the knock-back's end are the death 0x5f. Ratchet's own health stays as it is.
 //!
 //! **His weapons' counts** are the level's record 1 at `0x1b1890` (L22 `0x1b18a0`, L23 `0x1b1f20`; the hero's
-//! `0x18b6a8` points at it): `+8` the gun's, `+0xc` the specials'. The level fills them (the pickups, L22 `0x3a42e8`);
-//! the special (△) takes one.
+//! `0x18b6a8` points at it): `+0` a timer (set: strong shots), `+8` the gun's charge, `+0xc` the specials. The
+//! level's pickups fill them (crate::moby::classes::level22::pickups: full at the fight's set-up, raised by the
+//! pickups), and his health.
 //!
-//! Not ported: the gun (○ held, `0x2aa678`: the effect slot `0x310bc8` and two shots a tick from `0x39e1f0`, one off
-//! `+8` each) and the special's object (class 0x5f3, `0x3ba568` at joint 4 in 0x5e's first 22 frames and from state
-//! 1 with △, `0x3ba428`; its end `0x3ba798` at a knock-back); the pickups that fill the counts (`0x3a3d50` /
-//! `0x3a42e8`); the body's lean (the posture records `0x25de10 + 0x12f0..0x149c` from the walk's yaw velocity and
-//! in the jump); the strafe's camera lean in the body tick; the per-hit playback rate of 0x59 (`0x25fba0`); the
-//! hurt's sound bank. The level ELFs' variants of the L00 helpers (the edge brake `0x2be9e0`, the wall check
-//! `0x2b8f18`) are the port's L00 ones, with their body branches.
+//! **His gun** (`0x2aa678`, the body tick's last, not in a landing lag): ○ pressed within 8 with charge left, no
+//! special out and outside the punches and the special (0x5d / 0x5e) makes the gun's pose layer (`0x3173c0` on his
+//! joint list 2, sequence 13 from frame 0 over 9: the effect slot `0x1870`); while ○ is held it grows 0.13 a tick to
+//! weight 1 at speed 2, and each time its key B is frame 4 with the 5-tick timer out he fires a shot from each hand
+//! (joints 3 and 4, 1.4 ahead along his first row: `0x39e1f0`, crate::moby::classes::level22::shot) while the charge
+//! lasts, one each. Let go (or out of charge, or no longer allowed) it leaves at its sequence's end or once leaving,
+//! 0.07 a tick, and goes at weight 0.
+//!
+//! **His special** (class 0x5f3, crate::moby::classes::level22::special): from state 1 with △ within 7, one off the
+//! specials, at (2, −2.1, 8.7) in his frame (`0x3ba568`); in 0x5e's first 22 frames at his left hand (joint 4),
+//! charging while he holds it there; given up at a knock-back (`0x3ba798`); none while one is out (`0x3ba868`).
+//!
+//! Not ported: the gun's pose layer in his draw (the engine draws Ratchet's layers only), his aim pointer `0x188c`
+//! the shots set, the level's L23 shots and special (L23 `0x2aed78` calls its own copies: his charge and specials
+//! are spent there without a shot); the body's lean (the posture records `0x25de10 + 0x12f0..0x149c` from the
+//! walk's yaw velocity and in the jump); the strafe's camera lean in the body tick; the per-hit playback rate of
+//! 0x59 (`0x25fba0`); the hurt's sound bank. The level ELFs' variants of the L00 helpers (the edge brake `0x2be9e0`,
+//! the wall check `0x2b8f18`) are the port's L00 ones, with their body branches.
 
 use super::physics::*;
 use super::states::Entry;
 use super::Hero;
-use crate::hero::anim::AnimCtl;
+use crate::hero::anim::{AnimCtl, AnimLayer};
 use crate::moby::hits::HitTemplate;
 use crate::moby::{Ctx, MobyWorld};
 use crate::pad::button;
@@ -72,6 +84,26 @@ pub struct GiantBlock {
     /// This tick's hits and camera shake (`0x1b9c20` on L22: the amplitude, its ticks).
     pub hits: Vec<GiantHit>,
     pub shake: Option<(f32, i32)>,
+    /// `0x18b690`: the gun's pose layer; `0x18b69c` it is out, `0x18b6a0` leaving, `0x18b6a4` the shot timer.
+    pub gun: Option<AnimLayer>,
+    pub gun_on: bool,
+    pub gun_leave: bool,
+    pub gun_timer: i32,
+    /// `$gp+0x9c8` (L22 `0x1af9b8`): his special's object while it is out (the level's class 0x5f3 sets and clears it).
+    pub special: Option<usize>,
+    /// This tick's asks of the level ([`pass`]).
+    pub reqs: Vec<GiantReq>,
+}
+
+/// What his gun and special ask of the level's code this tick, carried out after the hero's tick ([`pass`]).
+#[derive(Clone, Copy, Debug)]
+pub enum GiantReq {
+    /// `0x39e1f0(Giant Clank, joint + 1.4 · row 0, 0, 0, strong)`: a shot from a hand.
+    Shot { joint: usize, strong: bool },
+    /// `0x3ba568(Giant Clank, at, 1)`: his special held at a point of his frame, or (None) at his left hand.
+    Special(Option<V3>),
+    /// `0x3ba798(Giant Clank)`: his special given up.
+    EndSpecial,
 }
 
 impl Hero {
@@ -191,11 +223,12 @@ impl Hero {
                 self.giant_gravity(false);
             }
             0x5e => {
-                // `0x2c7d48`: still; the special's object at his left hand in its first 22 frames (not ported).
+                // `0x2c7d48`: still; the special held at his left hand in its first 22 frames.
                 self.target_speed = 0.0;
                 self.speed_step(0.0, 0.004_916_667);
                 self.vel = [0.0; 3];
                 self.momentum_decay(0.004_916_667);
+                if !v.blending() && v.frame <= 22.0 { self.giant.reqs.push(GiantReq::Special(None)); }
                 if !v.blending() && v.frame < 55.0 { self.anim_speed = 1.0; }
                 self.giant_gravity(true);
             }
@@ -291,6 +324,7 @@ impl Hero {
         };
         let push = if t.flags & 4 != 0 || self.giant.hp <= 0 {
             self.set_state(anim, env, if h.source_class == 0x11df { 0x5a } else { 0x59 }, true);
+            self.giant.reqs.push(GiantReq::EndSpecial);
             scale(dir, 0.095)
         } else {
             [0.0; 3]
@@ -312,6 +346,69 @@ impl Hero {
             if let Some(n) = next { self.set_state(anim, env, n, true); }
         }
         if self.giant.punch_gap < 10000 { self.giant.punch_gap += 1; }
+        self.giant_gun(env, anim);
+    }
+
+    /// `0x2aa678` (module docs).
+    fn giant_gun(&mut self, env: &Env, anim: &mut dyn AnimCtl) {
+        if self.land_lag != 0 { return; }
+        if self.state == 1 && env.pad.pressed_within(button::TRIANGLE, 7).is_some() && self.giant.special.is_none() && self.giant.counts[3] != 0 {
+            let at = self.local_point(2.0, f32::from_bits(0xc006_6666), f32::from_bits(0x410b_3333));
+            self.giant.reqs.push(GiantReq::Special(Some(at)));
+            self.giant.counts[3] -= 1;
+        }
+        let mut ok = self.giant.counts[2] != 0 && self.giant.special.is_none();
+        if self.state == 0x5d || self.state == 0x5e { ok = false; }
+        if self.giant.gun_on && self.giant.counts[2] == 0 && self.gun_leaving() { return; }
+        if self.giant.gun_on {
+            if env.pad.held & button::CIRCLE == 0 || !ok {
+                if self.gun_leaving() { return; }
+            } else if self.giant.counts[2] != 0 {
+                self.giant.gun_leave = false;
+            }
+        }
+        let g = &mut self.giant;
+        if !g.gun_on && ok && env.pad.pressed_within(button::CIRCLE, 8).is_some() {
+            g.gun_leave = false;
+            let mut l = AnimLayer::new(2);
+            l.start(anim, 13, 0, 9, true);
+            g.gun = Some(l);
+            g.gun_on = true;
+        }
+        if !g.gun_on || g.gun_leave { return; }
+        let Some(mut l) = g.gun else { return };
+        approach(1.0, f32::from_bits(0x3e05_1eb8), &mut l.weight);
+        l.speed = 2.0;
+        l.advance(anim);
+        g.gun = Some(l);
+        crate::moby::countdown(&mut g.gun_timer);
+        if l.frame_b != 4 || g.gun_timer != 0 { return; }
+        g.gun_timer = 5;
+        for joint in [3, 4] {
+            if g.counts[2] == 0 { continue; }
+            g.reqs.push(GiantReq::Shot { joint, strong: g.counts[0] != 0 });
+            g.counts[2] -= 1;
+        }
+    }
+
+    /// The gun's way out (`0x2aa678`): leaving at its sequence's end; leaving, 0.07 a tick to 0, then gone (true: the
+    /// gun's tick ends there). No layer: not out.
+    fn gun_leaving(&mut self) -> bool {
+        let g = &mut self.giant;
+        let Some(mut l) = g.gun else {
+            g.gun_on = false;
+            return false;
+        };
+        if l.flags & 2 != 0 { g.gun_leave = true; }
+        if !g.gun_leave { return false; }
+        if l.weight == 0.0 {
+            g.gun = None;
+            g.gun_on = false;
+            return true;
+        }
+        approach(0.0, f32::from_bits(0x3d8f_5c29), &mut l.weight);
+        g.gun = Some(l);
+        false
     }
 
     /// The special (△ within 8): one off the counts, 0x5e.
@@ -339,8 +436,10 @@ impl Hero {
                 if env.pad.held & button::L1 != 0 { return Some(1); }
                 if pressed(button::CROSS, 0xf) { return Some(0x5b); }
                 if pressed(button::SQUARE, 0xf) { return Some(0x5d); }
-                // `0x3ba868`: the special's object not out (none is: not ported).
-                if let Some(s) = self.giant_special(env) { return s; }
+                // `0x3ba868`: not while his special is out.
+                if self.giant.special.is_none() {
+                    if let Some(s) = self.giant_special(env) { return s; }
+                }
                 if self.air_ticks != 0 && 2.0 < self.height { return Some(0x58); }
                 self.stick_target(env, 1.0, 0);
                 (0.22 < self.stick_mag && 0.0 < self.target_speed).then_some(0x57)
@@ -458,11 +557,34 @@ impl Hero {
     }
 }
 
-/// After the hero's tick while Giant Clank plays: his hits of the tick and the camera's shake.
+/// After the hero's tick while Giant Clank plays: his hits of the tick, the camera's shake, and his asks of the
+/// level (Dobbo's orbit's shots and special; L23's are not ported).
 pub fn pass(world: &mut MobyWorld, ctx: &mut Ctx) {
     if let Some((amp, ticks)) = ctx.hero.giant.shake.take() { ctx.game.shakes.ask(0, amp, ticks); }
     let hits = std::mem::take(&mut ctx.hero.giant.hits);
+    let reqs = std::mem::take(&mut ctx.hero.giant.reqs);
     let Some(hm) = ctx.hero_moby.filter(|&i| i < world.mobys.len()) else { return };
+    if ctx.game.level == 22 {
+        use crate::moby::classes::level22::{shot, special};
+        // The port's: a special word left from a world since rebuilt (a respawn) is dropped.
+        if let Some(s) = ctx.hero.giant.special {
+            if !world.mobys.get(s).is_some_and(|m| m.o_class == special::CLASS && m.state < 0x80) { ctx.hero.giant.special = None; }
+        }
+        for r in reqs {
+            match r {
+                GiantReq::Shot { joint, strong } => {
+                    let Some(p) = ctx.host.joint(&world.mobys[hm], joint) else { continue };
+                    let at = add(p, scale(world.mobys[hm].rows[0], f32::from_bits(0x3fb3_3333)));
+                    shot::fire(world, ctx, hm, at, None, false, strong);
+                }
+                GiantReq::Special(at) => {
+                    let Some(at) = at.or_else(|| ctx.host.joint(&world.mobys[hm], 4)) else { continue };
+                    special::hold(world, ctx, hm, at);
+                }
+                GiantReq::EndSpecial => special::end(world, ctx),
+            }
+        }
+    }
     for h in hits {
         match h {
             GiantHit::Sphere { centre, r, damage, flags } => {
