@@ -48,6 +48,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x0fec => Some(props::update_0fec),
         0x11b0 => Some(props::update_11b0),
         0x1225 => Some(props::update_1225),
+        0x1101 => Some(super::level04::misc::update_empty),
         _ => None,
     }
 }
