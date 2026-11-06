@@ -25,6 +25,8 @@ pub mod walker;
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
         0x110c => Some(breakables::update_110c),
+        // The hover pad: Level 9's code (`0x408a28` = L09 `0x411ae8`).
+        super::level09::hover_pad::CLASS => Some(super::level09::hover_pad::update_0e84),
         0x1307 => Some(breakables::update_1307),
         0x1114 => Some(breakables::update_1114),
         0x0852 | 0x0884 => Some(breakables::update_0852),

@@ -99,7 +99,12 @@ pub fn update_1162(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// in 0x80243278, the narrow one white (0x80808080), s across and t along.
 pub fn draw(w: &MobyWorld, id: usize, cam: V3, out: &mut Vec<FxQuad>) {
     let m = &w.mobys[id];
-    let (from, to) = (m.pos, beam_end(m));
+    beam(m.pos, beam_end(m), cam, out);
+}
+
+/// The beam's two quads from `from` to `to` ([`draw`]'s; also Grelbin's laser 0x11f0's draw, L19 `0x421e78`, the
+/// same code: crate::moby::classes::level19::props::draw_11f0).
+pub fn beam(from: V3, to: V3, cam: V3, out: &mut Vec<FxQuad>) {
     let way = sub(to, from);
     for (half, rgba) in [(0.15, 0x8024_3278u32), (0.05, 0x8080_8080)] {
         let a = set_len(cross(sub(from, cam), way), half);

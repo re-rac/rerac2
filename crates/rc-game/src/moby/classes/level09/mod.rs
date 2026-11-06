@@ -4,9 +4,11 @@
 
 pub mod bolt;
 pub mod breakables;
+pub mod critter;
 pub mod director;
 pub mod flyer;
 pub mod gunship;
+pub mod hover_pad;
 pub mod props;
 pub mod scroll;
 pub mod talker;
@@ -19,6 +21,7 @@ pub mod waker;
 pub fn draw(w: &mut crate::moby::MobyWorld, _host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, _hero_state: i32, _view: &crate::particles::BSphereView, cam: crate::hero::physics::V3, id: usize, first: bool, out: &mut Vec<crate::fx::FxQuad>, _frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
     match w.mobys[id].o_class {
         bolt::CLASS if first => bolt::draw(w, id, &mut game.rng, cam, out),
+        critter::CLASS => critter::draw(w, id, cam, out),
         _ => return false,
     }
     true
@@ -28,6 +31,9 @@ pub fn draw(w: &mut crate::moby::MobyWorld, _host: &dyn crate::moby::MobyHost, g
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
         talker::CLASS => Some(talker::update_0e5e),
+        critter::CLASS => Some(critter::update_0d90),
+        // Also level 12's (L12 `0x408a28`, the same code and data).
+        hover_pad::CLASS => Some(hover_pad::update_0e84),
         // Also level 16's (L16 `0x3eb260`, the same code).
         scroll::CLASS => Some(scroll::update_0d06),
         breakables::CRYSTAL => Some(breakables::update_1298),

@@ -43,11 +43,15 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         field::CLASS => Some(field::update_0afe),
         // Also level 19's (L19 `0x383478`, the same code).
         pit::CLASS => Some(pit::update_135f),
+        // Its corners; also level 19's (L19 `0x41d710`, the same code).
+        pit::CORNER => Some(pit::update_1130),
         energy::CLASS => Some(energy::update_1164),
         sheet::CLASS => Some(sheet::update_0bff),
         screen::CLASS => Some(screen::update_12b9),
         props::HATCH => Some(props::update_0b11),
         props::FLAP => Some(props::update_0ae7),
+        props::BREAKABLE => Some(props::update_1108),
+        props::PAD => Some(props::update_0d60),
         rappeller::CLASS => Some(rappeller::update_09b4),
         lift::CLASS | lift::CLASS_B => Some(lift::update_0ae8),
         movers::BRIDGE => Some(movers::update_0ae4),

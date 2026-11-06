@@ -37,6 +37,18 @@ pub const CLASS: i16 = 0x135f;
 /// The corners' class (its pvar `+0x14` the corner 0..3; corner 0's height the base).
 pub const CORNER: i16 = 0x1130;
 
+/// A corner 0x1130 (L14 `0x42e5f8`, 48 placed; L19 `0x41d710`, 8 placed, the same code; the decomp's
+/// `func_L14_0042D018` / `func_L19_0041C3D8`): in state 0 its pvar `+0x10` its bounding radius over √2·1024 (in
+/// doubles: `0x1234f0` widen, `0x131430` sqrt, `0x122b00` multiply, `0x122da8` divide, `0x123298` narrow), then 1
+/// (`0x323250` = set_state); nothing after. The pit reads only its place and `+0x14`.
+pub fn update_1130(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
+    let m = &mut w.mobys[id];
+    if m.state != 0 { return; }
+    let r = m.bsphere[3] as f64 / (2.0f64.sqrt() * 1024.0);
+    m.set_pv_f(0x10, r as f32);
+    m.set_state(1, -1);
+}
+
 const ACCEL: usize = 0x00;
 const HEIGHT: usize = 0x04;
 const SPEED: usize = 0x08;

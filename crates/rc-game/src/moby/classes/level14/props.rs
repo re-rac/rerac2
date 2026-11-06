@@ -34,6 +34,65 @@ use std::f32::consts::{FRAC_PI_2, PI};
 
 pub const HATCH: i16 = 0x0b11;
 pub const FLAP: i16 = 0x0ae7;
+pub const BREAKABLE: i16 = 0x1108;
+pub const PAD: i16 = 0x0d60;
+
+/// 0x0d60 (`0x40b080`, 2 placed; the decomp's `func_L14_00409B20`): a pad that, stood on, sets off its moby. **0**:
+/// Ratchet on it (`0x32cea8` = L00 `0x325398`, crate::moby::classes::level17::floaters::hero_on): the moby `+0x00`
+/// (−1 none) hooked (`0x333698` = L00 `0x32a818`), 1. **1**: on its first tick its class sound 0 (`0x36ada0`).
+/// **Every tick** its phase `+0x04` turns 6.17° (`0x2f7a68`, wrapped); its glow (`+0x78`) eased 0.15 of the way
+/// (`0x2f7c08` = boot `0x2846e8`, crate::gui::lerp_colour) to the colour between 0x808c8c8c and 0x80282828 (in 1
+/// 0x80468cdc and 0x801e78aa) by `sin(phase)·0.5 + 0.5` (`0x2f7028`).
+pub fn update_0d60(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let (mut a, mut b) = (0x808c_8c8cu32, 0x8028_2828u32);
+    match w.mobys[id].state {
+        0 => if crate::moby::classes::level17::floaters::hero_on(ctx, id) {
+            let k = w.mobys[id].pv_i(0);
+            if let Some(t) = usize::try_from(k).ok().and_then(|k| w.mobys.get_mut(k)) { t.once |= 4; }
+            w.mobys[id].set_state(1, -1);
+        },
+        1 => {
+            if w.mobys[id].first() { ctx.host.play_sound(&w.mobys[id], 0, 0); }
+            (a, b) = (0x8046_8cdc, 0x801e_78aa);
+        }
+        _ => {}
+    }
+    let m = &mut w.mobys[id];
+    let f = crate::hero::physics::add_rot(m.pv_f(4), 0.107_628_65);
+    m.set_pv_f(4, f);
+    let to = u32::from_le_bytes(crate::gui::lerp_colour(f.sin() * 0.5 + 0.5, a, b));
+    m.glow = u32::from_le_bytes(crate::gui::lerp_colour(0.15, m.glow, to));
+}
+
+/// 0x1108 (`0x428a38`, 21 placed; the decomp's `func_L14_00427458`): a breakable. **0**: 1 (`0x323250`). **1**: a hit
+/// with the flags 0x4010000 (`0x325680`) while its pvar `+0x00` is 0 breaks it: its pieces thrown (`0x334460` = L00
+/// `0x32b580`, crate::moby::shards::throw_all: from the hit's way 8 long − (3, 3, 0) to 18 long + (3, 3, 0) a second (`0x2f6d00` = L00 `0x2ef138`), not
+/// through its rows (flag 8); spin 90..360 and gravity 10..20 (`$gp+0x27e8` / `+0x27e0`), every piece pointed, no
+/// skip (`$gp+0x2810` −1), the bolts' sound 0), its class sound 0 (`0x36ada0(0, 0)`), 2; the hit let go (`+0xa8`
+/// −1) either way. **2**: deleted (`0x319058`).
+pub fn update_1108(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    use crate::hero::physics::{add, set_len, sub};
+    match w.mobys[id].state {
+        0 => w.mobys[id].set_state(1, -1),
+        1 => {
+            let hit = w.hit_message(id).filter(|h| h.tmpl.flags & 0x0401_0000 != 0);
+            if let Some(h) = hit {
+                if w.mobys[id].pv_i(0) == 0 {
+                    let dir = [h.tmpl.dir[0], h.tmpl.dir[1], h.tmpl.dir[2]];
+                    let off = [3.0, 3.0, 0.0];
+                    let lo = sub(set_len(dir, 8.0), off);
+                    let hi = add(set_len(dir, 18.0), off);
+                    crate::moby::shards::throw_all(w, id, ctx, [lo[0], lo[1], lo[2], 0.0, hi[0], hi[1], hi[2], 0.0], (90.0, 360.0), (10.0, 20.0), 0xffff, 0, -1, 8, 0xffff);
+                    ctx.host.play_sound(&w.mobys[id], 0, 0);
+                    w.mobys[id].set_state(2, -1);
+                }
+            }
+            w.mobys[id].hit_slot = -1;
+        }
+        2 => w.delete(id),
+        _ => {}
+    }
+}
 
 /// `0x2f7ab0`: `a − b` wrapped into −π..π.
 fn wrapped_sub(a: f32, b: f32) -> f32 {

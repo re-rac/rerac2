@@ -298,3 +298,136 @@ pub fn update_114d(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => {}
     }
 }
+
+pub const REVEALED: i16 = 0x1270;
+
+/// 0x1270 (`0x424ff0`, 5 placed; the decomp's `func_L19_00423CC0`): a moby hidden until Ratchet first enters its
+/// cuboid `+0x00`, then shown for good (its uid counted, so it is shown from the start once its uid is counted or
+/// gone for good). Without pvars it is deleted (`0x319058`).
+/// * **0**: no collision (`+0x98` 0), hidden and not a target (mode | 0x41, & ~0x1000), its update distance 0xff, 1.
+/// * **1**: Ratchet in the cuboid (`0x2acbc8`): its uid counted (crate::game::GameState::count_uid), shown — then, as
+///   with its uid already gone for good (crate::game::GameState::uid_dead) or counted: mode & ~0x41 | 0x1000, its
+///   class's collision (`+0x98` = the class's `+0x10`), 2.
+/// * **2**: nothing.
+pub fn update_1270(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    use crate::moby::mode;
+    if w.mobys[id].pvars.is_empty() { w.delete(id); return; }
+    let show = |w: &mut MobyWorld, id: usize| {
+        let solid = w.class(w.mobys[id].o_class).is_some_and(|c| c.has_collision);
+        let m = &mut w.mobys[id];
+        m.mode = (m.mode & 0xffbe) | mode::TARGET;
+        m.has_collision = solid;
+        m.set_state(2, -1);
+    };
+    match w.mobys[id].state {
+        0 => {
+            let m = &mut w.mobys[id];
+            m.has_collision = false;
+            m.mode = (m.mode | 0x41) & !mode::TARGET;
+            m.set_state(1, -1);
+            m.update_dist = 0xff;
+        }
+        1 => {
+            let uid = w.mobys[id].uid;
+            if ctx.level.in_cuboid(w.mobys[id].pv_i(0), ctx.hero.pos) {
+                ctx.game.count_uid(uid);
+                show(w, id);
+            }
+            let gone = ctx.game.uid_dead.get(uid.max(0) as usize).is_some_and(|&v| v != 0);
+            if !gone && ctx.game.uid_count(uid) == 0 { return; }
+            show(w, id);
+        }
+        _ => {}
+    }
+}
+
+pub const LASER: i16 = 0x11f0;
+
+/// 0x11f0 (`0x421b48`, 6 placed; the decomp's `func_L19_00420818`, its draw `func_L19_00420B48` = `0x421e78`): a laser
+/// emitter that, once set off, slides to and fro along its forward row with its beam up its up row. Its pvars:
+/// `+0x00` the far end's rise, `+0x04` the slide's length, `+0x08` its speed (s), `+0x0c` the beam's length, `+0x14`
+/// the spring's speed, `+0x1c` a moby that sets it off (−1 none), `+0x20` its home, `+0x30` the far end, `+0x40` its
+/// hum.
+/// * **0**: the far end its place + its forward row `+0x04` long (`0x2ec748` = L00 `0x2ef138`), raised `+0x00`; its
+///   home its place; no hum; then as 1.
+/// * **1**: its mission done, or the moby `+0x1c` past its state 0: 2.
+/// * **2** / **3**: its hum (its class sound 0 looped, `0x35e400` = L00 `0x3605f0(0, 4)`) kept playing; it springs
+///   (`0x31c8b8` = L00 `0x31ec88`, crate::moby::ai::spring_to: s/3600, s/3600, s/60) toward the far end (2) or its
+///   home (3), within s/60 of it (`0x2ec608` = L00 `0x2ef018`) the other state.
+/// * **From 2 on, every tick**: its draw ([`draw_11f0`]) on the first list (`0x2e4fd0` = L00 `0x2e7718`); a hit of
+///   4 (`0x31ac40` = L00 `0x31d158`, flags 1, its class in the kind word) along its beam to the first moby met
+///   (`0x2dc1b8` = L00 `0x2de878`, flags 0, itself skipped).
+pub fn update_11f0(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    use crate::hero::physics::{add, dist, set_len};
+    let hum = |w: &mut MobyWorld, ctx: &mut Ctx| {
+        let h = w.mobys[id].pv_i(0x40);
+        if !(h != -1 && ctx.host.sound_playing(h)) {
+            let h = ctx.host.play_sound(&w.mobys[id], 0, 4);
+            w.mobys[id].set_pv_i(0x40, h);
+        }
+    };
+    let state = w.mobys[id].state;
+    if state == 0 {
+        let m = &mut w.mobys[id];
+        let mut far = add(m.pos, set_len(m.rows[0], m.pv_f(4)));
+        far[2] += m.pv_f(0);
+        m.set_pv_v(0x30, far);
+        m.set_pv_v(0x20, m.pos);
+        m.set_pv_i(0x40, -1);
+    }
+    match state {
+        0 | 1 => {
+            let m = &w.mobys[id];
+            let done = m.mission != 0xff && ctx.game.missions.get(ctx.game.level.max(0) as usize * 0x10 + m.mission as usize).is_some_and(|&b| b & 0x80 != 0);
+            let woke = usize::try_from(m.pv_i(0x1c)).ok().and_then(|k| w.mobys.get(k)).is_some_and(|o| o.state != 0);
+            if done || woke { w.mobys[id].set_state(2, -1); }
+        }
+        s @ (2 | 3) => {
+            if s == 3 { hum(w, ctx); }
+            let m = &mut w.mobys[id];
+            let speed = m.pv_f(8);
+            let goal = m.pv_v(if s == 2 { 0x30 } else { 0x20 });
+            let mut v = m.pv_f(0x14);
+            crate::moby::ai::spring_to(&mut m.pos, goal, speed * 0.000_277_777_8, speed * 0.000_277_777_8, speed * 0.016_666_668, &mut v);
+            m.set_pv_f(0x14, v);
+            if s == 2 { hum(w, ctx); }
+            let m = &mut w.mobys[id];
+            if dist(m.pos, goal) < speed * 0.016_666_668 { m.set_state(5 - s, -1); }
+        }
+        _ => {}
+    }
+    if w.mobys[id].state < 2 { return; }
+    w.register_draw_first(id);
+    let m = &w.mobys[id];
+    let (from, to) = (m.pos, add(m.pos, set_len(m.rows[2], m.pv_f(0xc))));
+    let mut t = crate::moby::hits::HitTemplate::new(4.0, Some(id), 1, [0.0; 4]);
+    t.kind = (m.o_class as u16 as u32) << 16;
+    let hit = ctx.coll.and_then(|c| crate::collision::coll_line_m(c, ctx.scene, from, to, crate::collision::QueryFlags(0), Some(id)));
+    if let Some(o) = hit {
+        if let Some(target) = o.moby { w.deliver_hit_any(target, &t, [o.point[0], o.point[1], o.point[2], 1.0]); }
+    }
+}
+
+/// `0x421e78`: its beam up its up row `+0x0c` long (crate::moby::classes::level16::laser::beam, the same code).
+pub fn draw_11f0(w: &MobyWorld, id: usize, cam: crate::hero::physics::V3, out: &mut Vec<crate::fx::FxQuad>) {
+    use crate::hero::physics::{add, set_len};
+    let m = &w.mobys[id];
+    super::super::level16::laser::beam(m.pos, add(m.pos, set_len(m.rows[2], m.pv_f(0xc))), cam, out);
+}
+
+pub const SCENE_HIDDEN: i16 = 0x1331;
+
+/// 0x1331 (`0x381c48`, 1 placed; the decomp's `func_L19_00380A98`): hidden without collision nor a target during a
+/// scene (`0x1a8f00` = 2: mode | 0x41, & ~0x1000, `+0x98` 0); else shown, a target, with its class's collision.
+pub fn update_1331(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    use crate::moby::mode;
+    let solid = w.class(w.mobys[id].o_class).is_some_and(|c| c.has_collision);
+    let m = &mut w.mobys[id];
+    if ctx.game.scenes.mode == crate::scene::SCENE {
+        m.has_collision = false;
+        m.mode = (m.mode | 0x41) & !mode::TARGET;
+    } else {
+        m.mode = (m.mode & 0xffbe) | mode::TARGET;
+        m.has_collision = solid;
+    }
+}

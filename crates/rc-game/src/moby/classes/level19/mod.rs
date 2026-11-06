@@ -31,6 +31,9 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         props::TELEPORTER => Some(props::update_0edc),
         props::DROPPER => Some(props::update_11ff),
         props::TURN_LIFT => Some(props::update_114d),
+        props::REVEALED => Some(props::update_1270),
+        props::LASER => Some(props::update_11f0),
+        props::SCENE_HIDDEN => Some(props::update_1331),
         lurker::CLASS => Some(lurker::update_10d0),
         den::CLASS => Some(den::update_1177),
         frozen::CLASS => Some(frozen::update_0f57),
@@ -58,6 +61,10 @@ pub fn draw(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crat
     match w.mobys[id].o_class {
         frozen::CLASS if first => {
             frozen::draw(w, host, id, &mut game.rng, cam, out);
+            true
+        }
+        props::LASER if first => {
+            props::draw_11f0(w, id, cam, out);
             true
         }
         _ => false,

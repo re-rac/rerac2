@@ -201,7 +201,7 @@ fn go(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3, toward: bool) -> i3
 }
 
 /// `0x333980(yaw, m)`: its facing eased toward `yaw` at the movement block's turn limits.
-fn face(w: &mut MobyWorld, id: usize, yaw: f32) {
+pub(crate) fn face(w: &mut MobyWorld, id: usize, yaw: f32) {
     let m = &mut w.mobys[id];
     let (a, b, c) = (m.pv_f(MV + 0x14), m.pv_f(MV + 0x18), m.pv_f(MV + 0x1c));
     let (mut r, mut v) = (m.rot[2], m.pv_f(MV + 0xb4));
@@ -211,7 +211,7 @@ fn face(w: &mut MobyWorld, id: usize, yaw: f32) {
 }
 
 /// `0x3339e0(m, point)`: [`face`] toward a point (in the gravity frames crate::moby::frames::face_point).
-fn face_point(w: &mut MobyWorld, id: usize, ctx: &Ctx, p: V3) {
+pub(crate) fn face_point(w: &mut MobyWorld, id: usize, ctx: &Ctx, p: V3) {
     if ctx.hero.gravity.on {
         crate::moby::frames::face_point(w, id, p);
         return;
@@ -249,7 +249,7 @@ fn stroll(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
 }
 
 /// `0x32f758(m, at, group)`: its group's others to the right of the way to `at` less those to the left.
-fn spread(w: &MobyWorld, id: usize, at: V3) -> i32 {
+pub(crate) fn spread(w: &MobyWorld, id: usize, at: V3) -> i32 {
     let m = &w.mobys[id];
     let yaw = atan2(at[0] - m.pos[0], at[1] - m.pos[1]);
     let (s, c) = yaw.sin_cos();
@@ -264,15 +264,19 @@ fn spread(w: &MobyWorld, id: usize, at: V3) -> i32 {
 }
 
 /// `0x3d01c8`: the head's aim at the target in its frame, yaw within ±45° (`+0x2c0`), pitch within ±30° (`+0x2c8`).
-fn aim(w: &mut MobyWorld, id: usize) {
+fn aim(w: &mut MobyWorld, id: usize) { aim_into(w, id, 0x2c0); }
+
+/// [`aim`] into the turn asked of a head record at `ask` (`ask` + 8 the pitch): also L06 `0x445610` (the glowbug,
+/// `+0x2c0`) and L09 `0x406688` (Dobbo's 0x0d90, `+0x2e0`), the same code.
+pub(crate) fn aim_into(w: &mut MobyWorld, id: usize, ask: usize) {
     let m = &mut w.mobys[id];
     let d = sub(m.pv_v(TARGET), m.pos);
     let r = m.rows;
     let l = [r[0][0] * d[0] + r[0][1] * d[1] + r[0][2] * d[2], r[1][0] * d[0] + r[1][1] * d[1] + r[1][2] * d[2], r[2][0] * d[0] + r[2][1] * d[1] + r[2][2] * d[2]];
     let q = std::f32::consts::FRAC_PI_4;
-    m.set_pv_f(0x2c0, atan2(l[0], l[1]).clamp(-q, q));
+    m.set_pv_f(ask, atan2(l[0], l[1]).clamp(-q, q));
     let s = f32::from_bits(0x3f06_0a93);
-    m.set_pv_f(0x2c8, (-atan2(len2(l), l[2])).clamp(-s, s));
+    m.set_pv_f(ask + 8, (-atan2(len2(l), l[2])).clamp(-s, s));
 }
 
 /// `0x3cff80`: dying — its bolts (3), its sound 1, a small blast (size 1/3: ten puffs, twenty streaks, the flash), its

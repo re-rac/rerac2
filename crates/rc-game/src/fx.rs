@@ -407,8 +407,13 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         c if crate::water::ocean::CLASSES.contains(&c) => crate::water::ocean::draw(w, id, game, hero_state, cam, host.camera_rows(), out),
         c if first && crate::water::lid::CLASSES.contains(&c) => crate::water::lid::draw(w, id, game.frame, cam, out),
         crate::vendor::CLASS => crate::moby::classes::vendor::draw(w, id, game, host.camera_rows(), out),
+        // 0x0d5c is in the flocks' class switches but runs Damosel's traffic (L18 `0x3fcb78`, its only level): the flocks'
+        // draw (`0x38ee50`) is a callback their leader's update registers, which no 0x0d5c runs, and its groups hold no
+        // flock (the traffic's own warp draws are not ported).
+        0x0d5c => {}
         c if crate::moby::classes::flock::CLASSES.contains(&c) => crate::moby::classes::flock::draw(w, id, view, cam, out),
         crate::moby::classes::critter::CLASS | crate::moby::classes::critter::PRISON => crate::moby::classes::critter::draw(w, id, cam, out),
+        crate::moby::classes::thugs::SHOT => crate::moby::classes::thugs::draw_0ea7(w, id, &mut game.rng, cam, out),
         crate::moby::classes::level14::rappeller::CLASS => crate::moby::classes::level14::rappeller::draw(w, id, &mut game.rng, cam, out),
         0x0ab0 => crate::moby::classes::maktar::draw_0ab0(w, id, out),
         crate::moby::classes::maktar::NODE => crate::moby::classes::maktar::draw_0c82(w, id, cam, out),

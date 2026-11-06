@@ -51,6 +51,10 @@ pub fn angles_of(r: &[V3; 3]) -> V3 {
 /// The rows `a` turned by `r` (`0x2efa00(out, a, r)`: each row times `r`).
 pub fn turn(a: &[V3; 3], r: &[V3; 3]) -> [V3; 3] { a.map(|row| to_world(row, r)) }
 
+/// L00 `0x323c90` (L06 `0x364a90`; the decomp's `func_L00_00322A18`, on 27 levels): Euler angles `rot` turned by `d`
+/// in their own frame (the rows of `d` times the rows of `rot`, back to angles).
+pub fn turned(rot: V3, d: V3) -> V3 { angles_of(&turn(&rows_of(d), &rows_of(rot))) }
+
 /// A moby turned by `angles` in its own frame about its own point `pivot` (L14 `0x334b60`, the decomp's
 /// `func_002B4090`): the new rows `rows_of(angles)` through the old, its place moved by the pivot's shift and its
 /// angles those of the new rows (`0x320000`). Its rows are left for the caller.

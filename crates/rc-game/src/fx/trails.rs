@@ -6,6 +6,8 @@
 //!   L16's gunship shot 0x0ebd and drone shot 0x0f7a ([`shot_bolt`], their callbacks `0x406ad0` / `0x4152f0`); the
 //!   lobbers' glob 0x0ea5 (L17 `0x40dad8` from `0x40d968`, L12 `0x4097b0`, L13 `0x40e558`, L16 `0x3fd028`;
 //!   crate::moby::classes::level17::lobber::draw_0ea5).
+//! * [`beam`] (L13 `0x40f440`, L14 `0x4165b0`, L16 `0x3fdf10`, L30 `0x3fdb50`): a plainer shot bolt, its flares unturned
+//!   and one glow. User: the thugs' shot 0x0ea7 ([`shot_beam`], its callback L13 `0x40f2d0`; crate::moby::classes::thugs).
 //! * [`history`] (`0x2ec810`, L26 `0x2ece08`): a trail through the last places and turns of a moby. User: L26's
 //!   mote 0x0c00.
 //! * [`strand`] (L11 `0x46dc98`, L14 `0x423f60`): a scrolling core and a camera-facing halo through a path of
@@ -243,4 +245,76 @@ pub fn strand(out: &mut Vec<FxQuad>, p: &[V3], n: i32, scroll: f32, core: f32, h
         }
         out.push(FxQuad { fx: look.fx[1], additive: true, corners: [add(a, s), sub(a, s), add(b, s), sub(b, s)], st: ST, rgba });
     }
+}
+
+/// [`beam`]'s look (L13's words `$gp+0x2288..+0x230c`, L16's `$gp+0x21e8..+0x226c`: the same values).
+mod beam_look {
+    /// The head's and the flares' FX textures (`$gp+0x22b8` / `+0x22bc`).
+    pub const FX: [usize; 2] = [0x2f, 0x29];
+    /// The head's colours at the shot and at its back.
+    pub const HEAD: [u32; 2] = [0xffff_ffff, 0x40ff_ffff];
+    /// The head's length back along the way (`+0x22b4`) and half-width (`+0x2294`); it ends 0.17 further back.
+    pub const LENGTH: f32 = 4.0;
+    pub const WIDTH: f32 = f32::from_bits(0x3dcc_cccd);
+    /// The flares (colour at the front, at the back; half-width; start back along the way; half-length back).
+    pub const FLARES: [(u32, u32, f32, f32, f32); 4] = [
+        (0x4096_200a, 0x0096_200a, f32::from_bits(0x3e4c_cccd), 0.0, 4.0),
+        (0x4096_200a, 0x0096_200a, f32::from_bits(0x3ecc_cccd), f32::from_bits(0x3dcc_cccd), 4.0),
+        (0x2020_140a, 0x0020_1420, f32::from_bits(0x3ecc_cccd), f32::from_bits(0x3dcc_cccd), 4.0),
+        (0x40ff_ffff, 0x0096_200a, f32::from_bits(0x3e4c_cccd), 0.0, f32::from_bits(0x3f19_999a)),
+    ];
+    /// The glow (`+0x2298` FX, `+0x229c` size, `+0x22a0` colour).
+    pub const GLOW: (usize, f32, u32) = (0x13, f32::from_bits(0x3e99_999a), 0x6080_4020);
+}
+
+/// L13 `0x40f440(…, moby)` (its other arguments unused): the beam of a shot at `pos` flying along `dir`, additive.
+/// * The head: FX `0x2f`, from the shot to 4 back along the way and 0.17 more, 0.1 to either side across `back × (pos −
+///   camera)`, white at the front, `0x40ffffff` at the back; then the tail, 4 more behind it, to `0x801010`. Their s
+///   scrolls as [`bolt`]'s (the shot's `+0x28`).
+/// * Four flares, FX `0x29`, the unit square unturned, each from its start back along the way to twice its length
+///   back, its half-width across, from its front colour to its back's ([`beam_look::FLARES`]).
+/// * One glow at the shot (`0x2f8648` = L00 `0x2edf78`, crate::fx::sprite; 0.08 toward the camera, a random roll).
+pub fn beam(out: &mut Vec<FxQuad>, rng: &mut crate::rng::Rng, pos: V3, dir: V3, scroll: &mut f32, cam: V3) {
+    use beam_look as l;
+    let st = ST.map(|[s, t]| {
+        let s = s - *scroll;
+        [if s <= 7.0 { s + 7.0 } else { s }, t]
+    });
+    let s = *scroll + 0.1;
+    *scroll = if 4.0 <= s { s - 4.0 } else { s };
+    let near = add(pos, set_len(dir, f32::from_bits(0xbe2e_147b)));
+    let rel = sub(pos, cam);
+    let step = set_len(dir, -l::LENGTH);
+    let far = add(near, step);
+    // `0x2f9650(out, a, b)` = L00 `0x2eef88`: b × a.
+    let mut side = set_len(cross(step, rel), l::WIDTH);
+    let c = [add(pos, side), sub(pos, side), add(far, side), sub(far, side)];
+    let [h0, h1] = l::HEAD;
+    out.push(FxQuad { fx: l::FX[0], additive: true, corners: c, st, rgba: [h0, h0, h1, h1] });
+    let tail = [c[2], c[3], add(c[2], step), add(c[3], step)];
+    out.push(FxQuad { fx: l::FX[0], additive: true, corners: tail, st, rgba: [h1, h1, 0x80_1010, 0x80_1010] });
+    for &(front, back, width, from, length) in &l::FLARES {
+        side = set_len(side, width);
+        let base = if from == 0.0 { pos } else { add(pos, set_len(dir, -from)) };
+        let axis = set_len(dir, -length);
+        let tip = add(add(base, axis), axis);
+        out.push(FxQuad { fx: l::FX[1], additive: true, corners: [add(base, side), sub(base, side), add(tip, side), sub(tip, side)], st: ST, rgba: [front, front, back, back] });
+    }
+    let roll = rng.rand_angle();
+    super::sprite(out, l::GLOW.1, 0.08, roll, pos, cam, l::GLOW.0, l::GLOW.2, true);
+}
+
+/// A shot's beam callback (L13 `0x40f2d0`): [`beam`] twice, each after the arguments it does not use
+/// (`0x325ce0(0x5f, 0x6f)` then `0x325e00`; `0x325ce0(0x6f, 0x7f)` then `0x325e00`). The shot's pvars: `+0x00` its
+/// velocity (the way), `+0x28` the scroll.
+pub fn shot_beam(w: &mut MobyWorld, id: usize, rng: &mut crate::rng::Rng, cam: V3, out: &mut Vec<FxQuad>) {
+    let m = &mut w.mobys[id];
+    let (pos, dir) = (m.pos, m.pv_v(0x00));
+    let mut scroll = m.pv_f(0x28);
+    for (a, b) in [(0x5f, 0x6f), (0x6f, 0x7f)] {
+        rng.rand_range(a, b);
+        rng.rand_angle();
+        beam(out, rng, pos, dir, &mut scroll, cam);
+    }
+    m.set_pv_f(0x28, scroll);
 }

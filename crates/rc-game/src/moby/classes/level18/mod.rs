@@ -3,10 +3,13 @@
 //! after its own. The chain is global, so a class whose code levels 19 and 20 share is registered here once.
 
 pub mod breakables;
+pub mod capturable;
 pub mod breeder;
 pub mod director;
 pub mod dropship;
 pub mod hatch;
+pub mod launcher;
+pub mod pad;
 pub mod props;
 pub mod seller;
 pub mod stalker;
@@ -35,6 +38,12 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         props::ORB => Some(props::update_124a),
         props::SWING => Some(props::update_0f54),
         director::CLASS => Some(director::update_0f01),
+        // Also levels 19 and 20's (L19 `0x40efd0`, L20 `0x432580`, the same code).
+        pad::CLASS => Some(pad::update_0ed0),
+        // Also levels 19 and 20's (L19 `0x40ced0` / `0x424148`, L20 `0x438588` / `0x44a268`, the same code).
+        capturable::BITER | capturable::GUNNER => Some(capturable::update),
+        capturable::SHOT => Some(capturable::update_1263),
+        launcher::CLASS => Some(launcher::update_1158),
         _ => None,
     }
 }

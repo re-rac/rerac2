@@ -9,13 +9,12 @@
 //!
 //! The L06 engine functions with the port's: `0x36b678` / `0x36b650` the sub's / state's first tick, `0x36e6c8`
 //! senses, `0x3682a0` take_damage, `0x368fe8` flight, `0x36bbc0` find_target, `0x36d588` / `0x36d5e0` the move toward
-//! a point (with an offset: move_toward), `0x36e660` the move in place facing a heading, `0x3649f8` reached,
+//! a point (with an offset: move_toward), `0x36e660` = L02 `0x333980` the turn toward a heading
+//! (crate::moby::classes::critter::face), `0x3649f8` reached,
 //! `0x35d4e0` attack_joint, `0x35adb8` the bolts, `0x367668` = L00 `0x327498` (crate::moby::shards::break_into),
 //! `0x43b580` = L00 `0x3f8348` (crate::moby::blast::burst), `0x361b20` = L00 `0x3210a8` (smoke_burst), `0x366ec0`
 //! the glow sprite (crate::fx::sprite, FX 0xb), `0x3516d0` delete.
 //!
-//! Not ported: the head's look at Ratchet in the chase (`0x445610` into `+0x2c0` / `+0x2c8`: the joint aims), the
-//! big-head cheat (`0x3674d8` on `+0x260`).
 
 use crate::hero::physics::{add, add_rot, atan2, scale, set_len, sub, V3};
 use crate::moby::classes::props::{seq, wrapped};
@@ -27,6 +26,8 @@ const T_POINT: usize = 0x1f0;
 const T_MOBY: usize = 0x200;
 const AREA: usize = 0x210;
 const RAISED: usize = 0x214;
+/// The head's record (crate::moby::joint_aim).
+const HEAD: usize = 0x260;
 const HOME: usize = 0x2e0;
 const GOAL: usize = 0x2f0;
 const T310: usize = 0x310;
@@ -300,6 +301,8 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
             let (off, goal) = (w.mobys[id].pv_f(CROWD), w.mobys[id].pv_v(T_POINT));
             ai::move_toward(w, id, ctx, off, goal);
+            // `0x445610`: the head's look at its target (the turn asked of `+0x260`).
+            crate::moby::classes::critter::aim_into(w, id, HEAD + 0x60);
             if w.mobys[id].pv_f(MV + 0xcc) <= 1.25 { st(w, id, 7, -1); }
         }
         7 => {
@@ -308,8 +311,8 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 w.mobys[id].set_pv_f(BITE_YAW, atan2(t[0] - p[0], t[1] - p[1]));
                 anim(w, id, ctx, 8, 3, 6);
             }
-            let (y, p) = (w.mobys[id].pv_f(BITE_YAW), w.mobys[id].pos);
-            ai::move_step(w, id, ctx, y, p);
+            let y = w.mobys[id].pv_f(BITE_YAW);
+            crate::moby::classes::critter::face(w, id, y);
             if ai::reached(w, id, ctx, 13.0) {
                 let d = w.mobys[id].pv_b(0x34) as f32;
                 ai::attack_joint(w, id, ctx, 0.75, d, 1.0, 1, 0x400_0001, 0, 1, 0);
@@ -348,12 +351,16 @@ fn crowd(w: &MobyWorld, id: usize, p: V3) -> i32 {
 }
 
 /// `0x4453c0` and `0x445710`: the timers down, its ticks; drawn, its glow's pulse (12° a tick, its glow word between
-/// `0x80808080` and `0x00202000`) and once a frame its group's glows drawn ([`draw`]).
+/// `0x80808080` and `0x00202000`) and, unless its stamp `+0x330` is this frame's, every drawn glowbug of its group
+/// stamped and the group's glows asked once ([`draw`]).
 fn tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     tick_s(w, id, T310);
     tick_s(w, id, T312);
     let m = &mut w.mobys[id];
     if m.state_ticks != -1 { m.state_ticks += 1; }
+    // `0x3674d8` = L00 `0x327308`: the head record `+0x260` (the enemies' big heads, 2.5).
+    crate::moby::joint_aim::head(w, ctx, id, HEAD, 0, 2.5);
+    let m = &mut w.mobys[id];
     if m.drawn == 0 { return; }
     let ph = add_rot(m.pv_f(PHASE), f32::from_bits(0x3e56_7752));
     m.set_pv_f(PHASE, ph);
@@ -361,10 +368,14 @@ fn tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     m.set_pv_f(PULSE, pulse);
     m.glow = crate::hud::lerp_rgba(pulse, 0x8080_8080, 0x0020_2000);
     let f = ctx.game.frame;
-    if m.pv_i(DRAWN_AT) != f {
-        m.set_pv_i(DRAWN_AT, f);
-        w.register_draw(id);
+    if m.pv_i(DRAWN_AT) == f { return; }
+    // Every drawn, living glowbug of its group is stamped (its joint 0 kept for the draw), so the group's glows are
+    // asked once a frame.
+    let members = usize::try_from(w.mobys[id].group).ok().and_then(|g| w.groups.get(g)).cloned().unwrap_or_else(|| vec![id]);
+    for k in members {
+        if let Some(x) = w.mobys.get_mut(k).filter(|x| x.drawn != 0 && x.o_class == CLASS && x.state < 0xfd) { x.set_pv_i(DRAWN_AT, f); }
     }
+    w.register_draw(id);
 }
 
 /// `0x4458a8`: each drawn glowbug of its group a glow (FX 0xb, its scale × 0.2, pulled 0.08 toward the camera) at

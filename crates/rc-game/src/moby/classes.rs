@@ -30,6 +30,7 @@ pub mod blitz;
 pub mod blitz_mega;
 pub mod bouncer;
 pub mod bolt;
+pub mod button;
 pub mod bosses;
 pub mod carriers;
 pub mod chopper;
@@ -92,6 +93,9 @@ pub mod black_sheep;
 pub mod mini_nuke;
 pub mod swamp_monster;
 pub mod tractor;
+pub mod thugs;
+pub mod bounce_pad;
+pub mod barrier;
 pub mod vaporizer;
 pub mod turret;
 pub mod vendor;
@@ -143,6 +147,8 @@ pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS, e
 pub fn update_for(o_class: i16) -> Option<UpdateFn> {
     match o_class {
         0x47 => Some(wrench::update),
+        // The floor button (L00 `0x3b8de0`; placed on levels 6, 13 and 17).
+        button::CLASS => Some(button::update_08a1),
         0x5d2 => Some(lancer::update),
         // The Heavy Lancer's hand (`0x3e5dc8` calls the Lancer's `0x3a8060`; crate::upgrades).
         lancer::HEAVY_CLASS => Some(lancer::update),
@@ -448,6 +454,14 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         endako_d::CAGE => Some(endako_d::update_cage),
         0x0972 => Some(endako_d::update_0972),
         endako_d::NETWORK => Some(endako_d::update_0f2d),
+        // The Thugs-4-Less trooper (L13 `0x408480`, L16 `0x3f6f50`) and its shot (L13 `0x40edb0`, L16 `0x3fd880`).
+        thugs::CLASS => Some(thugs::update_0ea3),
+        thugs::SHOT => Some(thugs::update_0ea7),
+        // The bounce pads: Snivelak's (L16 `0x40d2f8`, L17 `0x417c30`) and the planets' (L22 `0x3cacc8`, L26 `0x3bc9f0`).
+        bounce_pad::PAD => Some(bounce_pad::update_0f05),
+        bounce_pad::PLANET_PAD => Some(bounce_pad::update_09b9),
+        // The barrier (L13 `0x420d98`, L16 `0x41a6e0`).
+        barrier::CLASS => Some(barrier::update_112e),
         // The levels' own (their modules' lists).
         _ => level04::update_for(o_class).or_else(|| level06::update_for(o_class)).or_else(|| level07::update_for(o_class)).or_else(|| level08::update_for(o_class)).or_else(|| level09::update_for(o_class)).or_else(|| level10::update_for(o_class)).or_else(|| level11::update_for(o_class)).or_else(|| level13::update_for(o_class)).or_else(|| level14::update_for(o_class)).or_else(|| level16::update_for(o_class)).or_else(|| level12::update_for(o_class)).or_else(|| level17::update_for(o_class)).or_else(|| level18::update_for(o_class)).or_else(|| level19::update_for(o_class)).or_else(|| level20::update_for(o_class)).or_else(|| level21::update_for(o_class)).or_else(|| level22::update_for(o_class)).or_else(|| level26::update_for(o_class)).or_else(|| level05::update_for(o_class)).or_else(|| level15::update_for(o_class)).or_else(|| level23::update_for(o_class)),
     }

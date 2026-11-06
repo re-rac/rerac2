@@ -2,12 +2,13 @@
 //! the L00 ones the port knows them by where they differ). Each class's update is registered in [`update_for`] and
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
 //!
-//! The seller of planet 7's coordinates 0x0ccf: [`host`]. The water sheet 0x093e (`0x404680` / `0x403ac0`): crate::water::ocean.
+//! The seller of planet 7's coordinates 0x0ccf: [`host`]. The spinning breakables 0x0fc1 / 0x0fc0: [`spinners`]. The
+//! floor button 0x08a1: crate::moby::classes::button. The water sheet 0x093e (`0x404680` / `0x403ac0`): crate::water::ocean.
 //!
 //! Not ported (level 6's other classes):
-//! * Waiting on a missing system (docs/plan/gaps.md): 0x0fc1 (`0x458888`) and 0x0fc0 (`0x458718`), effect-quad
-//!   trails (G-REN-004); the vent 0x0feb (`0x45da00`, particle type 0x53 `0x37fae8`) and 0x0fb2 / 0x0fd6 / 0x0fce /
-//!   0x0fcf / 0x0fe4 (`0x4581c8`) (G-PRT-001); 0x0eb1 (`0x451ad0`, items, G-WPN-002); 0x0bc7 (`0x422070`) and 0x0fe6
+//! * Waiting on a missing system (docs/plan/gaps.md): the vent 0x0feb (`0x45da00`, particle type 0x53 `0x37fae8`,
+//!   G-PRT-001); 0x0fb2 / 0x0fd6 / 0x0fce / 0x0fcf / 0x0fe4 (`0x4581c8`: the liquid grid's unit `0x3c0980` / `0x3c0ba0` /
+//!   `0x3c0ea8` / `0x3c0ee8`, crate::water's not ported kinds); 0x0eb1 (`0x451ad0`, items, G-WPN-002); 0x0bc7 (`0x422070`) and 0x0fe6
 //!   (`0x45bbc8`), the line test (G-CLS-005); the core 0x0fc2 (`0x458a00`), its beams (class 0x13ba, G-REN-019).
 //! * Ratchet's: the ferry 0x0330 (`0x3e5460`, L11 `0x3b7340`: a ride on paths with its own controls), 0x0947
 //!   (`0x404c60`: a swimmer that grabs Ratchet in the water, his state 0x12, and throws him out, his state 0x6f
@@ -16,8 +17,7 @@
 //!   nine shuffled symbols in a column, its draw `0x401f00` reading the table in its moby `+0x68`[3]'s pvars,
 //!   `+0x2c00` / `+0x12de0`).
 //! * The hints 0x0cdd (`0x4321e8`: help 0x9df / 0x9e0 / 0x9e1 / 0x9e2 / 0x9db / 0x9b5 by cuboids; it reads Ratchet's
-//!   `0x18c2d4`, the byte `0x1a7b27` and the table `0x21ecc4`, none mapped), 0x08a1 (`0x402450`: the table
-//!   `0x21ecc4` and the path points' `w`), 0x1240 (`0x465f18`: the level's table `0x1b21c4`, `0x47c358`).
+//!   `0x18c2d4` and the byte `0x1a7b27`, not mapped, and the uids gone for good `0x21ecc4`), 0x1240 (`0x465f18`: the level's table `0x1b21c4`, `0x47c358`).
 
 pub mod arc_shot;
 pub mod barrel;
@@ -29,6 +29,7 @@ pub mod host;
 pub mod lifts;
 pub mod pole;
 pub mod props;
+pub mod spinners;
 pub mod traffic;
 
 use crate::hero::physics::V3;
@@ -78,6 +79,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x0307 => Some(pole::update_0307),
         barrel::CLASS => Some(barrel::update_08b8),
         host::CLASS => Some(host::update_0ccf),
+        spinners::CLASS_0FC1 => Some(spinners::update_0fc1),
+        spinners::CLASS_0FC0 => Some(spinners::update_0fc0),
         _ => None,
     }
 }
