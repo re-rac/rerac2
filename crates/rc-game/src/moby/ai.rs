@@ -302,7 +302,7 @@ fn keep_in(w: &mut MobyWorld, id: usize, ctx: &Ctx) -> bool {
 /// `0x32d2b8(m, block, from)`: the move by the velocity, up to eight rounds of push-outs; pushed, the velocity is
 /// the move made (at most the speed it had), the stuck ticks count while it makes under half its top speed; kept on
 /// a floor it is over.
-fn move_body(w: &mut MobyWorld, id: usize, ctx: &Ctx, from: V3) {
+pub fn move_body(w: &mut MobyWorld, id: usize, ctx: &Ctx, from: V3) {
     let m = &mut w.mobys[id];
     let o = mv(m);
     m.pos = add(m.pos, m.pv_v(o + 0xa0));
