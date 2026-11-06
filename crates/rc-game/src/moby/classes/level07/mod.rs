@@ -15,6 +15,7 @@ pub mod mover;
 pub mod prowler;
 pub mod skill_target;
 pub mod swarm;
+pub mod tractor_block;
 pub mod turret;
 
 /// This level's class updates.
@@ -37,6 +38,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         boss::GLOW => Some(boss::update_0d45),
         laser::CLASS => Some(laser::update_0e28),
         bomb::CLASS => Some(bomb::update_0e52),
+        tractor_block::CLASS => Some(tractor_block::update_0e30),
         _ => None,
     }
 }

@@ -198,7 +198,7 @@ fn light(m: &mut crate::moby::Moby, c: u32) {
 }
 
 /// `0x32c0b8(phase, a, b)`: the colours mixed by `sin(phase)·0.5 + 0.5`.
-fn pulse_colour(phase: f32, a: u32, b: u32) -> u32 { crate::particles::tween_color((phase.sin() * 0.5 + 0.5).to_bits(), a, b) }
+pub(crate) fn pulse_colour(phase: f32, a: u32, b: u32) -> u32 { crate::particles::tween_color((phase.sin() * 0.5 + 0.5).to_bits(), a, b) }
 
 /// `0x3c65e8`: Ratchet within 24 (xy) and in the prompt's area (module docs).
 fn in_area(w: &MobyWorld, id: usize, ctx: &Ctx) -> bool {

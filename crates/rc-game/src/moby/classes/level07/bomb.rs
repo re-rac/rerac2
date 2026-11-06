@@ -62,7 +62,7 @@ pub fn launch(w: &mut MobyWorld, ctx: &mut Ctx, id: usize, owner: usize, pos: V3
 }
 
 pub fn update_0e52(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    if w.mobys[id].state != 1 { hurt(w, id, ctx); }
+    if w.mobys[id].state != 1 { hurt(w, id); }
     match w.mobys[id].state {
         2 => {
             set_scale(w, id);
@@ -99,7 +99,7 @@ fn set_scale(w: &mut MobyWorld, id: usize) {
 }
 
 /// `0x3f8090`: the set-up (state 0), else the hit's damage off its health; at none, 3; the hit let go.
-fn hurt(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+fn hurt(w: &mut MobyWorld, id: usize) {
     if w.mobys[id].state == 0 {
         set_scale(w, id);
         let m = &mut w.mobys[id];
