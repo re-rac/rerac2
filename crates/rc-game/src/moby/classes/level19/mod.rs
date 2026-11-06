@@ -2,12 +2,16 @@
 //! the L00 ones the port knows them by where they differ). Each class's update is registered in [`update_for`] and
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
 
+pub mod props;
+
 use crate::hero::physics::V3;
 use crate::moby::MobyWorld;
 
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
+        props::WATCHER => Some(props::update_0629),
+        props::ICE => Some(props::update_11c7),
         _ => None,
     }
 }
