@@ -6,6 +6,10 @@
 //! * **0x1150** ([`update_1150`], `0x424190`, 20 placed): a transponder: with Ratchet in its cuboid it switches its
 //!   group's bolts and a linked effect moby on and off by its timers.
 //!
+//! The bolt's pieces are shared: level 16's 0x07fb (crate::moby::classes::level16::bolts) runs the same tick
+//! ([`step`], L16 `0x3abec0`) and draw ([`draw_0ee7`], L16 `0x3ac090`) over the same pvars ([`pv`]) and builds its
+//! bolts with [`build`] in its own [`Shape`].
+//!
 //! The engine functions: `0x325ce0` / `0x325d38` / `0x325d98` / `0x325e00` / `0x325ec0` / `0x325ca0` = L00 `0x31b9e0` /
 //! `0x31ba38` / `0x31ba98` / `0x31bb00` / `0x31bbc0` / `0x31b9a0` (crate::rng), `0x2fa748` = L00 `0x2f0080` (the
 //! sphere's view test), `0x2fa6c8` = L00 `0x2f0000` (crate::hud::lerp_rgba), `0x33c240` = L00 `0x3327e8`
@@ -16,8 +20,8 @@
 use crate::hero::physics::{add, cross, dot, euler_rows, scale, set_len, sub, V3};
 use crate::moby::{Ctx, MobyWorld};
 
-/// 0x0ee7's pvars.
-mod pv {
+/// 0x0ee7's pvars (level 16's 0x07fb's too).
+pub mod pv {
     /// `[0]`: the cuboid giving the bolt's turn (its angles `+0x74` / `+0x78`).
     pub const CUBOID: usize = 0;
     /// `+4` (s16): the ticks of a run of bolts; `+6` (s16) ≠ 0: a pause between runs; `+0xc` (s16): the first wait.
@@ -48,7 +52,7 @@ mod pv {
 /// `$gp+0x25cc` / `+0x25d0`: a bolt's ticks (10..=40); `+0x25d4` / `+0x25d8`: its fade's turns (15, 0).
 const LIFE_RANGE: (i32, i32) = (10, 40);
 const FADE_AT: i16 = 15;
-const GONE_AT: i16 = 0;
+pub const GONE_AT: i16 = 0;
 /// `$gp+0x2600` / `+0x2604` / `+0x2608`: its colours (new, at the fade's turn, last).
 const RGBA_NEW: u32 = 0x2040_1040;
 const RGBA_FULL: u32 = 0xff80_3040;
@@ -77,26 +81,42 @@ fn frame(w: &MobyWorld, id: usize) -> ([V3; 3], V3) {
 
 fn to_world(rows: &[V3; 3], pos: V3, p: V3) -> V3 { add(pos, add(add(scale(rows[0], p[0]), scale(rows[1], p[1])), scale(rows[2], p[2]))) }
 
-/// `0x41b9e0`: a new bolt. Its ticks `randi(10, 40)` (`+0x12`, `+0x620`), its length `randf(4, 8)`; its 32 points
-/// along its y from +½ to −½ the length, all but the three at each end `randvec(0, 0.3)` off the line and drifting
-/// `randvec(0, 1/60)` a tick; then each point but the ends (and its drift) the mean of it and its neighbours (×
-/// 0.33325). Four branches: each from a random point of `4 + randf(6k, 6k + 6)`, going a random way 0.3 a step
-/// (`randvec(0.3, 0.3)`) plus `randvec(0.1, 0.1)`, its three points drifting `randvec(0, 1/60)` a tick. Then, the
-/// camera 4 or more away across: its frame turned (`+0x650`: a random yaw about x, the cuboid's y angle ±0..30°, its z
-/// angle) and sparks (`0x33c240`, the def 0x18 or 0x35 at random) at points 0, 8, 16, 24 and the tips of branches 0
-/// and 1 (def 0x35), each moving its point's drift, size 2, in 0 / 4 / 8 / 12 (the branches: the root's index / 2)
-/// ticks, 15 easing, out 20..29 ticks, between 0x10806080 and 0x10806060.
-fn build(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+/// A bolt's shape as a level's set-up draws it: its length's range, its points' spread off the line and drift a
+/// tick, its branches' step and drift, and whether its yaw wobbles off its cuboid's.
+pub struct Shape {
+    pub length: (f32, f32),
+    pub spread: f32,
+    pub drift: f32,
+    pub step: f32,
+    pub branch_drift: f32,
+    pub wobble: bool,
+}
+
+/// Level 13's (`0x41b9e0`): 4..8 long, spread 0.3 (`$gp+0x2650`), drifting 1/60 (`$gp+0x2654` a second), the
+/// branches 0.3 a step, the yaw ±0..30°.
+pub const SHAPE_0EE7: Shape = Shape { length: (4.0, 8.0), spread: SPREAD, drift: DRIFT * 0.016_666_668, step: SPREAD, branch_drift: DRIFT * 0.016_666_668, wobble: true };
+
+/// `0x41b9e0` (L16 `0x3ab830` in its own [`Shape`]): a new bolt. Its ticks `randi(10, 40)` (`+0x12`, `+0x620`), its
+/// length `randf(4, 8)`; its 32 points along its y from +½ to −½ the length, all but the three at each end
+/// `randvec(0, 0.3)` off the line and drifting `randvec(0, 1/60)` a tick; then each point but the ends (and its
+/// drift) the mean of it and its neighbours (× 0.33325). Four branches: each from a random point of `4 + randf(6k, 6k
+/// + 6)`, going a random way 0.3 a step (`randvec(0.3, 0.3)`) plus `randvec(0.1, 0.1)`, its three points drifting
+/// `randvec(0, 1/60)` a tick. Then, the camera 4 or more away across: its frame turned (`+0x650`: a random yaw about
+/// x, the cuboid's y angle ±0..30° (without the wobble: as it is), its z angle) and sparks (`0x33c240`, the def 0x18
+/// or 0x35 at random) at points 0, 8, 16, 24 and the tips of branches 0 and 1 (def 0x35), each moving its point's
+/// drift, size 2, in 0 / 4 / 8 / 12 (the branches: the root's index / 2) ticks, 15 easing, out 20..29 ticks, between
+/// 0x10806080 and 0x10806060.
+pub fn build(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, shape: &Shape) {
     let cam = ctx.host.camera_pos();
     let rng = &mut ctx.game.rng;
     let life = rng.rand_range(LIFE_RANGE.0, LIFE_RANGE.1) as i16;
-    let length = rng.randf(4.0, 8.0);
+    let length = rng.randf(shape.length.0, shape.length.1);
     let mut p = [[0.0f32; 3]; 32];
     let mut v = [[0.0f32; 3]; 32];
     for i in 0..32 {
         if (3..29).contains(&i) {
-            p[i] = rng.rand_vec(0.0, SPREAD);
-            v[i] = rng.rand_vec(0.0, DRIFT * 0.016_666_668);
+            p[i] = rng.rand_vec(0.0, shape.spread);
+            v[i] = rng.rand_vec(0.0, shape.drift);
         }
         p[i][1] += (0.5 - i as f32 / 31.0) * length;
     }
@@ -110,7 +130,7 @@ fn build(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_v(pv::VELS + i * 0x10, vi);
     }
     for k in 0..4 {
-        let dir = rng.rand_vec(SPREAD, SPREAD);
+        let dir = rng.rand_vec(shape.step, shape.step);
         let root = (rng.randf(k as f32 * 6.0, (k + 1) as f32 * 6.0) as i32 + 4) as usize;
         m.set_pv_b(pv::ROOTS + k, root as u8);
         let (at, vel) = (m.pv_v(pv::POINTS + root * 0x10), m.pv_v(pv::VELS + root * 0x10));
@@ -118,7 +138,7 @@ fn build(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_v(branch_vel(k, 0), vel);
         for j in 1..4 {
             let jitter = rng.rand_vec(0.1, 0.1);
-            let drift = rng.rand_vec(0.0, DRIFT * 0.016_666_668);
+            let drift = rng.rand_vec(0.0, shape.branch_drift);
             m.set_pv_v(branch_vel(k, j), drift);
             let next = add(add(m.pv_v(branch_at(k, j - 1)), dir), jitter);
             m.set_pv_v(branch_at(k, j), next);
@@ -126,7 +146,7 @@ fn build(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     if crate::hero::physics::dist2(m.pos, cam) < 4.0 { return; }
     let c = usize::try_from(m.pv_i(pv::CUBOID)).ok().and_then(|c| ctx.level.cuboids.get(c)).map_or([0.0; 4], |c| c.extra);
-    let yaw = c[1] + rng.randf_signed(0.0, 30.0) * 0.017_453_294;
+    let yaw = if shape.wobble { c[1] + rng.randf_signed(0.0, 30.0) * 0.017_453_294 } else { c[1] };
     let roll = rng.rand_angle();
     m.set_pv_v(pv::ANGLES, [roll, yaw, c[2]]);
     let (rows, pos) = (euler_rows(m.pv_v(pv::ANGLES)), m.pos);
@@ -150,10 +170,10 @@ fn build(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
 }
 
-/// `0x41bfc0`: a tick of the bolt. While it lives: one tick off, points 2..24 and the branches' points 1..3 moved by
+/// `0x41bfc0` (L16 `0x3abec0`): a tick of the bolt. While it lives: one tick off, points 2..24 and the branches' points 1..3 moved by
 /// their drift, each branch's root back on its point. Its colour: past the fade's turn (15) from 0x20401040 at its
 /// birth to 0xff803040, then down to 0x20400000 at 0 (`0x2fa6c8`); 0 when gone.
-fn step(w: &mut MobyWorld, id: usize) {
+pub fn step(w: &mut MobyWorld, id: usize) {
     let m = &mut w.mobys[id];
     let life = m.pv_s(pv::LIFE);
     if life != 0 {
@@ -203,7 +223,7 @@ pub fn update_0ee7(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if m.pv_i(pv::ON) == 0 { return; }
     match w.mobys[id].state {
         0 => {
-            build(w, id, ctx);
+            build(w, id, ctx, &SHAPE_0EE7);
             let m = &mut w.mobys[id];
             m.set_pv_s(pv::COUNT, m.pv_s(pv::FIRST));
             m.state = 2;
@@ -219,7 +239,7 @@ pub fn update_0ee7(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if out {
                 m.state = 3;
                 m.set_pv_s(pv::COUNT, m.pv_s(pv::RUN));
-                build(w, id, ctx);
+                build(w, id, ctx, &SHAPE_0EE7);
             }
         }
         3 => {
@@ -231,7 +251,7 @@ pub fn update_0ee7(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 if m.pv_s(pv::PAUSES) != 0 { m.state = 2; }
                 m.set_pv_s(pv::COUNT, 5);
             } else if m.pv_s(pv::LIFE) == 0 {
-                build(w, id, ctx);
+                build(w, id, ctx, &SHAPE_0EE7);
             }
         }
         _ => {}
@@ -241,7 +261,7 @@ pub fn update_0ee7(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if GONE_AT < w.mobys[id].pv_s(pv::LIFE) { w.register_draw(id); }
 }
 
-/// `0x41c190`: the bolt's quads (FX 0xe, additive), in its frame (`+0x650` at its place): each of its 31 segments a
+/// `0x41c190` (L16 `0x3ac090`): the bolt's quads (FX 0xe, additive), in its frame (`+0x650` at its place): each of its 31 segments a
 /// quad 0.2 across facing the camera (the side `0.1·unit((p[i+1] − camera) × (p[i] − p[i+2]))`, none past segment 29;
 /// a segment's start takes the last one's side, none at the first), then each branch from a point below 31 its three
 /// segments the same way (the first's start its own side); the colour `+0x14` at every corner, s a quarter a segment

@@ -57,7 +57,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
 #[allow(clippy::too_many_arguments, unused_variables)]
 pub fn draw(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, hero_state: i32, view: &crate::particles::BSphereView, cam: V3, id: usize, first: bool, out: &mut Vec<crate::fx::FxQuad>, frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
     match w.mobys[id].o_class {
-        0x0ee7 => powerline::draw_0ee7(w, id, cam, out),
+        0x0ee7 | super::level16::bolts::CLASS => powerline::draw_0ee7(w, id, cam, out),
         _ => return false,
     }
     true
