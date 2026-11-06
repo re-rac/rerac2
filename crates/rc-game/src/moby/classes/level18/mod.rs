@@ -4,7 +4,9 @@
 
 pub mod breakables;
 pub mod breeder;
+pub mod dropship;
 pub mod hatch;
+pub mod stalker;
 
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
@@ -15,6 +17,10 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         breakables::BIT_PANEL => Some(breakables::update_1186),
         breakables::BOLT_PANEL => Some(breakables::update_12a5),
         hatch::CLASS => Some(hatch::update_1151),
+        stalker::CLASS => Some(stalker::update_0f0a),
+        // `0x436980`: L09's `0x3f85e8`, the shadow alone.
+        stalker::BODY => Some(super::level09::trooper::update_0d0e),
+        dropship::CLASS => Some(dropship::update_0ede),
         _ => None,
     }
 }
