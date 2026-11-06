@@ -3,6 +3,7 @@
 //! after its own.
 
 pub mod breakables;
+pub mod breather;
 pub mod burrower;
 pub mod lift;
 pub mod props;
@@ -16,6 +17,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         breakables::CLASS_12D0 => Some(breakables::update_12d0),
         breakables::CLASS_129F => Some(breakables::update_129f),
         burrower::CLASS => Some(burrower::update_0fff),
+        breather::CLASS => Some(breather::update_09c6),
         props::PLATFORM => Some(props::update_090e),
         props::GLOWING => Some(props::update_0988),
         props::PICKUP => Some(props::update_0e5b),

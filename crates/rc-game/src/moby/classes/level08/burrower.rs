@@ -18,13 +18,13 @@
 //!
 //! **States** (`+0x20`): 0 the set-up ([`setup`], `0x4249e8`; gone at once when the moby `+0x184` is marked gone and
 //! so is it). 1 under the sand until woken ([`wake`]), then 3 a wait of 0..180 and 2 rising to its hover height
-//! (sub 0, then 5) or sinking back (sub 1, then 1), sand puffs about it early in its sequence ([`puffs`],
+//! (sub 0, then 5) or sinking back (sub 1, then 1), sand puffs about it early in its sequence (crate::moby::classes::level08::tabora_ai::puffs,
 //! `0x423798`). 4 launched upward until it meets something (but a 0x0945) or stalls, then 5. 5 hovering on a weave
 //! for 180..360, then 6 patrolling (new goals about home, sub 0 / 1; home and down when nothing is about, sub 2). In
 //! the hunt's volumes, 1 in 9 a tick it hunts (7): goals near Ratchet; within 12 of him with fewer than 3 of its
 //! group at him and its wait over, it dives (8): to him, the bite (sequence 4: frames 19.5..29, a sphere 0.5 at
 //! joint 1, its damage `+0x34`), a 120-tick hold and again while he is still about; else away. 9 the knock (the
-//! framework's flight; 360 ticks at most), then hunting. 10 dying: its class sound 1, its sparkles ([`sparkles`],
+//! framework's flight; 360 ticks at most), then hunting. 10 dying: its class sound 1, its sparkles (crate::moby::classes::level08::tabora_ai::sparkles,
 //! `0x423b80`), the explosion (`0x32e558` = L00 `0x320538`), its bolts (flag 0x1000 for one launched) and its uid
 //! marked; deleted.
 //!
@@ -58,7 +58,7 @@
 //! (`0x423a30` → `0x348d78` = L01 `0x330218`).
 
 use super::tabora_ai::{self, find_target, floor_at, volume_reach, Volumes};
-use crate::hero::physics::{add, add_rot, atan2, dist2, ease, len, len2, scale, set_len, sub, V3};
+use crate::hero::physics::{add, add_rot, atan2, dist2, ease, len2, set_len, sub, V3};
 use crate::moby::blast::{self, Explosion};
 use crate::moby::classes::props::{seq, set_seq, wrapped};
 use crate::moby::{ai, bolts, countdown, Ctx, MobyWorld};
@@ -297,69 +297,6 @@ fn steer(w: &mut MobyWorld, id: usize, ctx: &Ctx, s: Steer) -> u32 {
     flags
 }
 
-/// `0x423798(m, at, n, speed, rise, far, near, size, end)`: `n` sand puffs about `at` (a random way, `near..far`
-/// across through its rows), moving out faster the nearer the middle (`speed`), up `rise / 4..rise` a second;
-/// staged (`0x3327e8`): 15..25 in, 20..40 easing to `end`, 30..60 out, 0x50204050 → 0x7f7f7f, half of them additive.
-#[allow(clippy::too_many_arguments)]
-fn puffs(w: &MobyWorld, id: usize, ctx: &mut Ctx, at: V3, n: i32, speed: f32, rise: f32, far: f32, near: f32, size: f32, end: f32) {
-    let Some(sys) = ctx.parts.as_deref_mut() else { return };
-    let rows = w.mobys[id].rows;
-    let g = &mut ctx.game.rng;
-    for _ in 0..n {
-        let x = g.randf(-PI, PI).cos() * g.randf(near, far);
-        let y = g.randf(-PI, PI).sin() * g.randf(near, far);
-        let off = crate::gravity::to_world([x, y, 0.0], &rows);
-        let range = speed * ((far - len(off)) * 0.016_666_668) / far;
-        let mut v = set_len(off, g.randf(range * 0.25, range));
-        v[2] += g.randf(rise * 0.25, rise) * 0.016_666_668;
-        let p = add(off, at);
-        let a = g.randf(15.0, 25.0) as i32 as i16;
-        let b = g.randf(20.0, 40.0) as i32 as i16;
-        let c = g.randf(30.0, 60.0) as i32 as i16;
-        let made = crate::particles::staged(sys, g, p, [v[0], v[1], v[2], size], [0.0, 0.0, 0.0, end], 0x5020_4050, 0x7f_7f7f, a, b, c, -1);
-        if let Some(i) = made {
-            if g.rand() & 1 != 0 { sys.pool.recs[i][3] = 0x48; }
-        }
-    }
-}
-
-/// `0x3217d8(k, p)`: `p` jittered by −k..k on each axis.
-fn jitter(g: &mut crate::rng::Rng, p: &mut V3, k: f32) {
-    for c in p.iter_mut() { *c += g.randf(-k, k); }
-}
-
-/// `0x423b80(m, vel)`: its death's sparkles: 20 bursts from a quarter up (jittered 0.25), each a random way 1..8
-/// across and 2..6 up a second (plus `vel`), of ten staged puffs (`0x3327e8`: 10 in, 30 easing, 5..25 out; sizes
-/// 0.125 → 0.065 × 0.5..1.5, falling 1/6 a tick more; 0x8000eeee..0x8000ff90 → 0xffee).
-fn sparkles(w: &MobyWorld, id: usize, ctx: &mut Ctx, vel: V3) {
-    let Some(sys) = ctx.parts.as_deref_mut() else { return };
-    let pos = w.mobys[id].pos;
-    let g = &mut ctx.game.rng;
-    for _ in 0..20 {
-        let mut a = pos;
-        jitter(g, &mut a, 0.25);
-        a[2] += 0.25;
-        let angle = g.rand_angle();
-        let r = g.randf(1.0, 8.0);
-        let z = g.randf(2.0, 6.0);
-        let mut b = scale(vel, g.randf(0.0, 0.0) * 0.016_666_668);
-        b[0] += angle.cos() * 0.016_666_668 * r;
-        b[1] += angle.sin() * 0.016_666_668 * r;
-        b[2] += z * 0.016_666_668;
-        let mut c = b;
-        c[2] -= 0.166_666_67;
-        for _ in 0..10 {
-            let k = g.randf(0.5, 1.5);
-            jitter(g, &mut a, 0.125);
-            jitter(g, &mut c, 0.008_333_334);
-            let c0 = crate::hud::lerp_rgba(g.randf(0.0, 1.0), 0x8000_eeee, 0x8000_ff90);
-            let c1 = crate::hud::lerp_rgba(g.randf(0.0, 1.0), 0xffee, 0xffee);
-            let out = g.randf(5.0, 25.0) as i32 as i16;
-            crate::particles::staged(sys, g, a, [b[0], b[1], b[2], k * 0.125], [c[0], c[1], c[2], k * 0.065], c0, c1, 10, 30, out, -1);
-        }
-    }
-}
-
 /// `0x4249e8` (module docs): home and its floor, its update distance from its first volumes (and the wander radius
 /// from the hunt's), the reaction block, its start.
 fn setup(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
@@ -581,7 +518,7 @@ fn rise(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if ctx.host.frame_time(&w.mobys[id]) < 12.0 {
         let m = &w.mobys[id];
         let at = [m.pos[0], m.pos[1], m.pv_f(FLOOR)];
-        puffs(w, id, ctx, at, 3, 1.0, 1.5, 0.5, 0.0, 0.1, 0.8);
+        tabora_ai::puffs(w, id, ctx, at, 3, 1.0, 1.5, 0.5, 0.0, 0.1, 0.8);
     }
     if 0.2 <= (w.mobys[id].pos[2] - t).abs() { return; }
     match w.mobys[id].sub_state {
@@ -836,7 +773,7 @@ fn knock(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// State 10: its death (module docs).
 fn die(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].first() { ctx.host.play_sound(&w.mobys[id], 1, 0); }
-    sparkles(w, id, ctx, ZERO);
+    tabora_ai::sparkles(w, id, ctx, ZERO);
     let e = Explosion { flash: 2.0, flash2: 1.0, near: 9.0, size: 1.0, embers: 4, sound: -1, lod: -1, colour: 1, flags: 0x81_0001, ..Default::default() };
     blast::explode(w, ctx, Some(id), None, &e);
     release(w, id);
