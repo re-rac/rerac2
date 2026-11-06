@@ -1194,13 +1194,20 @@ pub fn update_crowd(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         return;
     }
     w.mobys[id].draw_dist = 0xff;
-    // `0x430570`: the start.
+    let score = w.mobys[ms].pv_f(pv::SCORE);
+    crowd_step(w, id, ctx, score, [500.0, 600.0]);
+}
+
+/// The crowd's step once it is in view (Maktar's 0x0e96 above; Joba's 0x126e, crate::moby::classes::level11::arena,
+/// the same with the master's score and the wave's centre its own): the start (`0x430570` / L11 `0x476798`) and the
+/// states 1 / 2 / 3 by the master's `score`, the wave round `centre` (x, y).
+pub fn crowd_step(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, score: f32, centre: [f32; 2]) {
+    let p = w.mobys[id].pos;
     if w.mobys[id].state == 0 {
         w.mobys[id].set_state(1, -1);
         let s = if ctx.game.rng.randi(2) == 0 { 1 } else { 0 };
         set_seq(w, id, ctx, s, 0, 10);
     }
-    let score = w.mobys[ms].pv_f(pv::SCORE);
     let sit_again = |w: &MobyWorld, ctx: &mut Ctx| {
         // Each sitting sequence's end: another at random (two draws, as the original).
         let now = super::props::seq(w, id, ctx) as i32;
@@ -1231,7 +1238,7 @@ pub fn update_crowd(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         3 => {
             let wave = ((ctx.game.frame % WAVE_FRAMES) as f32 * -std::f32::consts::TAU) / WAVE_FRAMES as f32 + std::f32::consts::PI;
-            let me = atan2(p[0] - 500.0, p[1] - 600.0);
+            let me = atan2(p[0] - centre[0], p[1] - centre[1]);
             let near = |a: f32| crate::hero::physics::rot_dist(me, a) < WAVE_WIDTH;
             if near(wave) || near(add_rot(wave, std::f32::consts::PI)) {
                 set_seq(w, id, ctx, 4, 0, 10);

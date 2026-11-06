@@ -295,10 +295,10 @@ fn alarm(w: &mut MobyWorld, id: usize) {
     }
 }
 
-/// `0x452900(at, n)`: `n` pairs of twinkles 0.3 toward the camera from `at` (which jitters ±0.15 a pair), thrown
+/// `0x452900(at, n)` (also L11 `0x4273f8`, crate::moby::classes::level11::thugs): `n` pairs of twinkles 0.3 toward the camera from `at` (which jitters ±0.15 a pair), thrown
 /// 0.05..3 a second across (the camera's way turned ±60°) and 1..5 up, 0.5..2 in size: pink `0x7f207f7f` and a smaller
 /// white `0x7f7f7f7f`, 60 ticks, spinning opposite ways.
-fn sparks(ctx: &mut Ctx, mut at: V3, n: i32) {
+pub(crate) fn sparks(ctx: &mut Ctx, mut at: V3, n: i32) {
     let cam = ctx.host.camera_pos();
     let mut d = crate::hero::physics::sub(cam, at);
     let off = set_len(d, 0.3);
