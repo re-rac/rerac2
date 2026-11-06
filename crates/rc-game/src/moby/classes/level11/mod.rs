@@ -10,11 +10,11 @@
 //! * [`sellers`]: the talking NPCs 0x0e95 (item 8's seller) and 0x0b7c (the Charge Boots).
 //! * [`thugs`]: the thug 0x0cf5 (the riders' family: chats, patrols, turrets and hovers it rides) and its squads'
 //!   triggers 0x0b6d.
-//! * [`arena`]: Joba's arena: its master 0x0d8a, spawners 0x0c7f and crowd 0x126e (its fighters not yet).
+//! * [`arena`]: Joba's arena: its master 0x0d8a, spawners 0x0c7f and crowd 0x126e.
+//! * [`fighters`]: the arena's fighters 0x0d37 / 0x0dcf / 0x0df4 / 0x0df7 (and the shared pieces); [`brutes`]: 0x0d98
+//!   / 0x0df9; [`bosses`]: 0x0d4a with its links 0x0d4b, bombs 0x0e20 and the links' bolts 0x0e2d, and 0x0b3a.
 //!
 //! Not ported (2026-11-06):
-//! * **Joba's arena**'s fighters 0x0d37 / 0x0df7 / 0x0dcf / 0x0d98 / 0x0df4 / 0x0df9 / 0x0e20 / 0x0d4b / 0x0d4a /
-//!   0x0b3a (docs/plan/gaps.md G-LVL-009; the master's calls into them: [`arena`]'s `start` / `pool`).
 //! * The level's other enemies 0x0cf6 (`0x427728`, 9) and the hovers 0x0d07 (`0x430848`, 10) the thugs ride, with the
 //!   carrier 0x0e86 (`0x462db0`, 3; it makes a 0x0cf6) (the wave floor wakes them, movers::update_0b6b; their deaths
 //!   make skill point 0x12, props::update_12c7).
@@ -22,7 +22,10 @@
 
 pub mod arena;
 pub mod beams;
+pub mod bosses;
+pub mod brutes;
 pub mod critters;
+pub mod fighters;
 pub mod movers;
 pub mod props;
 pub mod sellers;
@@ -93,6 +96,17 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         arena::CROWD => Some(arena::update_crowd),
         arena::MASTER => Some(arena::update_master),
         arena::SPAWNER => Some(arena::update_spawner),
+        arena::D37 => Some(fighters::update_d37),
+        arena::DCF => Some(fighters::update_dcf),
+        arena::DF4 => Some(fighters::update_df4),
+        arena::DF7 => Some(fighters::update_df7),
+        arena::D98 => Some(brutes::update_d98),
+        arena::DF9 => Some(brutes::update_df9),
+        arena::D4A => Some(bosses::update_d4a),
+        arena::D4B => Some(bosses::update_d4b),
+        arena::B3A => Some(bosses::update_b3a),
+        0x0e20 => Some(bosses::update_e20),
+        0x0e2d => Some(bosses::update_e2d),
         _ => None,
     }
 }
@@ -105,6 +119,7 @@ pub fn draw(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crat
         0x10ea | 0x118c => stalks::draw(w, id, &mut game.rng, cam, out),
         0x0ee0 => beams::draw(w, id, cam, out),
         0x0e49 => props::draw_0e49(w, id, game.frame, view, out),
+        arena::DF4 => fighters::draw_df4(w, id, &mut game.rng, cam, out),
         _ => return false,
     }
     true

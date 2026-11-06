@@ -618,9 +618,11 @@ pub fn update_d37(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     let m = &w.mobys[id];
                     let back = add(m.pos, set_len(m.rows[0], -4.0));
                     let o = ai::mv(m) + 0x38;
-                    w.mobys[id].set_pv_i(o, w.mobys[id].pv_i(o) | 0x10);
+                    let v = w.mobys[id].pv_i(o) | 0x10;
+                    w.mobys[id].set_pv_i(o, v);
                     go(w, id, ctx, back, ring);
-                    w.mobys[id].set_pv_i(o, w.mobys[id].pv_i(o) & !0x10);
+                    let v = w.mobys[id].pv_i(o) & !0x10;
+                    w.mobys[id].set_pv_i(o, v);
                 }
                 ai::attack_joint(w, id, ctx, 0.4, dmg, 1.0, 0, 1, 0, 1, 0);
             }
@@ -1427,7 +1429,8 @@ fn senses_df7(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         w.mobys[id].set_pv_i(HUM, -1);
     }
     let o = 0x98;
-    if ring { w.mobys[id].set_pv_i(o, w.mobys[id].pv_i(o) & !0x10); } else { w.mobys[id].set_pv_i(o, w.mobys[id].pv_i(o) | 0x10); }
+    let v = if ring { w.mobys[id].pv_i(o) & !0x10 } else { w.mobys[id].pv_i(o) | 0x10 };
+    w.mobys[id].set_pv_i(o, v);
     floor_hits(w, id, true);
     let hit = w.hit_message(id).filter(|h| h.tmpl.flags & 0x1_0000 != 0);
     let dmg = ai::damage_of(w, id, hit.as_ref(), false);

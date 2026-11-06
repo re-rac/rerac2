@@ -916,7 +916,7 @@ fn drop_shield(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// scaled as `m` is to its class, state 1, its life `randf(60, 120)` ticks, its spin a random `randvec(3°, 6°)` a
 /// tick, about its sphere's centre (here the carried piece's sphere, in its frame; [`update_shield`] moves it).
 #[allow(clippy::too_many_arguments)]
-fn throw_piece(w: &mut MobyWorld, src: usize, ctx: &mut Ctx, class: i16, pos: V3, rot: V3, vel: V3, gravity: f32, sphere: [f32; 4]) -> Option<usize> {
+pub(super) fn throw_piece(w: &mut MobyWorld, src: usize, ctx: &mut Ctx, class: i16, pos: V3, rot: V3, vel: V3, gravity: f32, sphere: [f32; 4]) -> Option<usize> {
     let c = w.class(class)?.clone();
     let own = w.class(w.mobys[src].o_class).map_or(1.0, |c| c.scale);
     let k = w.create(class);
@@ -1081,9 +1081,9 @@ fn head_off(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     crate::moby::shards::break_into(w, id, ctx, (3.0, 6.0), (3.0, 6.0), 0x20, v, 0xff);
 }
 
-/// `0x3d34f8(p, n)`: `n` pairs of sparks off the shield (two twinkles each: pink `0x7f007f40` and a smaller blue one,
+/// `0x3d34f8(p, n)` (shared: L11 `0x44ae20`, Joba's 0x0d98): `n` pairs of sparks off the shield (two twinkles each: pink `0x7f007f40` and a smaller blue one,
 /// `randf($gp+0x1134, +0x1138)`, 0.3 toward the camera, along a way turned ±60° about up).
-fn shield_sparks(ctx: &mut Ctx, p: V3, n: i32) {
+pub(super) fn shield_sparks(ctx: &mut Ctx, p: V3, n: i32) {
     let cam = ctx.host.camera_pos();
     let toward = set_len(sub(cam, p), 0.3);
     let way = { let d = sub(cam, p); [d[0], d[1], 0.0] };

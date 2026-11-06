@@ -25,10 +25,9 @@
 //!   (crate::moby::classes::arena::spawner_step) with their own release ([`release`], `0x418ab0`).
 //! * **The crowd 0x126e** ([`update_crowd`]).
 //!
-//! **The fighters** 0x0d98 / 0x0dcf / 0x0df4 / 0x0df7 / 0x0df9 / 0x0d37 and the bosses 0x0d4a / 0x0b3a are not ported
-//! (G-LVL-009): their set-ups never pool them (state 1), so the master finds none to send. The calls it and the
-//! spawners make into their code go through [`start`], [`start_boss`], [`pool`] and [`die_out`], which name the
-//! original entry points and do nothing yet.
+//! **The fighters** 0x0d98 / 0x0dcf / 0x0df4 / 0x0df7 / 0x0df9 / 0x0d37 and the bosses 0x0d4a / 0x0b3a are
+//! crate::moby::classes::level11::fighters, ::brutes and ::bosses; the master and the spawners call into them through
+//! [`start`], [`start_boss`], [`pool`] and [`die_out`].
 //!
 //! Not ported here (each a leftover of G-LVL-009):
 //! * the menu's own draw (`0x4454e8`, asm; Maktar's crate::moby::classes::arena::draw_menu stands in with Joba's names
