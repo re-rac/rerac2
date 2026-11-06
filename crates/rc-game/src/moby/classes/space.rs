@@ -45,6 +45,15 @@
 //! Its death (`0x40f270`): the blast `0x4184c8` ([`crate::moby::blast::burst`]) and a drop ([`drop`], the pickups'
 //! [`update_pickup`]).
 //!
+//! **The other ship levels** (Feltzin 5, Hrugis 10, Gorn 15: the same library, the decomp's `func_L05_0037…` /
+//! `func_002ED688`.., at L05 `0x37aad0..`, L10 `0x37c8e0..`, L15 `0x3812f8..`): their ships are the fighter's pattern
+//! with their own numbers ([`Spec`], the levels' modules: crate::moby::classes::level05 / level10). Each level's
+//! mission object (L05 0x1103 `0x41efc0`, L10 0x1155 `0x422828`, L15 0x119f `0x42f288`; not ported) sets the
+//! library's globals at its start: the fight's sphere (its `+0x68`[0], read here from the placed mission moby, as
+//! [`arena`]), the ready flag `0x221ca4` (L10; `0x37c8e0` returns it: taken as set here, as on Wupash) and the hit
+//! handler `0x221cd4` that `0x37e600` (the push) calls ([`hits`]: L05 `0x421c18`, L10 `0x4252b0`, L15 `0x431ad8`).
+//! The quiet and the tick's leading group are the Wupash mission's alone here (their missions keep them).
+//!
 //! Not ported: the exhaust trails (`0x3ca6c0` / `0x3cbc40` through `0x349c48`); the no-fly volumes' check
 //! (`0x3782c8`: none on Wupash) and the formations' set-up and break-up (`0x376d20`, `0x376e58`: none form on
 //! Wupash; state 3 itself is); the moby groups (`+0x21`: the leaders' groups are their classes here); the view test
@@ -59,8 +68,8 @@ pub const FIGHTER: i16 = 0x0957;
 /// The port's own words, past the classes' disc pvars (the gunship's reach `+0x2f8`): the health, started, a wave's
 /// return asked (`0x376428`: gather round `REVIVE_AT`, go for `REVIVE_GOAL`), the engine's and the fly-by's sound
 /// handles + 1, and the AI block (`+0x68`[`0x14`], 0x160 bytes).
-const HEALTH: usize = 0x400;
-const STARTED: usize = 0x404;
+pub(crate) const HEALTH: usize = 0x400;
+pub(crate) const STARTED: usize = 0x404;
 const REVIVE: usize = 0x408;
 const ENGINE: usize = 0x40c;
 const FLYBY: usize = 0x410;
@@ -74,7 +83,7 @@ pub const ACTIVE_COUNT: usize = 0x104;
 pub const LEADER: usize = 0x108;
 
 /// The AI block's words.
-mod a {
+pub(crate) mod a {
     pub const GOAL: usize = 0x60;
     pub const VEL: usize = 0x90;
     pub const ROLL: usize = 0x30;
@@ -103,16 +112,20 @@ mod a {
     pub const PUSHES: usize = 0x15c;
 }
 
-fn ai_i(w: &MobyWorld, id: usize, o: usize) -> i32 { w.mobys[id].pv_i(AI + o) }
-fn ai_f(w: &MobyWorld, id: usize, o: usize) -> f32 { w.mobys[id].pv_f(AI + o) }
+pub(crate) fn ai_i(w: &MobyWorld, id: usize, o: usize) -> i32 { w.mobys[id].pv_i(AI + o) }
+pub(crate) fn ai_f(w: &MobyWorld, id: usize, o: usize) -> f32 { w.mobys[id].pv_f(AI + o) }
 fn ai_v(w: &MobyWorld, id: usize, o: usize) -> V3 { w.mobys[id].pv_v(AI + o) }
-fn set_ai_i(w: &mut MobyWorld, id: usize, o: usize, v: i32) { w.mobys[id].set_pv_i(AI + o, v) }
-fn set_ai_f(w: &mut MobyWorld, id: usize, o: usize, v: f32) { w.mobys[id].set_pv_f(AI + o, v) }
+pub(crate) fn set_ai_i(w: &mut MobyWorld, id: usize, o: usize, v: i32) { w.mobys[id].set_pv_i(AI + o, v) }
+pub(crate) fn set_ai_f(w: &mut MobyWorld, id: usize, o: usize, v: f32) { w.mobys[id].set_pv_f(AI + o, v) }
 fn set_ai_v(w: &mut MobyWorld, id: usize, o: usize, v: V3) { w.mobys[id].set_pv_v(AI + o, v) }
 
-/// The fight's sphere (`0x1b2114 + 0x221800·0x80`: the mission object 0x0eee's `+0x68`[0]): its centre and radius.
+/// The levels' mission objects whose `+0x68`[0] is the fight's sphere (Wupash 0x0eee; Feltzin 0x1103, Hrugis
+/// 0x1155, Gorn 0x119f: their `0x221cc0` / `0x221c80` / `0x221dc0`).
+const MISSIONS: [i16; 4] = [0x0eee, 0x1103, 0x1155, 0x119f];
+
+/// The fight's sphere (`0x1b2114 + 0x221800·0x80`: the mission object's `+0x68`[0]): its centre and radius.
 fn arena(w: &MobyWorld, ctx: &Ctx) -> (V3, f32) {
-    let i = w.mobys.iter().find(|m| m.o_class == 0x0eee).map_or(0, |m| m.pv_i(0));
+    let i = w.mobys.iter().find(|m| MISSIONS.contains(&m.o_class)).map_or(0, |m| m.pv_i(0));
     let Some(v) = usize::try_from(i).ok().and_then(|i| ctx.level.spheres.get(i)) else { return ([512.0; 3], 256.0) };
     let m = &v.matrix;
     ([m[3][0], m[3][1], m[3][2]], len([m[0][0], m[0][1], m[0][2]]))
@@ -212,23 +225,76 @@ pub const GUNSHIP: i16 = 0x097c;
 /// (`0x375198`'s), and whether it may take the circling attack (kind 5).
 /// The disc pvars: its own target (a moby index, −1 none: `+0x1b0` / `+0x260`), its entry in the leaders' list
 /// (`+0x1b4` / `+0x264`), the gun's wait (`+0x1b8` / `+0x268`); and the fly-by's odds (`0x32e060(400)` / `(750)`).
-struct Spec {
-    health: f32,
-    scale: f32,
-    range: f32,
-    wait: i32,
-    shot: (f32, f32, u32),
-    circles: bool,
-    target: usize,
-    leads: usize,
-    gun: usize,
-    flyby: i32,
+/// The other ship levels' classes add: placed at random in the sphere at the start or left where they are (both then
+/// wander), the range test's screen check (`0x376a60`'s last argument: in range only with a sphere of 0.1 there on
+/// screen), the gun asking for the range or the cone alone, the aim's lead ahead of the target (`0x375198`'s second
+/// argument), the flame instead of the shot (Feltzin's 0x10f5), the sounds (the engine's loop, the death's, the
+/// gun's: one shot in three or two in three), and the exhaust's nozzles, puffs' speed (`(a..b)/60 · k` back),
+/// descriptor (crate::particles::EXHAUST_DESCS) and whether only on screen.
+#[derive(Clone, Copy)]
+pub(crate) struct Spec {
+    pub health: f32,
+    pub scale: f32,
+    pub scatter: bool,
+    pub range: f32,
+    pub on_screen: bool,
+    pub fire_in_range: bool,
+    pub lead: f32,
+    pub flame: bool,
+    pub wait: i32,
+    pub shot: (f32, f32, u32),
+    /// One shot in two (`0x336448(2) == 0`) this colour instead (Hrugis's 0xf93).
+    pub shot_alt: Option<u32>,
+    pub circles: bool,
+    pub target: usize,
+    pub leads: usize,
+    pub gun: usize,
+    /// The fly-by's odds (0: none).
+    pub flyby: i32,
+    pub engine: Option<(i16, i32)>,
+    pub death: Option<(i16, i32)>,
+    pub gun_sound: Option<(i16, i32, bool)>,
+    pub nozzles: &'static [V3],
+    pub puff: (f32, f32, f32),
+    pub desc: usize,
+    pub exhaust_on_screen: bool,
 }
+
+/// The Wupash fighter's numbers, the others' starting point.
+pub(crate) const FIGHTER_SPEC: Spec = Spec {
+    health: 1.0,
+    scale: 0.06,
+    scatter: true,
+    range: 176.0,
+    on_screen: false,
+    fire_in_range: true,
+    lead: 2.0,
+    flame: false,
+    wait: 0x14,
+    shot: (1.0, 1.0, 0x6000_8000),
+    shot_alt: None,
+    circles: false,
+    target: 0x1b0,
+    leads: 0x1b4,
+    gun: 0x1b8,
+    flyby: 400,
+    engine: Some((FIGHTER, 3)),
+    death: Some((FIGHTER, 1)),
+    gun_sound: Some((FIGHTER, 0, false)),
+    nozzles: &[[-0.3, 0.0, 0.0]],
+    puff: (30.0, 40.0, 0.4),
+    desc: 0,
+    exhaust_on_screen: true,
+};
+
+/// The other levels' ships ([`Spec`]).
+fn level_spec(class: i16) -> Option<Spec> { super::level05::ship_spec(class).or_else(|| super::level10::ship_spec(class)) }
 
 fn spec(class: i16) -> Spec {
     match class {
-        GUNSHIP => Spec { health: 5.0, scale: 0.04, range: 32.0, wait: 0x3c, shot: (0.6, 1.3, 0x6000_0090), circles: true, target: 0x260, leads: 0x264, gun: 0x268, flyby: 0x2ee },
-        _ => Spec { health: 1.0, scale: 0.06, range: 176.0, wait: 0x14, shot: (1.0, 1.0, 0x6000_8000), circles: false, target: 0x1b0, leads: 0x1b4, gun: 0x1b8, flyby: 400 },
+        GUNSHIP => Spec { health: 5.0, scale: 0.04, range: 32.0, wait: 0x3c, shot: (0.6, 1.3, 0x6000_0090), circles: true, target: 0x260, leads: 0x264, gun: 0x268, flyby: 0x2ee, engine: Some((GUNSHIP, 1)), death: None, gun_sound: Some((GUNSHIP, 0, false)), nozzles: &[[-0.21, 0.061, 0.045], [-0.21, -0.061, 0.045]], desc: 3, exhaust_on_screen: false, ..FIGHTER_SPEC },
+        FIGHTER => FIGHTER_SPEC,
+        _ => level_spec(class).unwrap_or(FIGHTER_SPEC),
     }
 }
 
@@ -254,11 +320,12 @@ pub(crate) fn in_view(ctx: &Ctx, c: V3, r: f32) -> bool {
 /// Its radius (`+0xc` / 1024).
 fn radius(w: &MobyWorld, id: usize) -> f32 { w.mobys[id].bsphere[3] / 1024.0 }
 
-/// The space AI's ships (the fighters and the gunships).
-fn is_ai(class: i16) -> bool { class == FIGHTER || class == GUNSHIP }
+/// The space AI's ships (the fighters and the gunships, the other levels' ships).
+pub(crate) fn is_ai(class: i16) -> bool { class == FIGHTER || class == GUNSHIP || level_spec(class).is_some() }
 
-/// `0x3ca4a8` / `0x3cba68` / `0x376068`: the start.
-fn start(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+/// `0x3ca4a8` / `0x3cba68` / `0x376068`: the start (the other levels' the same, some left where they were placed:
+/// Hrugis's `0x380228`, a wander goal from there).
+pub(crate) fn start(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let sp = spec(w.mobys[id].o_class);
     let (c, r) = arena(w, ctx);
     {
@@ -271,7 +338,7 @@ fn start(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.update_dist = 0xff;
         m.draw_dist = 0x1ff;
         m.scale = sp.scale;
-        m.pos = add(c, p);
+        if sp.scatter { m.pos = add(c, p); }
         m.set_pv_f(HEALTH, sp.health);
         m.set_pv_i(STARTED, 1);
     }
@@ -288,7 +355,7 @@ fn start(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// The class code's own target (`0x3ca118` / `0x3cb770` in the moby's state 1): with its disc target (`+0x1b0` /
 /// `+0x260` not −1) `+0x11c` = 1 (its runs take an offset) and `+0x120` that moby, every tick; without, no target
 /// (it wanders).
-fn take_own_target(w: &mut MobyWorld, id: usize) {
+pub(crate) fn take_own_target(w: &mut MobyWorld, id: usize) {
     match own_target(w, id) {
         Some(t) => {
             set_ai_i(w, id, a::OWN_TARGET, 1);
@@ -299,14 +366,14 @@ fn take_own_target(w: &mut MobyWorld, id: usize) {
 }
 
 /// `0x377278`: the AI tick.
-fn think(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+pub(crate) fn think(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let state = ai_i(w, id, a::STATE);
     let in_range = ai_i(w, id, a::RANGE) != 0;
     let (k, kd, top) = tuning(state, in_range);
     // The step (not circling).
     if state != 8 { w.mobys[id].pos = add(w.mobys[id].pos, ai_v(w, id, a::VEL)); }
     // `0x374f50` (not in state 2): kept inside the sphere less its own size; pushed off faces more than 6 times in a
-    // row (`+0x15c`, [`push_out`]), its velocity bounces off the last face (`0x301da0`) with 20 sparks.
+    // row (`+0x15c`, [`push`]), its velocity bounces off the last face (`0x301da0`) with 20 sparks.
     if state != 2 {
         let (c, r) = arena(w, ctx);
         let own = radius(w, id);
@@ -460,14 +527,18 @@ fn bounce_sparks(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
     }
 }
 
-/// `0x376650(m, 0, 0, 0)`, before the hits: a sphere of its size against the world and the mobys (`0x2f29f8`, flags
-/// 0); met, it is put at the pushed-out place, and a face (not a moby's primitive) counts a push in a row (`+0x15c`)
-/// and leaves its normal (`+0xd0`); nothing met, the count goes back to 0.
-fn push_out(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
+/// `0x376650(m, 0, keep, off)`, before the hits: a sphere of its size against the world and the mobys (`0x2f29f8`,
+/// flags 0); met, it is put at the pushed-out place (not with `keep` when what it met is a moby), and a face (not a
+/// moby's primitive) counts a push in a row (`+0x15c`) and leaves its normal (`+0xd0`); nothing met, the count goes
+/// back to 0. With `off` no sphere at all (the count to 0).
+pub(crate) fn push(w: &mut MobyWorld, id: usize, ctx: &Ctx, keep: bool, off: bool) {
+    if off { return set_ai_i(w, id, a::PUSHES, 0); }
     let r = radius(w, id);
     let hit = ctx.coll.and_then(|c| crate::collision::coll_sphere_m(c, ctx.scene, w.mobys[id].pos, r, crate::collision::QueryFlags(0), Some(id)));
     let Some(h) = hit else { return set_ai_i(w, id, a::PUSHES, 0) };
-    if let Some(p) = h.pushed_centre { w.mobys[id].pos = p; }
+    if !(keep && h.moby.is_some()) {
+        if let Some(p) = h.pushed_centre { w.mobys[id].pos = p; }
+    }
     if 0 < h.kind {
         let n = ai_i(w, id, a::PUSHES) + 1;
         set_ai_i(w, id, a::PUSHES, n);
@@ -475,43 +546,115 @@ fn push_out(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
     }
 }
 
-/// `0x40f270` (the mission's hit handler): a hit with the flags 0x230000 takes its damage; at 0 the fighter is put
-/// away (`0x375fe8`).
-fn hits(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    push_out(w, id, ctx);
-    let Some(h) = w.hit_message(id) else { return };
-    w.clear_hit(id);
-    if h.tmpl.flags & 0x0023_0000 == 0 { return; }
-    // `0x36cc38(2, 0, m, 0x957)`.
-    ctx.host.play_sound_of(&w.mobys[id], FIGHTER, 2, 0);
-    let hp = (w.mobys[id].pv_f(HEALTH) - h.tmpl.damage).max(0.0);
-    w.mobys[id].set_pv_f(HEALTH, hp);
-    if hp <= 0.0 {
-        // `0x4184c8(0.5, pos, 0, 0x32, 0x1e, 0x1e, 0x1e, 0x28, 1, 1, 0, 0)`: L25's copy of the blasts' `0x3f8348`
-        // (class 0x116a; crate::moby::blast): no shake, the flash ball (`+0x34` = 1); then its drop.
-        let at = w.mobys[id].pos;
-        crate::moby::blast::burst(w, ctx, at, &crate::moby::blast::Blast { size: 0.5, bursts: [0x32, 0x1e, 0x1e], puffs: 0x1e, streaks: 0x28, light: true, shake: false });
-        drop(w, id, ctx);
-        set_ai_i(w, id, a::ATTACKING, 0);
-        set_ai_i(w, id, a::ACTIVE, 0);
-        let m = &mut w.mobys[id];
-        m.has_collision = false;
-        m.draw_dist = 0;
-        m.drawn = 0;
-        m.mode |= 3;
-        w.changed = true;
-    }
+/// The standard blast of the levels' hit handlers (`0x4184c8` / L05 `0x426718` / L10 `0x427670` / L15 `0x4296b8`:
+/// L25's, Feltzin's, Hrugis's and Gorn's copies of the blasts' `0x3f8348`, class 0x116a; crate::moby::blast) at
+/// `size`: no shake, the flash ball (`+0x34` = 1).
+fn blast(size: f32, bursts: [i32; 3], puffs: i32, streaks: i32, light: bool) -> crate::moby::blast::Blast {
+    crate::moby::blast::Blast { size, bursts, puffs, streaks, light, shake: false }
 }
 
-/// `0x376a60(range, …)`: in range (the target within the class's range, the line clear) and in the gun's cone (40.5°
-/// across and up).
-fn range(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
+/// The hit handler's sound timer (L10 `0x1b34cc`: Hrugis's 0xf8e calls out at most every 10..20 ticks), kept on the
+/// level's mission moby (the port's word).
+const CALL_TIMER: usize = 0x400;
+
+/// `0x376650`'s call of the level's hit handler (`0x221cd4`, set by the mission): Wupash's `0x40f270`, Feltzin's
+/// `0x421c18`, Hrugis's `0x4252b0`, Gorn's `0x431ad8`. A hit with the flags 0x230000 takes its damage (`+0x2c`) from
+/// the health; at 0 the blast, the drop (`0x40fbc8(m, 1)` and its copies, [`drop`]), a formation broken up (none
+/// form here) and the ship put away (`0x375fe8`: hidden, no collision, not active; not with `stay`, the push's
+/// second argument). Returns 1 at the death. Each level's sounds and blast:
+/// * Wupash: the fighter's sound 2 each hit; the blast at 0.5.
+/// * Feltzin: the ship's 0xd each hit (not 0x0b73's), and one hit in three 0x10f5's own 1 (the others' the ship's
+///   0xb); the blast at 0.75, 0x10f5's (`0x39a388(0.8, …, 0x19, 0, 0, 0x1e, 0)`) and 0x111a's three
+///   (`0x39a388(2, …, 0xf, 0, 0, 0x1e, 0)` at it and twice ±1.5 round it) their own.
+/// * Hrugis: a ship already at 0 takes nothing, 0x0cbe only the wingmen's (0xf93) shots; the ship's 0xd (not 0x0b73's
+///   and 0xf8e's), 0xf8e's own 3 when the call timer is out (again in 10..20); the blast at 0.5.
+/// * Gorn: 0x1211's own 5, the others' the ship's 0xd; the blast at 0.75.
+///
+/// Not ported: the hit flash (`+0x68`[4], `0x33a760` / `0x33a6a0`), the drop's second chance by the level's table.
+pub(crate) fn hits_with(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, stay: bool, keep: bool, off: bool) -> bool {
+    push(w, id, ctx, keep, off);
+    let Some(h) = w.hit_message(id) else { return false };
+    w.clear_hit(id);
+    if h.tmpl.flags & 0x0023_0000 == 0 { return false; }
+    let class = w.mobys[id].o_class;
+    let level = ctx.game.level;
+    let ship = crate::ship::SHIP_CLASS;
+    if level == 10 {
+        if w.mobys[id].pv_f(HEALTH) <= 0.0 { return false; }
+        // Not ported: the hit's source (`+0x20`) — the port's hits carry none here, so 0x0cbe takes every hit.
+    }
+    let hp = (w.mobys[id].pv_f(HEALTH) - h.tmpl.damage).max(0.0);
+    w.mobys[id].set_pv_f(HEALTH, hp);
+    match level {
+        5 if class != 0x0b73 => {
+            ctx.host.play_sound_of(&w.mobys[id], ship, 0xd, 0);
+            if ctx.game.rng.randi(3) == 0 {
+                if class == 0x10f5 { ctx.host.play_sound_of(&w.mobys[id], 0x10f5, 1, 0); } else { ctx.host.play_sound_of(&w.mobys[id], ship, 0xb, 0); }
+            }
+        }
+        10 => {
+            if class != 0x0b73 && class != 0x0f8e { ctx.host.play_sound_of(&w.mobys[id], ship, 0xd, 0); }
+            let mid = w.mobys.iter().position(|m| m.o_class == 0x1155);
+            let mut t = mid.map_or(0, |m| w.mobys[m].pv_i(CALL_TIMER));
+            if crate::moby::countdown(&mut t) && class == 0x0f8e {
+                ctx.host.play_sound_of(&w.mobys[id], 0x0f8e, 3, 0);
+                t = ctx.game.rng.randf(10.0, 20.0) as i32;
+            }
+            if let Some(m) = mid { w.mobys[m].set_pv_i(CALL_TIMER, t); }
+        }
+        15 if class != 0x0b73 => {
+            if class == 0x1211 { ctx.host.play_sound_of(&w.mobys[id], 0x1211, 5, 0); } else { ctx.host.play_sound_of(&w.mobys[id], ship, 0xd, 0); }
+        }
+        5 | 15 => {}
+        // `0x36cc38(2, 0, m, 0x957)`.
+        _ => { ctx.host.play_sound_of(&w.mobys[id], FIGHTER, 2, 0); }
+    }
+    if 0.0 < hp { return false; }
+    let at = w.mobys[id].pos;
+    let burst = crate::moby::blast::burst;
+    match (level, class) {
+        (5, 0x10f5) => burst(w, ctx, at, &blast(0.8, [0x19, 0, 0], 0x1e, 0, true)),
+        (5, 0x111a) => {
+            burst(w, ctx, at, &blast(2.0, [0xf, 0, 0], 0x1e, 0, false));
+            for _ in 0..2 {
+                let g = &mut ctx.game.rng;
+                let p = [at[0] + g.randf(-1.5, 1.5), at[1] + g.randf(-1.5, 1.5), at[2] + g.randf(-1.5, 1.5)];
+                burst(w, ctx, p, &blast(2.0, [0xf, 0, 0], 0x1e, 0, false));
+            }
+        }
+        (5 | 15, _) => burst(w, ctx, at, &blast(0.75, [0x32, 0x1e, 0x1e], 0x1e, 0x28, true)),
+        _ => burst(w, ctx, at, &blast(0.5, [0x32, 0x1e, 0x1e], 0x1e, 0x28, true)),
+    }
+    drop(w, id, ctx);
+    if !stay { put_away(w, id); }
+    true
+}
+
+/// `0x375fe8` (L10 `0x37dea0`): the ship put away — hidden, no collision, not active, not attacking.
+pub(crate) fn put_away(w: &mut MobyWorld, id: usize) {
+    set_ai_i(w, id, a::ATTACKING, 0);
+    set_ai_i(w, id, a::ACTIVE, 0);
+    let m = &mut w.mobys[id];
+    m.has_collision = false;
+    m.draw_dist = 0;
+    m.drawn = 0;
+    m.mode |= 3;
+    w.changed = true;
+}
+
+fn hits(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool { hits_with(w, id, ctx, false, false, false) }
+
+/// `0x376a60(range, m, check)`: in range (the target within the class's range, the line clear; with `check` also a
+/// sphere of 0.1 at the ship on screen, `0x302b78`) and in the gun's cone (40.5° across and up; set before the
+/// screen check).
+pub(crate) fn range(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
     set_ai_i(w, id, a::CONE, 0);
     set_ai_i(w, id, a::RANGE, 0);
     if passive(w) { return; }
     let Some(t) = target(w, id) else { return };
     let (p, q) = (w.mobys[id].pos, w.mobys[t].pos);
-    if spec(w.mobys[id].o_class).range < dist(p, q) { return; }
+    let sp = spec(w.mobys[id].o_class);
+    if sp.range < dist(p, q) { return; }
     // The line clear, or ending on a moby of the target's class.
     let hit = ctx.coll.and_then(|c| crate::collision::coll_line_m(c, ctx.scene, p, q, crate::collision::QueryFlags(0), Some(id)));
     if hit.is_some_and(|h| h.moby.is_none_or(|m| w.mobys.get(m).is_none_or(|m| m.o_class != w.mobys[t].o_class))) { return; }
@@ -519,33 +662,60 @@ fn range(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
     let across = rot_dist(atan2(d[0], d[1]), ai_f(w, id, a::YAW));
     let up = rot_dist(atan2(len2(d), d[2]), 0.0);
     if across <= 0.706_858_3 && up <= 0.706_858_3 { set_ai_i(w, id, a::CONE, 1); }
+    if sp.on_screen && !in_view(ctx, p, 0.1) { return; }
     set_ai_i(w, id, a::RANGE, 1);
 }
 
-/// `0x3ca5a8` / `0x3cbb78`: in range and in the cone (the circling gunship: in range) with the gun ready (`+0x1b8` /
-/// `+0x268`), a shot at the point 2 ahead of the target (`0x375198`), the gun ready again after the class's wait.
-fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+/// `0x3ca5a8` / `0x3cbb78` (and the other levels' guns): in range and in the cone (the circling gunship: in range;
+/// some levels' ships the cone alone) with the gun ready (`+0x1b8` / `+0x268`), a shot at the point the class's lead
+/// ahead of the target (`0x375198`), the gun ready again after the class's wait; its sound one shot in three (or two
+/// in three). Feltzin's 0x10f5 throws flame instead ([`flame`]).
+pub(crate) fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let sp = spec(w.mobys[id].o_class);
     let mut wait = w.mobys[id].pv_i(sp.gun);
     crate::moby::countdown(&mut wait);
     w.mobys[id].set_pv_i(sp.gun, wait);
     let cone = ai_i(w, id, a::CONE) != 0 || (sp.circles && ai_i(w, id, a::STATE) == 8);
-    if wait != 0 || ai_i(w, id, a::RANGE) == 0 || !cone { return; }
+    if wait != 0 || (sp.fire_in_range && ai_i(w, id, a::RANGE) == 0) || !cone { return; }
     let Some(t) = target(w, id) else { return };
+    if sp.flame { return flame(w, id, t, ctx); }
     if w.mobys[t].draw_dist == 0 { return; }
-    let at = add(w.mobys[t].pos, set_len(w.mobys[t].rows[0], 2.0));
+    let at = add(w.mobys[t].pos, set_len(w.mobys[t].rows[0], sp.lead));
     let from = w.mobys[id].pos;
-    crate::ship::spawn_enemy_shot(w, &*ctx.host, from, at, t, sp.shot);
+    let mut shot = sp.shot;
+    if let Some(c) = sp.shot_alt {
+        if ctx.game.rng.randi(2) == 0 { shot.2 = c; }
+    }
+    if w.mobys[id].state == 1 { crate::ship::spawn_enemy_shot(w, &*ctx.host, from, at, t, shot); }
     w.mobys[id].set_pv_i(sp.gun, sp.wait);
-    // `0x36cc38(0, 0, m, class)` one shot in three.
-    if ctx.game.rng.randi(3) == 0 { let c = w.mobys[id].o_class; ctx.host.play_sound_of(&w.mobys[id], c, 0, 0); }
+    // `0x36cc38(0, 0, m, class)` one shot in three (`0x32e060(3) == 0`; some two in three, `≠ 0`).
+    if let Some((c, i, most)) = sp.gun_sound {
+        if (ctx.game.rng.randi(3) != 0) == most { ctx.host.play_sound_of(&w.mobys[id], c, i, 0); }
+    }
+}
+
+/// Feltzin's 0x10f5's flame (`0x41e108`): the line 5 toward the target (`0x2f7018`) meeting the player's ship (0x0fbf)
+/// shakes the camera (0.05 for 30 ticks, `0x1b9660`) and hits the ship for 1 (`0x37bef0`, crate::ship's hits); the
+/// gun ready again in 4 ticks. Not ported: its three flame puffs (`0x348378` from its joint 0, 0.58 a tick toward
+/// the target).
+fn flame(w: &mut MobyWorld, id: usize, t: usize, ctx: &mut Ctx) {
+    let from = w.mobys[id].pos;
+    let to = add(from, set_len(sub(w.mobys[t].pos, from), 5.0));
+    let hit = ctx.coll.and_then(|c| crate::collision::coll_line_m(c, ctx.scene, from, to, crate::collision::QueryFlags(0), Some(id)));
+    if let Some(s) = hit.and_then(|h| h.moby).filter(|&s| w.mobys.get(s).is_some_and(|m| m.o_class == crate::ship::SHIP_CLASS)) {
+        ctx.game.shakes.ask(0, 0.05, 30);
+        let n = w.mobys[s].pv_i(crate::ship::HITS) + 1;
+        w.mobys[s].set_pv_i(crate::ship::HITS, n);
+    }
+    let sp = spec(w.mobys[id].o_class);
+    w.mobys[id].set_pv_i(sp.gun, sp.wait);
 }
 
 /// `0x3769a0` / `0x3767e8`: the attack's start (not in the quiet, of the tick's leading group, not attacking, fewer
 /// than 4 (`0x221820`) attacking, not in a formation or out of a no-fly volume): a gunship takes the circling one
 /// (kind 5: → 7) while none of its group's last attack was one (`0x377f20`), else → 4, for 120..500 ticks. A run
 /// (→ 4) of a ship with its own target (`+0x11c`) takes an offset in the target's frame: ±1 across and ±1 up.
-fn maybe_attack(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+pub(crate) fn maybe_attack(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if passive(w) { return; }
     if target(w, id).is_none() || ai_i(w, id, a::ATTACKING) == 1 || matches!(ai_i(w, id, a::STATE), 3 | 0xd) { return; }
     let attacking = w.mobys.iter().filter(|m| is_ai(m.o_class) && m.state < 0x80 && m.pv_i(AI + a::ATTACKING) == 1).count();
@@ -607,6 +777,30 @@ pub fn next_wave(w: &mut MobyWorld, at: V3, goal: V3) {
     }
 }
 
+/// `0x376068(m, 1)` (L05 `0x37c130`) on a ship put away: shown and drawn from anywhere, its health back, the AI block
+/// cleared, active, wandering from where it is.
+pub(crate) fn activate(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    {
+        let m = &mut w.mobys[id];
+        m.mode &= !3;
+        m.update_dist = 0xff;
+        m.draw_dist = 0x1ff;
+        m.has_collision = true;
+        let h = spec(m.o_class).health;
+        m.set_pv_f(HEALTH, h);
+    }
+    for o in (0..0x160).step_by(4) { set_ai_i(w, id, o, 0); }
+    set_ai_i(w, id, a::ACTIVE, 1);
+    set_ai_i(w, id, a::STATE, 1);
+    set_ai_i(w, id, a::KIND, 1);
+    take_own_target(w, id);
+    wander_goal(w, id, ctx);
+    w.changed = true;
+}
+
+/// The goal again from where it is now (`0x3783a0`, L05 `0x37e480`).
+pub(crate) fn wander(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) { wander_goal(w, id, ctx) }
+
 /// The return: active again (`0x376068`), shown, its health back, within 10 of the gathering point, its goal within 10
 /// of the wave's.
 fn revive(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
@@ -639,22 +833,14 @@ pub fn update_fighter(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].pv_i(STARTED) == 0 { return start(w, id, ctx); }
     if w.mobys[id].pv_i(REVIVE) != 0 { revive(w, id, ctx); }
     if ai_i(w, id, a::ACTIVE) != 1 { return; }
+    let sp = spec(w.mobys[id].o_class);
     think(w, id, ctx);
-    hits(w, id, ctx);
-    if ai_i(w, id, a::ACTIVE) != 1 {
-        let h = w.mobys[id].pv_i(ENGINE) - 1;
-        if 0 <= h { ctx.host.stop_sound(h); w.mobys[id].set_pv_i(ENGINE, 0); }
-        return;
+    // The death's sound (`0x376650(m, 0, 0, 0) == 1`: the fighter's `0x36cc38(1, 0, m, 0x957)`).
+    if hits(w, id, ctx) {
+        if let Some((c, i)) = sp.death { ctx.host.play_sound_of(&w.mobys[id], c, i, 0); }
     }
-    // The engine's loop (`0x36cc38(3, 6, m, 0x957)` / `(1, 6, m, 0x97c)`, `+0x1bc` / `+0x2f0`).
-    let h = w.mobys[id].pv_i(ENGINE) - 1;
-    // Asked only within hearing (64: the sound layer drops the farther ones anyway).
-    let near = dist(w.mobys[id].pos, ctx.host.camera_pos()) < 64.0;
-    if near && (h < 0 || !ctx.host.sound_playing(h)) {
-        let (c, i) = if w.mobys[id].o_class == GUNSHIP { (GUNSHIP, 1) } else { (FIGHTER, 3) };
-        let n = ctx.host.play_sound_of(&w.mobys[id], c, i, 4);
-        w.mobys[id].set_pv_i(ENGINE, n + 1);
-    }
+    if ai_i(w, id, a::ACTIVE) != 1 { return stop_engine(w, id, ctx); }
+    engine(w, id, ctx);
     range(w, id, ctx);
     take_own_target(w, id);
     flyby(w, id, ctx);
@@ -664,24 +850,44 @@ pub fn update_fighter(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.rebuild(id, &*ctx.host);
 }
 
-/// `0x3ca6c0` (the fighter, while its sphere is on screen: `0x302b78`) / `0x3cbc40` (the gunship, its two engines):
-/// not in a scene, from the nozzle (the fighter's 0.3 behind it; the gunship's 0.21 behind, ±0.061 across, 0.045 up,
-/// in its frame) jittered ±0.1 (`0x333500`), three puffs (crate::particles::exhaust, each from its own jitter of the
-/// nozzle) moving back 0.4·(30..40)/60 a tick in its frame.
-fn exhaust(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
+/// The engine's loop gone (the ship put away).
+pub(crate) fn stop_engine(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let h = w.mobys[id].pv_i(ENGINE) - 1;
+    if 0 <= h { ctx.host.stop_sound(h); w.mobys[id].set_pv_i(ENGINE, 0); }
+}
+
+/// The engine's loop (`0x36cc38(3, 6, m, 0x957)` / `(1, 6, m, 0x97c)`, `+0x1bc` / `+0x2f0`; the class's), started
+/// again whenever it is not playing.
+pub(crate) fn engine(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let Some((c, i)) = spec(w.mobys[id].o_class).engine else { return };
+    let h = w.mobys[id].pv_i(ENGINE) - 1;
+    // Asked only within hearing (64: the sound layer drops the farther ones anyway).
+    let near = dist(w.mobys[id].pos, ctx.host.camera_pos()) < 64.0;
+    if near && (h < 0 || !ctx.host.sound_playing(h)) {
+        let n = ctx.host.play_sound_of(&w.mobys[id], c, i, 4);
+        w.mobys[id].set_pv_i(ENGINE, n + 1);
+    }
+}
+
+/// `0x3ca6c0` (the fighter, while its sphere is on screen: `0x302b78`) / `0x3cbc40` (the gunship, its two engines),
+/// and the other levels' (their [`Spec`]): not in a scene, from the nozzle (the fighter's 0.3 behind it; the
+/// gunship's 0.21 behind, ±0.061 across, 0.045 up, in its frame) jittered ±0.1 (`0x333500`), three puffs
+/// (crate::particles::exhaust, each from its own jitter of the nozzle) moving back 0.4·(30..40)/60 a tick in its frame.
+pub(crate) fn exhaust(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
     if ctx.game.scenes.mode == crate::scene::SCENE { return; }
     let m = &w.mobys[id];
-    let gunship = m.o_class == GUNSHIP;
-    if !gunship && !in_view(ctx, m.pos, radius(w, id)) { return; }
+    let sp = spec(m.o_class);
+    if sp.exhaust_on_screen && !in_view(ctx, m.pos, radius(w, id)) { return; }
     let Some(sys) = ctx.parts.as_deref_mut() else { return };
-    let (nozzles, first): (&[V3], usize) = if gunship { (&[[-0.21, 0.061, 0.045], [-0.21, -0.061, 0.045]], 3) } else { (&[[-0.3, 0.0, 0.0]], 0) };
+    let (nozzles, first) = (sp.nozzles, sp.desc);
     let jitter = |g: &mut crate::rng::Rng, p: V3| [p[0] + g.randf(-0.1, 0.1), p[1] + g.randf(-0.1, 0.1), p[2] + g.randf(-0.1, 0.1)];
     for &n in nozzles {
         let base = add(m.pos, in_frame(m.rows, n));
         for k in 0..3 {
             let g = &mut ctx.game.rng;
             let at = jitter(g, base);
-            let vel = [-(g.randf(30.0, 40.0) / 60.0) * 0.4, 0.0, 0.0];
+            let (lo, hi, k_back) = sp.puff;
+            let vel = [-(g.randf(lo, hi) / 60.0) * k_back, 0.0, 0.0];
             crate::particles::exhaust(sys, g, m, id, at, vel, first + k);
         }
     }
@@ -689,13 +895,13 @@ fn exhaust(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// The class code's fly-by: within 10 of its own target, its sound (`+0x1c0` / `+0x2f4`) not playing, one chance in
 /// 400 (the gunship 750) a tick: the ship's sound 0xe (`0x36cc38(0xe, 0, m, 0xfbf)`).
-fn flyby(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+pub(crate) fn flyby(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let Some(t) = own_target(w, id) else { return };
     if 10.0 <= dist(w.mobys[t].pos, w.mobys[id].pos) { return; }
     let h = w.mobys[id].pv_i(FLYBY) - 1;
     if 0 <= h && ctx.host.sound_playing(h) { return; }
     let odds = spec(w.mobys[id].o_class).flyby;
-    if ctx.game.rng.randi(odds) != 0 { return; }
+    if odds == 0 || ctx.game.rng.randi(odds) != 0 { return; }
     let n = ctx.host.play_sound_of(&w.mobys[id], crate::ship::SHIP_CLASS, 0xe, 0);
     w.mobys[id].set_pv_i(FLYBY, n + 1);
 }
