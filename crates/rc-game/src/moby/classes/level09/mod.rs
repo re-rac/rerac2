@@ -3,6 +3,7 @@
 //! after its own.
 
 pub mod breakables;
+pub mod flyer;
 pub mod props;
 pub mod trooper;
 pub mod waker;
@@ -27,6 +28,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         trooper::GUN_CLASS => Some(super::level12::debris::update_0d66),
         super::level12::shot::CLASS => Some(super::level12::shot::update_03a6),
         waker::CLASS => Some(waker::update_0de0),
+        flyer::CLASS => Some(flyer::update_0d57),
         _ => None,
     }
 }
