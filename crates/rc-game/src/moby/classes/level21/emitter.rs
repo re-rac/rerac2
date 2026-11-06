@@ -10,7 +10,7 @@
 //!
 //! * **0** (set-up): the most made at least 0, the least within 0..most; the timer `0x3221c8(least, most)` (L00
 //!   `0x31b9e0`, crate::rng::Rng::rand_range); then 1.
-//! * **1**: Ratchet in its cuboid (`0x327920` = L00 `0x32a848`, crate::level::LevelData::in_area): the prompt 0x1338
+//! * **1**: Ratchet in its cuboid (`0x327920` = L00 `0x321858`, crate::level::LevelData::in_cuboid): the prompt 0x1338
 //!   held (`0x32c268(1, 0x1338, 1)` = L00 `0x327ae0`, crate::prompt::Prompt::force).
 //! * **Each tick**: the timer down by 1; when it was 0, the bounds kept again (the least within 0..most), the timer
 //!   drawn anew and a sprite (`0x33fa68` = L00 `0x33ef78`, crate::particles::sprite) at its place, given ALPHA 0xff
@@ -59,7 +59,7 @@ pub fn update_1317(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         1 => {
             let c = w.mobys[id].pv_i(CUBOID);
-            if c != -1 && ctx.level.in_area(c, ctx.hero.pos) { ctx.game.prompt.force(1, 0x1338, 1); }
+            if c != -1 && ctx.level.in_cuboid(c, ctx.hero.pos) { ctx.game.prompt.force(1, 0x1338, 1); }
         }
         _ => {}
     }
