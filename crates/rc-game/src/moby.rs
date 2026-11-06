@@ -523,6 +523,13 @@ pub trait MobyHost {
     /// `0x1a63cc = id` when the dialogue is free (crate::audio::speech); whether it was taken (without the audio
     /// always, as if said).
     fn request_speech(&mut self, _id: i32) -> bool { true }
+    /// The line asked for started and waits for its owner's go (`0x1a641a` = 3, its id `0x1a6414` below 6000;
+    /// crate::audio::speech); without the audio always.
+    fn speech_held(&self) -> bool { true }
+    /// `0x2b6d28`: the held line let go (`0x1a641a` = 4).
+    fn speech_go(&mut self) {}
+    /// `0x1a641a = 5`: the line playing stopped.
+    fn speech_stop(&mut self) {}
 }
 
 /// The level's mobys (`0x1b1e1c`, 0x100 bytes each) with the class table and the collision grid.

@@ -2,13 +2,13 @@
 //! the L00 ones the port knows them by where they differ). Each class's update is registered in [`update_for`] and
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
 //!
+//! The seller of planet 7's coordinates 0x0ccf: [`host`].
+//!
 //! Not ported (level 6's other classes):
 //! * Waiting on a missing system (docs/plan/gaps.md): 0x0fc1 (`0x458888`) and 0x0fc0 (`0x458718`), effect-quad
 //!   trails (G-REN-004); the vent 0x0feb (`0x45da00`, particle type 0x53 `0x37fae8`) and 0x0fb2 / 0x0fd6 / 0x0fce /
 //!   0x0fcf / 0x0fe4 (`0x4581c8`) (G-PRT-001); 0x0eb1 (`0x451ad0`, items, G-WPN-002); 0x0bc7 (`0x422070`) and 0x0fe6
 //!   (`0x45bbc8`), the line test (G-CLS-005); the core 0x0fc2 (`0x458a00`), its beams (class 0x13ba, G-REN-019).
-//! * The challenge host 0x0ccf (`0x4318a0`): its talk (speech 0x1320 / 0x1321, the scene `0x3b3068`, the help
-//!   messages 0x4a / 0x4b / 0x4c, the bolt counts `0x295950` / `0x295954`; the dialogue system, G-UI-010).
 //! * Ratchet's: the ferry 0x0330 (`0x3e5460`, L11 `0x3b7340`: a ride on paths with its own controls), 0x0947
 //!   (`0x404c60`: a swimmer that grabs Ratchet in the water, his state 0x12, and throws him out, his state 0x6f
 //!   `0x2f96e8`), 0x0b57 (`0x41b200`, Ratchet's state 0x37 and the level's scene functions `0x479xxx`).
@@ -25,6 +25,7 @@ pub mod brawler;
 pub mod breakables;
 pub mod gate;
 pub mod glowbug;
+pub mod host;
 pub mod lifts;
 pub mod pole;
 pub mod props;
@@ -76,6 +77,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         gate::CLASS => Some(gate::update_031a),
         0x0307 => Some(pole::update_0307),
         barrel::CLASS => Some(barrel::update_08b8),
+        host::CLASS => Some(host::update_0ccf),
         _ => None,
     }
 }

@@ -478,6 +478,16 @@ impl MobyHost for Host<'_> {
         taken
     }
 
+    fn speech_held(&self) -> bool { self.sound.as_ref().is_none_or(|s| s.system.speech_held()) }
+
+    fn speech_go(&mut self) {
+        if let Some(s) = self.sound.as_mut() { s.system.speech_go(); }
+    }
+
+    fn speech_stop(&mut self) {
+        if let Some(s) = self.sound.as_mut() { s.system.speech_stop(); }
+    }
+
     fn seq_frames(&self, m: &Moby, seq: u8) -> Option<u8> {
         let (class, _, _) = self.state_of(m)?;
         self.lv.anim.get(class)?.sequences.get(seq as usize)?.as_ref().map(|q| q.header.frame_count)

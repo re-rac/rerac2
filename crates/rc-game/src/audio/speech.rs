@@ -8,6 +8,14 @@
 //! track table (crate::audio::music::MusicTrack::table) — 2000..2999 stream id − 2000 plus the language's offset
 //! (`0x1a7bbc`: English 0), 3000..3999 stream id − 3000 — played alone in group 2.
 //!
+//! **The player's state** (`0x1a63a8`: `+0x24` the request `0x1a63cc`, `+0x28` its flags, `+0x68` the line playing
+//! `0x1a6410`, `+0x6c` its id `0x1a6414`, `+0x72` the state `0x1a641a`): a started line waits in state 3 for its owner's
+//! go, `0x2b6d28` (L02 `0x3354e0`, L21 `0x32f3b8`: with a line in state 3 the stream let go, `0x133400`, and state 4);
+//! state 5 asks for the line's stop (6 / 7 already stopping). The port starts a line at once, so the held state is
+//! only the flag its owner waits on ([`AudioSystem::speech_held`], [`AudioSystem::speech_go`]); the museum's
+//! commentary 0x130e (crate::moby::classes::level21::commentary) is the one owner that waits on it, and stops a line
+//! ([`AudioSystem::speech_stop`]).
+//!
 //! Not ported: the other ranges of `0x335110` (below 2000 the scenes' table `0x151858` and `0x14db68`, 4000.. the
 //! space tables `0xb038` / `0x14fed0`, 6000.. `0x1481a0`), the sound slot it takes for the line's place (a line
 //! without an owner sits at the listener, 2-D) and its stereo second stream, the other languages' offset, the line
@@ -24,7 +32,21 @@ impl AudioSystem {
     pub fn request_speech(&mut self, id: i32) -> bool {
         if !self.speech_free() { return false; }
         self.speech_req = Some(id);
+        self.speech_held = false;
         true
+    }
+
+    /// The line asked for started and waits for its owner's go (`0x1a641a` = 3; the line's id `0x1a6414` below 6000,
+    /// as every line the port plays is).
+    pub fn speech_held(&self) -> bool { self.speech_held }
+
+    /// `0x2b6d28`: a held line let go (state 4); whether one was held.
+    pub fn speech_go(&mut self) -> bool { std::mem::take(&mut self.speech_held) }
+
+    /// `0x1a641a = 5`: the line playing stopped.
+    pub fn speech_stop(&mut self) {
+        self.speech_held = false;
+        self.stop_speech();
     }
 
     /// music_Update's dialogue step (`0x335da0`): the request starts once the player is idle; a line still playing is
@@ -37,6 +59,7 @@ impl AudioSystem {
         }
         self.speech_req = None;
         self.start_dialogue(id);
+        self.speech_held = true;
     }
 
     /// `0x335110(id, 0, 0, 0x400)` for the track table's ranges (module docs).

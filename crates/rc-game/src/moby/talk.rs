@@ -34,11 +34,15 @@
 //!   L08 `0x436ff8` = L19 `0x42aec0`, 2.3): in a scene with cheat byte 0, the level's one head node (`0x1b2510`, L08
 //!   `0x1b22e0`) hung on joint list 0 of the first scene actor of the NPC's class (`0x312f80`), at the scale.
 //!
+//! The consumers: L04 crate::moby::classes::level04::talkers (0x0c38, 0x0d3e, 0x0da8), L06
+//! crate::moby::classes::level06::host (0x0ccf), L08 level08::buyer, L09 level09::talker, L11 level11::sellers
+//! (0x0e95, 0x0b7c), L17 / L18 their sellers, Oozla's 0x0ace (crate::moby::classes::oozla::update_0ace).
+//!
 //! Not ported: the talk record (`0x3259b0` → `0x325980(0x3259d8(m))`, G-CLS-008: the moby's place in the level's
 //! talk list `0x1c5d20` from `0x28ead0[level]`, its record `0x139a34 + 0x10·i` set to 1; the missions' kinds 4 / 5 read
-//! it and are not ported either); the level's "NPC busy" word each sets while its scene plays (L08 `0x1b2728`, L09
-//! `0x1b2528`, L17 `0x1b2968`, L18 `0x1b24e8`; read by L00 `0x2fa968`, `0x30df80`, `0x30e200`, none ported); the
-//! autosave after a sale (`0x30d658(0, −1)`, as everywhere in the port).
+//! it and are not ported either); the level's "NPC busy" word each sets while its scene plays (L04 `0x1b2228`, L06
+//! `0x1b2568`, L08 `0x1b2728`, L09 `0x1b2528`, L11 `0x1b3368`, L17 `0x1b2968`, L18 `0x1b24e8`; read by L00 `0x2fa968`,
+//! `0x30df80`, `0x30e200`, none ported); the autosave after a sale (`0x30d658(0, −1)`, as everywhere in the port).
 
 use super::{countdown, joint_aim, Ctx, MobyWorld};
 use crate::hero::physics::{add, add_rot, atan2, dist, dist2, len, len2, rot_dist, sub, sub_rot, V3};
@@ -49,6 +53,9 @@ pub struct Mem {
     /// L09 `$gp+0x2570` (`0x1b1560`): Dobbo's 0x0e5e has asked for its arrival scene 0x66 this visit, or will not
     /// (crate::moby::classes::level09::talker).
     pub arrival_done: bool,
+    /// L21 `$gp−0x3b0` (`0x1aec40`): the museum's commentary kinds heard, a bit each (cleared by its set-up;
+    /// crate::moby::classes::level21::commentary).
+    pub museum_heard: i32,
 }
 
 /// A moby index in the pvars at `off` (as the level data gives them: −1 none).
@@ -167,13 +174,18 @@ const REACH: f32 = 6.0;
 const DEG: f32 = 0.017_453_294;
 
 /// The idle (module docs). Not in state 0.
-pub fn idle(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, l: &Layout) {
+pub fn idle(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, l: &Layout) { idle_on(w, id, ctx, l, Timer::Half(l.idle)) }
+
+/// [`idle`] with its idle timer a word (L04's 0x0c38 / 0x0da8: `+0x11c`, `0x30f6e8`).
+pub fn idle_word(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, l: &Layout) { idle_on(w, id, ctx, l, Timer::Word(l.idle)) }
+
+fn idle_on(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, l: &Layout, timer: Timer) {
     use crate::moby::classes::props::{seq, wrapped};
     if w.mobys[id].state == 0 { return; }
     let s = seq(w, id, ctx);
-    if s == l.look_seq && Timer::Half(l.idle).run(w, id) {
+    if s == l.look_seq && timer.run(w, id) {
         let t = ctx.game.rng.randf(1200.0, 2400.0) as i32;
-        w.mobys[id].set_pv_s(l.idle, t as i16);
+        timer.set(w, id, t);
         if let Some(f) = l.fidget { if s != f { ctx.host.set_anim(&w.mobys[id], f, 0, 10); } }
     } else if wrapped(w, id, ctx) && s != l.look_seq {
         ctx.host.set_anim(&w.mobys[id], l.look_seq, 0, 10);
@@ -181,12 +193,16 @@ pub fn idle(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, l: &Layout) {
 }
 
 /// The look (module docs): the asks set while it is in its looking sequence, then both aims.
-pub fn look(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, l: &Layout) {
+pub fn look(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, l: &Layout) { look_with(w, id, ctx, l, true, true) }
+
+/// [`look`] with the pitch's ask left alone (`pitch_ask` false: L04's 0x0c38 works it out but never stores it) or no
+/// asks at all (`track` false: L04's 0x0d3e before its first scene), the aims still run.
+pub fn look_with(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, l: &Layout, pitch_ask: bool, track: bool) {
     use std::f32::consts::FRAC_PI_2;
     const POINT: usize = 0x100;
     const HEAD_SCALE: usize = 0x70;
     let mut speed = f32::from_bits(0x3ca3_d70a);
-    if crate::moby::classes::props::seq(w, id, ctx) == l.look_seq {
+    if track && crate::moby::classes::props::seq(w, id, ctx) == l.look_seq {
         let (pos, yaw) = (w.mobys[id].pos, w.mobys[id].rot[2]);
         let hero = ctx.hero.pos;
         let centre = [hero[0], hero[1], hero[2] + 1.0];
@@ -214,7 +230,7 @@ pub fn look(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, l: &Layout) {
         let turn = sub_rot(atan2(d[0], d[1]), yaw).clamp(-lim, lim);
         let pitch = (-atan2(len2(d), d[2])).clamp(-l.pitch, l.pitch);
         let m = &mut w.mobys[id];
-        m.set_pv_f(joint_aim::ASK + 4, pitch);
+        if pitch_ask { m.set_pv_f(joint_aim::ASK + 4, pitch); }
         m.set_pv_f(joint_aim::ASK + 8, turn * 0.6);
         m.set_pv_f(0x80 + joint_aim::ASK + 8, turn * 0.4);
     }

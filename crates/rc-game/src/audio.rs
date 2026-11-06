@@ -530,6 +530,9 @@ pub struct AudioSystem {
     pub(crate) checkpoint_track: Option<i16>,
     /// The dialogue request `0x1a63cc` (L02; None: −1), [`speech`].
     pub(crate) speech_req: Option<i32>,
+    /// The line started and held for its owner's go (`0x1a641a` = 3; [`speech`]): set when a request starts, cleared
+    /// by the go (`0x2b6d28`), a stop or the next request.
+    pub(crate) speech_held: bool,
     started: bool,
     /// The level start's `music_start_track(0, 1, 0x400)` done ([`AudioSystem::level_music_start`]).
     music_started: bool,
@@ -579,6 +582,7 @@ impl AudioSystem {
             underwater: false,
             checkpoint_track: None,
             speech_req: None,
+            speech_held: false,
             started: false,
             music_started: false,
             snd_cmds: Vec::new(),

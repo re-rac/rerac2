@@ -2,11 +2,12 @@
 //! the L00 ones the port knows them by where they differ). Each class's update is registered in [`update_for`] and
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
 //!
+//! The talking NPCs 0x0c38, 0x0d3e and 0x0da8: [`talkers`].
+//!
 //! Not ported yet (level 4's own list; docs/plan/gaps.md has the systems):
 //! * **0x0bbc** (`0x41b020`, Ratchet's hoverbike), **0x0474** / **0x0cef** (`0x3c9760`, its flames), **0x0b2d** (`0x405aa0`, the
 //!   racers): the hoverbike race (G-LVL-010).
 //! * **0x0960** (`0x3e9320`): a liquid surface's grid and ripples (G-REN-009).
-//! * **0x0c38** (`0x424978`), **0x0d3e** (`0x4362f0`), **0x0da8** (`0x43b090`): NPCs on the talk prompt (G-UI-010).
 //! * **0x0c26** (`0x423a38`): the level's help-text controller (help texts 0x9b5..0x9de and 0xa3c on its cuboids,
 //!   over many of Ratchet's and the game's words not yet named).
 //! * **0x02f8** (`0x3c4f80`), **0x0b37** (`0x4084c0`), **0x0b54** (`0x409440`): draw-callback effects (strips and
@@ -23,6 +24,7 @@ pub mod misc;
 pub mod platforms;
 pub mod rider;
 pub mod skitter;
+pub mod talkers;
 pub mod tie_wave;
 
 /// This level's class updates.
@@ -57,6 +59,9 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x09eb => Some(platforms::update_09eb),
         0x09ea => Some(platforms::update_09ea),
         0x09bd => Some(platforms::update_09bd),
+        talkers::PLANET_GIVER => Some(talkers::update_0c38),
+        talkers::SELLER => Some(talkers::update_0d3e),
+        talkers::TALKER => Some(talkers::update_0da8),
         _ => None,
     }
 }

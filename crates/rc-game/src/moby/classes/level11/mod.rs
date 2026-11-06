@@ -7,6 +7,7 @@
 //! * [`critters`]: the birds 0x1105.
 //! * [`stalks`]: the sparked stalks 0x10ea / 0x118c.
 //! * [`props`]: the small objects (the Hacker's gate, the help texts, the sparks, ...).
+//! * [`sellers`]: the talking NPCs 0x0e95 (item 8's seller) and 0x0b7c (the Charge Boots).
 //!
 //! Not ported (2026-11-03):
 //! * **Joba's arena** (the level's chunk 1): its master 0x0d8a (`0x43f9e0`), spawners 0x0c7f (`0x4184e0`), fighters
@@ -17,13 +18,12 @@
 //!   carrier 0x0e86 (`0x462db0`, 3; it makes a 0x0cf6): big classes still to do (the wave floor wakes them,
 //!   movers::update_0b6b; their deaths make skill point 0x12, props::update_12c7).
 //! * The turret 0x0c20 (`0x4134b0`, 4): Ratchet mounted on it (its own camera and shots, `0x489c70..0x48a068`).
-//! * The sellers 0x0e95 (`0x463368`, item 8) and 0x0b7c (`0x3f9a50`, the Charge Boots): Oozla's 0x0ace again, but
-//!   their start reads flag words past the scene bits (`0x1397d0`, `0x1397d8`), G-TRI-006.
 
 pub mod beams;
 pub mod critters;
 pub mod movers;
 pub mod props;
+pub mod sellers;
 pub mod stalks;
 
 use crate::hero::physics::V3;
@@ -77,6 +77,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x10ea | 0x118c => Some(stalks::update),
         0x0ee0 => Some(beams::update),
         0x0e49 => Some(props::update_0e49),
+        sellers::SELLER => Some(sellers::update_0e95),
+        sellers::BOOTS => Some(sellers::update_0b7c),
         _ => None,
     }
 }
