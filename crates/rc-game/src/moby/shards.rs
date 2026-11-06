@@ -26,7 +26,7 @@
 //!
 //! The contacts test the level's mesh with the port's segment query, as `0x2e2248` tests the triangles `0x2df8d8`
 //! gathers. Mode 0 ([`spawn_whole`]) throws the whole moby. Mode 3 ([`whole_ball`], [`ball_at`]) makes the
-//! whole moby a ball on a block of its own pvars. Not ported: the gravity frames (`0x1a8ff0`), the other modes (4 / 5),
+//! whole moby a ball on a block of its own pvars, or throws a new one as a ball ([`spawn_whole_ball`]). Not ported: the gravity frames (`0x1a8ff0`), the other modes (4 / 5),
 //! mode 1's segments on joints.
 
 use super::{mode, Ctx, MobyWorld};
@@ -148,11 +148,21 @@ pub fn spawn_ball(w: &mut MobyWorld, ctx: &mut Ctx, o_class: i16, src: Option<us
     spawn(w, ctx, o_class, src, pos, rot, None, spin, gravity, piece, vel, sound, 1)
 }
 
+/// [`spawn_shard`] in mode 3 (`0x2dbff8`'s, as the Snivelak enemies' wrecks 0x0ecb: L16 `0x2d5088(…, 3, 0x0ecb, 0,
+/// …)`): the whole moby (every piece drawn) a ball about the bounding sphere of its sequence (its pivot and radius, as
+/// mode 0's); no points; it ticks as mode 1 does.
+#[allow(clippy::too_many_arguments)]
+pub fn spawn_whole_ball(w: &mut MobyWorld, ctx: &mut Ctx, o_class: i16, src: Option<usize>, pos: V3, rot: V3, spin: f32, gravity: f32, vel: V3, sound: u8) -> Option<usize> {
+    spawn(w, ctx, o_class, src, pos, rot, None, spin, gravity, 0, vel, sound, 3)
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, o_class: i16, src: Option<usize>, pos: V3, rot: V3, rows: Option<[V3; 3]>, spin: f32, gravity: f32, piece: u8, vel: V3, sound: u8, body: u8) -> Option<usize> {
     let info = w.class(o_class)?;
     let class_scale = info.scale;
-    let (centre, n, radius) = if body == 0 {
+    let (centre, n, radius) = if body == 3 {
+        ([0.0; 3], 0, 0.0)
+    } else if body == 0 {
         // Set from the sphere once the moby exists.
         ([0.0; 3], info.coll_points.len(), 0.0)
     } else if body == 1 {
@@ -202,9 +212,10 @@ pub(crate) fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, o_class: i16, src: Option<
     m.pvars[COUNT] = 0;
     m.pvars[MODE] = body;
     m.pvars[SOUND] = sound;
-    m.piece = (body != 0).then_some(piece);
-    // The pivot: the piece's centre in the moby's frame (`0x311cf0`, then `0x326248`); mode 0 its sequence's sphere.
-    let (centre, radius) = if body == 0 {
+    m.piece = (body == 1 || body == 2).then_some(piece);
+    // The pivot: the piece's centre in the moby's frame (`0x311cf0`, then `0x326248`); modes 0 and 3 its sequence's
+    // sphere.
+    let (centre, radius) = if body == 0 || body == 3 {
         ctx.host.sequence_sphere(&w.mobys[id]).map_or(([0.0; 3], 0.0), |s| ([s[0], s[1], s[2]], s[3]))
     } else {
         (centre, radius)

@@ -1311,6 +1311,20 @@ pub fn turn_to(m: &mut Moby, yaw: f32, k: f32, d: f32, max: f32, v_off: usize) {
     m.rot[2] = add_rot(m.rot[2], v);
 }
 
+/// `0x323560(m, yaw)` (L01; L12 `0x331bf0`, L16 `0x325d08`, L19 `0x32aa68`): the facing eased toward `yaw` at the
+/// movement block's turn limits (`+0x14` accel, `+0x18` brake, `+0x1c` most; its turn speed `+0xb4`, `0x31f230`).
+/// False without the block.
+pub fn face(m: &mut Moby, yaw: f32) -> bool {
+    if m.pv_i(0x18) == 0 { return false; }
+    let o = mv(m);
+    let (a, b, most) = (m.pv_f(o + 0x14), m.pv_f(o + 0x18), m.pv_f(o + 0x1c));
+    let (mut r, mut v) = (m.rot[2], m.pv_f(o + 0xb4));
+    turn_ease(yaw, a, b, most, &mut r, &mut v, 0);
+    m.rot[2] = r;
+    m.set_pv_f(o + 0xb4, v);
+    true
+}
+
 /// `0x31ec88(k, d, max, &p, target, &v)`: `p` springs toward `target` along the line between them ([`spring_vel`]
 /// on the distance), landing on it within `0.01·max`. Returns the distance left.
 pub fn spring_to(p: &mut V3, target: V3, k: f32, d: f32, max: f32, v: &mut f32) -> f32 {

@@ -92,12 +92,48 @@ pub fn smoke_burst(w: &mut MobyWorld, ctx: &mut Ctx, size: f32, light: f32, src:
     }
 }
 
+/// A blast's colours: the two flash sprites and the pairs after them, the three sets of blast sprites and the
+/// orange set's halo, the flash ball and the puffs.
+#[derive(Clone, Copy, Debug)]
+pub struct Palette {
+    pub flashes: [u32; 3],
+    pub bursts: [u32; 3],
+    pub halo: u32,
+    pub ball: [u8; 3],
+    pub puff: u32,
+}
+
+/// L00's (`0x3f8a70`, the 0x13a0 moby's).
+pub const ORANGE: Palette = Palette { flashes: [0x38_8ef7, 0x63f7, 0x38_8ef7], bursts: [0x40_7fff, 0x8fff, 0x30_64ff], halo: 0x20ff, ball: [0xff, 0, 0], puff: 0x7f60_a0ff };
+
+/// Snivelak's level copy (L16 `0x4074a8` → `0x407978`, its moby class 0x0ec1; L23 / L30 share it): the same blast
+/// in green — the Snivelak enemies' deaths and their shots' ends ([`burst_green`]).
+pub const GREEN: Palette = Palette { flashes: [0x38_8ef7, 0x14_f700, 0x38_f738], bursts: [0xff_7f40, 0x20_ff00, 0x64_ff30], halo: 0x20_ff00, ball: [0, 0, 0xff], puff: 0x7f20_ff60 };
+
+/// L13's level copy (L13 `0x413bc8` → `0x414098`, its moby class 0x0eae; L14 / L16 `0x402698` / L30 share it): the
+/// same blast in blue ([`burst_blue`]).
+pub const BLUE: Palette = Palette { flashes: [0x38_8ef7, 0xf7_6300, 0xf7_8e38], bursts: [0xff_7f40, 0xff_8f00, 0xff_6430], halo: 0xff_2000, ball: [0, 0, 0xff], puff: 0x7fff_a060 };
+
 /// `0x3f8348` → `0x3f8a70`: a blast at `at` (crate docs).
 pub fn burst(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, b: &Blast) { burst_shaking(w, ctx, at, b, 0x28) }
 
+/// L16 `0x402698` (L13 `0x413bc8`) → `0x402b68`: [`burst`] in the [`BLUE`] palette, its moby 0x0eae (update
+/// `0x402990`) as [`burst_green`]'s.
+pub fn burst_blue(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, b: &Blast) { burst_in(w, ctx, at, b, 0x28, &BLUE) }
+
+/// L16 `0x4074a8(s, pos, shake, a, b, c, puffs, streaks, _, light, _)` → `0x407978`: [`burst`] in the [`GREEN`]
+/// palette. Its moby (0x0ec1, update `0x4077a0`: 60 ticks, then gone) only draws (`0x407808`, not ported, as the
+/// 0x13a0 moby's draws are not); its call of `0x320538` (L16 `0x319e50`: `near` 9, light 20·s, lod −1) makes
+/// nothing, as L00's.
+pub fn burst_green(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, b: &Blast) { burst_in(w, ctx, at, b, 0x28, &GREEN) }
+
 /// [`burst`] with the shake lasting `shake_ticks`: the RYNO II's copy of the blast (L00 `0x415520` → `0x415a40`, its
 /// moby class 0x139c, crate::moby::classes::ryno) is the same but for its shake's 20 ticks (and no `k`).
-pub fn burst_shaking(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, b: &Blast, shake_ticks: i32) {
+pub fn burst_shaking(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, b: &Blast, shake_ticks: i32) { burst_in(w, ctx, at, b, shake_ticks, &ORANGE) }
+
+/// [`burst_shaking`] in the colours `p`.
+pub fn burst_in(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, b: &Blast, shake_ticks: i32, p: &Palette) {
+    let (halo, puff) = (p.halo, p.puff);
     let cam = ctx.host.camera_pos();
     let s = b.size;
     // `0x3f8348`: in view (`0x2f0080(128, (at, 3·s))`) within 48 of the camera (`0x2ef018`), the shake when asked.
@@ -111,14 +147,14 @@ pub fn burst_shaking(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, b: &Blast, shake_
     if let Some(sys) = ctx.parts.as_deref_mut() {
         let g = &mut ctx.game.rng;
         let (big, small) = (4.0 * s * 210_000.0, 3.0 * s * 210_000.0);
-        for (rgb, alpha, frame, n) in [(0x38_8ef7, 100, 0, 1), (0x63f7, 100, 0, 1), (0x38_8ef7, 0x7f, 5, 2), (0x38_8ef7, 0x7f, 6, 2)] {
+        for (rgb, alpha, frame, n) in [(p.flashes[0], 100, 0, 1), (p.flashes[1], 100, 0, 1), (p.flashes[2], 0x7f, 5, 2), (p.flashes[2], 0x7f, 6, 2)] {
             for _ in 0..n {
                 if let Some(i) = particles::sprite(sys, g, small, big, 0.0, at, [0.0; 3], 30, rgb, 0, alpha, 0, 0) {
                     sys.pool.recs[i][2] = sys.def_frame(0x5c, frame);
                 }
             }
         }
-        let sets = [(b.bursts[0], 0.6, 1.0, 0x40_7fff, 1), (b.bursts[1], 0.75, 1.5, 0x8fff, 5), (b.bursts[2], 0.6, 1.0, 0x30_64ff, 3)];
+        let sets = [(b.bursts[0], 0.6, 1.0, p.bursts[0], 1), (b.bursts[1], 0.75, 1.5, p.bursts[1], 5), (b.bursts[2], 0.6, 1.0, p.bursts[2], 3)];
         for (k, &(n, lo, hi, rgb, frame)) in sets.iter().enumerate() {
             for _ in 0..n {
                 let spin = g.randf_signed(2.0, 5.0) as i32;
@@ -131,7 +167,7 @@ pub fn burst_shaking(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, b: &Blast, shake_
                 let v = [a.cos() / 60.0 * speed, a.sin() / 60.0 * speed, up];
                 particles::burst(sys, g, size * 210_000.0, s * 2100.0, 0.004_05, p, v, life, rgb, spin as u8, 0x7f, 0x7f, frame);
                 if k == 0 {
-                    if let Some(i) = particles::burst(sys, g, size * 1_260_000.0, s * 4200.0, 0.004_05, p, v, life, 0x20ff, (spin * -2) as u8, 0x30, 0x30, 0) {
+                    if let Some(i) = particles::burst(sys, g, size * 1_260_000.0, s * 4200.0, 0.004_05, p, v, life, halo, (spin * -2) as u8, 0x30, 0x30, 0) {
                         sys.pool.recs[i][2] = sys.def_first(0x35);
                     }
                 }
@@ -147,7 +183,7 @@ pub fn burst_shaking(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, b: &Blast, shake_
     }
     // The flash, between the streaks and the puffs.
     if b.light {
-        super::classes::flash::spawn(w, ctx, s * 3.5, K, at, [0.0, 0.0, s * 0.133_333_34], FLASH_LIFE, [0xff, 0, 0], FLASH_ALPHA);
+        super::classes::flash::spawn(w, ctx, s * 3.5, K, at, [0.0, 0.0, s * 0.133_333_34], FLASH_LIFE, p.ball, FLASH_ALPHA);
     }
     let Some(sys) = ctx.parts.as_deref_mut() else { return };
     let g = &mut ctx.game.rng;
@@ -160,7 +196,7 @@ pub fn burst_shaking(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, b: &Blast, shake_
         let a = add_rot(yaw, g.randf_signed(0.0, 1.570_796_4));
         // `0x325100(r, a, pitch)`.
         let v = [a.cos() * r * pitch.cos(), a.sin() * r * pitch.cos(), pitch.sin() * r];
-        if let Some(i) = particles::puff(sys, g, 0.0, 1.0, 1.01, s * 315_000.0, p, side, v, 0x7f60_a0ff, 0) {
+        if let Some(i) = particles::puff(sys, g, 0.0, 1.0, 1.01, s * 315_000.0, p, side, v, puff, 0) {
             let life = g.rand_range(40, 70) as i16;
             let t = g.rand_range(1, 10) as f32;
             let r = &mut sys.pool.recs[i];

@@ -4,7 +4,9 @@
 
 pub mod bolts;
 pub mod breakables;
+pub mod copter;
 pub mod drawbridge;
+pub mod drone;
 pub mod movers;
 pub mod props;
 pub mod rocks;
@@ -22,6 +24,10 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         movers::FLIPPER => Some(movers::update_114c),
         rocks::ROCK => Some(rocks::update_0a80),
         rocks::FACE => Some(rocks::update_0e85),
+        copter::CLASS => Some(copter::update_0ebb),
+        copter::SHOT => Some(copter::update_0ebd),
+        drone::CLASS => Some(drone::update_0f35),
+        drone::SHOT => Some(drone::update_0f7a),
         _ => None,
     }
 }
