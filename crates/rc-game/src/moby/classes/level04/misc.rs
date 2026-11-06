@@ -1,16 +1,13 @@
 //! Level 4's small classes (L04 addresses; the copies on other levels noted per class).
 //!
 //! * **0x0969** (`0x3e9a40`, 16 placed), **0x0e1b** (`0x43cb58`, one) and level 11's **0x0e1c** (L11 `0x459b98`):
-//!   an empty update (`jr ra`), [`update_empty`].
+//!   an empty update (`jr ra`), crate::moby::classes::props::update_empty.
 //! * **0x1293** ([`update_1293`], `0x457ef8`, 12 placed; L20 `0x44aaf0`): a breakable.
 //! * **0x0a99** ([`update_0a99`], `0x3f76b8`, 13 placed; L11 `0x3df6f8`): a spinning beacon of three parts.
 //! * **0x0ab8** ([`update_0ab8`], `0x3fa730`, 6 placed; L11 `0x3e2770`): the beacon's glow alone.
 
 use crate::hero::physics::{add, add_rot, set_len, sub};
 use crate::moby::{countdown, Ctx, MobyWorld};
-
-/// An update that does nothing (`jr ra`).
-pub fn update_empty(_w: &mut MobyWorld, _id: usize, _ctx: &mut Ctx) {}
 
 /// 0x1293 (`0x457ef8`): **0** → 1. **1**: a hit with the flags 0x4010000 (`0x33f8d0`) while `+0x68`[0] = 0 breaks
 /// it (2); the hit record let go. **2**: the level's bolts (`0x3499a8` = L00 `0x327388`, crate::moby::bolts::level_drop,

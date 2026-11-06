@@ -35,7 +35,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         den::CLASS => Some(den::update_1177),
         frozen::CLASS => Some(frozen::update_0f57),
         floe::CLASS => Some(floe::update_0f4b),
-        floe::MOVER | floe::MOVER_B => Some(floe::update_0edb),
+        floe::MOVER | floe::MOVER_B | floe::SOUNDED => Some(floe::update_0edb),
         floe::RISER => Some(floe::update_1271),
         switches::CLEARER => Some(switches::update_1205),
         switches::SPINNER => Some(switches::update_11f4),
@@ -44,10 +44,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         director::TRADER => Some(director::update_1313),
         ride_cam::CLASS => Some(ride_cam::update_1258),
         // The hovership 0x0eef and the raritanium 0x099a (L19 `0x414848` / `0x3c1cc8`) are in level 8's list.
-        // The liquid lid 0x11fe (L19 `0x422c70`) is in level 8's list, the sinking pit 0x135f (L19 `0x383478`) in level
+        // The liquid lid 0x12b4 (L19 `0x422c70`) is crate::water::lid, the sinking pit 0x135f (L19 `0x383478`) in level
         // 14's.
-        // Level 8's lift 0x0aaa's code (L19 `0x41fcb8`).
-        0x1176 => Some(super::level08::lift::update_0aaa),
         // Level 20's fading field 0x119b's code (L19 `0x423750`).
         0x1204 => Some(super::level20::props::update_119b),
         _ => None,

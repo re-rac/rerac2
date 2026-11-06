@@ -39,7 +39,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         props::MOVER => Some(props::update_094d),
         props::PAD => Some(props::update_0efc),
         props::LAUNCH_PAD => Some(props::update_0e80),
-        0x0ccb => Some(super::level04::misc::update_empty),
         trooper::CLASS => Some(trooper::update_0d0f),
         trooper::TURRET_CLASS => Some(trooper::update_0d0e),
         // The troopers' guns and shots: the same code as Level 12's (`0x405c58` = L12 `0x400850`, `0x3a1538` = L12

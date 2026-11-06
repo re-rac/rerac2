@@ -110,6 +110,8 @@ pub mod mod_vendor;
 pub mod hacker_panel;
 pub mod sheep;
 pub mod sheepinator;
+#[cfg(test)]
+mod update_audit;
 
 use super::UpdateFn;
 
@@ -172,7 +174,8 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         seeker::HAND_CLASS => Some(seeker::update),
         // The upgraded Seeker Gun (`0x3f51f0`, rows 0x43 / 0x55 / 0x56).
         seeker::PLUS_CLASS => Some(seeker::update_plus),
-        seeker::MISSILE => Some(seeker::update_missile),
+        // 0x05d9: the record's shot class, which `lvl.vtbl` maps to the missile's update too (`0x3abb40`).
+        seeker::MISSILE | 0x05d9 => Some(seeker::update_missile),
         minirocket::HAND_CLASS => Some(minirocket::update),
         // The Megarocket Cannon (`0x410ba0`, rows 0x45 / 0x63 / 0x64).
         megarocket::HAND_CLASS => Some(megarocket::update),
@@ -231,7 +234,10 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x099c => Some(enemies::update_099c),
         0x0b0a => Some(enemies::update_0b0a),
         0x0b0b => Some(enemies::update_0b0b),
-        0x0b41 | 0x0b42 | 0x0b45 | 0x0b4d | 0x0b51 | 0x0b52 | 0x0b53 | 0x0c02 | 0x0c3f => Some(props::update_stub),
+        0x0b41 | 0x0b42 | 0x0b45 | 0x0b4d | 0x0b51 | 0x0b52 | 0x0b53 | 0x0c02 | 0x0c3f | 0x0dd1 | 0x0da3 | 0x0da1 => Some(props::update_stub),
+        // The empty update (L00 `0x3e7760`, one function on every level).
+        0x094e | 0x0969 | 0x0a29 | 0x0afc | 0x0b18 | 0x0b84 | 0x0ccb | 0x0d40 | 0x0d54 | 0x0e1b | 0x0e1c | 0x0f78 | 0x1101 | 0x11ed
+        | 0x1354 => Some(props::update_empty),
         0x0f6e => Some(props::update_0f6e),
         0x0ddf => Some(props::update_0ddf),
         0x0a38 => Some(carriers::update_0a38),
@@ -304,10 +310,14 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         critter::CLASS => Some(critter::update),
         dropship::CLASS => Some(dropship::update),
         explosion::CLASS => Some(explosion::update),
+        // Damosel's traffic (L18 `0x3fcb78`): 0x0d5c is in the flocks' class switches, but its update is the traffic's.
+        level18::traffic::CAR | level18::traffic::RAM | 0x11cc | 0x0d5c => Some(level18::traffic::update_11cf),
         c if flock::CLASSES.contains(&c) => Some(flock::update),
         0x0ca0 => Some(oozla::update_0ca0),
         0x046f => Some(oozla::update_046f),
-        0x0a17 => Some(oozla::update_0a17),
+        // The water surfaces (crate::water): the ocean about the camera and the liquid lids.
+        c if crate::water::ocean::CLASSES.contains(&c) => Some(crate::water::ocean::update),
+        c if crate::water::lid::CLASSES.contains(&c) => Some(crate::water::lid::update),
         0x0a92 | 0x0a93 => Some(oozla::update_float),
         0x09a2 => Some(leaper::update),
         0x0b2b => Some(spitter::update),
@@ -340,7 +350,6 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x12dc => Some(smash::update_12dc),
         0x0a26 => Some(smash::update_0a26),
         0x0a27 | 0x0a28 => Some(smash::update_plant_piece),
-        0x0a29 => Some(smash::update_0a29),
         0x0fa0 => Some(oozla::update_0fa0),
         0x0ab3 => Some(oozla::update_0ab3),
         0x0b07 => Some(oozla::update_0b07),
@@ -358,7 +367,6 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x0c24 => Some(maktar_hints::update_0c24),
         maktar_pads::CRITTER => Some(maktar_pads::update_critter),
         maktar_pads::PAD => Some(maktar_pads::update_pad),
-        0x0afc => Some(maktar::update_0afc),
         0x0b25 => Some(maktar::update_0b25),
         0x0aaf => Some(maktar::update_0aaf),
         0x0873 => Some(maktar::update_0873),
@@ -380,7 +388,8 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         crate::ship::MISSION_CLASS => Some(crate::ship::update_mission),
         space::FIELD => Some(space::update_field),
         0x0953..=0x0956 | 0x0971 => Some(space::update_asteroid),
-        crate::ship::MISSILE_CLASS => Some(crate::ship::update_missile),
+        // 0x1161: the upgraded missile, the same update (`0x3caae8`'s class with the upgrade; the port makes none).
+        crate::ship::MISSILE_CLASS | 0x1161 => Some(crate::ship::update_missile),
         space::SHIELD_PICKUP | space::BOLT_PICKUP => Some(space::update_pickup),
         // 0x0ae0: a placed pickup (L25 `0x3da5f8`, 1 placed), the same update.
         pickup::CLASS | 0x0ae0 => Some(pickup::update),
@@ -388,8 +397,8 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         crate::vendor::CLASS => Some(vendor::update),
         // Endako (endakoA).
         0x09b2 => Some(endako_a::update_09b2),
-        0x09a3 | 0x09a4 | 0x09a6 => Some(endako_a::update_barrier),
-        0x0d40 => Some(endako_a::update_0d40),
+        // Level 21's 0x1345 (L21 `0x4191d8`) is the same code.
+        0x09a3 | 0x09a4 | 0x09a6 | 0x1345 => Some(endako_a::update_barrier),
         0x02f6 | endako_a::HOOK_NODE => Some(endako_a::update_swing_node),
         0x09b6 => Some(endako_a::update_09b6),
         0x0979 => Some(endako_a::update_0979),
@@ -412,7 +421,6 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x1304 => Some(endako_b::update_1304),
         0x0ef9 => Some(endako_b::update_0ef9),
         0x099d => Some(endako_b::update_099d),
-        0x094e => Some(endako_b::update_empty),
         0x0a0a => Some(endako_b::update_0a0a),
         0x0a0b => Some(endako_b::update_0a0b),
         0x11e7 => Some(endako_b::update_11e7),

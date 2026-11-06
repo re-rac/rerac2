@@ -1,4 +1,4 @@
-//! 0x0878 / 0x08ad (`0x3be7d0`, 30 and 27 placed; the decomp's `func_L17_003BD310`): a chain of hazards riding a
+//! 0x0878 / 0x08ad / 0x08d8 (`0x3be7d0`, 30, 27 and 4 placed; the decomp's `func_L17_003BD310`): a chain of hazards riding a
 //! path (`+0x00`). Each link names the next one (`+0x04`, a moby index), which links back to it (`+0x1c`). The
 //! link with no next one is the leader: it drives the chain round the path, and the links trail it.
 //!
@@ -30,7 +30,7 @@ use crate::moby::{blast, bolts, countdown, shards, Ctx, MobyWorld};
 
 pub const CHAIN: i16 = 0x0878;
 pub const CHAIN_B: i16 = 0x08ad;
-const LOUD: i16 = 0x08d8;
+pub const LOUD: i16 = 0x08d8;
 
 const RUNNING: bool = true;
 const QUARTER: f32 = std::f32::consts::FRAC_PI_2;

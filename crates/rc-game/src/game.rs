@@ -78,13 +78,15 @@ pub struct GameState {
     pub shadow: crate::shadow_volumes::ShadowState,
     /// `0x1b1a68`: the death height (the level's setting; objects change it).
     pub death_z: Option<f32>,
-    /// Oozla's water (L01 `$gp+0xdec` / `$gp+0xde8`, kept by its class 0x0a17): the level of the water and the
-    /// height the floating objects read (`0x3bc3b8`: the level and a 0.1 wave; 0 until the class runs).
+    /// The ocean's water (crate::water::ocean; L01 `$gp+0xdec` / `$gp+0xde8`, L09 `0x1b30a4` / `0x1b30a0`, L06
+    /// `0x1b3284` / `0x1b3280`): the level of the water and the height it waves to (what Oozla's floating objects
+    /// read, `0x3bc3b8`; 0 until the class runs).
     pub water_base: f32,
     pub water_z: f32,
-    /// `0x1b2fd0` (L01): the swamp water's two surface layers' texture scroll (s, t), within ±1.
+    /// The ocean's two surface layers' texture scroll (s, t), within ±1 (L01 `0x1b2fd0`, L09 `0x1b3090`, L06
+    /// `0x1b3270`).
     pub water_scroll: [[f32; 2]; 2],
-    /// `$gp+0x3fd0` (L01): the camera where the swamp water's last update saw it.
+    /// The camera where the ocean's last update saw it (L01 `$gp+0x3fd0`, L09 `$gp+0x4090`, L06 `0x1b3260`).
     pub water_cam: [f32; 3],
     /// `0x19b2e8 + level·0x10`: the missions' progress, two bits per sub-mission (`mission + level·0x10`, bits
     /// `2·(sub & 3)`); `0x18c0e6`: the mission whose area Ratchet is in.

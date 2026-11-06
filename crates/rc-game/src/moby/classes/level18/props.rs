@@ -13,7 +13,7 @@
 //!   go. **2**: every piece thrown (`0x346658` = L00 `0x32b580`, crate::moby::shards::throw_all: `$gp+0x2cf0` /
 //!   `+0x2ce8` / `+0x2ce0`), the blast at it (`0x415e70` = L00 `0x3f8348`: 10 times its scale, sprites 5 / 5 / 5, 5 puffs,
 //!   5 streaks, its flash ball), deleted (`0x32c688` = L00 `0x311688`).
-//! * **0x11af** (4 placed), **0x11ae** (2), **0x11b3** (1) ([`update_11af`], `0x3fecc8`; the decomp's
+//! * **0x11af** (4 placed), **0x11ae** (2), **0x11b3** (1), **0x11b4** (1) ([`update_11af`], `0x3fecc8`; the decomp's
 //!   `func_L18_003FD858`): a slider that runs out along a direction and back. Its pvars: `+0x00..+0x10` four cuboids
 //!   and `+0x10..+0x20` four groups (−1 none), `+0x20` / `+0x28` their flags (four halves each: set, the cuboid or
 //!   group sends it out; clear, back), `+0x30` the direction, `+0x40` its start, `+0x50` the tick's step, `+0x60` /
@@ -366,6 +366,7 @@ pub fn update_0f54(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 pub const SLIDER_A: i16 = 0x11af;
 pub const SLIDER_B: i16 = 0x11ae;
 pub const SLIDER_C: i16 = 0x11b3;
+pub const SLIDER_D: i16 = 0x11b4;
 
 /// The point the slider's cuboids test: the moby `+0x70`'s place, else Ratchet's.
 fn slider_point(w: &MobyWorld, id: usize, ctx: &Ctx) -> V3 {
@@ -410,7 +411,7 @@ fn test(w: &mut MobyWorld, id: usize, ctx: &Ctx, p: V3, out: bool) -> bool {
     ok && any
 }
 
-/// 0x11af / 0x11ae / 0x11b3 (module docs).
+/// 0x11af / 0x11ae / 0x11b3 / 0x11b4 (module docs).
 pub fn update_11af(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let slice = ctx.game.frame & 0xf == 0;
     match w.mobys[id].state {

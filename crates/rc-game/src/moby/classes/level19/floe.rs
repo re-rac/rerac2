@@ -250,8 +250,8 @@ fn tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, old_pos: V3, old_rot: V3) {
 
 pub const MOVER: i16 = 0x0edb;
 pub const MOVER_B: i16 = 0x1146;
-/// The class whose burst also plays its sound 0 (none placed here).
-const SOUNDED: i16 = 0x10ed;
+/// The class whose burst also plays its sound 0 (none placed here; level 18 places one, L18 `0x43ae58`, the same code).
+pub const SOUNDED: i16 = 0x10ed;
 
 /// 0x0edb / 0x1146's pvars (module docs).
 mod mv {

@@ -1,7 +1,9 @@
-//! The liquid lid **0x11fe** (L08 `0x430568`, 2 placed; L19 `0x422c70`, 15 placed; the decomp's
-//! `func_L08_0042EF00`, its draw `func_L08_0042E678` = L08 `0x42fce0` / L19 `0x4223e8`; the same code and data on
-//! both levels): a square of layered, scrolling quads that the game sends as its own GS packets, rising from its low
-//! height to its high one once opened. Its model is not drawn. Its pvars: `+0x00` / `+0x04` the high and low
+//! The liquid lids (the decomp's `func_L08_0042EF00`, its draw `func_L08_0042E678`; the same code and data on each
+//! level): **0x11fe** (L08 `0x430568` / `0x42fce0`, 2 placed), **0x12af** and **0x12b4** (L09 `0x423d20` /
+//! `0x423498`: Dobbo's pools, 15 and 3 placed, one list for both classes), 0x12b4 (L19 `0x422c70` / `0x4223e8`, 1
+//! placed). Each is a square of layered, scrolling quads that the game sends as its own GS packets, rising from its
+//! low height to its high one once opened (Dobbo's have both heights the same). Its model is not drawn. Its pvars:
+//! `+0x00` / `+0x04` the high and low
 //! heights, `+0x08` the phase, `+0x0c` the rate (degrees a second), `+0x10` its texture (an FX index − 0x3f),
 //! `+0x14` its colour, `+0x18` the sheen's texture (−1 none), `+0x1c` the sheen's colour, `+0x20` the frame grid's
 //! colour (its alpha byte `+0x23` the grid's switch).
@@ -34,7 +36,7 @@ use crate::hero::physics::{sub, unit, V3};
 use crate::moby::{Ctx, MobyWorld};
 use std::f32::consts::PI;
 
-pub const CLASS: i16 = 0x11fe;
+pub const CLASSES: [i16; 3] = [0x11fe, 0x12af, 0x12b4];
 
 const HIGH: usize = 0x00;
 const LOW: usize = 0x04;
@@ -50,10 +52,12 @@ const SCROLL_RATE: f32 = f32::from_bits(0x3a83_126f);
 const BOB_RATE: f32 = f32::from_bits(0x3c23_d70a);
 const BOB: f32 = f32::from_bits(0x3dcc_cccd);
 /// The lids' heights off the bobbing height, toward the camera: the two crossed layers, the plain one.
+/// The lids' blend factor (L08 `$gp+0x2e28` = `0x1b1e18`, L09 `$gp+0x2cd8`: the ALPHA register's FIX).
+const FIX: u32 = 0x28;
 const LAYERS: [f32; 3] = [0.06, 0.04, 0.0];
 
 /// `0x430568` (module docs).
-pub fn update_11fe(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let done = crate::moby::director::mission_is_done(ctx.game, w.mobys[id].mission as i32);
     match w.mobys[id].sub_state {
         0 => {
@@ -86,7 +90,7 @@ pub fn update_11fe(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => {}
     }
     let hero = (ctx.hero.mode, ctx.hero.group, ctx.hero.state);
-    let class_scale = w.class(CLASS).map_or(1.0, |c| c.scale);
+    let class_scale = w.class(w.mobys[id].o_class).map_or(1.0, |c| c.scale);
     let m = &mut w.mobys[id];
     let p = m.pv_f(PHASE);
     let moving = m.sub_state == 2 && p < PI && -3.0 <= p;
@@ -112,18 +116,18 @@ fn wrap(a: f32) -> f32 { ((a + PI) * 0.159_154_94).rem_euclid(1.0) * std::f32::c
 /// its own (`+0x10` + 0x3f) in the first layer and the list's last lid's in the other two (the packet keeps it); then, when the last lid has a sheen (`+0x18` ≠ −1), each one's
 /// sheen at its height: additive (ALPHA 0x48), FX `+0x18` + 0x3f in `+0x1c`, each corner's `s, t` the x and y of the
 /// way from the camera (`0x1b9b00`) to it mirrored in the up plane (`0x2fae78` with (0, 0, 1)) and made unit
-/// (`0x2fad08`). Here the lids take the normal blend at their colours' alpha (0x28 in every placed lid: the FIX).
+/// (`0x2fad08`). Here the lids take the normal blend at the FIX as their colours' alpha (L08's colours carry 0x28 already,
+/// Dobbo's 0x40 / 0x50).
 pub fn draw(w: &MobyWorld, id: usize, frame: i32, cam: V3, out: &mut Vec<FxQuad>) {
-    let lids: Vec<usize> = w.draws_first.iter().copied().filter(|&k| w.mobys.get(k).is_some_and(|m| m.o_class == CLASS && m.state < 0x80)).collect();
+    let lids: Vec<usize> = w.draws_first.iter().copied().filter(|&k| w.mobys.get(k).is_some_and(|m| CLASSES.contains(&m.o_class) && m.state < 0x80)).collect();
     if lids.last() != Some(&id) { return; }
-    let class_scale = w.class(CLASS).map_or(1.0, |c| c.scale);
     let f = frame as f32;
     let bob = BOB * wrap(f * BOB_RATE).sin();
     let s = (f * SCROLL_RATE) % 1.0;
     let st = [[s, s], [s + 2.0, s], [s, s + 2.0], [s + 2.0, s + 2.0]];
     let square = |k: usize, push: f32, flip: [f32; 2]| {
         let m = &w.mobys[k];
-        let r = m.scale * 8.0 / class_scale;
+        let r = m.scale * 8.0 / w.class(m.o_class).map_or(1.0, |c| c.scale);
         let sign = if m.pos[2] < cam[2] { -1.0 } else { 1.0 };
         let z = m.pos[2] + bob + sign * push;
         let c = |x: f32, y: f32| [m.pos[0] + x * r * flip[0], m.pos[1] + y * r * flip[1], z];
@@ -132,7 +136,7 @@ pub fn draw(w: &MobyWorld, id: usize, frame: i32, cam: V3, out: &mut Vec<FxQuad>
     let tex = w.mobys[*lids.last().unwrap_or(&id)].pv_i(TEX) + 0x3f;
     for (n, (layer, flip)) in LAYERS.iter().zip([[1.0, 1.0], [-1.0, 1.0], [-1.0, -1.0]]).enumerate() {
         for &k in &lids {
-            let rgba = w.mobys[k].pv_i(COLOUR) as u32;
+            let rgba = (w.mobys[k].pv_i(COLOUR) as u32 & 0x00ff_ffff) | FIX << 24;
             // The first layer sets each lid's own texture into the packet; the others keep the last one's.
             let fx = if n == 0 { w.mobys[k].pv_i(TEX) + 0x3f } else { tex };
             out.push(FxQuad { fx: fx.max(0) as usize, additive: false, corners: square(k, *layer, flip), st, rgba: [rgba; 4] });

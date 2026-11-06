@@ -58,9 +58,6 @@
 use crate::moby::{carry_hero, mode, Ctx, MobyWorld};
 use crate::shadow_volumes::probe_near;
 
-/// 0x0afc.
-pub fn update_0afc(_w: &mut MobyWorld, _id: usize, _ctx: &mut Ctx) {}
-
 /// 0x0af3 (`0x3efea8`), state 0: no path (`+0` = −1) deletes it (`0x3157a0`). Not ported: the rest (its path's set-up
 /// `0x3f0048`, the guide along it `0x3f01c8` / `0x3f0340` and its view test `0x3f0528`): no placed one has a path.
 pub fn update_0af3(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {

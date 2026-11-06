@@ -49,5 +49,6 @@ pub mod skill_points;
 pub mod sky;
 pub mod spline;
 pub mod vendor;
+pub mod water;
 pub mod upgrades;
 pub mod travel;

@@ -10,7 +10,7 @@
 //!   ([`update_0ef9`], `0x41ac38`): pieces the level's robots (0x093c / 0x0940, not ported) raise, stand on and
 //!   watch; their own parts.
 //! * **0x099d** ([`update_099d`], `0x3cd7e0`): the Swingshot's pull target turning while drawn; **0x094e**
-//!   ([`update_empty`], `0x3c9dd0`: `jr ra`).
+//!   (`0x3c9dd0`: `jr ra`, crate::moby::classes::props::update_empty).
 //! * **0x0a0a** ([`update_0a0a`], `0x3d3800`): a camera tweak of priority 4 held at its defaults; **0x0a0b**
 //!   ([`update_0a0b`], `0x3d38d0`): a script camera sliding along a cuboid beside Ratchet while he is in a polygon.
 //! * **0x11e7** ([`update_11e7`], `0x4269e8`): a group of mobys glowing in a wave.
@@ -432,9 +432,6 @@ pub fn update_099d(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
     m.rot[1] = add_rot(m.rot[1], 0.104_719_77);
     m.rot[2] = add_rot(m.rot[2], 0.046_542_123);
 }
-
-/// 0x094e (`0x3c9dd0`, one placed): an update that does nothing (`jr ra`): the moby stays in the run list.
-pub fn update_empty(_w: &mut MobyWorld, _id: usize, _ctx: &mut Ctx) {}
 
 /// 0x0a0a (`0x3d3800`, one placed): a camera tweak of priority 4 (`0x2d8038(4)`, L00 `0x2d7468`, kept at `$gp+0x1640`)
 /// put back to its defaults every tick (every field −1, the springs not firm, the stick on, no facing, the rest 0x78

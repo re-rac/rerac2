@@ -7,7 +7,6 @@ pub mod buyer;
 pub mod breather;
 pub mod burrower;
 pub mod crystal;
-pub mod door;
 pub mod hovership;
 pub mod lift;
 pub mod mission;
@@ -28,7 +27,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         props::PLATFORM => Some(props::update_090e),
         props::GLOWING => Some(props::update_0988),
         props::PICKUP => Some(props::update_0e5b),
-        lift::CLASS => Some(lift::update_0aaa),
+        // Also levels 9 (0x0d49, L09 `0x401350`) and 19 (0x1176, L19 `0x41fcb8`): the same code.
+        lift::CLASS | 0x0d49 | 0x1176 => Some(lift::update_0aaa),
         mission::CLASS => Some(mission::update_0c2a),
         // Also level 19's (L19 `0x414848` / `0x3c1cc8`, the same code and data).
         hovership::HOVERSHIP => Some(hovership::update_0eef),
@@ -39,18 +39,14 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         crystal::CARRIER => Some(crystal::update_0e78),
         // The chips: the same code as Level 12's (`0x3d49b8` = L12 `0x400850`).
         crystal::CHIP | crystal::CHIP_B => Some(super::level12::debris::update_0d66),
-        // Also level 19's (L19 `0x422c70`, the same code and data).
-        door::CLASS => Some(door::update_11fe),
+        // The liquid lid 0x11fe is crate::water::lid.
         _ => None,
     }
 }
 
-/// This level's draw callbacks (crate::fx): true when the moby's class is one of them.
+/// This level's draw callbacks (crate::fx): true when the moby's class is one of them (none since the liquid lid
+/// moved to crate::water::lid).
 #[allow(clippy::too_many_arguments)]
-pub fn draw(w: &mut crate::moby::MobyWorld, _host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, _hero_state: i32, _view: &crate::particles::BSphereView, cam: crate::hero::physics::V3, id: usize, first: bool, out: &mut Vec<crate::fx::FxQuad>, _frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
-    match w.mobys[id].o_class {
-        door::CLASS if first => door::draw(w, id, game.frame, cam, out),
-        _ => return false,
-    }
-    true
+pub fn draw(_w: &mut crate::moby::MobyWorld, _host: &dyn crate::moby::MobyHost, _game: &mut crate::game::GameState, _hero_state: i32, _view: &crate::particles::BSphereView, _cam: crate::hero::physics::V3, _id: usize, _first: bool, _out: &mut Vec<crate::fx::FxQuad>, _frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
+    false
 }

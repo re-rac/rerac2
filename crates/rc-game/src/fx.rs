@@ -38,6 +38,7 @@
 //! | `0x3cbaa0` | the upgraded turret's plasma shot 0x0a82 | its glow and trail ([`crate::moby::classes::turret::draw_plasma`]) |
 //! | `0x2a7ac8` (first list) | Ratchet | the hand item's glows ([`HeroGlow`]; its other glows are not ported) |
 //! | `0x3c6eb8` (L02) | the Spiderbot Glove in the hand 0x0907 | where its throw lands ([`crate::moby::classes::spiderbot::draw_marker`]) |
+//! | `0x3bc3c0` (L01; L09 `0x380fe8`, L20; L06 `0x403ac0` and five more) | the ocean 0x0a17 / 0x12b5 / 0x093e | its band and surface layers ([`crate::water::ocean::draw`]) |
 //! | `0x3cac30` | Oozla's conveyor 0x0a7b out | its belt of light ([`crate::moby::classes::oozla::draw_0a7b`]) |
 //! | `0x3d2ea8` | Oozla's hatch 0x0a9d open | its light ([`crate::moby::classes::oozla::draw_0a9d`]) |
 //! | `0x414118` | Maktar's power node 0x0c82 showing | its arc to the lock ([`ribbon`], crate::moby::classes::maktar::draw_0c82) |
@@ -61,7 +62,7 @@
 //! | `0x3d5ff8` (L26, first list) | the motes 0x0c00 of a group | their trails ([`trails::history`], crate::moby::classes::level26::props::draw_0c00) |
 //! | `0x423e80` (L14) | the electric strand 0x0f80 on | its strands ([`trails::strand`], crate::moby::classes::level14::fence::draw) |
 //! | `0x3b02e8` (L09; L16, L18, L19, L20; first list) | the bolt 0x05de | its strips, glow and sparks ([`crate::moby::classes::level09::bolt::draw`]) |
-//! | `0x42fce0` (L08; L19 `0x4223e8`; first list) | the liquid lids 0x11fe | the frame's lids' layers and sheens (crate::moby::classes::level08::door::draw) |
+//! | `0x42fce0` (L08; L09 `0x423498`, L19 `0x4223e8`; first list) | the liquid lids 0x11fe / 0x12af / 0x12b4 | the frame's lids' layers and sheens ([`crate::water::lid::draw`]) |
 //! | `0x390d60` (L14; L19 `0x383a18`; the world's list `0x2e77e0`, here the first) | the sinking pit 0x135f | its 7 × 7 waving cells (crate::moby::classes::level14::pit::draw) |
 //! | `0x432150` (L14) | the energy field 0x1164 | its halo, rings, core and rays (crate::moby::classes::level14::energy::draw) |
 //! | `0x41e3b8` (L16, first list) | the sweeping laser 0x1162 | its beam (crate::moby::classes::level16::laser::draw) |
@@ -403,7 +404,8 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::spiderbot::HAND_CLASS | crate::moby::classes::spiderbot::PLUS_HAND => crate::moby::classes::spiderbot::draw_marker(w, id, hero_state, game.scenes.mode, game.frame, out),
         0x0a7b => crate::moby::classes::oozla::draw_0a7b(w, id, out),
         0x0a9d => crate::moby::classes::oozla::draw_0a9d(w, id, out),
-        0x0a17 => crate::moby::classes::oozla::draw_0a17(w, id, game, cam, host.camera_rows(), out),
+        c if crate::water::ocean::CLASSES.contains(&c) => crate::water::ocean::draw(w, id, game, hero_state, cam, host.camera_rows(), out),
+        c if first && crate::water::lid::CLASSES.contains(&c) => crate::water::lid::draw(w, id, game.frame, cam, out),
         crate::vendor::CLASS => crate::moby::classes::vendor::draw(w, id, game, host.camera_rows(), out),
         c if crate::moby::classes::flock::CLASSES.contains(&c) => crate::moby::classes::flock::draw(w, id, view, cam, out),
         crate::moby::classes::critter::CLASS | crate::moby::classes::critter::PRISON => crate::moby::classes::critter::draw(w, id, cam, out),

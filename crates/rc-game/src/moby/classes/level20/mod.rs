@@ -35,7 +35,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         props::FIELD => Some(props::update_119b),
         props::NEST => Some(props::update_11ec),
         // `0x446c78`: `jr ra`.
-        0x11ed => Some(super::level04::misc::update_empty),
         misc::SLAB => Some(misc::update_11ef),
         misc::LIFT => Some(misc::update_1246),
         misc::CRATE => Some(misc::update_131a),

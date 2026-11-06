@@ -1525,8 +1525,9 @@ pub fn update_0ddf(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     m.state_ticks = m.state_ticks.wrapping_add(1);
 }
 
-/// The stubs 0x0b41 / 0x0b42 / 0x0b45 / 0x0b4d / 0x0b52 / 0x0b53 / 0x0c02 / 0x0c3f (`0x41b058` .. `0x41b170`, one
-/// body each): on the first update, state 1 and mode |= 0x800.
+/// The stubs 0x0b41 / 0x0b42 / 0x0b45 / 0x0b4d / 0x0b51 / 0x0b52 / 0x0b53 / 0x0c02 / 0x0c3f (`0x41b058` .. `0x41b170`,
+/// one body each) and level 13's 0x0dd1 / 0x0da3 / 0x0da1 (L13 `0x42d390` / `0x42d368` / `0x42d340`, the same code):
+/// on the first update, state 1 and mode |= 0x800.
 pub fn update_stub(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
     let m = &mut w.mobys[id];
     if m.state == 0 {
@@ -1534,6 +1535,14 @@ pub fn update_stub(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
         m.mode |= 0x800;
     }
 }
+
+/// An update that does nothing (`jr ra`: L00 `0x3e7760` and its copies, one function in every level's overlay): the
+/// moby stays in the run list. The classes that run it: 0x094e (L03 `0x3c9dd0`), 0x0969 / 0x0e1b (L04 `0x3e9a40` /
+/// `0x43cb58`), 0x0a29 (L01 `0x3be550`, the plant's stump), 0x0afc (L02 `0x3f0618`; 0x0873 makes one), 0x0b18 (L14),
+/// 0x0ccb (L09), 0x0d40 (L03 `0x4063d0`), 0x0d54 (L26), 0x0e1c (L11 `0x459b98`), 0x0f78 (L16), 0x1101 (L13), 0x11ed
+/// (L20), 0x1354 (L12). Level 21's 0x0b84 (`0x3da5d8`, L00 `0x4450c0`) runs it too: its own update is only a debug
+/// print (`0x2a48f0`).
+pub fn update_empty(_w: &mut MobyWorld, _id: usize, _ctx: &mut Ctx) {}
 
 /// `0x29fc20[level]` (Oozla's copy `0x2a1820`, read live): the scene lists of the level's scene triggers (0x0f6e's
 /// `+0x68`[8]; scenes 0x20.., movies below), Aranos's, Oozla's (the store's: a scene, the TV's movie 2, a scene; then

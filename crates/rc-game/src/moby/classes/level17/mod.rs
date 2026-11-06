@@ -24,7 +24,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
         seller::CLASS => Some(seller::update_11a6),
         vent::CLASS => Some(vent::update_02be),
-        hazard::CHAIN | hazard::CHAIN_B => Some(hazard::update_0878),
+        hazard::CHAIN | hazard::CHAIN_B | hazard::LOUD => Some(hazard::update_0878),
         props::CONVEYOR => Some(props::update_0fbd),
         props::CRATE => Some(props::update_0fd7),
         props::LAMP => Some(props::update_10ec),

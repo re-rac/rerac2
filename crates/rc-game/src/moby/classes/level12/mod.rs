@@ -56,7 +56,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         robot::CLASS => Some(robot::update_1169),
         towers::CLASS => Some(towers::update_12b1),
         // `0x38b400`: `jr ra`, as level 4's U293 classes.
-        0x1354 => Some(super::level04::misc::update_empty),
         _ => None,
     }
 }

@@ -12,7 +12,7 @@
 //!   (`0x41cb00`: a pad that moves Ratchet, `0x2c4e70` / `0x2def40`), the clock 0x0e9d (`0x407d60`: the console's clock
 //!   `0x1256d8`, its hands 0x0e9f / 0x0ea0 / 0x0ea1 created, the chimes 0x10 / 0x11), 0x0c2f (`0x3e9d48`: help 0x9e3
 //!   and the message 0x1233 by cuboids, with the unmapped `0x1a7a6c`, `0x1a903c`, `0x18c90c`, `0x18cc18`).
-//! * Shared with level 6, not reached: 0x0431 (`0x3ae168`), the ferry 0x0330 (`0x3ac360`), 0x093e (`0x3c7fd0`),
+//! * Shared with level 6, not reached: 0x0431 (`0x3ae168`), the ferry 0x0330 (`0x3ac360`),
 //!   0x08a0 (`0x3c6108`), 0x08a1 (`0x3c6a18`), 0x031a (`0x3a98d0`).
 
 pub mod breakables;
@@ -37,7 +37,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x0d65 => Some(movers::update_0d65),
         0x0cd8 => Some(movers::update_0cd8),
         0x0b5c | 0x0b67 | 0x0b68 | 0x0b5b | 0x0b61 => Some(props::update_0b5c),
-        0x0dd1 | 0x0da3 | 0x0da1 => Some(props::update_0dd1),
         0x0ef2 | 0x113c => Some(props::update_0ef2),
         0x12ed => Some(props::update_12ed),
         0x0f20 => Some(props::update_0f20),
@@ -48,7 +47,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x0fec => Some(props::update_0fec),
         0x11b0 => Some(props::update_11b0),
         0x1225 => Some(props::update_1225),
-        0x1101 => Some(super::level04::misc::update_empty),
         _ => None,
     }
 }

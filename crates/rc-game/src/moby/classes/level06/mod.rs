@@ -2,7 +2,7 @@
 //! the L00 ones the port knows them by where they differ). Each class's update is registered in [`update_for`] and
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
 //!
-//! The seller of planet 7's coordinates 0x0ccf: [`host`].
+//! The seller of planet 7's coordinates 0x0ccf: [`host`]. The water sheet 0x093e (`0x404680` / `0x403ac0`): crate::water::ocean.
 //!
 //! Not ported (level 6's other classes):
 //! * Waiting on a missing system (docs/plan/gaps.md): 0x0fc1 (`0x458888`) and 0x0fc0 (`0x458718`), effect-quad
@@ -12,7 +12,7 @@
 //! * Ratchet's: the ferry 0x0330 (`0x3e5460`, L11 `0x3b7340`: a ride on paths with its own controls), 0x0947
 //!   (`0x404c60`: a swimmer that grabs Ratchet in the water, his state 0x12, and throws him out, his state 0x6f
 //!   `0x2f96e8`), 0x0b57 (`0x41b200`, Ratchet's state 0x37 and the level's scene functions `0x479xxx`).
-//! * The draws: 0x093e (`0x404680`, L11 `0x3d19f8`: a screen layer drawn by `0x403ac0`), 0x08a0 (`0x401b40`:
+//! * The draws: 0x08a0 (`0x401b40`:
 //!   nine shuffled symbols in a column, its draw `0x401f00` reading the table in its moby `+0x68`[3]'s pvars,
 //!   `+0x2c00` / `+0x12de0`).
 //! * The hints 0x0cdd (`0x4321e8`: help 0x9df / 0x9e0 / 0x9e1 / 0x9e2 / 0x9db / 0x9b5 by cuboids; it reads Ratchet's

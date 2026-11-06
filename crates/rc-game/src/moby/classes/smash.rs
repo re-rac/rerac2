@@ -418,5 +418,3 @@ fn settle(m: &mut crate::moby::Moby) {
     m.mode |= 0x2000;
 }
 
-/// 0x0a29 (`0x3be550`): the stump; an empty update.
-pub fn update_0a29(_w: &mut MobyWorld, _id: usize, _ctx: &mut Ctx) {}

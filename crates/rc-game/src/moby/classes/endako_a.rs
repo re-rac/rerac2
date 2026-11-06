@@ -186,9 +186,6 @@ pub fn update_barrier(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
 }
 
-/// 0x0d40 (`0x4063d0`): `jr ra`.
-pub fn update_0d40(_w: &mut MobyWorld, _id: usize, _ctx: &mut Ctx) {}
-
 /// The class of the hook nodes.
 pub const HOOK_NODE: i16 = 0x0323;
 

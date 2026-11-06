@@ -3,7 +3,7 @@
 //!
 //! * **0x0b5c** / **0x0b67** / **0x0b68** / **0x0b5b** / **0x0b61** ([`update_0b5c`], `0x3e2748` / `0x3e27b8` /
 //!   `0x3e27f0` / `0x3e2710` / `0x3e2780`; 4, 2, 1, 1 and 1 placed): turn about their pitch.
-//! * **0x0dd1** / **0x0da3** / **0x0da1** ([`update_0dd1`], `0x42d390` / `0x42d368` / `0x42d340`, one each): mode
+//! * **0x0dd1** / **0x0da3** / **0x0da1** (crate::moby::classes::props::update_stub, `0x42d390` / `0x42d368` / `0x42d340`, one each): mode
 //!   0x800 at the start, nothing more.
 //! * **0x0ef2** / **0x113c** ([`update_0ef2`], `0x42d3b8` / `0x42d4b0`, one each): sink 6 once a linked moby is in
 //!   its state 2.
@@ -29,15 +29,6 @@ pub fn update_0b5c(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
     let m = &mut w.mobys[id];
     let k = if m.o_class == 0x0b61 { f32::from_bits(0x3cee_4bb0) } else { f32::from_bits(0x3c8e_fa37) };
     m.rot[1] = add_rot(m.rot[1], k);
-}
-
-/// 0x0dd1 / 0x0da3 / 0x0da1 (`0x42d390` / `0x42d368` / `0x42d340`). **0**: mode | 0x800, 1.
-pub fn update_0dd1(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
-    let m = &mut w.mobys[id];
-    if m.state == 0 {
-        m.state = 1;
-        m.mode |= 0x800;
-    }
 }
 
 /// 0x0ef2 (`0x42d3b8`) / 0x113c (`0x42d4b0`): its pvars `[0]` a moby, `[4]` its height to sink to, `[8]` its height

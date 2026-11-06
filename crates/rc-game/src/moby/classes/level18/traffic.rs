@@ -1,5 +1,5 @@
-//! Damosel's flying traffic **0x11cf** (28 placed) and **0x0d9b** (7), one update (L18 `0x3fcb78`; the decomp's
-//! `func_L18_003FB708`): a car that flies a path or straight ahead (or rides along with a leader, like the cars of a
+//! Damosel's flying traffic **0x11cf** (28 placed), **0x0d9b** (7), **0x11cc** (13) and **0x0d5c** (12), one update
+//! (L18 `0x3fcb78`; the decomp's `func_L18_003FB708`): a car that flies a path or straight ahead (or rides along with a leader, like the cars of a
 //! train), carries Ratchet (its platform block `+0x20`, crate::moby::platform), and at the end of its run drops and
 //! bursts, or warps out (stretched along its first row) and comes back at its start. 0x0d9b also rams: what its nose
 //! touches is knocked away, and Ratchet is knocked down and dies 30 ticks later.
@@ -10,8 +10,8 @@
 //! that ends its run (−1 none), `+0xbc` it comes back after a warp, `+0xc0` / `+0xc4` the warp's size and colour (for
 //! its draws), `+0xc8` its leader (−1 none), `+0xcc` the warp-in's size (as an integer), `+0xd0` its speed (a second),
 //! `+0xd4` an area that, with the camera in it, puts it away (−1 none), `+0xd8` / `+0xdc` its share of the path and
-//! its rate (a tick), `+0xe0` the countdown to Ratchet's death, `+0xe4` its loop sound. The code also clears `+0x08`
-//! for any other class (none here).
+//! its rate (a tick), `+0xe0` the countdown to Ratchet's death, `+0xe4` its loop sound. In state 0 the classes other than
+//! 0x0d9b and 0x11cf clear `+0x08`.
 //!
 //! **Each tick**: with the camera (`0x1b9740`) in its area `+0xd4` it is put away ([`put_away`], `0x3fddc8`: state
 //! 2). The death's countdown on: under 2, Ratchet dies (`0x2d0748` = L00 `0x2b31f0`).
@@ -195,6 +195,9 @@ pub fn update_11cf(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 m.set_pv_f(RATE, 1.0 / dist(a, b) * PER_TICK * m.pv_f(SPEED));
                 m.pos = a;
                 m.set_pv_i(DEATH, -1);
+            }
+            if class != RAM && class != CAR {
+                m.set_pv_i(0x08, 0);
             }
             if let Some((lp, lr)) = lead {
                 // `0x2ef9b0` then `0x2ef318`: the offset through the leader's rows transposed.
