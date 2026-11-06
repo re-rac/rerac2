@@ -1,4 +1,5 @@
-//! The crates, classes 500 (bolt crate), 501, 511 (ammo crate) (L00 `0x39c870`, one update for the three): wait for
+//! The crates, classes 500 (bolt crate), 501 / 512 (nanotech crates 0x1f5 / 0x200), 505 (TNT), 511 (ammo crate) (L00
+//! `0x39c870`, one update for all): wait for
 //! a hit (`0x31dce8` with mask 0x5830001; damage above 0), break (`0x39daa0`: the stack above and below re-linked
 //! and set to fall, hidden, no collision, the break counter), drop the reward (`0x39d948`: a bolt crate's bolts with
 //! 1..4 bolt mobys, fewer the more crates broke lately; the others their pickups), then go (state 3: deleted, or

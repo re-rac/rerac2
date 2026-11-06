@@ -222,7 +222,8 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         swingshot::HOOK_CLASS => Some(swingshot::update_hook),
         0xbfe => Some(shot::update),
         flash::CLASS | flash::BOMB_CLASS => Some(flash::update),
-        500 | 501 | 505 | 511 => Some(crate_::update),
+        // The crates: bolt 500, nanotech 501 (0x1f5) and 512 (0x200), TNT 505, ammo 511 (one update, L00 `0x39c870`).
+        500 | 501 | 505 | 511 | 512 => Some(crate_::update),
         13..=19 => Some(bolt::update),
         0x12f5 => Some(props::update_12f5),
         0x0c8b => Some(props::update_0c8b),
