@@ -1233,11 +1233,11 @@ fn tick(
         let v = rc_game::hero::anim::AnimCtl::view(&p.anim.ctl(class));
         let h = &p.hero;
         println!(
-            "tick {}: state {:#x}/{} pos ({:.2}, {:.2}, {:.2}) vel ({:.3}, {:.3}, {:.3}) air {} h {:.2} slope {:.2} seq {}/{} f {:.1} spd {:.2} cap {} at ({:.2}, {:.2}, {:.2}) n ({:.2}, {:.2}, {:.2}) capsule {:.2}/{:.2}/{:.2} cam ({:.2}, {:.2}, {:.2}) yaw {:.2} pitch {:.2} grav {} rot ({:.2}, {:.2}, {:.2}) up ({:.2}, {:.2}, {:.2})",
+            "tick {}: state {:#x}/{} pos ({:.2}, {:.2}, {:.2}) vel ({:.3}, {:.3}, {:.3}) air {} h {:.2} slope {:.2} seq {}/{} f {:.1} spd {:.2} cap {} at ({:.2}, {:.2}, {:.2}) n ({:.2}, {:.2}, {:.2}) capsule {:.2}/{:.2}/{:.2} cam ({:.2}, {:.2}, {:.2}) yaw {:.2} pitch {:.2} grav {} rot ({:.2}, {:.2}, {:.2}) up ({:.2}, {:.2}, {:.2}) surf {} hp {} liquid {:.2}/{:.2}",
             p.ticks, h.state, h.substate, h.pos[0], h.pos[1], h.pos[2], h.vel[0], h.vel[1], h.vel[2], h.air_ticks, h.height, h.slope, v.seq_a, v.seq_b, v.frame, h.anim_speed,
             h.cap_hit, h.contact_point[0], h.contact_point[1], h.contact_point[2], h.contact_normal[0], h.contact_normal[1], h.contact_normal[2], h.cap_bottom, h.cap_top, h.cap_radius,
             p.camera.pos[0], p.camera.pos[1], p.camera.pos[2], p.camera.yaw(), p.camera.pitch(),
-            h.gravity.mode, h.rot[0], h.rot[1], h.rot[2], h.rows[2][0], h.rows[2][1], h.rows[2][2]
+            h.gravity.mode, h.rot[0], h.rot[1], h.rot[2], h.rows[2][0], h.rows[2][1], h.rows[2][2], h.surface, h.hp, h.surf.water_z, h.surf.sand_z
         );
     }
     if let Some(o) = occl.as_mut() {

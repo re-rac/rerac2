@@ -622,7 +622,7 @@ impl Hero {
     /// 50° the air ticks `0x18a16e` reset. The first hit's surface is the one under the feet (`0x18b2b0`); a water
     /// surface (0) sets the water's height `0x18a150` and the line goes on through it (flags 0x24; nothing below: no
     /// ground), a deep liquid (0xd) and quicksand (3) set theirs and the line goes on from just under them (flags 4), a
-    /// pit (0xb) sets its height. The side probes for the model's tilt (`0x2b8f50`) are not ported.
+    /// pit (0xb) sets its height and is no ground, as the lava (1) is in the lava deaths 0x79 / 0x7a. The side probes for the model's tilt (`0x2b8f50`) are not ported.
     pub fn ground_probe(&mut self, env: &Env) {
         self.air_ticks = self.air_ticks.saturating_add(1);
         self.f16c = self.f16c.saturating_add(1);
@@ -666,7 +666,14 @@ impl Hero {
                     a[2] = o.point[2] - 0.01;
                     hit = env.line(a, b, 4);
                 }
-                0xb => self.surf.sand_z = o.point[2],
+                // A pit (a death liquid: Tabora's lava streams, the falls of levels 13, 14 and 16) is no ground: Ratchet
+                // sinks into it until the surface step's 0x78 / 0x74 takes him (crate::hero::surface).
+                0xb => {
+                    self.surf.sand_z = o.point[2];
+                    hit = None;
+                }
+                // The lava under its deaths 0x79 / 0x7a is no ground either (he sinks into it).
+                1 if matches!(self.state, 0x79 | 0x7a) => hit = None,
                 _ => {}
             }
         }
