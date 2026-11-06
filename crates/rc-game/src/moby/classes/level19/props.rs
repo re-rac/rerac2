@@ -213,3 +213,104 @@ pub fn update_11ff(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => {}
     }
 }
+
+pub const TURN_LIFT: i16 = 0x114d;
+
+/// 0x114d's `$gp+0x2d0c..+0x2d18`: how far below its place it waits, the rise's and the turn's ticks, and how far
+/// its rider may go before it goes back.
+const LIFT_DROP: f32 = 4.8;
+const LIFT_RISE: f32 = 30.0;
+const LIFT_TURN: f32 = 20.0;
+const LIFT_LEAVE: f32 = 1.6;
+
+/// 0x114d (`0x41f8e0`, 8 placed; the decomp's `func_L19_0041E5B0`): a lift that comes up and turns round for a
+/// rider (`+0x00`, set by its rider's class: the port's link).
+/// * **0**: it keeps its yaw and height (`+4`, `+8`), turned half round and waiting [`LIFT_DROP`] below; then 1.
+/// * **1**: once it has a rider, 2.
+/// * **2**: its sound 0; it rises over [`LIFT_RISE`] ticks (cosine eased); up, its timer byte 1 and 3.
+/// * **3**: it turns back to its yaw over [`LIFT_TURN`] ticks; its timer byte 2 and 4.
+/// * **4**: when its rider is gone or more than [`LIFT_LEAVE`] off it (xy), its timer byte 3 and 5.
+/// * **5**: its sound 1; it turns half round again; then 6.
+/// * **6**: it sinks back down; its timer byte 0 and 1.
+pub fn update_114d(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    use crate::hero::physics::{add_rot, dist2};
+    use std::f32::consts::PI;
+    let ease = |t: f32| (((t * PI).cos() + 1.0) * 0.5).clamp(0.0, 1.0);
+    let rider = ai::link(&w.mobys[id], 0).filter(|&r| w.mobys.get(r).is_some_and(|o| o.state < 0xfd));
+    let rider_pos = rider.map(|r| w.mobys[r].pos);
+    let m = &mut w.mobys[id];
+    let (yaw, height, t) = (m.pv_f(4), m.pv_f(8), m.pv_f(0xc));
+    match m.state {
+        0 => {
+            ai::set_link(m, 0, None);
+            let (y, z) = (m.rot[2], m.pos[2]);
+            m.set_pv_f(4, y);
+            m.set_pv_f(8, z);
+            m.rot[2] = add_rot(y, PI);
+            m.pos[2] = z - LIFT_DROP;
+            m.set_state(1, -1);
+        }
+        1 => if rider.is_some() {
+            m.set_pv_f(0xc, 0.0);
+            m.set_state(2, -1);
+        },
+        2 => {
+            if m.first() { ctx.host.play_sound(&w.mobys[id], 0, 0); }
+            let m = &mut w.mobys[id];
+            let t = t + 1.0 / LIFT_RISE;
+            if 1.0 < t {
+                m.set_pv_f(0xc, 0.0);
+                m.pos[2] = height;
+                m.timer = 1;
+                m.set_state(3, -1);
+            } else {
+                m.set_pv_f(0xc, t);
+                m.pos[2] = height - ease(t) * LIFT_DROP;
+            }
+        }
+        3 => {
+            let t = t + 1.0 / LIFT_TURN;
+            if 1.0 < t {
+                m.set_pv_f(0xc, 0.0);
+                m.rot[2] = yaw;
+                m.timer = 2;
+                m.set_state(4, -1);
+            } else {
+                m.set_pv_f(0xc, t);
+                m.rot[2] = add_rot(yaw, ease(t) * PI);
+            }
+        }
+        4 => if rider_pos.is_none_or(|p| LIFT_LEAVE < dist2(m.pos, p)) {
+            m.timer = 3;
+            ai::set_link(m, 0, None);
+            m.set_pv_f(0xc, 1.0);
+            m.set_state(5, -1);
+        },
+        5 => {
+            if m.first() { ctx.host.play_sound(&w.mobys[id], 1, 0); }
+            let m = &mut w.mobys[id];
+            let t = t - 1.0 / LIFT_TURN;
+            if t <= 0.0 {
+                m.set_pv_f(0xc, 1.0);
+                m.rot[2] = add_rot(yaw, PI);
+                m.set_state(6, -1);
+            } else {
+                m.set_pv_f(0xc, t);
+                m.rot[2] = add_rot(yaw, ease(t) * PI);
+            }
+        }
+        6 => {
+            let t = t - 1.0 / LIFT_RISE;
+            if t <= 0.0 {
+                m.set_pv_f(0xc, 0.0);
+                m.timer = 0;
+                m.pos[2] = height - LIFT_DROP;
+                m.set_state(1, -1);
+            } else {
+                m.set_pv_f(0xc, t);
+                m.pos[2] = height - ease(t) * LIFT_DROP;
+            }
+        }
+        _ => {}
+    }
+}
