@@ -906,6 +906,7 @@ fn tick(
             coll, pad: &p.pad, cam_yaw: hero_cam_rows[0][1].atan2(hero_cam_rows[0][0]), cam_pos: hero_cam_pos, cam_rows: hero_cam_rows, mirror: false, scene: scene.as_ref(), hero_moby: mobys.hero_moby, targets: &targets, hit, death_z,
             // Clank away from his back (`0x18c31c`, rc_game::hero::body): no packs.
             clank: p.game.clank && !p.hero.body.clank_away, pack: if p.hero.body.clank_away { -1 } else { p.game.pack() }, boots: p.game.boots, charge_boots: p.game.charge_boots, grind_boots: p.game.grind_boots, rails: &mobys.rails, level: p.game.level, arena_on: p.game.arena_on, cheats: p.game.cheats, classes: &classes, nodes: &nodes, hooks: &hooks, pulls: &pulls,
+            liquid: Some(&mobys.world.liquid),
         };
         let before = rc_game::hero::anim::AnimCtl::view(&p.anim.ctl(class));
         let mut ctl = p.anim.ctl(class);
@@ -1194,7 +1195,7 @@ fn tick(
     {
         let scene = crate::mobys::scene_of(&mobys.snap, &mobys.coll, &mobys.cache);
         let off = p.game.scenes.mode != rc_game::scene::PLAY;
-        rc_game::fog::underwater_test_in(&mut p.game.underwater, p.camera.pos, off, coll, scene.as_ref());
+        rc_game::fog::underwater_test_in(&mut p.game.underwater, p.camera.pos, off, coll, scene.as_ref(), Some(&mobys.world.liquid));
         rc_game::fog::region_fog(&mut p.game.fog, &mobys.level.light_regions, p.camera.pos);
     }
     // △ opens the quick select's screen with Quick Select Pause off and shows the health (360 ticks) and bolt (180)

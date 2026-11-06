@@ -77,6 +77,8 @@ pub struct CollMoby {
     pub(crate) mode: u16,
     /// +0x98: per-primitive disable bits (bit i: primitive i).
     pub(crate) disable: u32,
+    /// The faces' type when the moby's own collision copy has them rewritten (crate::moby::Moby::coll_type).
+    pub(crate) face_type: Option<u8>,
     /// +0xa8: `index << 16 | rebuild count`, the pose-cache key.
     pub(crate) key: u32,
     pub(crate) o_class: i16,
@@ -274,10 +276,12 @@ fn mesh_verts(m: &CollMoby, blob: &MobyCollision, lo: V3, hi: V3) -> Vec<Vert> {
 }
 
 /// The faces as `(vertices, type)`, skipping outcode-culled and flag-excluded ones.
-fn mesh_faces<'v>(blob: &'v MobyCollision, verts: &'v [Vert], fl: u32) -> impl Iterator<Item = ([Vert; 3], u8)> + 'v {
+fn mesh_faces<'v>(blob: &'v MobyCollision, verts: &'v [Vert], fl: u32, over: Option<u8>) -> impl Iterator<Item = ([Vert; 3], u8)> + 'v {
     blob.faces.iter().filter_map(move |f| {
         let v = [verts[f[0] as usize], verts[f[1] as usize], verts[f[2] as usize]];
-        (v[0].code & v[1].code & v[2].code == 0 && !face_excluded(fl, f[3])).then_some((v, f[3]))
+        // The type bits a moby's own copy rewrote (`0x3a28a8`: bits 24..29 of the face word; its top two kept).
+        let ty = over.map_or(f[3], |t| (f[3] & 0xc0) | (t & 0x3f));
+        (v[0].code & v[1].code & v[2].code == 0 && !face_excluded(fl, ty)).then_some((v, ty))
     })
 }
 
@@ -429,7 +433,7 @@ pub(super) fn volume_pass(sc: &MobyScene, fl: u32, vol: &Volume, h: Option<F>, i
                     let mut hi = c_rel.map(|v| add(v, r));
                     if let Some(h) = h { hi[2] = add(hi[2], h); }
                     let verts = mesh_verts(&m, blob, lo, hi);
-                    for ([v0, v1, v2], ty) in mesh_faces(blob, &verts, fl) {
+                    for ([v0, v1, v2], ty) in mesh_faces(blob, &verts, fl, m.face_type) {
                         let hit = match h {
                             None => sphere_tri(fl, c_rel, v0.p, v1.p, v2.p, *best_d),
                             Some(h) => capsule_tri(fl, c_rel, h, v0.p, v1.p, v2.p, *best_d),
@@ -498,7 +502,7 @@ pub(crate) fn coll_sphere_mobys(sc: &MobyScene, centre: [f32; 3], radius: f32, f
                 if !blob.vertices.is_empty() {
                     let c_rel = vsub(c, pos);
                     let verts = mesh_verts(&m, blob, c_rel.map(|v| sub(v, r)), c_rel.map(|v| add(v, r)));
-                    hit = mesh_faces(blob, &verts, fl).any(|([v0, v1, v2], _)| sphere_tri(fl, c_rel, v0.p, v1.p, v2.p, best).is_some());
+                    hit = mesh_faces(blob, &verts, fl, m.face_type).any(|([v0, v1, v2], _)| sphere_tri(fl, c_rel, v0.p, v1.p, v2.p, best).is_some());
                 }
                 if !hit {
                     hit = active_prims(blob, &m, fl).any(|(_, p)| {
@@ -559,7 +563,7 @@ pub(super) fn line_pass(sc: &MobyScene, fl: u32, a: V3, b: V3, d: V3, list: &[(F
                 let lo: V3 = std::array::from_fn(|k| min(a_rel[k], b_rel[k]));
                 let hi: V3 = std::array::from_fn(|k| max(a_rel[k], b_rel[k]));
                 let verts = mesh_verts(&m, blob, lo, hi);
-                for ([v0, v1, v2], ty) in mesh_faces(blob, &verts, fl) {
+                for ([v0, v1, v2], ty) in mesh_faces(blob, &verts, fl, m.face_type) {
                     let Some((q, p, nrm, e1, e2)) = line_tri(fl, d, a_rel, b_rel, v0.p, v1.p, v2.p, *best_t) else { continue };
                     *best_t = q;
                     best = Some(record(ty, p, nrm, v0.p, e1, e2, pos, Some(id)));

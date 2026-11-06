@@ -4,11 +4,11 @@
 //!
 //! The seller of planet 7's coordinates 0x0ccf: [`host`]. The spinning breakables 0x0fc1 / 0x0fc0: [`spinners`]. The
 //! floor button 0x08a1: crate::moby::classes::button. The water sheet 0x093e (`0x404680` / `0x403ac0`): crate::water::ocean.
+//! The liquid grid 0x0fb2 / 0x0fd6 / 0x0fce / 0x0fcf / 0x0fe4 (`0x4581c8`): crate::water::grid.
 //!
 //! Not ported (level 6's other classes):
 //! * Waiting on a missing system (docs/plan/gaps.md): the vent 0x0feb (`0x45da00`, particle type 0x53 `0x37fae8`,
-//!   G-PRT-001); 0x0fb2 / 0x0fd6 / 0x0fce / 0x0fcf / 0x0fe4 (`0x4581c8`: the liquid grid's unit `0x3c0980` / `0x3c0ba0` /
-//!   `0x3c0ea8` / `0x3c0ee8`, crate::water's not ported kinds); 0x0eb1 (`0x451ad0`, items, G-WPN-002); 0x0bc7 (`0x422070`) and 0x0fe6
+//!   G-PRT-001); 0x0eb1 (`0x451ad0`, items, G-WPN-002); 0x0bc7 (`0x422070`) and 0x0fe6
 //!   (`0x45bbc8`), the line test (G-CLS-005); the core 0x0fc2 (`0x458a00`), its beams (class 0x13ba, G-REN-019).
 //! * Ratchet's: the ferry 0x0330 (`0x3e5460`, L11 `0x3b7340`: a ride on paths with its own controls), 0x0947
 //!   (`0x404c60`: a swimmer that grabs Ratchet in the water, his state 0x12, and throws him out, his state 0x6f

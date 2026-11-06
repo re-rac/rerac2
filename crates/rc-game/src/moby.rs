@@ -174,6 +174,9 @@ pub struct Moby {
     pub pvars: Vec<u8>,
     pub has_collision: bool,
     pub coll_disable: u32,
+    /// The type its collision faces are given (their type bits `0x3f << 24` rewritten in its own copy of the class's
+    /// collision, `moby+0x98`: crate::water::grid's water 0 / ice 7); None: the class's.
+    pub coll_type: Option<u8>,
     pub grid_rect: u32,
     pub o_class: i16,
     pub rebuilds: u16,
@@ -380,7 +383,7 @@ impl Moby {
     pub fn init(index: usize, o_class: i16, class: Option<&ClassInfo>) -> Moby {
         let mut m = Moby {
             index, bsphere: [0.0; 4], pos: [0.0; 3], state: 0, group: -1, slot: 0, alpha: 0x80, scale: 0.0, update_dist: 0,
-            drawn: 0, draw_dist: 0, mode: 0, update: None, pvars: Vec::new(), has_collision: false, coll_disable: 0,
+            drawn: 0, draw_dist: 0, mode: 0, update: None, pvars: Vec::new(), has_collision: false, coll_disable: 0, coll_type: None,
             grid_rect: GRID_NONE, o_class, rebuilds: 0, mission: 0, sub_index: 0, uid: 0, rows: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
             rot: [0.0; 3], instance: None, hit_slot: -1, parent: None, pvar_index: -1, bolts: 0, xp: 0, timer: 0, drops: 0, prev_state: 0, sub_state: 0, state_ticks: 0, once: 0, drive: false, manips: Vec::new(), joint_scales: Vec::new(), joint_moves: Vec::new(), joint_nodes: Vec::new(), serial: 0, freed_at: 0,
             // `0x311418`: `+0x38` = 0x40404000000000.
@@ -455,6 +458,7 @@ impl Moby {
             scale: self.scale.to_bits(),
             mode: self.mode,
             disable: self.coll_disable,
+            face_type: self.coll_type,
             key: self.key(),
             o_class: self.o_class,
             collision: self.has_collision,
@@ -595,6 +599,8 @@ pub struct MobyWorld {
     pub chopper: classes::chopper::Pool,
     /// The Pulse Rifle's records in the trail slots' memory and its beams' next (classes::pulse_rifle).
     pub pulse: classes::pulse_rifle::Mem,
+    /// The liquid grid's unit: its records, buffers and clock (crate::water::grid).
+    pub liquid: crate::water::grid::Grid,
     /// The Minirocket Tube's rockets' trail slots (classes::minirocket).
     pub rockets: classes::minirocket::Trails,
     /// The RYNO II's missiles' trail slots (classes::ryno).

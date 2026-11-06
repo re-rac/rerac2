@@ -366,7 +366,7 @@ pub fn park_ship(w: &mut MobyWorld, host: &dyn MobyHost, g: &mut GameState, game
 
 /// `0x31ed78(target, accel, accel, max, &v, &vel)`: `v` toward `target` with a velocity that builds by `accel` a
 /// tick to `max`, braking so as to land on it; the step taken.
-fn approach(target: f32, accel: f32, max: f32, v: &mut f32, vel: &mut f32) -> f32 {
+pub(crate) fn approach(target: f32, accel: f32, max: f32, v: &mut f32, vel: &mut f32) -> f32 {
     let d = target - *v;
     if *vel == 0.0 && d == 0.0 { return 0.0; }
     if *vel * d < 0.0 {

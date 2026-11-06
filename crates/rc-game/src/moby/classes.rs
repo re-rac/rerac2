@@ -325,6 +325,7 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         // The water surfaces (crate::water): the ocean about the camera and the liquid lids.
         c if crate::water::ocean::CLASSES.contains(&c) => Some(crate::water::ocean::update),
         c if crate::water::lid::CLASSES.contains(&c) => Some(crate::water::lid::update),
+        c if crate::water::grid::CLASSES.contains(&c) => Some(crate::water::grid::update),
         0x0a92 | 0x0a93 => Some(oozla::update_float),
         0x09a2 => Some(leaper::update),
         0x0b2b => Some(spitter::update),

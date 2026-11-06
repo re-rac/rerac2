@@ -81,6 +81,8 @@ pub struct Env<'a> {
     pub nodes: &'a [super::swing::Node],
     pub hooks: &'a [super::swing::Node],
     pub pulls: &'a [super::swing::Node],
+    /// The liquid grid (crate::water::grid) the water's height query `0x31d7a0` asks; None: none.
+    pub liquid: Option<&'a crate::water::grid::Grid>,
 }
 
 /// `0x330368(n)`: the stick's angle `min(n, count)` ticks back in the pad's history (1: this tick).
@@ -651,7 +653,8 @@ impl Hero {
             self.surface = o.surface_id();
             match self.surface {
                 0 => {
-                    self.surf.water_z = o.point[2];
+                    // `0x31d7a0`: the liquid grid's rippled height there, else the face's.
+                    self.surf.water_z = env.liquid.filter(|g| g.on()).and_then(|g| g.height(o.point)).unwrap_or(o.point[2]);
                     if self.pos[2] < self.surf.water_z && self.water.under < 1 { self.water.under = 1; }
                     hit = env.line(a, b, 0x24);
                     if let Some(o) = &hit { self.footstep = o.sound_class() as u8; }

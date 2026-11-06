@@ -27,6 +27,9 @@ pub struct LevelData {
     /// Joba's arena challenges, read so from its overlay (crate::moby::classes::level11::arena::read_challenges; empty
     /// elsewhere).
     pub joba: Vec<crate::moby::classes::level11::arena::Challenge>,
+    /// The liquid grid's records, groups and masks, read so from its overlay (crate::water::grid::read_tables; None on
+    /// a level without it).
+    pub liquid: Option<crate::water::grid::Tables>,
     /// The height map the rain stops on (core header `+0xa4`; the engine sets it from the core).
     pub height_map: Option<rc_formats::height_map::HeightMap>,
 }
@@ -46,6 +49,7 @@ impl LevelData {
             items: Vec::new(),
             arena: Vec::new(),
             joba: Vec::new(),
+            liquid: None,
             variant_planes: g::variant_planes(gameplay).map_err(|e| eprintln!("level: variant planes: {e}")).unwrap_or_default(),
             height_map: None,
         }

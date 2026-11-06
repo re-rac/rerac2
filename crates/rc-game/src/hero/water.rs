@@ -5,7 +5,7 @@
 //!
 //! **Where the water is.** The ground probe (`0x2b4a08`, crate::hero::physics): a surface-0 face under the feet sets
 //! the water level `0x18a150` to the face's height through `0x31d7a0` (the ripple module's patch height `0x37dc10`
-//! when the level has one — G-REN-009, not ported: the face's own height is used — else a flat plane `0x1b25bc..cc`
+//! when the level has one — crate::water::grid's [`Grid::height`](crate::water::grid::Grid::height) — else a flat plane `0x1b25bc..cc`
 //! (on, centre, height, radius: within 0.5 of its height and its radius) that only the level start clears on levels
 //! 0–3 (L01 `0x313828` / `0x1b2cfc`, L02 `0x321af8` / `0x1b3d3c`), else the face's height) and the line goes on
 //! through it; a deep liquid (0xd) sets it too, the quicksand (3) and a pit (0xb) set `0x18a154`. The surface step
@@ -42,7 +42,7 @@
 //! ticks, [`Hero::breath_bubble`]; in the water death 0x67 every `rand_range(2, 5) + timer / 5` then `rand_range(10,
 //! 20)`, [`Hero::drown_breath`]).
 //!
-//! Not ported: the ripple disturbances (`0x37d5a0`, with the ripple module: G-REN-009), the fast swim's jets
+//! Not ported: the ripple disturbances (`0x37d5a0`, crate::water::grid::Grid::disturb, which the swim does not call yet), the fast swim's jets
 //! (`0x18a858`: four bubbles a time from Clank's joints 0 / 1 while the back item is class 0x261 — the back slot's moby
 //! is not ported), the splash moby 0x307 (in no level's class table: the game spawns none either), the scripted no-jump
 //! / no-dive flags `0x18a018` / `0x18a01e` (always allowed here; Oozla's swamp water 0x0a17 sets `0x18a01e` to 2 out of

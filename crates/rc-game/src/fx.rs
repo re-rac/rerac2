@@ -65,6 +65,7 @@
 //! | `0x423e80` (L14) | the electric strand 0x0f80 on | its strands ([`trails::strand`], crate::moby::classes::level14::fence::draw) |
 //! | `0x3b02e8` (L09; L16, L18, L19, L20; first list) | the bolt 0x05de | its strips, glow and sparks ([`crate::moby::classes::level09::bolt::draw`]) |
 //! | `0x42fce0` (L08; L09 `0x423498`, L19 `0x4223e8`; first list) | the liquid lids 0x11fe / 0x12af / 0x12b4 | the frame's lids' layers and sheens ([`crate::water::lid::draw`]) |
+//! | `0x3e94a0` → `0x3a35e8` (L04; L06 `0x3c1100`, L08 `0x3d1440` → `0x38e260`, L18, L20; first list, the second under water) | the liquid grid's mover of record 0 | every drawn patch's water and sheen ([`crate::water::grid::draw`]) |
 //! | `0x390d60` (L14; L19 `0x383a18`; the world's list `0x2e77e0`, here the first) | the sinking pit 0x135f | its 7 × 7 waving cells (crate::moby::classes::level14::pit::draw) |
 //! | `0x432150` (L14) | the energy field 0x1164 | its halo, rings, core and rays (crate::moby::classes::level14::energy::draw) |
 //! | `0x41e3b8` (L16, first list) | the sweeping laser 0x1162 | its beam (crate::moby::classes::level16::laser::draw) |
@@ -410,6 +411,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         0x0a9d => crate::moby::classes::oozla::draw_0a9d(w, id, out),
         c if crate::water::ocean::CLASSES.contains(&c) => crate::water::ocean::draw(w, id, game, hero_state, cam, host.camera_rows(), out),
         c if first && crate::water::lid::CLASSES.contains(&c) => crate::water::lid::draw(w, id, game.frame, cam, out),
+        c if crate::water::grid::CLASSES.contains(&c) => crate::water::grid::draw(w, view, cam, out),
         crate::vendor::CLASS => crate::moby::classes::vendor::draw(w, id, game, host.camera_rows(), out),
         // 0x0d5c is in the flocks' class switches but runs Damosel's traffic (L18 `0x3fcb78`, its only level): the flocks'
         // draw (`0x38ee50`) is a callback their leader's update registers, which no 0x0d5c runs, and its groups hold no

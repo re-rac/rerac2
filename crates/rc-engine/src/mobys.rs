@@ -720,6 +720,7 @@ impl Mobys {
             l.items = crate::play::menu_tables(&crate::level_load::extracted_root(), crate::level_load::level_index()).items;
             l.arena = arena_challenges();
             l.joba = joba_challenges();
+            l.liquid = liquid_tables(&lv.gameplay);
             l
         }, footstep_base: footstep_base(&lv.gameplay), left_out }
     }
@@ -735,6 +736,20 @@ fn arena_challenges() -> Vec<rc_game::moby::classes::arena::Challenge> {
     if !o.vtbl().iter().any(|e| e.o_class == fighters::MASTER as i32) { return Vec::new(); }
     let read = |a: u32, n: usize| o.read(a, n).map(<[u8]>::to_vec);
     arena::read_challenges(&read).unwrap_or_else(|| { eprintln!("arena: the challenge table at {:#x} was not read", arena::CHALLENGE_TABLE); Vec::new() })
+}
+
+/// The liquid grid's tables (rc_game::water::grid::read_tables) on a level with its unit; None otherwise.
+fn liquid_tables(gameplay: &[u8]) -> Option<rc_game::water::grid::Tables> {
+    let level = crate::level_load::level_index() as i32;
+    if !rc_game::water::grid::SITES.iter().any(|s| s.level == level) { return None; }
+    let bytes = crate::level_wad::overlay(&crate::level_load::extracted_root(), crate::level_load::level_index()).ok()?;
+    let o = rc_formats::level_overlay::LevelOverlay::parse(&bytes).ok()?;
+    let read = |a: u32, n: usize| o.read(a, n).map(<[u8]>::to_vec);
+    // The level's first light set's A direction (`0x1c7440 + 0x10`, the bank's set 0).
+    let light = rc_formats::tfrag_light::parse_light_bank(gameplay).ok().and_then(|b| b.key_lights().first().copied()).map_or([0.0, 0.0], |d| [d[0], d[1]]);
+    let t = rc_game::water::grid::read_tables(level, &read, light);
+    if t.is_none() { eprintln!("liquid grid: level {level}'s tables were not read"); }
+    t
 }
 
 /// Joba's arena challenges (rc_game::moby::classes::level11::arena::read_challenges) when the level's class table holds
