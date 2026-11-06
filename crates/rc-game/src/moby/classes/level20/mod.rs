@@ -5,6 +5,7 @@
 pub mod biter;
 pub mod boss;
 pub mod fighter;
+pub mod misc;
 pub mod props;
 pub mod shooter;
 
@@ -19,6 +20,17 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         props::CRYSTAL => Some(props::update_1269),
         props::FIELD => Some(props::update_119b),
         props::NEST => Some(props::update_11ec),
+        // `0x446c78`: `jr ra`.
+        0x11ed => Some(super::level04::misc::update_empty),
+        misc::SLAB => Some(misc::update_11ef),
+        misc::LIFT => Some(misc::update_1246),
+        misc::CRATE => Some(misc::update_131a),
+        misc::TRIGGER => Some(misc::update_04f7),
+        misc::BOX => Some(misc::update_0f88),
+        misc::PAD => Some(misc::update_1209),
+        misc::BRIDGE => Some(misc::update_11e8),
+        // `0x449298`: L19's floating platform `0x4168b8`, the same code.
+        0x1257 => Some(super::level19::floe::update_0f4b),
         _ => None,
     }
 }

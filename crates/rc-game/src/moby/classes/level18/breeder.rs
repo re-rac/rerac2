@@ -274,7 +274,7 @@ fn die(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, now: bool) {
 }
 
 /// Its bolts (`0x335db0(m, 0, 1)`), then gone.
-fn drop_and_die(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+pub(crate) fn drop_and_die(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     bolts::drop(w, id, 0, 1, ctx);
     die(w, id, ctx, false);
 }

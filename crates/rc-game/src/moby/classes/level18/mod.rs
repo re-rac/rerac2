@@ -6,7 +6,9 @@ pub mod breakables;
 pub mod breeder;
 pub mod dropship;
 pub mod hatch;
+pub mod props;
 pub mod stalker;
+pub mod traffic;
 
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
@@ -21,6 +23,15 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         // `0x436980`: L09's `0x3f85e8`, the shadow alone.
         stalker::BODY => Some(super::level09::trooper::update_0d0e),
         dropship::CLASS => Some(dropship::update_0ede),
+        traffic::CAR | traffic::RAM => Some(traffic::update_11cf),
+        // Level 20's 0x1212 runs the same code (`0x447010`).
+        props::ARCS => Some(props::update_1212),
+        props::PANEL => Some(props::update_12a6),
+        props::SLIDER_A | props::SLIDER_B | props::SLIDER_C => Some(props::update_11af),
+        props::NEST => Some(props::update_0f06),
+        props::SHELL => Some(props::update_12bf),
+        props::ORB => Some(props::update_124a),
+        props::SWING => Some(props::update_0f54),
         _ => None,
     }
 }
