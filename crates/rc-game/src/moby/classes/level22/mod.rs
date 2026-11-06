@@ -4,6 +4,7 @@
 
 pub mod asteroid;
 pub mod debris;
+pub mod props;
 
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
@@ -11,6 +12,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         debris::ROCK | debris::ROCK_B | debris::ICE => Some(debris::update_rock),
         debris::DUST => Some(debris::update_0cb6),
         asteroid::CLUSTER => Some(asteroid::update),
+        props::HIDDEN => Some(props::update_0a6c),
         _ => None,
     }
 }

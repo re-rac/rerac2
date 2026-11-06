@@ -3,8 +3,11 @@
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
 
 pub mod den;
+pub mod floe;
+pub mod frozen;
 pub mod lurker;
 pub mod props;
+pub mod switches;
 
 use crate::hero::physics::V3;
 use crate::moby::MobyWorld;
@@ -26,6 +29,15 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         props::TURN_LIFT => Some(props::update_114d),
         lurker::CLASS => Some(lurker::update_10d0),
         den::CLASS => Some(den::update_1177),
+        frozen::CLASS => Some(frozen::update_0f57),
+        floe::CLASS => Some(floe::update_0f4b),
+        floe::MOVER | floe::MOVER_B => Some(floe::update_0edb),
+        floe::RISER => Some(floe::update_1271),
+        switches::CLEARER => Some(switches::update_1205),
+        switches::SPINNER => Some(switches::update_11f4),
+        switches::PLANET_SCENE => Some(switches::update_1267),
+        // Level 8's lift 0x0aaa's code (L19 `0x41fcb8`).
+        0x1176 => Some(super::level08::lift::update_0aaa),
         // Level 20's fading field 0x119b's code (L19 `0x423750`).
         0x1204 => Some(super::level20::props::update_119b),
         _ => None,
@@ -36,6 +48,10 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
 #[allow(clippy::too_many_arguments, unused_variables)]
 pub fn draw(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, hero_state: i32, view: &crate::particles::BSphereView, cam: V3, id: usize, first: bool, out: &mut Vec<crate::fx::FxQuad>, frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
     match w.mobys[id].o_class {
+        frozen::CLASS if first => {
+            frozen::draw(w, host, id, &mut game.rng, cam, out);
+            true
+        }
         _ => false,
     }
 }
