@@ -3,10 +3,12 @@
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
 
 pub mod carrier;
+pub mod brute;
 pub mod floaters;
 pub mod gate;
 pub mod hatchling;
 pub mod hazard;
+pub mod lobber;
 pub mod lifts;
 pub mod misc;
 pub mod mortar;
@@ -29,6 +31,10 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         gate::CLASS => Some(gate::update_1305),
         // Also level 8's (L08 `0x3f7ab0`).
         mortar::CLASS => Some(mortar::update_0c1a),
+        brute::CLASS => Some(brute::update_0bcb),
+        // Also level 12's (L12 `0x3e3838`) and its glob 0x0ea5.
+        lobber::CLASS => Some(lobber::update_0bbf),
+        lobber::SHOT => Some(lobber::update_0ea5),
         carrier::CARRIER => Some(carrier::update_08b1),
         carrier::PLATFORM => Some(carrier::update_093b),
         lifts::DOCK => Some(lifts::update_0935),
