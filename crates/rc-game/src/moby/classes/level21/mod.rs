@@ -3,11 +3,13 @@
 //! after its own.
 
 pub mod exhibits;
+pub mod toys;
 
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
         exhibits::EXHIBIT => Some(exhibits::update_134e),
+        toys::STRUCK => Some(toys::update_0bd5),
         _ => None,
     }
 }

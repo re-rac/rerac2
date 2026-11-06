@@ -25,8 +25,9 @@
 //! their count, `+0x5d` the mode (2), `+0x5e` the sound (0xff none).
 //!
 //! The contacts test the level's mesh with the port's segment query, as `0x2e2248` tests the triangles `0x2df8d8`
-//! gathers. Mode 0 ([`spawn_whole`]) throws the whole moby. Not ported: the gravity frames (`0x1a8ff0`), the other
-//! modes (3 the whole moby as a ball, 4 / 5), mode 1's segments on joints.
+//! gathers. Mode 0 ([`spawn_whole`]) throws the whole moby. Mode 3 ([`whole_ball`], [`ball_at`]) makes the
+//! whole moby a ball on a block of its own pvars. Not ported: the gravity frames (`0x1a8ff0`), the other modes (4 / 5),
+//! mode 1's segments on joints.
 
 use super::{mode, Ctx, MobyWorld};
 use crate::hero::physics::{add, dot, len, scale, set_len, sub, V3};
@@ -246,7 +247,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// `0x2dc1f0` mode 2: true when its life is over (or it left the world).
 pub(crate) fn step(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
-    if w.mobys[id].pvars[MODE] == 1 { return ball(w, id, ctx); }
+    if matches!(w.mobys[id].pvars[MODE], 1 | 3) { return ball(w, id, ctx); }
     let pts = points(w, id);
     let mut done = body(w, id, ctx, &pts);
     let m = &mut w.mobys[id];
@@ -292,19 +293,23 @@ fn body(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, pts: &[V3]) -> bool {
 /// radius — and from 1/30 into the face it sounds (its sound, else the level's 8; the slot's position `0x3609d0` is not
 /// ported). Against a wall it
 /// reflects. Its life counts down every tick; true when it is over (or it left the world).
-fn ball(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
-    fly(w, id);
+fn ball(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool { ball_in(w, id, ctx, 0) }
+
+/// [`ball`] on the block at `b` of the moby's pvars (mode 3 carries it in a moby's own pvars: the original points
+/// `+0x68` at the block for the call).
+fn ball_in(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, b: usize) -> bool {
+    fly_in(w, id, b);
     let m = &w.mobys[id];
-    let centre = add(through(&m.rows, m.pv_v(PIVOT)), m.pos);
-    let (r, src) = (m.pv_f(RADIUS), usize::try_from(m.pv_i(SOURCE)).ok());
+    let centre = add(through(&m.rows, m.pv_v(b + PIVOT)), m.pos);
+    let (r, src) = (m.pv_f(b + RADIUS), usize::try_from(m.pv_i(b + SOURCE)).ok());
     let hit = ctx.coll.and_then(|c| crate::collision::coll_sphere_m(c, ctx.scene, centre, r, crate::collision::QueryFlags(2), src));
     if let Some(h) = hit {
         let m = &mut w.mobys[id];
         if let Some(p) = h.pushed_centre { m.pos = add(m.pos, sub(p, centre)); }
         let n = set_len(h.normal, 1.0);
-        let mut vel = m.pv_v(VEL);
-        let spin = add_turn(m.pv_q(SPIN), cross(vel, n));
-        m.set_pv_q(SPIN, spin);
+        let mut vel = m.pv_v(b + VEL);
+        let spin = add_turn(m.pv_q(b + SPIN), cross(vel, n));
+        m.set_pv_q(b + SPIN, spin);
         if 0.7 < dot([0.0, 0.0, 1.0], n) {
             let vn = dot(vel, n);
             let half = vn * 0.5;
@@ -318,10 +323,10 @@ fn ball(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
                 let s = if r != 0.0 { (len(axis) * -0.5) / r } else { 0.0 };
                 let roll = set_len(axis, s);
                 let q = [roll[0], roll[1], roll[2], (1.0 - s * s).max(0.0).sqrt()];
-                m.set_pv_q(SPIN, crate::quat::nlerp(m.pv_q(SPIN), q, 0.1));
+                m.set_pv_q(b + SPIN, crate::quat::nlerp(m.pv_q(b + SPIN), q, 0.1));
             }
-            m.set_pv_v(VEL, vel);
-            let sound = m.pvars[SOUND];
+            m.set_pv_v(b + VEL, vel);
+            let sound = m.pvars[b + SOUND];
             if 0.033_333_335 <= vn.abs() {
                 // Its class sound, or without one the level's 8 on it (`0x360750(8, 0, moby)` at `0x2dc730`).
                 if sound != 0xff { ctx.host.play_sound(&w.mobys[id], sound as i32, 0); } else { ctx.host.play_level_sound(Some(&w.mobys[id]), 8, 0); }
@@ -329,27 +334,66 @@ fn ball(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
         } else {
             let d = dot(vel, n);
             if d < 0.0 { vel = sub(vel, scale(n, 2.0 * d)); }
-            m.set_pv_v(VEL, vel);
+            m.set_pv_v(b + VEL, vel);
         }
     }
     let m = &mut w.mobys[id];
-    let t = m.pv_s(LIFE);
-    m.set_pv_s(LIFE, (t - 1).max(0));
+    let t = m.pv_s(b + LIFE);
+    m.set_pv_s(b + LIFE, (t - 1).max(0));
     let p = m.pos;
     let inside = |c: f32| (2.0..=1021.0).contains(&c);
     t <= 1 || !(inside(p[0]) && inside(p[1]) && inside(p[2]))
 }
 
-/// `0x2dc7a8`: falls, moves, and spins about its pivot.
-fn fly(w: &mut MobyWorld, id: usize) {
+/// `0x2dbff8(gravity, m, 3, 0, vel, spin, sound)` on the block at `b` of moby `id`'s own pvars: the whole moby a ball
+/// — no collision, mode 0x100; the block's velocity and spin, the floor's loss 0.45 (least 1/30), 0.5, sin 0.75°, the
+/// gravity (/3600), the weight's turn, 180 ticks, the sound, no points or contacts; its pivot the moby's bounding
+/// sphere (`+0x00`, /1024) back into its frame, its radius the sphere's. The source (`+0x54`, which the original
+/// leaves as the block held it) is the moby itself here, so its own collision is not met.
+pub fn whole_ball(w: &mut MobyWorld, id: usize, b: usize, gravity: f32, vel: V3, spin: Q, sound: u8) {
     let m = &mut w.mobys[id];
-    let mut vel = m.pv_v(VEL);
-    vel[2] -= m.pv_f(GRAVITY);
-    m.set_pv_v(VEL, vel);
+    if m.pvars.len() < b + BLOCK { m.pvars.resize(b + BLOCK, 0); }
+    m.has_collision = false;
+    m.mode |= mode::KEEP_ROWS;
+    m.set_pv_v(b + VEL, vel);
+    m.set_pv_q(b + SPIN, spin);
+    m.set_pv_f(b + LOSS, f32::from_bits(0x3ee6_6666));
+    m.set_pv_f(b + LEAST, f32::from_bits(0x3d08_8889));
+    m.set_pv_f(b + 0x40, 0.5);
+    m.set_pv_f(b + 0x44, f32::from_bits(0x3c56_7752));
+    m.set_pv_f(b + GRAVITY, gravity * 0.000_277_777_8);
+    m.set_pv_f(b + WEIGHT, f32::from_bits(0x3ae4_c38a));
+    m.set_pv_s(b + LIFE, 0xb4);
+    m.pvars[b + SOUND] = sound;
+    m.pvars[b + MODE] = 3;
+    m.pvars[b + POINTS] = 0;
+    m.pvars[b + COUNT] = 0;
+    m.set_pv_i(b + 0x30, 0);
+    m.set_pv_i(b + SOURCE, id as i32);
+    let k = 0.000_976_562_5;
+    let c = [m.bsphere[0] * k, m.bsphere[1] * k, m.bsphere[2] * k];
+    let d = sub(c, m.pos);
+    let rows = m.rows;
+    m.set_pv_v(b + PIVOT, [dot(d, rows[0]), dot(d, rows[1]), dot(d, rows[2])]);
+    m.set_pv_f(b + RADIUS, m.bsphere[3] * k);
+}
+
+/// `0x2dc1f0` on the block at `b` of moby `id`'s pvars (modes 1 and 3 share `0x2dc518`, [`ball`]): true when its life
+/// is over or it left the world.
+pub fn ball_at(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, b: usize) -> bool { ball_in(w, id, ctx, b) }
+
+/// `0x2dc7a8`: falls, moves, and spins about its pivot.
+fn fly(w: &mut MobyWorld, id: usize) { fly_in(w, id, 0) }
+
+fn fly_in(w: &mut MobyWorld, id: usize, b: usize) {
+    let m = &mut w.mobys[id];
+    let mut vel = m.pv_v(b + VEL);
+    vel[2] -= m.pv_f(b + GRAVITY);
+    m.set_pv_v(b + VEL, vel);
     m.pos = add(m.pos, vel);
-    let pivot = m.pv_v(PIVOT);
+    let pivot = m.pv_v(b + PIVOT);
     let before = through(&m.rows, pivot);
-    let q = m.pv_q(SPIN);
+    let q = m.pv_q(b + SPIN);
     m.rows = m.rows.map(|r| rotate(q, r));
     let after = through(&m.rows, pivot);
     m.pos = sub(m.pos, sub(after, before));

@@ -41,11 +41,15 @@
 //! `0x3eb1d0` (crate::moby::classes::death_fade), `0x331ed0` = L00 `0x31ce20` (crate::moby::ai::ground_z),
 //! `0x333c58` = L00 `0x31eb18` (approach), `0x3309e8` = L00 `0x31ba98` (randf_signed), `0x3308f0` = L00 `0x31b9a0`.
 //!
-//! Not ported: the flight's body itself (`0x2f01f0` = L00 `0x2dc1f0` on the block `+0x210`: the break pieces' mode 3,
-//! the whole moby as a ball, which crate::moby::shards lacks) and the throw (`0x4416d8`, called only by 0x11e0's
-//! `0x445238`, which the port lacks: until then they stay in the pool); in a scene the deletion once the loaded
-//! part (`0x1bdc70`, set by `0x319ba8`) is 5 or more; the head's aim (`0x33c3d8` = L00 `0x327308` on `+0x2b0`, 2.5).
-//! The frame slice uses its index for the moby's address `>> 8`.
+//! **The throw** ([`throw`], `0x4416d8`, from the boss 0x11e0's state 12, crate::moby::classes::level20::boss): the
+//! first of the group in the pool, at the throw's place facing Ratchet, shown with its collision; sequence 7 cut in,
+//! state 7 (sub 3); its body (`0x2efff8` = L00 `0x2dbff8` mode 3 on `+0x210`, crate::moby::shards::whole_ball: gravity
+//! 15, the throw's velocity, a spin of sin 6° about `up × velocity`, no sound) and the throw's spin `+0x288`; its
+//! collision back and targeted. In state 7 the body flies (`0x2f01f0` = L00 `0x2dc1f0`, crate::moby::shards::ball_at).
+//!
+//! Not ported: in a scene the deletion once the loaded part (`0x1bdc70`, set by `0x319ba8`) is 5 or more; the head's
+//! aim (`0x33c3d8` = L00 `0x327308` on `+0x2b0`, 2.5); the moby word `+0x9c` = 1 of the throw. The frame slice uses its
+//! index for the moby's address `>> 8`.
 
 use crate::hero::physics::{add, approach, atan2, dist2, euler_rows, len2, set_len2, V3};
 use crate::moby::classes::death_fade;
@@ -242,6 +246,33 @@ fn set_walk(w: &mut MobyWorld, id: usize, speed: f32, accel: f32) {
     m.set_pv_f(MV + 0x24, accel * 0.000_277_777_78);
 }
 
+/// `0x4416d8(spin, group, pos, vel)`: the first of `group` in the pool (state 6) thrown out (module docs); None when
+/// none is.
+pub fn throw(w: &mut MobyWorld, ctx: &mut Ctx, group: i32, pos: V3, vel: V3, spin: f32) -> Option<usize> {
+    let list = usize::try_from(group).ok().filter(|_| group & 0xff != 0xff).and_then(|g| w.groups.get(g))?;
+    let id = list.iter().copied().take_while(|&k| k < w.mobys.len()).find(|&k| w.mobys[k].state == 6)?;
+    let h = ctx.hero.pos;
+    let coll = w.class(w.mobys[id].o_class).is_some_and(|c| c.has_collision);
+    let m = &mut w.mobys[id];
+    m.pos = pos;
+    m.rot[2] = atan2(h[0] - pos[0], h[1] - pos[1]);
+    m.mode &= 0xefbe;
+    m.has_collision = coll;
+    ctx.host.set_anim(&w.mobys[id], 7, 0, 0);
+    w.mobys[id].set_state(7, 3);
+    w.rebuild(id, &*ctx.host);
+    // `0x302f98`: up (`vf0.zwxy`), across the velocity; `0x336d50`: the quaternion of sin 6° about it.
+    let axis = crate::hero::physics::cross([0.0, 0.0, 1.0], vel);
+    let q = crate::quat::axis_quat(f32::from_bits(0x3dd6_7752), axis);
+    crate::moby::shards::whole_ball(w, id, BODY, 15.0, vel, q, 0xff);
+    let m = &mut w.mobys[id];
+    m.set_pv_f(SPIN, spin);
+    m.has_collision = coll;
+    m.mode |= mode::TARGET;
+    w.changed = true;
+    Some(id)
+}
+
 /// 0x119e (module docs).
 pub fn update_119e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     head(w, id, ctx);
@@ -332,7 +363,8 @@ pub fn update_119e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if wrapped(w, id, ctx) && REACH < dist2(w.mobys[id].pos, hero) { w.mobys[id].set_state(3, -1); }
         }
         7 => {
-            // The flight's body (`0x2f01f0` on `+0x210`) is not ported (module docs).
+            // `0x2f01f0` on `+0x210` (its result unused).
+            crate::moby::shards::ball_at(w, id, ctx, BODY);
             let p = w.mobys[id].pos;
             ai::attack_sphere(w, id, ctx, 0.5, 5.0, 1.0, p, 0x400_0000, 0, 1, 0);
             let m = &mut w.mobys[id];
