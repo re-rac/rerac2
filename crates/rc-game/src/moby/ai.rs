@@ -1091,6 +1091,20 @@ pub fn attack_joint(w: &mut MobyWorld, id: usize, ctx: &Ctx, r: f32, damage: f32
     attack_sphere(w, id, ctx, r, damage, push, c, flags, b7, b8, query)
 }
 
+/// `0x3132c8` (L01; L07 `0x313618`): a hit from the moby along the line `a` → `b` — the first moby the line meets
+/// (`query | 9`, the moby itself ignored) gets `damage` pushed along its facing (`push` times; the rows' with mode
+/// 0x100, the z 1, the no-limit 5627.925), flags `flags`; returns the moby it hit.
+#[allow(clippy::too_many_arguments)]
+pub fn attack_line(w: &mut MobyWorld, id: usize, ctx: &Ctx, a: V3, b: V3, flags: u32, damage: f32, push: f32, query: u32) -> Option<usize> {
+    let m = &w.mobys[id];
+    let d = if m.mode & super::mode::KEEP_ROWS == 0 { [m.rot[2].cos(), m.rot[2].sin(), 0.0] } else { m.rows[0] };
+    let t = super::hits::HitTemplate::new(damage, Some(id), flags, [d[0] * push, d[1] * push, 1.0, 5_627.925]);
+    let o = w.coll_line(ctx, a, b, query | 9, Some(id))?;
+    let hit = o.moby?;
+    w.deliver_hit_any(hit, &t, [o.point[0], o.point[1], o.point[2], 1.0]);
+    Some(hit)
+}
+
 /// `0x31ce20(up, p, flags)`: the ground's height under `p` (a line from `up` above to 0.01; 0 none).
 pub fn ground_z(ctx: &Ctx, up: f32, p: V3, flags: u32) -> f32 {
     let a = [p[0], p[1], p[2] + up];

@@ -14,7 +14,7 @@
 //!   collision.
 //! * **1**: Ratchet (`0x189ea0`) in cuboid `+0x90` (`0x317920`) → [`set_off`] (`0x3f0020`).
 //! * **2**: [`fly`]; hooked (`0x320c98`) → 3.
-//! * **3**: [`fly`]; within √3 of the target: each prowler / gunner of the group not dying gets its class sound 0 and
+//! * **3**: [`fly`]; within 3 of the target (xy): each prowler / gunner of the group not dying gets its class sound 0 and
 //!   is dropped ([`drop_in`]) from `$gp+0x1c10` in its frame; 4.
 //! * **4**: its first tick the timer 60; [`fly`]; the last group (or the seventh) → 5; else once the group is dead
 //!   and the timer out, the next group and 3.
@@ -153,7 +153,7 @@ pub(super) fn set_off(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// `0x3f0168`: one tick of flight toward the target (in the frame of what it rides): the velocity steered toward the
 /// stopping speed √(d·a/2) (at most [`TOP`]) by at most `a`; the roll eased toward its sideways speed; the three
-/// wobbles; its platform block written. Returns the distance² left.
+/// wobbles; its platform block written. Returns the xy distance left (`0x2e5110`).
 fn fly(w: &mut MobyWorld, id: usize) -> f32 {
     let support = ai::link(&w.mobys[id], 0x110);
     let (old_pos, old_rot) = (w.mobys[id].pos, w.mobys[id].rot);
@@ -198,8 +198,7 @@ fn fly(w: &mut MobyWorld, id: usize) -> f32 {
     m.pos[2] += WOBBLE[2] * ph[2].sin() + m.pv_f(0x118);
     let (new_pos, new_rot) = (m.pos, m.rot);
     if let Some(b) = platform::block(m) { platform::write(m, b, sub(new_pos, old_pos), old_rot, new_rot); }
-    let d = sub(place, target);
-    dot(d, d)
+    crate::hero::physics::dist2(place, target)
 }
 
 /// `0x3e86c0` / `0x3ecf28`: a prowler (state 10) or gunner (state 8) shown with its class's collision and carried

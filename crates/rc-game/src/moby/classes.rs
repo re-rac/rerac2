@@ -123,7 +123,7 @@ use super::UpdateFn;
 /// upgraded Synthenoids' drone 0x0b02 and bomb 0x0cf3 (L00 `lvl.vtbl` `0x3d5e70` / `0x3f56b0`) are listed so too. The
 /// upgraded Shield Charger's shield 0x1192 (`0x3c51d8`) and its zap 0x1195 (`0x414628`) have no model: their looks are
 /// their draws'.
-pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS, explosion::CLASS, spiderbot::BOT_CLASS, endako_boss::BEAM, endako_boss::TRACER, endako_boss::ROCKET, blitz::TRACER, gravity_bomb::MINI_BOMB, gravity_bomb::MINI_BLAST, pulse_rifle::SHOT, spiderbot::PLUS_BOT, spiderbot_plus::SHOT, spiderbot_plus::LOB, blitz::MEGA_TRACER, beam::CLASS, synthenoid::SHOT, turret::PLASMA, vaporizer::SHOT, plasma_coil::BALL, plasma_storm::BALL, synthenoid::PLUS_DRONE, synthenoid_bomb::CLASS, zodiac::EFFECT, shield::CLASS, shield::PLUS_CLASS, shield_zap::CLASS];
+pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS, explosion::CLASS, spiderbot::BOT_CLASS, endako_boss::BEAM, endako_boss::TRACER, endako_boss::ROCKET, blitz::TRACER, gravity_bomb::MINI_BOMB, gravity_bomb::MINI_BLAST, pulse_rifle::SHOT, spiderbot::PLUS_BOT, spiderbot_plus::SHOT, spiderbot_plus::LOB, blitz::MEGA_TRACER, beam::CLASS, synthenoid::SHOT, turret::PLASMA, vaporizer::SHOT, plasma_coil::BALL, plasma_storm::BALL, synthenoid::PLUS_DRONE, synthenoid_bomb::CLASS, zodiac::EFFECT, shield::CLASS, shield::PLUS_CLASS, shield_zap::CLASS, level07::laser::CLASS, level07::boss::GLOW, level07::boss::BODY];
 
 pub fn update_for(o_class: i16) -> Option<UpdateFn> {
     match o_class {

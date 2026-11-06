@@ -636,6 +636,8 @@ pub struct MobyWorld {
     pub endako: classes::endako_c::Globals,
     /// Level 6's globals (classes::level06::Globals).
     pub level06: classes::level06::Globals,
+    /// Level 7's globals (classes::level07::boss::Globals).
+    pub level07: classes::level07::boss::Globals,
     /// Level 11's globals (classes::level11::Globals).
     pub level11: classes::level11::Globals,
     /// The point lights (`0x1c6ec0`), owned by the explosion lights (classes::light); the engine lights the world and

@@ -3,11 +3,17 @@
 //! after its own. Level 4's light 0x0cfd (crate::moby::classes::level04::misc::update_0cfd) is this level's
 //! `0x3e3698`.
 
+pub mod bomb;
+pub mod boss;
 pub mod can;
 pub mod dropship;
 pub mod gunner;
+pub mod hooks;
 pub mod icicle;
+pub mod laser;
+pub mod mover;
 pub mod prowler;
+pub mod skill_target;
 pub mod swarm;
 pub mod turret;
 
@@ -23,6 +29,14 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         swarm::FLYER => Some(swarm::update_0d1d),
         turret::CLASS => Some(turret::update_0e4c),
         dropship::CLASS => Some(dropship::update_0d44),
+        skill_target::CLASS => Some(skill_target::update_0f67),
+        mover::CLASS => Some(mover::update_0eac),
+        hooks::TRIGGER => Some(hooks::update_0d3c),
+        hooks::BLAST => Some(hooks::update_0d3b),
+        boss::CLASS => Some(boss::update_0e5f),
+        boss::GLOW => Some(boss::update_0d45),
+        laser::CLASS => Some(laser::update_0e28),
+        bomb::CLASS => Some(bomb::update_0e52),
         _ => None,
     }
 }

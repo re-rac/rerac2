@@ -1,6 +1,6 @@
 //! 0x0e4c (`0x3f76c8`, 4 placed; the decomp's `func_L07_003F6328`): a swaying turret that fires Endako's tracers
 //! (crate::moby::classes::endako_boss::spawn_tracer, `0x3bf850` = L03 `0x3dae28`). It waits hidden until something
-//! outside it puts it in state 2.
+//! outside it puts it in state 2: the boss carries it in and wakes it ([`wake`], crate::moby::classes::level07::boss).
 //!
 //! * Every tick but in state 1 ([`hurt`], `0x3f7b58`): a hit's damage (`0x3140c0(m, 0x10000)`, `0x314120`) taken from
 //!   its health (`+0x20`, toward 0, `0x314ef0`); at 0 its reward (`0x310fd0(m, 0, 3)`, crate::moby::bolts::drop), its
@@ -74,6 +74,17 @@ pub fn update_0e4c(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         _ => {}
     }
+}
+
+/// `0x3f78c8`: woken (2) with full health, its sway's phase a quarter turn away from Ratchet's side of its kept yaw.
+pub fn wake(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
+    let hero = ctx.hero.pos;
+    let m = &mut w.mobys[id];
+    m.set_state(2, -1);
+    m.set_pv_f(0x20, m.pv_s(0x24) as f32);
+    let side = crate::hero::physics::sub_rot(crate::hero::physics::atan2(hero[0] - m.pos[0], hero[1] - m.pos[1]), m.pv_f(0x60));
+    m.set_pv_f(0x54, if 0.0 < side { -std::f32::consts::FRAC_PI_2 } else { std::f32::consts::FRAC_PI_2 });
+    sway(m, 0.0);
 }
 
 /// `0x3f7c90(m, rate)`: the phase on by `rate`, the yaw the kept yaw ± [`REACH`]° by its sine.
