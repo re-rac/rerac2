@@ -7,12 +7,16 @@ use crate::moby::MobyWorld;
 
 pub mod breakables;
 pub mod debris;
+pub mod fence;
 pub mod field;
+pub mod grid;
 pub mod head;
 pub mod lifts;
 pub mod mine;
 pub mod props;
+pub mod robot;
 pub mod shot;
+pub mod towers;
 pub mod tractor;
 pub mod trooper;
 pub mod walker;
@@ -47,6 +51,10 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x114b => Some(trooper::update_114b),
         0x0d66 => Some(debris::update_0d66),
         0x03a6 => Some(shot::update_03a6),
+        fence::CLASS => Some(fence::update_0fae),
+        grid::CLASS => Some(grid::update_0f9f),
+        robot::CLASS => Some(robot::update_1169),
+        towers::CLASS => Some(towers::update_12b1),
         // `0x38b400`: `jr ra`, as level 4's U293 classes.
         0x1354 => Some(super::level04::misc::update_empty),
         _ => None,
@@ -63,6 +71,14 @@ pub fn draw(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crat
         }
         0x0fab => {
             mine::draw(w, id, out);
+            true
+        }
+        fence::CLASS => {
+            fence::draw(w, id, out);
+            true
+        }
+        grid::CLASS => {
+            grid::draw(w, id, cam, out);
             true
         }
         _ => false,

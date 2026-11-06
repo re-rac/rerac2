@@ -33,8 +33,9 @@ use crate::moby::{carry_hero, mode, Ctx, MobyWorld};
 
 /// The boxes' classes (Maktar's 0x0e2a too), and the other things it picks (Maktar's bomb 0x09c8,
 /// crate::moby::classes::maktar; its critter 0x09bc, crate::moby::classes::maktar_pads; level 12's 0x0fc4..0x0fc8,
-/// crate::moby::classes::level12::tractor; Yeedil's 0x0f88, crate::moby::classes::level20::misc).
-const BOXES: [i16; 11] = [0x0acb, 0x0acc, 0x0e2a, crate::moby::classes::maktar::BOMB, crate::moby::classes::maktar_pads::CRITTER, 0x0fc4, 0x0fc5, 0x0fc6, 0x0fc7, 0x0fc8, 0x0f88];
+/// crate::moby::classes::level12::tractor; Yeedil's 0x0f88, crate::moby::classes::level20::misc; level 12's robot 0x1169,
+/// crate::moby::classes::level12::robot, its range at `+0x178` as the critter's).
+const BOXES: [i16; 12] = [0x0acb, 0x0acc, 0x0e2a, crate::moby::classes::maktar::BOMB, crate::moby::classes::maktar_pads::CRITTER, 0x0fc4, 0x0fc5, 0x0fc6, 0x0fc7, 0x0fc8, 0x0f88, crate::moby::classes::level12::robot::CLASS];
 /// The beam's pvar holding its target + 1 (the port's `0x18a3e0`).
 const TARGET: usize = 0x60;
 
@@ -63,7 +64,7 @@ fn pick(w: &MobyWorld, ctx: &Ctx) -> Option<usize> {
         d[2] = 0.0;
         let l = len(d);
         // The range: the drag block's `+0x38` (the critter's block is at `+0x140`).
-        let range = if m.o_class == crate::moby::classes::maktar_pads::CRITTER { m.pv_f(0x178) } else { m.pv_f(0x88) };
+        let range = if m.o_class == crate::moby::classes::maktar_pads::CRITTER || m.o_class == crate::moby::classes::level12::robot::CLASS { m.pv_f(0x178) } else { m.pv_f(0x88) };
         if range < l || (0.1 < l && dot(d, fwd) < 0.5 * l) { continue; }
         let from = [hero[0], hero[1], hero[2] + 1.0];
         if w.coll_line(ctx, from, [m.pos[0], m.pos[1], m.pos[2] + 0.5], 2, Some(i)).is_some_and(|o| o.moby != ctx.hero_moby) { continue; }
