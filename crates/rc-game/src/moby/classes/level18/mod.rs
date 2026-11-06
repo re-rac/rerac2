@@ -2,12 +2,19 @@
 //! with the port's). Each class's update is registered in [`update_for`]; crate::moby::classes::update_for asks it
 //! after its own. The chain is global, so a class whose code levels 19 and 20 share is registered here once.
 
+pub mod breakables;
 pub mod breeder;
+pub mod hatch;
 
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
         breeder::CLASS => Some(breeder::update_0b69),
+        breakables::PANEL_A | breakables::PANEL_B | breakables::PANEL_C => Some(breakables::update_122c),
+        breakables::GLOW_PANEL => Some(breakables::update_1184),
+        breakables::BIT_PANEL => Some(breakables::update_1186),
+        breakables::BOLT_PANEL => Some(breakables::update_12a5),
+        hatch::CLASS => Some(hatch::update_1151),
         _ => None,
     }
 }
