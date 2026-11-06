@@ -163,3 +163,116 @@ pub fn update_0af2(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
         _ => {}
     }
 }
+
+pub const SEQUENCER: i16 = 0x0b19;
+
+/// 0x0b19's `$gp+0x1580..+0x158c`: the light's two scales and the two ramps' shapes.
+const RAMP_SCALE: (f32, f32) = (0.05, 0.4);
+const RAMP_SHAPE: (f32, f32) = (2.0, 8.0);
+
+fn linked(w: &MobyWorld, m: usize, off: usize) -> Option<usize> {
+    usize::try_from(w.mobys[m].pv_i(off)).ok().filter(|&i| w.mobys.get(i).is_some_and(|o| o.state < 0xfd))
+}
+
+fn rgb(m: &crate::moby::Moby, at: usize) -> u32 {
+    (m.pv_s(at + 4) as u32) << 16 | (m.pv_s(at + 2) as u32) << 8 | m.pv_s(at) as u32
+}
+
+/// 0x0b19 (`0x3e60b8`, 25 placed; the decomp's `func_L14_003E4BA0`): the vents' sequencer. A ring of eight
+/// thresholds (`+0x00..+0x0e`, s16, falling) is walked by its clock (`+0x14`, counting down from the period `+0x34`
+/// and synced across its group). The index (`+0x16`) moves past every threshold the clock is under. At an even index
+/// it is in state 1, at an odd one in state 2.
+///
+/// * **0**: it hands its colours (`+0x40..+0x4a`) to the other 0x0b19s of its group.
+/// * **1**: on the first tick its light (`+0x24`) is lit with the colours. Each tick the light's two levels
+///   (`+0x40`, `+0x44`) ramp over the stretch to the next threshold.
+/// * **2**: on the first tick its two vents (`+0x1c`, `+0x20`, 0x0b0d) are set off. Their counts come from this
+///   stretch (`+0x14`, `+0x18`), their colours from its own, and their trigger is 1.0. Its light goes out.
+pub fn update_0b19(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let _ = ctx;
+    let group = w.mobys[id].group;
+    let members: Vec<usize> = usize::try_from(group).ok().and_then(|g| w.groups.get(g)).map_or(Vec::new(), |g| {
+        g.iter().map(|&i| i as usize).filter(|&i| w.mobys.get(i).is_some_and(|o| o.o_class == SEQUENCER)).collect()
+    });
+    match w.mobys[id].state {
+        0 => {
+            let colours: Vec<i16> = (0..6).map(|k| w.mobys[id].pv_s(0x40 + 2 * k)).collect();
+            for &o in &members { for k in 0..6 { w.mobys[o].set_pv_s(0x40 + 2 * k, colours[k]); } }
+        }
+        1 => {
+            if w.mobys[id].first() {
+                if let Some(l) = linked(w, id, 0x24) {
+                    let (a, b, period) = (rgb(&w.mobys[id], 0x40), rgb(&w.mobys[id], 0x46), w.mobys[id].pv_i(0x18));
+                    let q = &mut w.mobys[l];
+                    q.set_pv_i(0x48, a as i32);
+                    q.set_pv_i(0x4c, b as i32);
+                    q.set_pv_i(0x3c, 1);
+                    q.set_pv_i(0x34, period);
+                }
+            }
+            ramp(w, id);
+        }
+        2 => if w.mobys[id].first() {
+            let m = &w.mobys[id];
+            let k = m.pv_s(0x16) as usize & 7;
+            if k % 2 == 1 {
+                let (a, b) = (m.pv_s(2 * k) as i32, m.pv_s(2 * ((k + 1) % 8)) as i32);
+                let cur = m.pv_s(0x14) as i32;
+                let c0 = 0x8000_0000 | rgb(m, 0x40);
+                let c1 = 0x8000_0000 | rgb(m, 0x46);
+                for off in [0x1c, 0x20] {
+                    let Some(v) = linked(w, id, off) else { continue };
+                    let q = &mut w.mobys[v];
+                    q.set_pv_i(0x14, cur - a);
+                    q.set_pv_i(0x18, a - b);
+                    for (at, c) in [(0x30, c0), (0x38, c0), (0x34, c1), (0x3c, c1)] { q.set_pv_i(at, c as i32); }
+                    q.set_pv_f(0xc, 1.0);
+                }
+            }
+            if let Some(l) = linked(w, id, 0x24) { w.mobys[l].set_pv_i(0x3c, 0); }
+        },
+        _ => {}
+    }
+    let period = w.mobys[id].pv_i(0x34);
+    if period != 0 {
+        let mut t = w.mobys[id].pv_s(0x14) as i32;
+        if crate::moby::countdown(&mut t) {
+            t = period;
+            for &o in &members { w.mobys[o].set_pv_s(0x16, 0); }
+        }
+        w.mobys[id].set_pv_s(0x14, t as i16);
+        for &o in &members { w.mobys[o].set_pv_s(0x14, t as i16); }
+    }
+    let m = &mut w.mobys[id];
+    let mut k = m.pv_s(0x16) as usize & 7;
+    for _ in 0..8 {
+        if m.pv_s(0x14) >= m.pv_s(2 * k) { break; }
+        k = (k + 1) % 8;
+    }
+    m.set_pv_s(0x16, k as i16);
+    let want = if k % 2 == 0 { 1 } else { 2 };
+    if m.state != want { m.set_state(want, -1); }
+}
+
+/// `0x3e63b8`: the light's two levels by where the clock is between this threshold and the one before (the period
+/// at index 0), each `(shape − |shape − 1 − (2·shape − 2)·f|)·scale`.
+fn ramp(w: &mut MobyWorld, id: usize) {
+    let Some(l) = linked(w, id, 0x24) else { return };
+    let m = &w.mobys[id];
+    let k = m.pv_s(0x16) as usize & 7;
+    let cur = m.pv_s(0x14) as f32;
+    let before = if k == 0 {
+        if 0 < m.pv_i(0x34) { m.pv_i(0x34) } else { m.pv_s(0x14) as i32 }
+    } else {
+        m.pv_s(2 * (k - 1)) as i32
+    };
+    let at = m.pv_s(2 * k) as f32;
+    let d = before as f32 - at;
+    if d == 0.0 { return; }
+    let f = (cur - at) / d;
+    let level = |s: f32| s - ((s - 1.0) - (2.0 * s - 2.0) * f).abs();
+    let (a, b) = (level(RAMP_SHAPE.0) * RAMP_SCALE.0, level(RAMP_SHAPE.1) * RAMP_SCALE.1);
+    let q = &mut w.mobys[l];
+    q.set_pv_f(0x40, a);
+    q.set_pv_f(0x44, b);
+}
