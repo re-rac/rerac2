@@ -374,7 +374,7 @@ fn pre(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
         m.set_pv_b(r + 0x48, 30);
         m.set_pv_b(r + 0x4a, 11);
         m.set_pv_b(pv::KILL, 1);
-        m.draw_dist = 0xff;
+        m.update_dist = 0xff;
         for (class, at, bits) in [(BODY, pv::BODY, 0x400), (GLOW, pv::GLOW, 0x100)] {
             if w.class(class).is_none() { continue; }
             let c = w.create(class);

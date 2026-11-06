@@ -1,7 +1,7 @@
 //! Level 7's **0x0c29** (`0x379b08`, 1 placed; the decomp's `func_L07_00378898`): up to three tie groups turning
 //! about z on the ground chunk.
 //!
-//! Its pvars: `[0..3]` the tie groups (−1 none), `[3..6]` their yaws. **0**: alpha 0xff; 1. **1**: with chunk 0 in
+//! Its pvars: `[0..3]` the tie groups (−1 none), `[3..6]` their yaws. **0**: updated from any distance (`+0x30` 0xff); 1. **1**: with chunk 0 in
 //! place (`0x1c9700` = 0, crate::game::GameState::variant), each group's yaw on by its [`RATES`] (`0x2efe60` =
 //! crate::hero::physics::add_rot) and each of its ties' rows made the yaw's (`0x2e5778`) with the first two
 //! scaled by its first row's length (`0x2e5060`, `0x2e51f8`; the third is left unit), its place kept, the tie updated
@@ -20,7 +20,7 @@ const RATES: [f32; 3] = [5.0, -10.0, 15.0];
 pub fn update_0c29(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     match w.mobys[id].state {
         0 => {
-            w.mobys[id].alpha = 0xff;
+            w.mobys[id].update_dist = 0xff;
             w.mobys[id].set_state(1, -1);
         }
         1 if ctx.game.variant == 0 => {

@@ -5,7 +5,7 @@
 //! path, is the parked ship of chunk 0 whose ramp takes Ratchet up there.
 //!
 //! * **0**: drawn off, hidden (mode 1), the hum's handle `+0x1ac` −1; without a path (`+0x90` −1) the lead to 3, a car
-//!   to 4. With one: alpha 0xff, the script's steps cleared (`0x411000`), the convoy set up ([`set_up`], `0x40fd30`),
+//!   to 4. With one: updated from any distance (`+0x30` 0xff), the script's steps cleared (`0x411000`), the convoy set up ([`set_up`], `0x40fd30`),
 //!   2. (`0x410ca8`, the three point clouds' centres `0x2a00c0` for the areas' outlines, is left out with them.)
 //! * **2**: the sky chunk in place (`0x1c9700`, crate::game::GameState::variant ≠ 0): 1, its class sound 2 looped
 //!   (`+0x16cc`) and its lift's rise 6 (`+0x16c8`). (The crash's start on `$gp+0x26f0`, which nothing sets, is left
@@ -175,7 +175,7 @@ pub fn update_11d9(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 let s = if m.o_class == LEAD { 3 } else { 4 };
                 m.set_state(s, -1);
             } else {
-                m.alpha = 0xff;
+                m.update_dist = 0xff;
                 w.convoy.steps = [0; 16];
                 set_up(w, id, ctx);
                 w.mobys[id].set_state(2, -1);
@@ -533,7 +533,7 @@ fn hook_group(w: &mut MobyWorld, g: i32) {
 }
 
 /// `0x3eff38(dropship, car, &from, &to)`: a dropship sent off from a car it rides (`+0x110`): shown with its class's
-/// collision, state 2, alpha and draw distance 0xff, at `from` in the car's frame, its target `to` (`+0xd0`, in the
+/// collision, state 2, updated and drawn from any distance (`+0x30`, `+0x32` 0xff), at `from` in the car's frame, its target `to` (`+0xd0`, in the
 /// car's frame as its flight reads it), its place before the bob `+0xf0`; out of the target list.
 fn launch(w: &mut MobyWorld, ds: usize, car: usize, from: V3, to: V3) {
     let has = w.class(w.mobys[ds].o_class).is_some_and(|c| c.has_collision);
@@ -542,7 +542,7 @@ fn launch(w: &mut MobyWorld, ds: usize, car: usize, from: V3, to: V3) {
     m.mode = (m.mode & 0xffbe) | 0x1000;
     m.has_collision = has;
     m.set_state(2, -1);
-    m.alpha = 0xff;
+    m.update_dist = 0xff;
     m.draw_dist = 0xff;
     ai::set_link(m, 0x110, Some(car));
     m.pos = add(through(from, &cr), cp);

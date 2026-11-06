@@ -13,6 +13,9 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         props::SPINNER => Some(props::update_0c21),
         props::SWAY_A | props::SWAY_B => Some(props::update_0bf4),
         props::WHEEL => Some(props::update_0a14),
+        props::FIELD => Some(props::update_0e60),
+        props::MOVER => Some(props::update_094d),
+        props::PAD => Some(props::update_0efc),
         0x0ccb => Some(super::level04::misc::update_empty),
         _ => None,
     }

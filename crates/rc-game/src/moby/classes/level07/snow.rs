@@ -6,7 +6,7 @@
 //! `+0x50` its origin (both set by the convoy, crate::moby::classes::level07::train), `+0x60` the point the drift is
 //! taken from.
 //!
-//! * **0**: alpha 0xff, mode |= 0x100; on level 7 past the first frame (`0x1b1d88` ≠ 0) the view filled ([`fill`],
+//! * **0**: updated from any distance (`+0x30` 0xff), mode |= 0x100; on level 7 past the first frame (`0x1b1d88` ≠ 0) the view filled ([`fill`],
 //!   `0x37a290`) and 1. Its speed 1.5, fall 2.5, `[2]` 1; it is the convoy's snow (`$gp−0x430`).
 //! * **1**: on level 7 with the sky chunk in place (`0x1c9700` = 1): 2. Else flakes while `0x311bb0(2)` (drawn again
 //!   each time) beats the count: within 15 across ([`disc`]) and 7 up of the point 4 ahead of the camera, moving
@@ -57,7 +57,7 @@ pub fn update_12ec(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     match w.mobys[id].state {
         0 => {
             let m = &mut w.mobys[id];
-            m.alpha = 0xff;
+            m.update_dist = 0xff;
             m.mode |= 0x100;
             if ctx.game.level == 7 && ctx.game.frame != 0 {
                 fill(w, id, ctx);
