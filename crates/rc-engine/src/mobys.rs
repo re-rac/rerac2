@@ -719,6 +719,7 @@ impl Mobys {
             l.height_map = lv.height_map.clone();
             l.items = crate::play::menu_tables(&crate::level_load::extracted_root(), crate::level_load::level_index()).items;
             l.arena = arena_challenges();
+            l.joba = joba_challenges();
             l
         }, footstep_base: footstep_base(&lv.gameplay), left_out }
     }
@@ -734,6 +735,17 @@ fn arena_challenges() -> Vec<rc_game::moby::classes::arena::Challenge> {
     if !o.vtbl().iter().any(|e| e.o_class == fighters::MASTER as i32) { return Vec::new(); }
     let read = |a: u32, n: usize| o.read(a, n).map(<[u8]>::to_vec);
     arena::read_challenges(&read).unwrap_or_else(|| { eprintln!("arena: the challenge table at {:#x} was not read", arena::CHALLENGE_TABLE); Vec::new() })
+}
+
+/// Joba's arena challenges (rc_game::moby::classes::level11::arena::read_challenges) when the level's class table holds
+/// its master; empty otherwise.
+fn joba_challenges() -> Vec<rc_game::moby::classes::level11::arena::Challenge> {
+    use rc_game::moby::classes::level11::arena;
+    let Ok(bytes) = crate::level_wad::overlay(&crate::level_load::extracted_root(), crate::level_load::level_index()) else { return Vec::new() };
+    let Ok(o) = rc_formats::level_overlay::LevelOverlay::parse(&bytes) else { return Vec::new() };
+    if !o.vtbl().iter().any(|e| e.o_class == arena::MASTER as i32) { return Vec::new(); }
+    let read = |a: u32, n: usize| o.read(a, n).map(<[u8]>::to_vec);
+    arena::read_challenges(&read).unwrap_or_else(|| { eprintln!("arena: Joba's challenge table at {:#x} was not read", arena::CHALLENGE_TABLE); Vec::new() })
 }
 
 /// The scene the queries test: every moby's collision view and, for classes whose blob poses joints, the joint

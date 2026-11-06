@@ -24,6 +24,9 @@ pub struct LevelData {
     /// Maktar's arena challenges, read from the level's overlay at load (crate::moby::classes::arena::read_challenges;
     /// the engine sets them; empty on a level without them).
     pub arena: Vec<crate::moby::classes::arena::Challenge>,
+    /// Joba's arena challenges, read so from its overlay (crate::moby::classes::level11::arena::read_challenges; empty
+    /// elsewhere).
+    pub joba: Vec<crate::moby::classes::level11::arena::Challenge>,
     /// The height map the rain stops on (core header `+0xa4`; the engine sets it from the core).
     pub height_map: Option<rc_formats::height_map::HeightMap>,
 }
@@ -42,6 +45,7 @@ impl LevelData {
             light_regions: g::light_regions(gameplay).map_err(|e| eprintln!("level: light regions: {e}")).unwrap_or_default(),
             items: Vec::new(),
             arena: Vec::new(),
+            joba: Vec::new(),
             variant_planes: g::variant_planes(gameplay).map_err(|e| eprintln!("level: variant planes: {e}")).unwrap_or_default(),
             height_map: None,
         }

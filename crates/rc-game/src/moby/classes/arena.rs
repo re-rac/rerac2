@@ -88,6 +88,9 @@ pub fn ready(w: &MobyWorld, id: usize) -> bool { w.mobys[id].state == 2 && (0..3
 /// `0x3d8d60`: it holds a fighter.
 pub fn loaded(w: &MobyWorld, id: usize) -> bool { (0..3).any(|k| rider(w, id, k).is_some()) }
 
+/// `0x3d8d98`: closed and holding none (Joba's master, crate::moby::classes::level11::arena, waits on it).
+pub fn empty(w: &MobyWorld, id: usize) -> bool { w.mobys[id].state == 2 && !loaded(w, id) }
+
 /// `0x3d8dd0`: fighter `f` takes the first free slot and waits in it (state 2).
 pub fn attach(w: &mut MobyWorld, id: usize, f: usize) {
     if let Some(k) = (0..3).find(|&k| rider(w, id, k).is_none()) { ai::set_link(&mut w.mobys[id], RIDERS[k], Some(f)); }
@@ -122,7 +125,11 @@ fn place_frame(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
 }
 
 /// 0x0a15 (`0x3d8898`).
-pub fn update_spawner(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+pub fn update_spawner(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) { spawner_step(w, id, ctx, release) }
+
+/// The spawner's update with its riders' release (`0x3d8898` here; Joba's 0x0c7f `0x4184e0` is the same code with
+/// its own release, crate::moby::classes::level11::arena).
+pub fn spawner_step(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, release: fn(&mut MobyWorld, usize, &mut Ctx)) {
     match w.mobys[id].state {
         0 => {
             for o in RIDERS { w.mobys[id].set_pv_i(o, 0); }
@@ -429,20 +436,29 @@ pub fn on_menu(cs: &[Challenge], game: &crate::game::GameState, n: i32) -> bool 
 /// `0x3fe398(n)`: the bolts a win of `n` pays — its prize, a third less for each win before (×0.3), at least 500; ten
 /// times that in the challenge mode.
 pub fn prize(cs: &[Challenge], game: &crate::game::GameState, n: i32) -> i32 {
-    let base = cs.get(n as usize).map_or(0, |c| c.bolts) as f32;
+    prize_of(cs.get(n as usize).map_or(0, |c| c.bolts), wins(game, n), game.challenge)
+}
+
+/// The prize's sum (`0x3fe398`, Joba's copy `0x4441a8` on its own table): `base` bolts, a third less for each of
+/// `wins`, at least 500; ten times that in the challenge mode.
+pub fn prize_of(base: i32, wins: u8, challenge: bool) -> i32 {
+    let base = base as f32;
     let mut f = base;
-    for _ in 0..wins(game, n) { f *= 0.3; }
+    for _ in 0..wins { f *= 0.3; }
     let mut v = base;
     if f <= v { v = f.max(500.0); }
-    if game.challenge { v *= 10.0; }
+    if challenge { v *= 10.0; }
     v as i32
 }
 
 /// `0x3fe4a8(n)`: the XP a win of `n` pays (its XP, a third for each win before, at least 5; ×32).
-fn xp(cs: &[Challenge], game: &crate::game::GameState, n: i32) -> i32 {
-    let base = cs.get(n as usize).map_or(0, |c| c.xp) as f32;
+fn xp(cs: &[Challenge], game: &crate::game::GameState, n: i32) -> i32 { xp_of(cs.get(n as usize).map_or(0, |c| c.xp), wins(game, n)) }
+
+/// The XP's sum (`0x3fe4a8`, Joba's copy `0x4442b8`).
+pub fn xp_of(base: i32, wins: u8) -> i32 {
+    let base = base as f32;
     let mut f = base;
-    for _ in 0..wins(game, n) { f *= 0.33333; }
+    for _ in 0..wins { f *= 0.33333; }
     let mut v = base;
     if f <= v { v = f.max(5.0); }
     (v as i32) << 5
@@ -451,8 +467,9 @@ fn xp(cs: &[Challenge], game: &crate::game::GameState, n: i32) -> i32 {
 /// What the engine draws of the challenge menu (`0x3ff808`).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Menu {
-    /// The selection, its prize (none for the first challenge not won yet) and wins.
+    /// The selection, its name's text, its prize (none for the first challenge not won yet) and wins.
     pub selected: i32,
+    pub name: u32,
     pub prize: Option<i32>,
     pub wins: u8,
     /// A challenge before / after it on the menu.
@@ -1081,7 +1098,7 @@ pub fn update_master(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 if let Some(n) = n { say(w, id, ctx, n); }
             }
             let m = &w.mobys[id];
-            ctx.game.arena_results = Some(Results { first: m.pv_s(pv::SELECTED) == 0 && wins(ctx.game, 0) < 2, prize: m.pv_i(pv::PRIZE) });
+            ctx.game.arena_results = Some(Results { first: m.pv_s(pv::SELECTED) == 0 && wins(ctx.game, 0) < 2, first_line: 0x2ddc, prize: m.pv_i(pv::PRIZE) });
             let pressed = ctx.hero.items.pressed;
             if pressed & crate::pad::button::CROSS != 0 {
                 w.mobys[id].set_state(7, -1);
@@ -1255,6 +1272,8 @@ pub fn crowd_step(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, score: f32, centr
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Results {
     pub first: bool,
+    /// The first win's line (0x2ddc here; Joba's 0x2e2c / 0x2e2d).
+    pub first_line: u32,
     pub prize: i32,
 }
 
@@ -1270,7 +1289,7 @@ pub fn draw_results(r: &Results, text: &dyn Fn(u32) -> Vec<u8>, fonts: [(&[rc_fo
     let (g1, s1) = fonts[0];
     crate::gui::text(out, g1, s1, &first(0x2ddb), 180.0, 93.0, 1.1, colour);
     let boxed = |x: i32, y: i32| crate::gui::TextBox { top: 125, bottom: 200, left: 10, right: 500, x, y, line: 16, flags: CENTRE | MIDDLE, ..Default::default() };
-    let line = if r.first { first(0x2ddc) } else { [first(0x2df8), format!(" {} ", r.prize).into_bytes(), first(0x2df4)].concat() };
+    let line = if r.first { first(r.first_line) } else { [first(0x2df8), format!(" {} ", r.prize).into_bytes(), first(0x2df4)].concat() };
     let (g3, s3) = fonts[2];
     crate::gui::text_in_box(out, g3, s3, &mut boxed(260, 135), &line, colour);
     crate::gui::text_in_box(out, g1, s1, &mut boxed(250, 160), &first(0x2ddd), colour);
@@ -1508,6 +1527,7 @@ fn menu(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let sel = w.mobys[id].pv_s(pv::SELECTED) as i32;
     ctx.game.arena_menu = Some(Menu {
         selected: sel,
+        name: challenge_name(sel),
         prize: (sel != 0 || wins(ctx.game, 0) != 0).then(|| prize(&ctx.level.arena, ctx.game, sel)),
         wins: wins(ctx.game, sel),
         prev: sel != 0,
@@ -1933,7 +1953,7 @@ pub fn draw_menu(m: &Menu, text: &dyn Fn(u32) -> Vec<u8>, fonts: [(&[rc_formats:
     let first = |id: u32| { let t = text(id); t.split(|&c| c == 0).next().unwrap_or(&[]).to_vec() };
     let [(g1, s1), (g2, s2), (g3, s3)] = fonts;
     let mut name = crate::gui::TextBox { top: 125, bottom: 185, left: 10, right: 460, x: 250, y: 150, line: 20, flags: CENTRE | MIDDLE, ..Default::default() };
-    crate::gui::text_in_box(out, g3, s3, &mut name, &first(challenge_name(m.selected)), colour);
+    crate::gui::text_in_box(out, g3, s3, &mut name, &first(m.name), colour);
     if let Some(p) = m.prize {
         let t = if p < 10000 { [first(0x2dda), format!(" {p} ").into_bytes(), first(0x2df4)].concat() } else { first(0x2dda) };
         crate::gui::text(out, g2, s2, &t, 90.0, 184.0, 1.0, colour);
