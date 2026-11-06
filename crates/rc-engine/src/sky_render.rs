@@ -84,10 +84,12 @@ pub fn load(core: &LevelCore, core_data: &[u8], level: u32) -> Result<Option<Lev
     Ok(Some(LevelSky { level, sky, textures }))
 }
 
-/// Whether the level's frame code zeroes sky header +4 (`clear_screen`) every frame, i.e. the frame is cleared only on
-/// the first frame after load. Not read from Going Commando's code yet: R&C1's rule (every level but 05, 07, 10, 13,
-/// 14, 15 zeroes it), which on Aranos clears the first frame only (G-REN-009).
-pub fn level_zeroes_clear_flag(level: u32) -> bool { !matches!(level, 5 | 7 | 10 | 13 | 14 | 15) }
+/// Whether the level's frame code zeroes sky header +4 (`clear_screen`), i.e. the frame is cleared only on the first
+/// frame after load. In Going Commando never on a level: the frame draw (L00 `0x2e6658`) clears with `0x2f12a0(0)`
+/// while +4 is non-zero, the loader (`0x2fe7d0`) sets it to 1 (`0x2fe818`) and the level sky draw (`0x2fd348`) never
+/// zeroes it — only the flight sky (`0x35e038`, at `0x35e084`) does. (R&C1's rule, every level but 05, 07, 10, 13, 14,
+/// 15, left Dobbo's and Notak's undrawn areas smearing.)
+pub fn level_zeroes_clear_flag(_level: u32) -> bool { false }
 
 /// Pipeline key: gouraud shells write depth (ZMSK 0), textured ones do not (ZMSK 1).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
