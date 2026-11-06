@@ -75,7 +75,9 @@
 //! teleport-in, crate::moby::classes::teleport), `0x3337d8` = L00 `0x32a7c8` (crate::moby::Moby::first), `0x2af8f0`
 //! (an empty debug print).
 //!
-//! Not ported: the wall walk of `+0x2a0` (4 placed on L13; the path walk `0x40ada8`, its move `0x40ab60` with
+//! The heavy trooper 0x0ea4 beside it: [`update_0ea4`].
+//!
+//! Not ported: the wall walk of `+0x2a0` (the heavy's `+0x2a4`; 4 placed on L13; the path walk `0x40ada8`, its move `0x40ab60` with
 //! `0x40a0a0` / `0x40a2c8` / `0x409c40` / `0x409ee8` / `0x409b08` turning the moby onto the surface under it, the
 //! turn toward Ratchet `0x40b9e8` → `0x40a3b0`, and the word `0x1a79f8` it tests against 0x45): those troopers stand
 //! where they are when they would walk ([`crawl`]).
@@ -1037,8 +1039,8 @@ const H_PVARS: usize = 0x370;
 pub const LAUNCHER: i16 = 0x0ea9;
 /// The senses C (`0x3ada740e`, `0x3d2aaaab`, 0.4°, 48°): its patrol's.
 const SENSES_C: [f32; 4] = [f32::from_bits(0x3ada_740e), f32::from_bits(0x3d2a_aaab), f32::from_bits(0x3be4_c38a), f32::from_bits(0x3f56_7752)];
-/// 45° (`0x3f490fdb`): the most its facing may be off the target for a lob.
-const LOB_ARC: f32 = f32::from_bits(0x3f49_0fdb);
+/// 45° (`0x3f490fdc`): the most its facing may be off the target for a lob.
+const LOB_ARC: f32 = f32::from_bits(0x3f49_0fdc);
 
 /// Its launcher, when it is one.
 fn gun(w: &MobyWorld, id: usize) -> Option<usize> { ai::link(&w.mobys[id], H_GUN).filter(|&k| w.mobys.get(k).is_some_and(|g| g.o_class == LAUNCHER)) }

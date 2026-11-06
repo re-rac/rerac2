@@ -457,6 +457,8 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         // The Thugs-4-Less trooper (L13 `0x408480`, L16 `0x3f6f50`) and its shot (L13 `0x40edb0`, L16 `0x3fd880`).
         thugs::CLASS => Some(thugs::update_0ea3),
         thugs::SHOT => Some(thugs::update_0ea7),
+        // The heavy trooper (L13 `0x40bc88`, L16 `0x3fa758`).
+        thugs::HEAVY => Some(thugs::update_0ea4),
         // The bounce pads: Snivelak's (L16 `0x40d2f8`, L17 `0x417c30`) and the planets' (L22 `0x3cacc8`, L26 `0x3bc9f0`).
         bounce_pad::PAD => Some(bounce_pad::update_0f05),
         bounce_pad::PLANET_PAD => Some(bounce_pad::update_09b9),
