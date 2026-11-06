@@ -22,8 +22,9 @@
 //! is `0x2a65d8`: no ledge probe but Clank's, no rail or pole, no item pass (`0x2b21f0`) and no pose layers
 //! (`0x2afc38`): [`body_pass`] delivers the body's own hits (Clank's punch) in its place.
 //!
-//! Not ported: the GUI slot 3's callbacks for Clank (`0x2f8c00(0x23, …)`, only with △ held at the switch, and
-//! Ratchet's back at the return), the item records `0x18b700` / `0x18b850` (`0x3253d0`), Ratchet's moby's `+0x9c`, the
+//! Clank's GUI slot 3 callbacks (`0x2f8c00(0x23, …)`, his command ring) are crate::hero::commands.
+//!
+//! Not ported: the item records `0x18b700` / `0x18b850` (`0x3253d0`), Ratchet's moby's `+0x9c`, the
 //! words `0x18aa44` / `0x18aa60` / `0x18aa68` (`0x2d33d8`), the body's light (`0x31bcac`), Clank's mobys
 //! `0x18b680` / `0x18b684` deleted at the return (none made: G-HERO-004), the use's idle sequence of `0x2b5208`.
 
@@ -59,10 +60,13 @@ pub struct BodyBlock {
     pub clank_away: bool,
     /// The switches of this tick for the engine.
     pub changes: Vec<Change>,
+    /// Clank's commands to the little robots: his ring, the command word `0x18c304` and the robots' counts
+    /// ([`super::commands`]).
+    pub commands: super::commands::Commands,
 }
 
 impl Default for BodyBlock {
-    fn default() -> Self { BodyBlock { moby: None, clank_hp: 4, ratchet_hp: 0, state: 0, clank_away: false, changes: Vec::new() } }
+    fn default() -> Self { BodyBlock { moby: None, clank_hp: 4, ratchet_hp: 0, state: 0, clank_away: false, changes: Vec::new(), commands: Default::default() } }
 }
 
 /// `0x2abc28`: every posture record unlinked, its angles and targets cleared, its scale 1. The port's: the blink's
@@ -139,6 +143,8 @@ impl Hero {
 /// After the hero's tick while a body plays (`0x2a65d8` has no item pass): the hits the body's states dealt this tick
 /// (Clank's punch, `0x2ba8e0` case 0x4d), as the item pass delivers Ratchet's ([`crate::hero::items::item_pass`]).
 pub fn body_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
+    // Clank's antenna and his command word (`0x2ac520`, the end of `0x2a65d8`; crate::hero::commands).
+    super::commands::tick(ctx.hero);
     // Giant Clank's hits (crate::hero::giant).
     if ctx.hero.mode == 2 { super::giant::pass(world, ctx); }
     for h in std::mem::take(&mut ctx.hero.hits_out) {

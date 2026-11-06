@@ -44,8 +44,6 @@
 //!   0.25, sprites 5 / 5 / 5, 10 puffs, 0x14 streaks, its light), 0x0964 breaks (`0x327e78`: pieces 0..3), its
 //!   velocity stopped, 4 (sub 1), and it is beamed back to its child (`0x3c6c70` → `0x2ed370`, crate::moby::classes::
 //!   teleport::start); the hit record let go.
-//! * Sub-state 1, its first tick: the walk (`0x32f550`: turn accel 0.2°, at most 6°; walk accel 6/3600, most 3/60),
-//!   accel `+0x24` 0.0017, stop 1.5.
 //! * **1**: asleep until its child is hooked (`0x32bf38`): the help for its kind once (0x0940: 0x9cf in slot 0x26,
 //!   0x093c: 0x9d1 / 0x28, 0x0a59: 0xa08 / 0x5f, while their counts are 0; 0x0964: 0x9d2 / 0x29 while never shown);
 //!   4 (sub 1).
@@ -56,25 +54,56 @@
 //! * **3**, following: toward Clank through the network ([`move_to`], `0x3c57c0`) fanned out by its place among its
 //!   group's robots on the way (`0x3c6ef8`, every 16th frame; `0x3c70c0`); no way, within 1.5, or stuck over 60 ticks
 //!   within 3: 4, sequence 0.
-//! * **7**, sent (L14 only: `0x3cab28`, [`send_to`], by the prison's lifts): toward its goal through the network
-//!   for 60 ticks, then 4.
-//! * **The tail** (`0x3c31f8`, `0x3c5a70`): in the air or on a moby, upright and held (`0x32e698`); its state's ticks
-//!   counted; drawn, its glow `+0x78` pulses between its sub-state's colours (`0x3c5b80`, `$gp+0xee0..`); its fence
-//!   path the record it is in (`0x41b218`).
+//! * **7**, sent (L14 only: `0x3cab28`, [`send_to`], by the prison's lifts and launch plates): toward its goal
+//!   through the network for 60 ticks, then 4.
+//! * **The sub-states' limits** (`0x3c31f8`, `limits`): the walk (`0x32f550`, accel / most a second, the turn's
+//!   accel and most), `+0x134` and the stop distance `+0x144`: 1 (6 / 3, 0.2° / 6°, 1/600, 1.5) and 2 (10 / 5,
+//!   0.4° / 12°, 1/180, 0) and 3 (6 / 3, 0.4° / 12°, 1/180, 0.1) on their first tick; 4 (1/600, 0.4), 5 (1/600, 0.05)
+//!   and 6 (0.4° / 12°, 1/200, 0.05) every tick. Sub-state 8 (the knock-back, `0x3298a8`) nothing sets.
 //!
-//! Not ported (the robots): Clank's commands (`0x18c304`, its D-pad orders 1..8: the hero side has none) and all
-//! they lead to — the states 2, 5, 6 and 8..0x15 (going to and using the unseen floors 0x097a, the pieces 0x0e87 they
-//! raise, 0x0b10 / 0x0f4d, `0x3c6348` / `0x3c6560` / `0x3c6730` / `0x3c68d8` / `0x3c6a90` and their helps 0x9d0 /
-//! 0xa29 / 0xa0a), the command list `0x32c138` and timer `+0x364`, the sub-states 2..8's limits; the fall of state
-//! 0x16 (nothing the port has sets it); the head's look at Clank and the joint aims (`0x3c61e0` / `0x3c6018`,
-//! `0x325588`: crate::moby::ai's joint aims are not ported); the colour flash `0x321690`; the counts of robots near
-//! Clank (`0x1b275c..0x1b2764`); the glow's group stamp and draw hook (`0x2e8310(0x3c5e08)`); `0x3c6c70`'s search for a
-//! nearer 0x0972 of its groups to beam back to (`0x2e0558`); the push on a moving floor moby (`0x3234d0`); the light
-//! `0x31bcac`. 0x0964's child is the cage 0x0972 ([`update_0972`]).
+//! **Clank's commands** (the command word `0x18c304` his ring sets, crate::hero::commands; `0x3c4828`'s end,
+//! `command`): every robot awake (not 1), not entering (13) nor sent (sub-state 7), past its 30 ticks since the last
+//! (`+0x364`) — in the bridge (sub-state 4) or the lift (5) only that command undoes it — takes it:
+//! * **1 follow**: (not following already) farther than 3 across from Clank 3 (sub-state 1), else 4.
+//! * **2 wait**: 2 (sub-state 0), its look about's countdown 60..120.
+//! * **3 attack** (0x0964): the nearest enemy of its eight groups (`0x3c6348`: a target of class kind 5 within 15
+//!   across and 1.5 in height it can reach): **9** after it, every 8th frame the nearest again, making way for a
+//!   robot it pushes on, the enemy in a line 0.333 ahead: **10** the blow (a hit of 4 at frame 14, `0x31e6d0`); none:
+//!   **11** looking for one for 300 ticks (sub-state 2).
+//! * **4 enter** (0x0964): the nearest 0x0ef9 taking robots it can reach (`0x3c6560`): **12** to 1 before it (its
+//!   radius 0.11 when first in line, `0x3c73d0`), **13** into it (`0x41aed8`), gone (sub-state 3).
+//! * **6 bridge** (0x0940): the first 0x097a whose cuboid holds it or Clank (`0x3c6730`): **14** to its end 4.3 out
+//!   (`0x3cc0f8`), **15** on (its network's record opened), **16** the floor (hooked: solid) until Clank is more than
+//!   12 off, off it and out of its cuboid and none stands on it (`0x3c72f0`); then (or the command again) off
+//!   (`0x3c74f0`: its record closed, at the end toward Clank, `0x3cc188`) **17**, then 6 (sub-state 4).
+//! * **5 lift** (0x093c): the nearest 0x0e87 / 0x0e88 waiting within 14 (`0x3c68d8`): **18** beside it (`0x3cb750`),
+//!   **19** holding it up (`0x3cb828`) until the sequence's end, then 6 (sub-state 5); the command again lets go.
+//! * **7 zap** (0x0a59): the nearest arc 0x0b10 or launch plate 0x0f4d waiting within 10 (`0x3c6a90`): **20** before
+//!   it (2 / 3 out, `0x38bea0` / `0x3cb838`), **21** the zap (hooked at frame 20), then 6 (sub-state 6).
+//! * **8 call off**: 0x0964 beside Clank (4), the others' bow **6** (sequence 3 facing him, then 4).
+//! * Each walk to its piece (14, 18, 20; 9) makes a robot of its group waiting or following in its way step aside
+//!   (`0x3c7130`): **5**, 60 ticks toward the yaw given, then 4.
+//! * Its helps: while awake and in reach of its piece, 0x9d0 (0x0940, slot 0x27), 0xa29 (0x093c, 0x80) and 0xa0a
+//!   (0x0a59, 0x61) — again past 1080 ticks; the bridge, the lift and the zap turn them off.
+//! * Its counts for the ring: awake within 16 across of Clank, and by kind; in sub-state 4.
+//! * **0x16**, launched (L14 `0x3cabb0`, [`launch`], by the launch plates): along its velocity under its gravities,
+//!   tumbling about its pitch; landed, 4 in the network that holds it.
+//! * **The head** (`0x3c61e0` / `0x3c6018`): drawn, in 2 and 11, and in 4 with its idles past 5, it looks about; in 4
+//!   else at Clank's centre; its two aim records (`+0x240` / `+0x2c0`, crate::moby::joint_aim, the walk turning them
+//!   too) aimed in the tail, with Clank's big head the first's scale 1.75.
+//! * **The tail** (`0x3c31f8`, `0x3c5a70`): in the air or on a moby, upright and held (`0x32e698`); its state's ticks
+//!   counted, the command's 30 ticks counted down; drawn, its glow `+0x78` pulses between its sub-state's colours
+//!   (`0x3c5b80`, `$gp+0xee0..`); its fence path the record it is in (`0x41b218`).
+//!
+//! Not ported (the robots): the list of robots the enemies may target (`0x32c138` → `0x1c63a8`, read by
+//! crate::moby::ai::find_target's `0x32c4e8` and the hero's `0x2b3b00`); the colour flash `0x321690` (nothing starts
+//! it); the glow's group stamp and draw hook (`0x2e8310(0x3c5e08)`); `0x3c6c70`'s search for a nearer 0x0972 of its
+//! groups to beam back to (`0x2e0558`); the push on a moving floor moby (`0x3234d0`); the light `0x31bcac`. 0x0964's
+//! child is the cage 0x0972 ([`update_0972`]).
 
 use crate::hero::physics::{add, add_rot, atan2, set_len, V3};
 use crate::moby::blast::{self, Blast, Explosion};
-use crate::moby::{bolts, countdown, shards, Ctx, MobyWorld};
+use crate::moby::{bolts, countdown, joint_aim, shards, Ctx, MobyWorld};
 
 /// The hit flags the breakables answer (`0x31f0f0(m, 0x4010000, 0)`).
 const BREAK_FLAGS: u32 = 0x0401_0000;
@@ -266,9 +295,32 @@ const AT: usize = 0x368;
 const TO: usize = 0x36c;
 const IDLES: usize = 0x380;
 const START_Z: usize = 0x3a4;
-/// State 7's goal and ticks (set by L14 `0x3cab28`, [`send_to`]).
+/// State 7's goal and ticks (set by L14 `0x3cab28`, [`send_to`]); the goal is every command's (`+0x340`).
 const WALK_GOAL: usize = 0x340;
+const GOAL: usize = WALK_GOAL;
 const WALK_TICKS: usize = 0x37c;
+/// The command's piece (a link), its 30 ticks before the next command, the yaw a robot in the way steps aside to.
+const TARGET: usize = 0x358;
+const COOLDOWN: usize = 0x364;
+const ASIDE: usize = 0x374;
+/// The head's look about: its ticks, yaw, pitch, at Clank.
+const LOOK_TICKS: usize = 0x384;
+const LOOK_YAW: usize = 0x388;
+const LOOK_PITCH: usize = 0x38c;
+const LOOK_CLANK: usize = 0x390;
+/// The launch (L14 `0x3cabb0`, [`launch`]): its gravities up and down, its tumble's speed, its landing height.
+const LAUNCH_UP: usize = 0x394;
+const LAUNCH_DOWN: usize = 0x398;
+const LAUNCH_SPIN: usize = 0x39c;
+const LAUNCH_LAND: usize = 0x3a0;
+/// The two aim records (crate::moby::joint_aim; the movement block points at them, `+0x158` / `+0x15c`).
+const AIM_A: usize = 0x240;
+const AIM_B: usize = 0x2c0;
+/// The pieces the commands use: 0x0ef9 (crate::moby::classes::endako_b), the arcs 0x0b10
+/// (crate::moby::classes::level14::arcs), the launch plate 0x0f4d (crate::moby::classes::level14::plate).
+const SLOT: i16 = 0x0ef9;
+const ARC: i16 = 0x0b10;
+pub const PLATE: i16 = 0x0f4d;
 /// The movement block's fields: radius, walk accel / most, stop distance, options, fence path, push moby, floor moby,
 /// floor height, stuck ticks, velocity, goal distance, turn limits and speed.
 const RADIUS: usize = MOVE;
@@ -282,6 +334,7 @@ const PUSHER: usize = MOVE + 0x84;
 const FLOOR_MOBY: usize = MOVE + 0x88;
 const FLOOR_Z: usize = MOVE + 0x90;
 const VEL: usize = MOVE + 0xa0;
+const MOVE_FLAGS: usize = MOVE + 0x94;
 const GOAL_DIST: usize = MOVE + 0xcc;
 const TURN_ACCEL: usize = MOVE + 0x14;
 const TURN_BRAKE: usize = MOVE + 0x18;
@@ -294,6 +347,8 @@ const TURN_SPEED: usize = MOVE + 0xb4;
 const NEAR: f32 = 1.5;
 const FOLLOW: f32 = 3.0;
 const WALK: (f32, f32) = (6.0, 3.0);
+/// Sub-state 2's walk (accel 10 a second², most 5 a second, `$gp+0xeb8` / `+0xebc`).
+const RUN: (f32, f32) = (10.0, 5.0);
 const PUSH: (f32, f32) = (2.0, 8.0);
 const BLAST_GAP: i32 = 0x2d;
 const CAGE_PIECES: u16 = 0x3fff;
@@ -575,6 +630,9 @@ fn robot_init(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     m.set_pv_f(MOVE + 0x30, f32::from_bits(0x3f06_0a93));
     m.set_pv_f(MOVE + 0x2c, f32::from_bits(0x3bb6_0b61));
     m.set_pv_f(MOVE + 8, 0.5);
+    // `+0x158` / `+0x15c`: the aim records the walk turns (crate::moby::ai::joint_turns).
+    m.set_pv_i(MOVE + 0x48, AIM_A as i32);
+    m.set_pv_i(MOVE + 0x4c, AIM_B as i32);
     m.set_state(1, 0);
     play_rand(w, id, ctx, 0, 0);
     if class == ROBOT_940 {
@@ -602,6 +660,32 @@ fn respawn(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     super::teleport::start(w, id, p, rot, &[]);
 }
 
+/// A help slot's step for the robots' helps (`0x18c958 + 0xc·slot`, `0x3c4828`): with the slot on, shown before, again
+/// past 1080 ticks since it was last; the first time counted.
+fn help_step(ctx: &mut Ctx, slot: usize, text: i32) {
+    let now = ctx.game.play_time;
+    let level_bit = 1u32.checked_shl(ctx.game.level.max(0) as u32).unwrap_or(0);
+    let g = &mut *ctx.game;
+    if g.help_counts.get(slot).is_none_or(|&c| c == -1) { return; }
+    let last = g.help_last[slot];
+    if g.help_counts[slot] != 0 {
+        if 0x438 < now.wrapping_sub(last) as u32 || last == 0 {
+            g.help(text, slot as i32);
+        } else if (last as u32) < now as u32 {
+            g.help_last[slot] = now;
+        }
+    } else {
+        g.help_counts[slot] = g.help_counts[slot].wrapping_add(1);
+        if (last as u32) < now as u32 { g.help_last[slot] = now; }
+        g.help_levels[slot] |= level_bit | 0x8000_0000;
+    }
+}
+
+/// A help slot turned off (its count −1: `0x18cb2c`, `0x18cf58`, `0x18cde4`).
+fn help_off(ctx: &mut Ctx, slot: usize) {
+    if let Some(c) = ctx.game.help_counts.get_mut(slot) { *c = -1; }
+}
+
 /// The robots' every-tick part before their state (`0x3c4828` past the set-up); see the module.
 fn robot_pre(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].state == 0 { robot_init(w, id, ctx); }
@@ -610,22 +694,476 @@ fn robot_pre(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &w.mobys[id];
     let z = m.pos[2];
     let fell = z < m.pv_f(START_Z) - 10.0 && z - 10.0 < m.pv_f(FLOOR_Z);
-    if !hit && !fell { return; }
-    if BLAST_GAP < (ctx.game.robot_blast_frame - ctx.game.frame).abs() {
-        ctx.game.robot_blast_frame = ctx.game.frame;
-        let at = add(w.mobys[id].pos, [0.0, 0.0, 0.5]);
-        blast::burst(w, ctx, at, &Blast { size: 0.25, bursts: [5, 5, 5], puffs: 10, streaks: 0x14, light: true, shake: false });
-        if w.mobys[id].o_class == ROBOT_964 {
-            let v = w.mobys[id].pv_v(VEL);
-            shards::break_into(w, id, ctx, (3.0, 6.0), (3.0, 6.0), 0xf, v, 0xff);
+    if hit || fell {
+        if BLAST_GAP < (ctx.game.robot_blast_frame - ctx.game.frame).abs() {
+            ctx.game.robot_blast_frame = ctx.game.frame;
+            let at = add(w.mobys[id].pos, [0.0, 0.0, 0.5]);
+            blast::burst(w, ctx, at, &Blast { size: 0.25, bursts: [5, 5, 5], puffs: 10, streaks: 0x14, light: true, shake: false });
+            if w.mobys[id].o_class == ROBOT_964 {
+                let v = w.mobys[id].pv_v(VEL);
+                shards::break_into(w, id, ctx, (3.0, 6.0), (3.0, 6.0), 0xf, v, 0xff);
+            }
+            let m = &mut w.mobys[id];
+            m.set_state(4, 1);
+            m.set_pv_v(VEL, [0.0; 3]);
+            m.set_pv_i(MOVE + 0xd8, -1);
+            respawn(w, id, ctx);
         }
-        let m = &mut w.mobys[id];
-        m.set_state(4, 1);
-        m.set_pv_v(VEL, [0.0; 3]);
-        m.set_pv_i(MOVE + 0xd8, -1);
-        respawn(w, id, ctx);
+        w.clear_hit(id);
     }
-    w.clear_hit(id);
+    let (class, state, sub, pos) = { let m = &w.mobys[id]; (m.o_class, m.state, m.sub_state, m.pos) };
+    if sub == 4 { let r = &mut ctx.hero.body.commands.robots; r.bridges = r.bridges.wrapping_add(1); }
+    // The helps of the robots' own commands, once one of their pieces is in reach (`0x18c958` slots 0x27, 0x80, 0x61).
+    if state != 1 {
+        if class == ROBOT_940 && find_floor(w, id, ctx).is_some() { help_step(ctx, 0x27, 0x9d0); }
+        if class == ROBOT_93C && find_piece(w, id).is_some() { help_step(ctx, 0x80, 0xa29); }
+        if class == ROBOT_A59 && find_zap(w, id).is_some() { help_step(ctx, 0x61, 0xa0a); }
+        if crate::hero::physics::dist2(pos, ctx.hero.pos) < 16.0 {
+            let r = &mut ctx.hero.body.commands.robots;
+            // u16 counters that keep counting while the ring is up (`0x371b48` zeroes them only with it down).
+            r.near = r.near.wrapping_add(1);
+            match class {
+                ROBOT_940 => r.near_940 = r.near_940.wrapping_add(1),
+                ROBOT_93C => r.near_93c = r.near_93c.wrapping_add(1),
+                ROBOT_A59 => r.near_a59 = r.near_a59.wrapping_add(1),
+                _ => {}
+            }
+        }
+    }
+    command(w, id, ctx);
+}
+
+/// `0x3c4828`'s end: Clank's command word (`0x18c304`, crate::hero::commands) read — not asleep (1), entering (13),
+/// sent (sub-state 7) or within its 30 ticks since the last (`+0x364`), and in the bridge's or the lift's sub-states
+/// (4, 5) only their own command to undo them.
+fn command(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let cmd = ctx.hero.body.commands.command;
+    let (class, state, sub) = { let m = &w.mobys[id]; (m.o_class, m.state, m.sub_state) };
+    if cmd == 0 || state == 1 || state == 13 || sub == 7 || w.mobys[id].pv_i(COOLDOWN) != 0 { return; }
+    if (sub == 4 && cmd != 6) || (sub == 5 && cmd != 5) { return; }
+    let hero = ctx.hero.pos;
+    match cmd {
+        // Follow.
+        1 => {
+            if sub == 1 { return; }
+            if FOLLOW < crate::hero::physics::dist2(w.mobys[id].pos, hero) {
+                w.mobys[id].set_state(3, 1);
+                play_rand(w, id, ctx, 2, 10);
+            } else {
+                w.mobys[id].set_state(4, 1);
+                play_rand(w, id, ctx, 0, 10);
+            }
+        }
+        // Attack (0x0964).
+        3 => {
+            if sub == 2 || class != ROBOT_964 { return; }
+            let t = find_enemy(w, id, ctx);
+            set_target(w, id, t);
+            if t.is_some() {
+                w.mobys[id].set_state(9, 2);
+                play_rand(w, id, ctx, 3, 10);
+            } else {
+                w.mobys[id].set_state(11, 2);
+                play_rand(w, id, ctx, 0, 10);
+            }
+        }
+        // Wait.
+        2 => {
+            if sub == 0 { return; }
+            w.mobys[id].set_state(2, 0);
+            play_rand(w, id, ctx, 0, 10);
+            let n = ctx.game.rng.rand_range(60, 120);
+            let m = &mut w.mobys[id];
+            m.set_pv_i(LOOK_TICKS, n);
+            m.set_pv_f(LOOK_YAW, 0.0);
+            m.set_pv_f(LOOK_PITCH, 0.0);
+        }
+        // Enter (0x0964): into the nearest open 0x0ef9 it can reach.
+        4 => {
+            if class != ROBOT_964 { return; }
+            w.mobys[id].set_pv_i(COOLDOWN, 30);
+            if sub != 3 {
+                let Some(t) = find_slot(w, id, ctx) else {
+                    set_target(w, id, None);
+                    return;
+                };
+                set_target(w, id, Some(t));
+                let p = slot_point(&w.mobys[t]);
+                if reachable(w, net_of(w, id), ctx, w.mobys[id].pos, p) {
+                    w.mobys[id].set_pv_v(GOAL, p);
+                    w.mobys[id].set_state(12, 3);
+                    super::props::set_seq(w, id, ctx, 2, 0, 10);
+                } else {
+                    set_target(w, id, None);
+                }
+            } else if state != 13 {
+                w.mobys[id].set_state(4, 1);
+                super::props::set_seq(w, id, ctx, 0, 0, 10);
+            }
+        }
+        // Bridge (0x0940): onto the unseen floor 0x097a of a cuboid Clank or it is in, or off it again.
+        6 => {
+            if class != ROBOT_940 { return; }
+            w.mobys[id].set_pv_i(COOLDOWN, 30);
+            if sub != 4 {
+                let Some(t) = find_floor(w, id, ctx) else {
+                    set_target(w, id, None);
+                    return;
+                };
+                set_target(w, id, Some(t));
+                w.mobys[id].set_state(14, 4);
+                super::props::set_seq(w, id, ctx, 2, 0, 10);
+                let (a, b) = floor_sides(&w.mobys[t]);
+                let p = if reachable(w, net_of(w, id), ctx, w.mobys[id].pos, a) { a } else { b };
+                w.mobys[id].set_pv_v(GOAL, p);
+            } else if state == 14 {
+                w.mobys[id].set_state(4, 1);
+                super::props::set_seq(w, id, ctx, 0, 0, 20);
+            } else if state == 16 && !held_up(w, id, ctx) {
+                step_off(w, id, ctx);
+            }
+        }
+        // Lift (0x093c): beside the nearest 0x0e87 / 0x0e88 waiting, or let it go.
+        5 => {
+            if class != ROBOT_93C { return; }
+            if sub != 5 {
+                let Some(t) = find_piece(w, id) else {
+                    set_target(w, id, None);
+                    return;
+                };
+                set_target(w, id, Some(t));
+                w.mobys[id].set_state(18, 5);
+                super::props::set_seq(w, id, ctx, 2, 0, 10);
+                w.mobys[id].set_pv_i(COOLDOWN, 30);
+                let p = piece_side(&w.mobys[t], w.mobys[id].pos);
+                w.mobys[id].set_pv_v(GOAL, p);
+                return;
+            }
+            if state != 19 { let_go(w, id, ctx); }
+        }
+        // Zap (0x0a59): an arc 0x0b10 or a launch plate 0x0f4d, or give it up.
+        7 => {
+            if class != ROBOT_A59 { return; }
+            if sub != 6 {
+                let Some(t) = find_zap(w, id) else {
+                    set_target(w, id, None);
+                    return;
+                };
+                set_target(w, id, Some(t));
+                w.mobys[id].set_state(20, 6);
+                super::props::set_seq(w, id, ctx, 2, 0, 10);
+                w.mobys[id].set_pv_i(COOLDOWN, 30);
+                let p = zap_point(&w.mobys[t]);
+                w.mobys[id].set_pv_v(GOAL, p);
+            } else if state != 21 {
+                let_go(w, id, ctx);
+            }
+        }
+        // Call off: 0x0964 back beside Clank, the others bow (6).
+        8 => {
+            if class == ROBOT_964 {
+                if sub != 1 { w.mobys[id].set_state(4, 1); }
+            } else {
+                w.mobys[id].set_state(6, 1);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Commands 5 and 7 undone: its piece let go (`0x32bf18(t, 0)`), no piece, 30 ticks, beside Clank (4) in sequence 0.
+fn let_go(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    if let Some(t) = target(w, id) { w.mobys[t].once &= !4; }
+    set_target(w, id, None);
+    let m = &mut w.mobys[id];
+    m.set_pv_i(COOLDOWN, 30);
+    m.set_state(4, 1);
+    super::props::set_seq(w, id, ctx, 0, 0, 20);
+}
+
+/// The robot's piece of its command (`+0x358`).
+fn target(w: &MobyWorld, id: usize) -> Option<usize> { link(w, id, TARGET) }
+fn set_target(w: &mut MobyWorld, id: usize, t: Option<usize>) { crate::moby::ai::set_link(&mut w.mobys[id], TARGET, t); }
+
+/// The members of the robot's eight groups (`+0x200`), in order.
+fn in_groups(w: &MobyWorld, id: usize) -> Vec<usize> {
+    (0..8).flat_map(|k| members(w, w.mobys[id].pv_i(GROUPS + 4 * k))).collect()
+}
+
+/// The members of its own group (`+0x21`).
+fn own_group(w: &MobyWorld, id: usize) -> Vec<usize> { members(w, w.mobys[id].group as u8 as i32) }
+
+/// `0x3c6348`: the nearest enemy of its groups within 15 across it can reach — a target (mode 0x1000) of a class of
+/// kind 5 (class header `+0x46`) within 1.5 of its height.
+fn find_enemy(w: &MobyWorld, id: usize, ctx: &Ctx) -> Option<usize> {
+    let (pos, net) = (w.mobys[id].pos, net_of(w, id));
+    let mut best = (15.0, None);
+    for e in in_groups(w, id) {
+        let Some(m) = w.mobys.get(e).filter(|_| live(w, e)) else { continue };
+        if m.mode & crate::moby::mode::TARGET == 0 || w.class(m.o_class).is_none_or(|c| c.kind != 5) { continue; }
+        if 1.5 <= (pos[2] - m.pos[2]).abs() || !reachable(w, net, ctx, pos, m.pos) { continue; }
+        let d = crate::hero::physics::dist2(pos, m.pos);
+        if d < best.0 { best = (d, Some(e)); }
+    }
+    best.1
+}
+
+/// `0x3c6560`: the nearest 0x0ef9 of its groups within 15 across that takes robots ([`slot_open`]) and it can reach.
+fn find_slot(w: &MobyWorld, id: usize, ctx: &Ctx) -> Option<usize> {
+    let (pos, net) = (w.mobys[id].pos, net_of(w, id));
+    let mut best = (15.0, None);
+    for e in in_groups(w, id) {
+        let Some(m) = w.mobys.get(e) else { continue };
+        if m.o_class != SLOT || !slot_open(m) || !reachable(w, net, ctx, pos, m.pos) { continue; }
+        let d = crate::hero::physics::dist2(pos, m.pos);
+        if d < best.0 { best = (d, Some(e)); }
+    }
+    best.1
+}
+
+/// `0x41ae68`: a 0x0ef9 takes robots — in its state 2 with robots still to take (`[0x10]`).
+fn slot_open(m: &crate::moby::Moby) -> bool { m.state == 2 && m.pv_i(0x10) != 0 }
+
+/// `0x41ae88`: the place before a 0x0ef9 a robot walks to, 1 along its facing.
+fn slot_point(m: &crate::moby::Moby) -> V3 { add(m.pos, set_len(m.rows[0], f32::from_bits(0x3f80_0000))) }
+
+/// `0x41aed8(slot, r)`: robot `r` goes into the 0x0ef9 (`[0x1c]`, the moby it waits to see gone), one fewer to take;
+/// none left, the 0x0ef9's state 3.
+fn slot_enter(w: &mut MobyWorld, slot: usize, r: usize) {
+    let m = &mut w.mobys[slot];
+    m.set_pv_i(0x1c, r as i32);
+    let n = m.pv_i(0x10) - 1;
+    m.set_pv_i(0x10, n);
+    if n == 0 { m.set_state(3, -1); }
+}
+
+/// `0x3c6730`: the first 0x097a of its groups whose cuboid (`[0x60]`, `0x3cc0d0`) holds it or Clank.
+fn find_floor(w: &MobyWorld, id: usize, ctx: &Ctx) -> Option<usize> {
+    let pos = w.mobys[id].pos;
+    in_groups(w, id).into_iter().find(|&e| {
+        w.mobys.get(e).is_some_and(|m| m.o_class == FLOOR_97A && (floor_holds(ctx, m, pos) || floor_holds(ctx, m, ctx.hero.pos)))
+    })
+}
+
+/// `0x3cc0d0(floor, p)`: `p` in the 0x097a's cuboid `[0x60]`.
+fn floor_holds(ctx: &Ctx, m: &crate::moby::Moby, p: V3) -> bool { ctx.level.in_cuboid(m.pv_i(0x60), p) }
+
+/// `0x3cc0f8`: the 0x097a's two ends, 4.3 along its facing either way (`$gp+0x1314`).
+fn floor_sides(m: &crate::moby::Moby) -> (V3, V3) {
+    let d = set_len(m.rows[0], f32::from_bits(0x4089_999a));
+    (add(m.pos, d), crate::hero::physics::sub(m.pos, d))
+}
+
+/// `0x3c68d8`: the nearest 0x0e87 / 0x0e88 of its groups within 14 across waiting to be raised (state 1, `0x3cb740`).
+fn find_piece(w: &MobyWorld, id: usize) -> Option<usize> {
+    let pos = w.mobys[id].pos;
+    let mut best = (14.0, None);
+    for e in in_groups(w, id) {
+        let Some(m) = w.mobys.get(e) else { continue };
+        if !matches!(m.o_class, 0x0e87 | 0x0e88) || m.state != 1 { continue; }
+        let d = crate::hero::physics::dist2(pos, m.pos);
+        if d < best.0 { best = (d, Some(e)); }
+    }
+    best.1
+}
+
+/// `0x3cb750(piece, from)`: the place beside the piece on `from`'s side, along its facing (its angles' rows): 1 for
+/// 0x0e87 (`$gp+0x12a0`), else 2.5 (`0x1b0294`).
+fn piece_side(m: &crate::moby::Moby, from: V3) -> V3 {
+    let rows = crate::hero::physics::euler_rows(m.rot);
+    let v = crate::gravity::to_local(crate::hero::physics::sub(from, m.pos), &m.rows);
+    let mut s = if m.o_class == 0x0e87 { 1.0 } else { 2.5 };
+    if v[0] < 0.0 { s = -s; }
+    add(set_len(rows[0], s), m.pos)
+}
+
+/// `0x3c6a90`: the nearest arc 0x0b10, or launch plate 0x0f4d waiting (state 1, `0x3cb888`), of its groups within 10
+/// across (none being deleted).
+fn find_zap(w: &MobyWorld, id: usize) -> Option<usize> {
+    let pos = w.mobys[id].pos;
+    let mut best = (10.0, None);
+    for e in in_groups(w, id) {
+        let Some(m) = w.mobys.get(e).filter(|_| live(w, e)) else { continue };
+        let ok = match m.o_class { ARC => true, PLATE => m.state == 1, _ => false };
+        if !ok { continue; }
+        let d = crate::hero::physics::dist2(pos, m.pos);
+        if d < best.0 { best = (d, Some(e)); }
+    }
+    best.1
+}
+
+/// The place a 0x0a59 zaps from: before an arc 2 along its facing (`0x38bea0`, `$gp−0xcc`), before a plate 3
+/// (`0x3cb838`, `$gp+0x12c0`).
+fn zap_point(m: &crate::moby::Moby) -> V3 {
+    let s = if m.o_class == ARC { 2.0 } else { 3.0 };
+    add(crate::hero::physics::scale(m.rows[0], s), m.pos)
+}
+
+/// `0x3c7130(m, yaw)`: the robots of its group waiting or following (sub-state 0 / 1, awake) in its way — within 1
+/// ahead, 0.7 across and 0.5 up or down in its frame — step aside toward `yaw` (5, sub-state 1, from tick 0).
+fn step_aside(w: &mut MobyWorld, id: usize, yaw: f32) {
+    if w.mobys[id].group as u8 == 0xff { return; }
+    let (pos, rows) = (w.mobys[id].pos, w.mobys[id].rows);
+    for e in own_group(w, id) {
+        let Some(m) = w.mobys.get_mut(e) else { continue };
+        if m.state == 1 || 2 <= m.sub_state { continue; }
+        let v = crate::gravity::to_local(crate::hero::physics::sub(m.pos, pos), &rows);
+        if 0.0 < v[0] && v[0] < 1.0 && v[1].abs() < 0.7 && v[2].abs() < 0.5 {
+            m.set_state(5, 1);
+            m.set_pv_f(ASIDE, yaw);
+            m.state_ticks = 0;
+        }
+    }
+}
+
+/// `0x3c72f0`: someone stands on its 0x097a — Clank (`0x18a15c`) or a robot of its group (its floor moby `+0x198`).
+fn held_up(w: &MobyWorld, id: usize, ctx: &Ctx) -> bool {
+    let Some(t) = target(w, id) else { return false };
+    if ctx.hero.ground_moby == Some(t) { return true; }
+    if w.mobys[id].group as u8 == 0xff { return false; }
+    own_group(w, id).into_iter().any(|e| w.mobys.get(e).is_some_and(|m| crate::moby::ai::link(m, FLOOR_MOBY) == Some(t)))
+}
+
+/// `0x3c73d0(m, goal)`: no robot of its group after the same piece is nearer `goal` across.
+fn first_in_line(w: &MobyWorld, id: usize, goal: V3) -> bool {
+    let d = crate::hero::physics::dist2(w.mobys[id].pos, goal);
+    let t = w.mobys[id].pv_i(TARGET);
+    own_group(w, id).into_iter().all(|e| e == id || w.mobys.get(e).is_none_or(|m| m.pv_i(TARGET) != t || d <= crate::hero::physics::dist2(m.pos, goal)))
+}
+
+/// `0x3c74f0`: off the 0x097a — its record closed again (`0x41b120(net, p, 0)`); the end toward Clank
+/// ([`floor_end`]) clear of the world for a sphere of its radius at its height there (`0x2e0558`, flags 0): that end
+/// its goal, the floor let go, no piece, its collision back (`+0x98`), stepping off (0x11, sub-state 4) in sequence
+/// 0; else the record opened again.
+fn step_off(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let Some(t) = target(w, id) else { return };
+    let net = net_of(w, id);
+    let tp = w.mobys[t].pos;
+    if let Some(n) = net { net_mark(w, n, ctx, tp, false); }
+    let p = floor_end(w, t, ctx);
+    let m = &w.mobys[id];
+    let r = m.pv_f(RADIUS);
+    let test = [p[0], p[1], p[2] + r + m.pv_f(MOVE + 4)];
+    let blocked = ctx.coll.is_some_and(|c| {
+        let live = |i: usize| w.mobys.get(i).is_some_and(|m| m.state < 0x80 && m.has_collision);
+        crate::collision::coll_sphere_live(c, ctx.scene, test, r, crate::collision::QueryFlags(0), Some(id), &live).is_some()
+    });
+    if blocked {
+        if let Some(n) = net { net_mark(w, n, ctx, tp, true); }
+        return;
+    }
+    w.mobys[id].set_pv_v(GOAL, p);
+    w.mobys[t].once &= !4;
+    set_target(w, id, None);
+    let solid = w.class(w.mobys[id].o_class).is_some_and(|c| c.has_collision);
+    let m = &mut w.mobys[id];
+    m.has_collision = solid;
+    m.set_state(0x11, 4);
+    super::props::set_seq(w, id, ctx, 0, 0, 0x14);
+}
+
+/// `0x3cc188(floor, _, out)`: the 0x097a's end to step off at: the first from which the floor's network (`[0x64]`)
+/// has a way to Clank, else the first in a record of it, else the nearer to Clank across; 0.5 up and down on the
+/// ground (`0x31e228`).
+fn floor_end(w: &MobyWorld, t: usize, ctx: &Ctx) -> V3 {
+    let (a, b) = floor_sides(&w.mobys[t]);
+    let net = network(w, w.mobys[t].pv_i(0x64));
+    let hero = ctx.hero.pos;
+    let locate = |p: V3| {
+        let mut k = -1;
+        crate::path_network::locate(ctx.level, &net_nodes(w, net), p, &mut k);
+        k
+    };
+    let mut p = if reachable(w, net, ctx, a, hero) {
+        a
+    } else if reachable(w, net, ctx, b, hero) {
+        b
+    } else {
+        let region = locate(a);
+        if region != -1 {
+            a
+        } else if locate(b) != region {
+            b
+        } else if crate::hero::physics::dist2(hero, a) < crate::hero::physics::dist2(hero, b) {
+            a
+        } else {
+            b
+        }
+    };
+    p[2] += 0.5;
+    p[2] = crate::moby::ai::ground_z(ctx, 0.5, p, 0);
+    p
+}
+
+/// `0x3c61e0`: the head's look about — on its countdown's end (`+0x384`) a new one: waiting (sub-state 2), 5..60°
+/// either way and −20..0° up for 30..45 ticks; else 5..20° either way, −15..5° up, and one time in four a look at
+/// Clank (`+0x390`) for 180..300 ticks, else 60..120. Then the look at Clank's centre ([`look_at`]) or the turn
+/// asked of both aim records (`+0x2a4` / `+0x2a8`, `+0x324` / `+0x328`).
+fn look_around(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    {
+        let rng = &mut ctx.game.rng;
+        let m = &mut w.mobys[id];
+        let mut t = m.pv_i(LOOK_TICKS);
+        let out = countdown(&mut t);
+        m.set_pv_i(LOOK_TICKS, t);
+        if out {
+            const DEG: f32 = 0.017_453_294;
+            if m.sub_state == 2 {
+                m.set_pv_f(LOOK_YAW, rng.randf_signed(5.0, 60.0) * DEG);
+                m.set_pv_f(LOOK_PITCH, rng.randf(-20.0, 0.0) * DEG);
+                m.set_pv_i(LOOK_TICKS, rng.rand_range(30, 45));
+                m.set_pv_i(LOOK_CLANK, 0);
+            } else {
+                m.set_pv_f(LOOK_YAW, rng.randf_signed(5.0, 20.0) * DEG);
+                m.set_pv_f(LOOK_PITCH, rng.randf(-15.0, 5.0) * DEG);
+                let at = rng.randi(4) == 0;
+                m.set_pv_i(LOOK_CLANK, at as i32);
+                m.set_pv_i(LOOK_TICKS, if at { rng.rand_range(180, 300) } else { rng.rand_range(60, 120) });
+            }
+        }
+    }
+    if w.mobys[id].pv_i(LOOK_CLANK) != 0 {
+        let c = add(ctx.hero.pos, [0.0, 0.0, 1.0]);
+        look_at(w, id, ctx, c);
+    } else {
+        let m = &mut w.mobys[id];
+        let (u, v) = (m.pv_f(LOOK_PITCH), m.pv_f(LOOK_YAW));
+        for b in [AIM_A, AIM_B] {
+            m.set_pv_f(b + joint_aim::ASK + 4, u);
+            m.set_pv_f(b + joint_aim::ASK + 8, v);
+        }
+    }
+}
+
+/// `0x3c6018(m, p)`: the head turned to look at `p` (none for a 0x093c in its sequence 1): `p` in its frame, less its
+/// eyes' height (0.1 for 0x0964, 0.8 the others: `$gp+0x1010..`), the yaw within ±90° and the pitch within ±45°,
+/// each halved, asked of both aim records.
+fn look_at(w: &mut MobyWorld, id: usize, ctx: &Ctx, p: V3) {
+    let m = &w.mobys[id];
+    if m.o_class == ROBOT_93C && ctx.host.anim(m).is_some_and(|a| a.seq_a == 1) { return; }
+    let mut v = crate::gravity::to_local(crate::hero::physics::sub(p, m.pos), &m.rows);
+    v[2] -= if m.o_class == ROBOT_964 { f32::from_bits(0x3dcc_cccd) } else { f32::from_bits(0x3f4c_cccd) };
+    use std::f32::consts::{FRAC_PI_2, FRAC_PI_4};
+    let yaw = atan2(v[0], v[1]).clamp(-FRAC_PI_2, FRAC_PI_2) * 0.5;
+    let pitch = (-atan2(crate::hero::physics::len2(v), v[2])).clamp(-FRAC_PI_4, FRAC_PI_4) * 0.5;
+    let m = &mut w.mobys[id];
+    for b in [AIM_A, AIM_B] {
+        m.set_pv_f(b + joint_aim::ASK + 4, pitch);
+        m.set_pv_f(b + joint_aim::ASK + 8, yaw);
+    }
+}
+
+/// `0x31ffd8(p, goal, step)`: `p` moved toward `goal` by at most `step`.
+fn step_toward(p: V3, goal: V3, step: f32) -> V3 {
+    let d = crate::hero::physics::sub(goal, p);
+    let l = crate::hero::physics::len(d).clamp(-step, step);
+    add(p, set_len(d, l))
+}
+
+/// The yaw from the robot to its piece.
+fn yaw_to(w: &MobyWorld, id: usize, t: usize) -> f32 {
+    let (a, b) = (w.mobys[id].pos, w.mobys[t].pos);
+    atan2(b[0] - a[0], b[1] - a[1])
 }
 
 /// The glow (`0x3c5b80`), drawn: its phase steps by the sub-state's speed and the glow word goes between the
@@ -646,17 +1184,36 @@ fn glow(m: &mut crate::moby::Moby) {
     m.glow = crate::hud::lerp_rgba(ph.sin() * 0.5 + 0.5, a, b);
 }
 
-/// 0x093c / 0x0940 / 0x0964 / 0x0a59 (`0x3c31f8`): Endako's robots; see the module.
+/// `0x3c31f8`'s sub-state limits: the walk's (`0x32f550`, crate::moby::ai::senses; accel and most a second², a
+/// second), its accel `+0x134` and its stop distance `+0x144` — sub-states 1..3 on their first tick, 4..6 every tick.
+fn limits(m: &mut crate::moby::Moby) {
+    const SLOW: (f32, f32) = (f32::from_bits(0x3b64_c38a), f32::from_bits(0x3dd6_7752));
+    const QUICK: (f32, f32) = (f32::from_bits(0x3be4_c38a), f32::from_bits(0x3e56_7752));
+    let first = m.once & 2 == 0;
+    let (walk, turn, accel, stop) = match m.sub_state {
+        1 if first => (WALK, SLOW, f32::from_bits(0x3ada_740e), NEAR),
+        2 if first => (RUN, QUICK, f32::from_bits(0x3bb6_0b61), 0.0),
+        3 if first => (WALK, QUICK, f32::from_bits(0x3bb6_0b61), f32::from_bits(0x3dcc_cccd)),
+        4 => (WALK, SLOW, f32::from_bits(0x3ada_740e), f32::from_bits(0x3ecc_cccd)),
+        5 => (WALK, SLOW, f32::from_bits(0x3ada_740e), f32::from_bits(0x3d4c_cccd)),
+        6 => (WALK, QUICK, f32::from_bits(0x3ba3_d70a), f32::from_bits(0x3d4c_cccd)),
+        _ => return,
+    };
+    if matches!(m.sub_state, 1..=3) { m.once |= 2; }
+    crate::moby::ai::senses(m, walk.0 * 0.000_277_777_78, walk.1 * 0.016_666_668, turn.0, turn.1);
+    m.set_pv_f(MOVE + 0x24, accel);
+    m.set_pv_f(STOP, stop);
+}
+
+/// 0x093c / 0x0940 / 0x0964 / 0x0a59 (`0x3c31f8`): Endako's and the prison's robots; see the module.
 pub fn update_robot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     robot_pre(w, id, ctx);
-    if w.mobys[id].sub_state == 1 && w.mobys[id].once & 2 == 0 {
-        let m = &mut w.mobys[id];
-        m.once |= 2;
-        crate::moby::ai::senses(m, WALK.0 * 0.000_277_777_78, WALK.1 * 0.016_666_668, f32::from_bits(0x3b64_c38a), f32::from_bits(0x3dd6_7752));
-        m.set_pv_f(STOP, NEAR);
-        m.set_pv_f(MOVE + 0x24, f32::from_bits(0x3ada_740e));
-    }
+    limits(&mut w.mobys[id]);
     let hero = ctx.hero.pos;
+    // Clank pressing on it (`0x18a090` / `0x18a08c`); its turn of the frames spread over 4, 8 and 16.
+    let pushed = ctx.hero.wall_moby == Some(id) || ctx.hero.push_moby == Some(id);
+    let frame = ctx.game.frame;
+    let every = |n: i32| frame & n == (id as i32) & n;
     match w.mobys[id].state {
         1 => {
             let woke = link(w, id, CHILD).is_some_and(|c| w.mobys[c].once & 4 != 0);
@@ -673,6 +1230,12 @@ pub fn update_robot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 w.mobys[id].set_state(4, 1);
             }
         }
+        // Waiting (command 2): pushed by Clank and backing off, looking about while drawn.
+        2 => {
+            if pushed { push(w, id, hero); }
+            back_off(w, id, ctx);
+            if w.mobys[id].drawn != 0 { look_around(w, id, ctx); }
+        }
         3 => {
             let ok = move_to(w, id, ctx, hero, true);
             let m = &w.mobys[id];
@@ -681,7 +1244,7 @@ pub fn update_robot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 w.mobys[id].set_state(4, -1);
                 play_rand(w, id, ctx, 0, 10);
             }
-            if ctx.game.frame & 0xf == id as i32 & 0xf {
+            if every(0xf) {
                 let n = spread(w, id, hero);
                 w.mobys[id].set_pv_i(SPREAD, n);
             }
@@ -693,13 +1256,16 @@ pub fn update_robot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 m.set_pv_i(IDLES, 2);
                 m.set_pv_v(VEL, [0.0; 3]);
             }
-            if ctx.hero.wall_moby == Some(id) || ctx.hero.push_moby == Some(id) { push(w, id, hero); }
+            if pushed { push(w, id, hero); }
             back_off(w, id, ctx);
             let net = net_of(w, id);
             let pos = w.mobys[id].pos;
             if FOLLOW < crate::hero::physics::dist2(pos, hero) && reachable(w, net, ctx, pos, hero) {
                 w.mobys[id].set_state(3, -1);
                 play_rand(w, id, ctx, 2, 10);
+            } else if w.mobys[id].drawn != 0 && ctx.host.anim(&w.mobys[id]).is_none_or(|a| a.seq_a != 1) {
+                // The head: at Clank's centre while its idles are few, else about.
+                if w.mobys[id].pv_i(IDLES) < 5 { look_at(w, id, ctx, add(hero, [0.0, 0.0, 1.0])) } else { look_around(w, id, ctx) }
             }
             let a = ctx.host.anim(&w.mobys[id]);
             if super::props::wrapped(w, id, ctx) && a.is_some_and(|a| a.seq_a == a.seq_b) {
@@ -717,6 +1283,32 @@ pub fn update_robot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     }
                 }
             }
+        }
+        // Stepping aside (`0x3c7130`) toward `+0x374` for 60 ticks, fanned out, in sequence 2; then beside Clank.
+        5 => {
+            if w.mobys[id].first() {
+                play_rand(w, id, ctx, 2, 20);
+                w.mobys[id].set_pv_f(STOP, f32::from_bits(0x3dcc_cccd));
+            }
+            let m = &w.mobys[id];
+            let h = m.pv_f(ASIDE);
+            let p = add([h.cos(), h.sin(), 0.0], m.pos);
+            move_to(w, id, ctx, p, true);
+            if 61 <= w.mobys[id].state_ticks {
+                w.mobys[id].set_pv_f(STOP, NEAR);
+                w.mobys[id].set_state(4, 1);
+                play_rand(w, id, ctx, 0, 10);
+            }
+        }
+        // The bow (command 8, sequence 3; state 8's sequence 7, which nothing sets) facing Clank, then beside him.
+        6 | 8 => {
+            if w.mobys[id].first() {
+                let s = if w.mobys[id].state == 8 { 7 } else { 3 };
+                super::props::set_seq(w, id, ctx, s, 0, 20);
+            }
+            let p = w.mobys[id].pos;
+            turn_to(&mut w.mobys[id], atan2(hero[0] - p[0], hero[1] - p[1]));
+            if super::props::wrapped(w, id, ctx) { w.mobys[id].set_state(4, -1); }
         }
         7 => {
             // Sent (L14 `0x3cab28`, [`send_to`]): its first tick the stop distance 0.1; farther across than that from
@@ -737,8 +1329,306 @@ pub fn update_robot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.set_pv_i(WALK_TICKS, t);
             if out { m.set_state(4, -1); }
         }
+        // Attack (0x0964): after its enemy, every 8th frame the nearest again; it makes way for a robot it pushes on
+        // (straight on a 0x097a, else to the side away from it); the enemy in a line 0.333 ahead (every 4th frame,
+        // 0.2 up, `0x2df4f8` flags 0): the blow (10) in sequence 4.
+        9 => {
+            if every(7) {
+                let t = find_enemy(w, id, ctx);
+                set_target(w, id, t);
+            }
+            if let Some(p) = link(w, id, PUSHER) {
+                let m = &w.mobys[id];
+                let yaw = m.rot[2];
+                let on_floor = link(w, id, FLOOR_MOBY).is_some_and(|f| w.mobys[f].o_class == FLOOR_97A);
+                let h = if on_floor {
+                    yaw
+                } else {
+                    let turn = crate::hero::physics::sub_rot(yaw_to(w, id, p), yaw);
+                    add_rot(if turn < 0.0 { -std::f32::consts::FRAC_PI_2 } else { std::f32::consts::FRAC_PI_2 }, yaw)
+                };
+                step_aside(w, id, h);
+            }
+            let Some(t) = target(w, id) else {
+                w.mobys[id].set_state(11, -1);
+                play_rand(w, id, ctx, 0, 20);
+                return robot_tail(w, id, ctx);
+            };
+            let goal = w.mobys[t].pos;
+            move_to(w, id, ctx, goal, false);
+            if every(3) {
+                let m = &w.mobys[id];
+                let a = add(m.pos, [0.0, 0.0, 0.2]);
+                let b = add(add(set_len(m.rows[0], f32::from_bits(0x3eaa_7efa)), m.pos), [0.0, 0.0, 0.2]);
+                let hit = w.coll_line(ctx, a, b, 0, Some(id)).and_then(|o| o.moby);
+                if hit == Some(t) {
+                    w.mobys[id].set_state(10, -1);
+                    super::props::set_seq(w, id, ctx, 4, 0, 10);
+                }
+            }
+        }
+        // The blow: at frame 14 a hit of 4 (`0x31e6d0`: 0.333 round at joint 1, flags 0x10000); at its end the
+        // nearest enemy again: after it (9, sequence 3), or none (11).
+        10 => {
+            if crate::moby::ai::reached(w, id, ctx, 14.0) {
+                crate::moby::ai::attack_joint(w, id, ctx, f32::from_bits(0x3eaa_7efa), 4.0, 1.0, 1, 0x10000, 0, 1, 0);
+            } else if super::props::wrapped(w, id, ctx) {
+                let t = find_enemy(w, id, ctx);
+                set_target(w, id, t);
+                if t.is_some() {
+                    w.mobys[id].set_state(9, -1);
+                    play_rand(w, id, ctx, 3, 10);
+                } else {
+                    w.mobys[id].set_state(11, -1);
+                    play_rand(w, id, ctx, 0, 10);
+                }
+            }
+        }
+        // No enemy: looking about, every 8th frame for one; one found, after it (9); none for 300 ticks, beside Clank.
+        11 => {
+            if every(7) {
+                let t = find_enemy(w, id, ctx);
+                set_target(w, id, t);
+            }
+            look_around(w, id, ctx);
+            if target(w, id).is_some() {
+                w.mobys[id].set_state(9, -1);
+                play_rand(w, id, ctx, 3, 20);
+            } else if 301 <= w.mobys[id].state_ticks {
+                w.mobys[id].set_state(4, 1);
+                play_rand(w, id, ctx, 0, 20);
+            }
+        }
+        // To a 0x0ef9 (command 4): its radius 0.11 while first in line, else 0.15 (every 4th frame); the 0x0ef9 no
+        // longer taking robots, beside Clank; there, in (13).
+        12 => {
+            let goal = w.mobys[id].pv_v(GOAL);
+            move_to(w, id, ctx, goal, false);
+            if every(3) {
+                let r = if first_in_line(w, id, goal) { f32::from_bits(0x3de1_47ae) } else { f32::from_bits(0x3e19_999a) };
+                w.mobys[id].set_pv_f(RADIUS, r);
+            }
+            let open = target(w, id).is_some_and(|t| slot_open(&w.mobys[t]));
+            let m = &w.mobys[id];
+            if !open {
+                w.mobys[id].set_state(4, 1);
+                play_rand(w, id, ctx, 0, 10);
+            } else if m.pv_f(GOAL_DIST) < m.pv_f(STOP) {
+                w.mobys[id].set_state(13, -1);
+            }
+        }
+        // Into the 0x0ef9: its first tick it goes in (`0x41aed8`), the turn before walking 10°, its velocity across
+        // the 0x0ef9's facing kept, no radius; at its place (within 0.1 across) it is gone.
+        13 => {
+            let Some(t) = target(w, id) else { return robot_tail(w, id, ctx) };
+            if w.mobys[id].first() {
+                slot_enter(w, t, id);
+                let rows = w.mobys[t].rows;
+                let m = &mut w.mobys[id];
+                m.set_pv_f(MOVE + 0x30, f32::from_bits(0x3e32_b8c3));
+                let mut v = crate::gravity::to_local(m.pv_v(VEL), &rows);
+                v[1] = 0.0;
+                m.set_pv_v(VEL, through(&rows, v));
+                m.set_pv_f(RADIUS, 0.0);
+            }
+            let goal = w.mobys[t].pos;
+            move_to(w, id, ctx, goal, false);
+            if crate::hero::physics::dist2(w.mobys[id].pos, goal) < 0.1 {
+                w.delete(id);
+                return;
+            }
+        }
+        // To the 0x097a's end (command 6): help 0x27 off; making way for a robot it pushes on; arrived (flag 0x80),
+        // the climb on (15).
+        14 => {
+            let goal = w.mobys[id].pv_v(GOAL);
+            move_to(w, id, ctx, goal, false);
+            if w.mobys[id].first() { help_off(ctx, 0x27); }
+            if link(w, id, PUSHER).is_some() {
+                let h = add_rot(w.mobys[id].rot[2], std::f32::consts::PI);
+                step_aside(w, id, h);
+            }
+            if w.mobys[id].pv_i(MOVE_FLAGS) & 0x80 != 0 { w.mobys[id].set_state(15, -1); }
+        }
+        // The climb on, in sequence 4 with no collision: its goal the floor's middle 3.8 across on its side; facing
+        // the floor, past frame 11 it eases toward it (0.133 a tick); at the end the floor's record opened, it stands
+        // as the floor (16, sequence 5) and hooks it (crate::moby::classes::endako_b::update_097a: solid).
+        15 => {
+            let Some(t) = target(w, id) else { return robot_tail(w, id, ctx) };
+            if w.mobys[id].first() {
+                super::props::set_seq(w, id, ctx, 4, 0, 10);
+                let (tp, rows) = (w.mobys[t].pos, w.mobys[t].rows);
+                let m = &mut w.mobys[id];
+                m.has_collision = false;
+                let mut v = crate::gravity::to_local(crate::hero::physics::sub(m.pv_v(GOAL), tp), &rows);
+                v[1] = 0.0;
+                v[0] = if v[0] < v[1] { -3.8 } else { 3.8 };
+                m.set_pv_v(GOAL, add(through(&rows, v), tp));
+            }
+            let h = yaw_to(w, id, t);
+            turn_to(&mut w.mobys[id], h);
+            if 11.0 < ctx.host.frame_time(&w.mobys[id]) {
+                let m = &mut w.mobys[id];
+                m.pos = step_toward(m.pos, m.pv_v(GOAL), f32::from_bits(0x3e08_8889));
+            }
+            if super::props::wrapped(w, id, ctx) {
+                let tp = w.mobys[t].pos;
+                if let Some(n) = net_of(w, id) { net_mark(w, n, ctx, tp, true); }
+                w.mobys[id].set_state(16, -1);
+                super::props::set_seq(w, id, ctx, 5, 0, 5);
+                w.mobys[t].once |= 4;
+            }
+        }
+        // The floor: Clank more than 12 across from it, off it and out of its cuboid, and no robot on it: off (17).
+        16 => {
+            if w.mobys[id].first() { w.mobys[id].set_pv_i(FLOOR_MOBY, 0); }
+            if let Some(t) = target(w, id) {
+                let tp = w.mobys[t].pos;
+                if 12.0 < crate::hero::physics::dist2(hero, tp) && !held_up(w, id, ctx) && !floor_holds(ctx, &w.mobys[t], hero) {
+                    step_off(w, id, ctx);
+                }
+            }
+        }
+        // Stepping off toward its goal (at most 0.4167 a tick); at the sequence's end there, the bow (6).
+        17 => {
+            let m = &mut w.mobys[id];
+            let goal = m.pv_v(GOAL);
+            let d = crate::hero::physics::sub(goal, m.pos);
+            let l = crate::hero::physics::len(d);
+            let most = f32::from_bits(0x3ed5_5556);
+            let d = if most < l { crate::hero::physics::scale(d, most / l) } else { d };
+            m.pos = add(m.pos, d);
+            if ctx.host.anim(&w.mobys[id]).is_some_and(|a| a.seq_a == a.seq_b) {
+                let m = &mut w.mobys[id];
+                m.pos = goal;
+                m.set_state(6, 1);
+            }
+        }
+        // To beside the piece (command 5); arrived, the lift (19) holding it (hooked: crate::moby::classes::
+        // endako_b::update_0e87).
+        18 => {
+            let goal = w.mobys[id].pv_v(GOAL);
+            move_to(w, id, ctx, goal, false);
+            if link(w, id, PUSHER).is_some() {
+                let h = add_rot(w.mobys[id].rot[2], std::f32::consts::PI);
+                step_aside(w, id, h);
+            }
+            if w.mobys[id].pv_i(MOVE_FLAGS) & 0x80 != 0 {
+                w.mobys[id].set_state(19, -1);
+                if let Some(t) = target(w, id) { w.mobys[t].once |= 4; }
+            }
+        }
+        // The lift, in sequence 4 facing the piece: from frame 10 the piece held at its joint 3's height over it
+        // (`0x3cb828`); at the end let go (it rises) and the bow (6). Help 0x80 off.
+        19 => {
+            if w.mobys[id].first() { super::props::set_seq(w, id, ctx, 4, 0, 10); }
+            if let Some(t) = target(w, id) {
+                let h = yaw_to(w, id, t);
+                turn_to(&mut w.mobys[id], h);
+                if ctx.host.anim(&w.mobys[id]).is_some_and(|a| a.seq_a == a.seq_b) {
+                    if 10.0 <= ctx.host.frame_time(&w.mobys[id]) {
+                        if let Some(j) = ctx.host.joint(&w.mobys[id], 3) {
+                            let z = j[2] - w.mobys[id].pos[2];
+                            w.mobys[t].set_pv_f(0xa0, z);
+                        }
+                    }
+                    if super::props::wrapped(w, id, ctx) {
+                        w.mobys[id].set_state(6, 1);
+                        w.mobys[t].once &= !4;
+                    }
+                }
+            }
+            help_off(ctx, 0x80);
+        }
+        // To before the arc or plate (command 7); arrived, the zap (21).
+        20 => {
+            let goal = w.mobys[id].pv_v(GOAL);
+            move_to(w, id, ctx, goal, false);
+            if link(w, id, PUSHER).is_some() {
+                let h = add_rot(w.mobys[id].rot[2], std::f32::consts::PI);
+                step_aside(w, id, h);
+            }
+            if w.mobys[id].pv_i(MOVE_FLAGS) & 0x80 != 0 { w.mobys[id].set_state(21, -1); }
+        }
+        // The zap, in sequence 5 facing it (help 0x61 off): at frame 20 the arc or plate hooked (crate::moby::
+        // classes::level14::arcs bursts, crate::moby::classes::level14::plate launches); at the end the bow (6).
+        21 => {
+            if w.mobys[id].first() {
+                super::props::set_seq(w, id, ctx, 5, 0, 10);
+                help_off(ctx, 0x61);
+            }
+            if let Some(t) = target(w, id) {
+                let h = yaw_to(w, id, t);
+                turn_to(&mut w.mobys[id], h);
+                if super::props::wrapped(w, id, ctx) {
+                    w.mobys[id].set_state(6, 1);
+                } else if crate::moby::ai::reached(w, id, ctx, 20.0) {
+                    w.mobys[t].once |= 4;
+                }
+            }
+        }
+        // Launched (L14 `0x3cabb0`, [`launch`]): along its velocity under its two gravities (`+0x394` up, `+0x398`
+        // down), tumbling back 24° a tick about its pitch (eased upright once past it on the way down, `0x320220`:
+        // 0.4°/tick², at most 24°) about its point 0.8 up (0.3 for 0x0964); below its landing height `+0x3a0` and on
+        // the ground (`0x31e228`, 0.5 up): there, beside Clank, in the network that holds it.
+        0x16 => {
+            let land = {
+                let m = &mut w.mobys[id];
+                m.pos = add(m.pos, m.pv_v(VEL));
+                let h = if m.o_class == ROBOT_964 { 0.3 } else { 0.8 };
+                let point = through(&m.rows, [0.0, 0.0, h]);
+                let mut v = m.pv_v(VEL);
+                let spin = f32::from_bits(0x3ed6_7752);
+                let mut land = false;
+                if v[2] < 0.0 {
+                    v[2] -= m.pv_f(LAUNCH_DOWN);
+                    if 0.0 < m.rot[1] {
+                        let (mut a, mut s) = (m.rot[1], m.pv_f(LAUNCH_SPIN));
+                        crate::hero::physics::ease(0.0, f32::from_bits(0x3be4_c38a), f32::from_bits(0x3be4_c38a), spin, &mut a, &mut s);
+                        m.rot[1] = a;
+                        m.set_pv_f(LAUNCH_SPIN, s);
+                    } else {
+                        m.rot[1] = crate::hero::physics::sub_rot(m.rot[1], spin);
+                    }
+                    land = m.pos[2] < m.pv_f(LAUNCH_LAND);
+                } else {
+                    v[2] -= m.pv_f(LAUNCH_UP);
+                    m.rot[1] = crate::hero::physics::sub_rot(m.rot[1], spin);
+                }
+                m.set_pv_v(VEL, v);
+                m.rows = crate::hero::physics::euler_rows(m.rot);
+                let other = through(&m.rows, [0.0, 0.0, h]);
+                m.pos = add(m.pos, crate::hero::physics::sub(point, other));
+                land
+            };
+            if land {
+                let pos = w.mobys[id].pos;
+                let floor = crate::moby::ai::ground_z(ctx, 0.5, pos, 0);
+                if pos[2] <= floor {
+                    w.mobys[id].pos[2] = floor;
+                    w.mobys[id].set_state(4, 1);
+                    let pos = w.mobys[id].pos;
+                    for n in 0..w.mobys.len() {
+                        if w.mobys[n].o_class == NETWORK && reachable(w, Some(n), ctx, pos, pos) {
+                            let m = &mut w.mobys[id];
+                            m.set_pv_i(NET, n as i32);
+                            m.set_pv_i(AT, -1);
+                            m.set_pv_i(TO, -1);
+                        }
+                    }
+                }
+            }
+        }
         _ => {}
     }
+    robot_tail(w, id, ctx);
+}
+
+/// The end of `0x3c31f8`: in the air or on a moby (not asleep, launched, climbing on or the floor), upright and held
+/// (`0x32e698`); then `0x3c5a70`: its state's ticks, the command's 30 ticks (`+0x364`), the glow, with Clank's big
+/// head (cheat byte 3) the first aim record's scale 1.75 while awake, both aim records (`0x325588`: crate::moby::
+/// joint_aim, 0.03 / 0.3, joint lists 1 and 0) and its fence path the record it is in (`0x41b218`).
+fn robot_tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &mut w.mobys[id];
     if !matches!(m.state, 0x16 | 1 | 0xf | 0x10) && (m.pv_f(FLOOR_Z) < m.pos[2] - 0.05 || m.pv_i(FLOOR_MOBY) != 0) {
         m.rot[0] = 0.0;
@@ -747,13 +1637,38 @@ pub fn update_robot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     let m = &mut w.mobys[id];
     if m.state_ticks != -1 { m.state_ticks += 1; }
+    let mut c = m.pv_i(COOLDOWN);
+    countdown(&mut c);
+    m.set_pv_i(COOLDOWN, c);
     glow(m);
+    if ctx.game.cheat(crate::cheats::cheat::CLANK_HEAD) && m.state != 1 { m.set_pv_f(AIM_A + 0x70, 1.75); }
+    joint_aim::aim(w, id, AIM_A, id, 1, f32::from_bits(0x3cf5_c28f), f32::from_bits(0x3e99_999a));
+    joint_aim::aim(w, id, AIM_B, id, 0, f32::from_bits(0x3cf5_c28f), f32::from_bits(0x3e99_999a));
+    let m = &w.mobys[id];
     if m.sub_state != 7 && m.state != 1 {
         let at = m.pv_i(AT);
         let nodes = net_nodes(w, net_of(w, id));
         let path = usize::try_from(at).ok().and_then(|k| nodes.get(k)).map_or(-1, |n| n.path);
         w.mobys[id].set_pv_i(FENCE, path);
     }
+}
+
+/// L14 `0x3cabb0(r, to, peak, up, down)`: the robot launched (0x16, sub-state 7) to land at `to` over a top at the
+/// height `peak` — its velocity across over the flight's time (up at the gravity `up`, down at `down`), up at the
+/// speed that reaches the top; no fence path; its landing height 0.333 over `to`. Its user: the launch plate 0x0f4d
+/// (crate::moby::classes::level14::plate).
+pub(crate) fn launch(w: &mut MobyWorld, r: usize, to: V3, peak: f32, up: f32, down: f32) {
+    let m = &mut w.mobys[r];
+    m.set_state(0x16, 7);
+    let rise = (peak - m.pos[2]) * 2.0;
+    let t = (rise / up).sqrt() + ((peak - to[2]) * 2.0 / down).sqrt();
+    let mut v = crate::hero::physics::scale(crate::hero::physics::sub(to, m.pos), 1.0 / t);
+    v[2] = (rise * up).sqrt();
+    m.set_pv_v(VEL, v);
+    m.set_pv_f(LAUNCH_UP, up);
+    m.set_pv_f(LAUNCH_DOWN, down);
+    m.set_pv_i(FENCE, -1);
+    m.set_pv_f(LAUNCH_LAND, to[2] + 0.333);
 }
 
 /// 0x0d75 (`0x4096c8`): a robot's cage. **0**: its pieces 10..14 drawn over it (`+0x7c` = 0x7c00, `$gp+0x25dc`); 1.

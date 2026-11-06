@@ -23,8 +23,8 @@
 //!
 //! Not ported: the classes' load wait (`0x305cc0` / `0x305ab0`: the port has every class), the game statistics
 //! counters, the d-pad's rumble (`0x31dc30` with its last flag), the dim layer `0x1a9054+0x3f9dc`, the items' tints
-//! (`0x42ddd8`) and XP bars (`+0x36f28`), Clank's ring (`0x2f9380` / `0x2f93c8` / `0x2f98d0`), the message box's veto
-//! (`0x1a8fb4`).
+//! (`0x42ddd8`) and XP bars (`+0x36f28`), the message box's veto
+//! (`0x1a8fb4`). Clank's ring (`0x2f9380` / `0x2f93c8` / `0x2f98d0`) is crate::hero::commands.
 
 use crate::hud::{Align, Draw, Fader};
 use crate::pad::{button, PadState};
@@ -259,6 +259,10 @@ impl QuickSelect {
     }
 
     pub fn is_open(&self) -> bool { self.screen.is_some() }
+
+    /// The screen given up for Clank's callbacks (screen 0x23 opened with his body runs his ring,
+    /// crate::hero::commands).
+    pub fn close(&mut self) { self.screen = None; }
 
     /// `0x2f84e8`: the screen's frame (`paused`: Quick Select Pause is on and the game's paused mode runs it; `pause`:
     /// the option).

@@ -13,6 +13,7 @@ pub mod lift;
 pub mod lift_guard;
 pub mod movers;
 pub mod pit;
+pub mod plate;
 pub mod props;
 pub mod rappeller;
 pub mod screen;
@@ -71,6 +72,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         switch::CLASS => Some(switch::update_113b),
         gate::CLASS => Some(gate::update_113e),
         director::CLASS => Some(director::update_10ff),
+        plate::CLASS => Some(plate::update_0f4d),
         super::critter::PRISON => Some(super::critter::update),
         _ => None,
     }

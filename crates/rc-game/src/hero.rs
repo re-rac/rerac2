@@ -23,6 +23,7 @@ pub mod anim;
 pub mod back;
 pub mod body;
 pub mod clank;
+pub mod commands;
 pub mod damage;
 pub mod extras;
 pub mod frame;

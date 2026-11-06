@@ -164,6 +164,21 @@ fn quick_select_frame(qs: &mut rc_game::quick_select::QuickSelect, paused: &mut 
     qs.ring_tick(&slots);
 }
 
+/// Screen 0x23 with Clank's body (`0x18c0d4` = 1): his command ring's frame (`0x2fa5f0`, rc_game::hero::commands) in
+/// the quick select's place — a quick select opened for it (by △ or the paused mode) is his ring.
+fn clank_ring_frame(qs: &mut rc_game::quick_select::QuickSelect, paused: &mut bool, pad: &mut PadState, game: &mut rc_game::game::GameState, hero: &mut Hero, pause: bool) {
+    if qs.is_open() {
+        qs.close();
+        hero.body.commands.open();
+    }
+    for o in hero.body.commands.update(pad, pause) {
+        match o {
+            rc_game::hero::commands::Out::Resume => *paused = false,
+            rc_game::hero::commands::Out::Sound(n) => game.level_sounds.push(n as i32),
+        }
+    }
+}
+
 /// `0x3227d8`: the hand item asked for (rc_game::hero::items::ItemBlock::ask).
 pub(crate) fn equip(held: i32, hero: &mut Hero, item: i32) {
     if !hero.items.ask(held, item) { eprintln!("play: item {item:#x} cannot be held yet"); }
@@ -771,7 +786,9 @@ fn tick(
     let qs_ok = !p.qs_paused && 7 < p.game.frame && !matches!(p.hero.state, 0x6f | 0x31) && p.hero.items.flying != 2 && p.hero.mode < 2 && 0 < p.game.prompt.free_frames;
     if p.qs.main_loop(&p.pad, qs_pause, qs_ok) { p.qs_paused = true; }
     if p.qs_paused {
-        if let Some(m) = p.mobys.as_ref() { quick_select_frame(&mut p.qs, &mut p.qs_paused, &p.pad, &mut p.game, &mut p.hero, &m.level.items, qs_pause); }
+        if p.hero.mode == 1 {
+            clank_ring_frame(&mut p.qs, &mut p.qs_paused, &mut p.pad, &mut p.game, &mut p.hero, qs_pause);
+        } else if let Some(m) = p.mobys.as_ref() { quick_select_frame(&mut p.qs, &mut p.qs_paused, &p.pad, &mut p.game, &mut p.hero, &m.level.items, qs_pause); }
         p.ticks += 1;
         return;
     }
@@ -824,6 +841,8 @@ fn tick(
         let scene = crate::mobys::scene_of(&mobys.snap, &mobys.coll, &mobys.cache);
         // The movers' carry of this tick starts from nothing (`0x189f70`).
         (p.hero.carry, p.hero.carry_yaw) = ([0.0; 3], 0.0);
+        // The robots' counts for Clank's ring start from 0 (`0x371b48`, rc_game::hero::commands).
+        rc_game::hero::commands::frame_start(p.hero.mode, &mut p.hero.body.commands);
         // The view the updates test their spheres against: the camera as the last tick left it (`0x2f0080`) — the
         // first-person camera's (or a blend's) when that is the one shown.
         let (tx, ty) = crate::game_camera::projection_tans(None);
@@ -1185,7 +1204,11 @@ fn tick(
         p.qs.open();
         (p.game.show_health, p.game.show_bolts) = (Some(0x168), Some(0xb4));
     }
-    quick_select_frame(&mut p.qs, &mut p.qs_paused, &p.pad, &mut p.game, &mut p.hero, &mobys.level.items, qs_pause);
+    if p.hero.mode == 1 {
+        clank_ring_frame(&mut p.qs, &mut p.qs_paused, &mut p.pad, &mut p.game, &mut p.hero, qs_pause);
+    } else {
+        quick_select_frame(&mut p.qs, &mut p.qs_paused, &p.pad, &mut p.game, &mut p.hero, &mobys.level.items, qs_pause);
+    }
     // The HUD (`0x443c08`) with this tick's requests.
     let (sb, sh) = (p.game.show_bolts.take(), p.game.show_health.take());
     // `0x2fa770`: the held item when it has ammo (not with the items off, `0x18c0d4`).
@@ -2598,6 +2621,12 @@ fn draw_hud(
             let slots = rc_game::quick_select::slots(&p.game, &m.level.items);
             let strings = &hud.data.assets().strings;
             p.qs.draw(&slots, &p.pad, &|id| strings.get(id).to_vec(), &mut draws);
+        }
+        // Clank's command ring (rc_game::hero::commands): its names the level's texts, else the front end's.
+        {
+            let strings = &hud.data.assets().strings;
+            let texts = |id: u32| Some(rc_formats::strings::find_index(&p.texts, id as i32).map(|i| p.texts[i].text.clone()).unwrap_or_else(|| strings.get(id).to_vec()));
+            p.hero.body.commands.draw(&texts, &mut draws);
         }
         let icon = |id: u16, f: u16| hud.icons.get(&(id, f)).map(|&(i, s)| (rc_game::gui::Tex::Slot(i), s));
         quads.extend(rc_game::hud::quads(&draws, &hud.data.assets().sprites, &hud.data.assets().glyphs, &icon, rc_game::gui::MENU_TAN));

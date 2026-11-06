@@ -7,8 +7,8 @@
 //!   into its cuboid `[0x4c]`.
 //! * **0x0982 / 0x0983** ([`update_lift`], `0x3cc4e8`): the lifts between their floor and the cuboid `[0x60]`'s.
 //! * **0x0e87 / 0x0961** ([`update_0e87`], `0x3cb5c0`), **0x097a** ([`update_097a`], `0x3cc000`), **0x0ef9**
-//!   ([`update_0ef9`], `0x41ac38`): pieces the level's robots (0x093c / 0x0940, not ported) raise, stand on and
-//!   watch; their own parts.
+//!   ([`update_0ef9`], `0x41ac38`): pieces the level's robots (crate::moby::classes::endako_d's commands) raise,
+//!   stand on and go into; their own parts.
 //! * **0x099d** ([`update_099d`], `0x3cd7e0`): the Swingshot's pull target turning while drawn; **0x094e**
 //!   (`0x3c9dd0`: `jr ra`, crate::moby::classes::props::update_empty).
 //! * **0x0a0a** ([`update_0a0a`], `0x3d3800`): a camera tweak of priority 4 held at its defaults; **0x0a0b**
@@ -20,12 +20,10 @@
 //! Clank's rescue **0x0a08** (`0x3d2fd0`) and Clank's body **0x0057** (`0x394728`) are crate::moby::classes::endako_clank.
 //! The hacking panel **0x0b29** (`0x3e5c90`) is crate::moby::classes::hacker_panel, its puzzle crate::hacker.
 //! The mod vendor **0x0ddc / 0x0e0d** (`0x40a8a8` / `0x40b110`) is crate::moby::classes::mod_vendor.
+//! The robots **0x093c / 0x0940 / 0x0964 / 0x0a59** (`0x3c31f8`) and their network **0x0f2d** are
+//! crate::moby::classes::endako_d. The boss **0x0c8a** (`0x3f5c78`) is crate::moby::classes::endako_boss.
 //!
-//! Not ported (set B's other classes):
-//! * The robots **0x093c / 0x0940** (`0x3c31f8`, 49 functions: they walk the network of **0x0f2d** (`0x41b0b0`, built
-//!   by `0x32b318` from its list of paths) and raise 0x0e87 and stand on 0x097a): too large for this pass. The boss
-//!   **0x0c8a** (`0x3f5c78`) is crate::moby::classes::endako_boss.
-//! * **0x0cfc / 0x094c** (`0x3c9430`: Ghidra has no function there).
+//! Not ported (set B's other classes): **0x0cfc / 0x094c** (`0x3c9430`: Ghidra has no function there).
 
 use crate::hero::physics::{add, add_rot, dist, dist2, len, len2, scale, sub, turn_ease, ease, ease_speed, V3};
 use crate::moby::{countdown, Ctx, Moby, MobyWorld};
