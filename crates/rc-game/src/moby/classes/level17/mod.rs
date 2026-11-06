@@ -2,10 +2,13 @@
 //! the L00 ones the port knows them by where they differ). Each class's update is registered in [`update_for`] and
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
 
+pub mod carrier;
 pub mod floaters;
 pub mod gate;
 pub mod hatchling;
 pub mod hazard;
+pub mod lifts;
+pub mod misc;
 pub mod mortar;
 pub mod props;
 
@@ -26,6 +29,17 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         gate::CLASS => Some(gate::update_1305),
         // Also level 8's (L08 `0x3f7ab0`).
         mortar::CLASS => Some(mortar::update_0c1a),
+        carrier::CARRIER => Some(carrier::update_08b1),
+        carrier::PLATFORM => Some(carrier::update_093b),
+        lifts::DOCK => Some(lifts::update_0935),
+        lifts::LIFT_A | lifts::LIFT_B => Some(lifts::update_08ac),
+        lifts::ELEVATOR => Some(lifts::update_08a7),
+        misc::MARKER_A | misc::MARKER_B | misc::MARKER_C => Some(misc::update_0877),
+        misc::UPDRAFT => Some(misc::update_120d),
+        misc::BARRIER => Some(misc::update_1256),
+        misc::SWITCH => Some(misc::update_1326),
+        misc::MUSIC => Some(misc::update_1272),
+        misc::SCENE_FX => Some(misc::update_0f27),
         _ => None,
     }
 }
@@ -34,6 +48,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
 #[allow(clippy::too_many_arguments, unused_variables)]
 pub fn draw(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, hero_state: i32, view: &crate::particles::BSphereView, cam: V3, id: usize, first: bool, out: &mut Vec<crate::fx::FxQuad>, frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
     match w.mobys[id].o_class {
+        carrier::CARRIER => { carrier::draw_08b1(w, id, cam, out); true }
         _ => false,
     }
 }

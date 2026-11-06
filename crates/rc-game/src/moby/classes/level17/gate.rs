@@ -48,7 +48,7 @@ fn standing(w: &MobyWorld, id: usize) -> usize {
 /// the mobys near (flags 0x10); each alive one whose nearest point of the wall's plane (its local x and z kept, held
 /// to the half sides once beyond them by more than the reaches) has it within the reach across of it takes a hit of
 /// its damage (flags 0x10001, from it, at that point).
-fn wall(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
+pub(super) fn wall(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
     let m = &w.mobys[id];
     if m.pv_i(8) & 0x100 != 0 { return; }
     let Some(sc) = ctx.scene else { return };
@@ -77,11 +77,16 @@ fn wall(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
 
 /// 0x1305 (module docs).
 pub fn update_1305(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let t = target(w, id);
     let m = &w.mobys[id];
     let done = m.mission != 0xff
         && ctx.game.missions.get(ctx.game.level.max(0) as usize * 0x10 + m.mission as usize).is_some_and(|b| b & 0x80 != 0);
     let count = if done || m.state == 0 { 0 } else { standing(w, id) };
+    run(w, id, ctx, count);
+}
+
+/// The states (module docs) with `count` links standing; 0x1256 (crate::moby::classes::level17::misc) runs them too.
+pub(super) fn run(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, count: usize) {
+    let t = target(w, id);
     let flags = w.mobys[id].pv_i(8);
     match w.mobys[id].state {
         0 => {
@@ -98,7 +103,7 @@ pub fn update_1305(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     w.mobys[id].set_pv_s(l + 4, c);
                 }
             }
-            let s = w.class(CLASS).map_or(1.0, |c| c.scale);
+            let s = w.class(w.mobys[id].o_class).map_or(1.0, |c| c.scale);
             let m = &mut w.mobys[id];
             m.scale = m.pv_f(0).max(m.pv_f(4)) * s;
             m.state = 1;
