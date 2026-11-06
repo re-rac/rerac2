@@ -2,6 +2,9 @@
 //! the L00 ones the port knows them by where they differ). Each class's update is registered in [`update_for`] and
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
 
+pub mod floaters;
+pub mod gate;
+pub mod hatchling;
 pub mod hazard;
 pub mod props;
 
@@ -15,6 +18,11 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         props::CONVEYOR => Some(props::update_0fbd),
         props::CRATE => Some(props::update_0fd7),
         props::LAMP => Some(props::update_10ec),
+        hatchling::HATCHLING => Some(hatchling::update_0b88),
+        hatchling::POD | hatchling::POD_OPEN => Some(hatchling::update_0920),
+        floaters::BUOY => Some(floaters::update_08af),
+        floaters::TIPPER => Some(floaters::update_0937),
+        gate::CLASS => Some(gate::update_1305),
         _ => None,
     }
 }
