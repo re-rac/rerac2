@@ -56,12 +56,14 @@
 //! * **3**, following: toward Clank through the network ([`move_to`], `0x3c57c0`) fanned out by its place among its
 //!   group's robots on the way (`0x3c6ef8`, every 16th frame; `0x3c70c0`); no way, within 1.5, or stuck over 60 ticks
 //!   within 3: 4, sequence 0.
+//! * **7**, sent (L14 only: `0x3cab28`, [`send_to`], by the prison's lifts): toward its goal through the network
+//!   for 60 ticks, then 4.
 //! * **The tail** (`0x3c31f8`, `0x3c5a70`): in the air or on a moby, upright and held (`0x32e698`); its state's ticks
 //!   counted; drawn, its glow `+0x78` pulses between its sub-state's colours (`0x3c5b80`, `$gp+0xee0..`); its fence
 //!   path the record it is in (`0x41b218`).
 //!
 //! Not ported (the robots): Clank's commands (`0x18c304`, its D-pad orders 1..8: the hero side has none) and all
-//! they lead to — the states 2 and 5..0x15 (going to and using the unseen floors 0x097a, the pieces 0x0e87 they
+//! they lead to — the states 2, 5, 6 and 8..0x15 (going to and using the unseen floors 0x097a, the pieces 0x0e87 they
 //! raise, 0x0b10 / 0x0f4d, `0x3c6348` / `0x3c6560` / `0x3c6730` / `0x3c68d8` / `0x3c6a90` and their helps 0x9d0 /
 //! 0xa29 / 0xa0a), the command list `0x32c138` and timer `+0x364`, the sub-states 2..8's limits; the fall of state
 //! 0x16 (nothing the port has sets it); the head's look at Clank and the joint aims (`0x3c61e0` / `0x3c6018`,
@@ -264,6 +266,9 @@ const AT: usize = 0x368;
 const TO: usize = 0x36c;
 const IDLES: usize = 0x380;
 const START_Z: usize = 0x3a4;
+/// State 7's goal and ticks (set by L14 `0x3cab28`, [`send_to`]).
+const WALK_GOAL: usize = 0x340;
+const WALK_TICKS: usize = 0x37c;
 /// The movement block's fields: radius, walk accel / most, stop distance, options, fence path, push moby, floor moby,
 /// floor height, stuck ticks, velocity, goal distance, turn limits and speed.
 const RADIUS: usize = MOVE;
@@ -359,9 +364,14 @@ fn net_nodes(w: &MobyWorld, net: Option<usize>) -> Vec<crate::path_network::Node
     crate::path_network::read_nodes(&m.pvars, NET_NODES, n)
 }
 
-/// `0x41b120(net, p, open)`: the record that holds `p` closed to walking (flag 1) or opened; the network built
-/// first if it is not yet.
-fn net_mark(w: &mut MobyWorld, net: usize, ctx: &mut Ctx, p: V3, open: bool) {
+/// A network moby by its index (the robots' `+0x220`, the prison's lifts' `+0x64`, 0x0aeb's `+0x00`), when it is one.
+pub(crate) fn network(w: &MobyWorld, index: i32) -> Option<usize> {
+    usize::try_from(index).ok().filter(|&n| w.mobys.get(n).is_some_and(|m| m.o_class == NETWORK))
+}
+
+/// `0x41b120(net, p, open)` (L14 `0x421f60`): the record that holds `p` closed to walking (flag 1) or opened; the
+/// network built first if it is not yet.
+pub(crate) fn net_mark(w: &mut MobyWorld, net: usize, ctx: &mut Ctx, p: V3, open: bool) {
     if w.mobys[net].state == 0 { net_build(w, net, ctx); }
     let mut nodes = net_nodes(w, Some(net));
     let mut k = -1;
@@ -370,6 +380,41 @@ fn net_mark(w: &mut MobyWorld, net: usize, ctx: &mut Ctx, p: V3, open: bool) {
     if open { n.flags &= !1 } else { n.flags |= 1 }
     crate::path_network::write_nodes(&mut w.mobys[net].pvars, NET_NODES, &nodes);
 }
+
+/// L14 `0x4220d0(net, a, b, open)`: the link between the records that hold `a` and `b` (both found, not the same)
+/// opened (bit 0x80 of the link byte clear) or closed (set) both ways — the first of each record's four links whose
+/// low 7 bits name the other; the network built first if it is not yet. The walk ([`crate::path_network::steer`])
+/// skips closed links. Its user: the prison's lifts (crate::moby::classes::level14::lift).
+pub(crate) fn net_link(w: &mut MobyWorld, net: usize, ctx: &mut Ctx, a: V3, b: V3, open: bool) {
+    if w.mobys[net].state == 0 { net_build(w, net, ctx); }
+    let mut nodes = net_nodes(w, Some(net));
+    let (mut i, mut j) = (-1, -1);
+    if !crate::path_network::locate(ctx.level, &nodes, a, &mut i) || !crate::path_network::locate(ctx.level, &nodes, b, &mut j) || i == j {
+        return;
+    }
+    for (x, y) in [(i as usize, j as u8), (j as usize, i as u8)] {
+        if let Some(l) = nodes[x].links.iter_mut().find(|l| **l & 0x7f == y) {
+            if open { *l &= 0x7f } else { *l |= 0x80 }
+        }
+    }
+    crate::path_network::write_nodes(&mut w.mobys[net].pvars, NET_NODES, &nodes);
+}
+
+/// L14 `0x3cab28(r, p)`: a robot in sub-state 1, not already in 7, sent to walk to `p` (state 7, 60 ticks) when the
+/// network has a way there from it ([`reachable`]). Its users: the prison's lifts keeping their prisoners on them
+/// (crate::moby::classes::level14::lift, `0x3e0718`) and 0x0f4d (`0x3ccd38`).
+pub(crate) fn send_to(w: &mut MobyWorld, r: usize, ctx: &mut Ctx, p: V3) {
+    let m = &w.mobys[r];
+    if m.sub_state != 1 || m.state == 7 { return; }
+    if !reachable(w, net_of(w, r), ctx, m.pos, p) { return; }
+    let m = &mut w.mobys[r];
+    m.set_state(7, -1);
+    m.set_pv_i(WALK_TICKS, 0x3c);
+    m.set_pv_v(WALK_GOAL, p);
+}
+
+/// L14 `0x3caa18(m)`: its sub-state (`+0x95`) is 1 (whatever its class).
+pub(crate) fn sub_one(w: &MobyWorld, r: usize) -> bool { w.mobys.get(r).is_some_and(|m| m.sub_state == 1) }
 
 /// `0x41b298(net, from, to)` → `0x41b2c0`: a way from `from` to `to` through the network (crate::path_network::
 /// steer, 0.1 narrowing the openings, fresh records).
@@ -672,6 +717,25 @@ pub fn update_robot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     }
                 }
             }
+        }
+        7 => {
+            // Sent (L14 `0x3cab28`, [`send_to`]): its first tick the stop distance 0.1; farther across than that from
+            // its goal it walks there through the network (`0x3c57c0`, no spread) playing 2, else it plays 0 (blend
+            // 20 each); its ticks out (`0x2eeab0`), 4.
+            if w.mobys[id].first() { w.mobys[id].set_pv_f(STOP, 0.1); }
+            let m = &w.mobys[id];
+            let goal = m.pv_v(WALK_GOAL);
+            if m.pv_f(STOP) < crate::hero::physics::dist2(m.pos, goal) {
+                move_to(w, id, ctx, goal, false);
+                play_rand(w, id, ctx, 2, 0x14);
+            } else {
+                play_rand(w, id, ctx, 0, 0x14);
+            }
+            let m = &mut w.mobys[id];
+            let mut t = m.pv_i(WALK_TICKS);
+            let out = countdown(&mut t);
+            m.set_pv_i(WALK_TICKS, t);
+            if out { m.set_state(4, -1); }
         }
         _ => {}
     }

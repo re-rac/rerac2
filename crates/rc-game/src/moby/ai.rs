@@ -1146,6 +1146,14 @@ pub fn ground_z(ctx: &Ctx, up: f32, p: V3, flags: u32) -> f32 {
     ctx.coll.and_then(|c| crate::collision::coll_line_m(c, ctx.scene, a, b, crate::collision::QueryFlags(flags | 2), None)).map_or(0.0, |o| o.point[2])
 }
 
+/// `0x326638(p, m, out)` (L14 `0x32e258`; the decomp's `func_002B0178`), its flat branch: the floor under `p` (a line
+/// from 0.5 above it down to 0.01, flags 2, the moby itself ignored), else `p`. Not ported: its gravity-frame branch
+/// (`0x1a8ca0` set; along the frame's down 10 / 0.5), which none of its users' levels has.
+pub fn floor_under(ctx: &Ctx, id: usize, p: V3) -> V3 {
+    let (a, b) = ([p[0], p[1], p[2] + 0.5], [p[0], p[1], 0.01]);
+    ctx.coll.and_then(|c| crate::collision::coll_line_m(c, ctx.scene, a, b, crate::collision::QueryFlags(2), Some(id))).map_or(p, |o| o.point)
+}
+
 /// `0x328b80(m, react)` → `0x328e90`: the knock-back flight (while its phase is under 3); the flags: 1 dead (or out of
 /// the world, or under the kill height), 2 over, 4 it hit something.
 pub fn flight(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> u32 {

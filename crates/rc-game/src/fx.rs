@@ -43,6 +43,7 @@
 //! | `0x3d2ea8` | Oozla's hatch 0x0a9d open | its light ([`crate::moby::classes::oozla::draw_0a9d`]) |
 //! | `0x414118` | Maktar's power node 0x0c82 showing | its arc to the lock ([`ribbon`], crate::moby::classes::maktar::draw_0c82) |
 //! | `0x413460` | Maktar's lock 0x0c81 showing | its rings of light (crate::moby::classes::maktar::draw_0c81) |
+//! | `0x4210b8` (L13; L16 `0x41aa00`, first list) | the barrier 0x112e | its curtain ([`spin`], crate::moby::classes::barrier::draw) |
 //! | `0x3ec7c8` | Maktar's conveyor bridge 0x0ab0 running | its belt's beam (crate::moby::classes::maktar::draw_0ab0) |
 //! | `0x3e90c8` | Maktar's slot machine 0x0a9c drawn | its reels (crate::moby::classes::maktar::draw_0a9c) |
 //! | `0x402bc8` | the keeper's shot 0x0b5a flying | its glow and streak ([`halo`], [`streak`]; crate::moby::classes::keeper::draw_shot) |
@@ -60,6 +61,7 @@
 //! | `0x40d968` (L17; L12 `0x409640`, L13 `0x40e3e8`) | the lobbers' glob 0x0ea5 | its bolt ([`trails::bolt`], crate::moby::classes::level17::lobber::draw_0ea5) |
 //! | `0x406ad0` / `0x4152f0` (L16) | the gunship's shot 0x0ebd / the drone's shot 0x0f7a | their bolts ([`trails::shot_bolt`]) |
 //! | `0x3d5ff8` (L26, first list) | the motes 0x0c00 of a group | their trails ([`trails::history`], crate::moby::classes::level26::props::draw_0c00) |
+//! | `0x42b550` (L08) / `0x3fd428` (L09) | the beam managers 0x1006 / 0x0d12 with a beam shaped | every slot's strips and ends ([`beams::draw_tabora`], [`beams::draw_dobbo`]) |
 //! | `0x423e80` (L14) | the electric strand 0x0f80 on | its strands ([`trails::strand`], crate::moby::classes::level14::fence::draw) |
 //! | `0x3b02e8` (L09; L16, L18, L19, L20; first list) | the bolt 0x05de | its strips, glow and sparks ([`crate::moby::classes::level09::bolt::draw`]) |
 //! | `0x42fce0` (L08; L09 `0x423498`, L19 `0x4223e8`; first list) | the liquid lids 0x11fe / 0x12af / 0x12b4 | the frame's lids' layers and sheens ([`crate::water::lid::draw`]) |
@@ -90,6 +92,8 @@
 use crate::hero::physics::{add, cross, len, scale, sub, V3};
 use crate::moby::MobyWorld;
 
+pub mod spin;
+pub mod beams;
 pub mod trails;
 
 /// One quad (`0x2eb998`): FX texture, additive (0x48) or normal (0x44), corners in GS strip order, ST, RGBA.
@@ -362,7 +366,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         0x097b => crate::moby::classes::endako_b::draw_097b(w, id, cam, out),
         0x0944 => crate::moby::classes::endako_c::draw_0944(w, id, out),
         0x0b0a => draw_0b0a(w, id, &mut game.rng, cam, out),
-        0x0b0b | 0x0b22 | crate::moby::classes::level07::prowler::CLASS => draw_0b0b(w, host, id, &mut game.rng, cam, out),
+        0x0b0b | 0x0b22 | crate::moby::classes::level07::prowler::CLASS | crate::moby::classes::level14::lift_guard::CLASS => draw_0b0b(w, host, id, &mut game.rng, cam, out),
         crate::moby::classes::level07::gunner::SHOT => crate::moby::classes::level07::gunner::draw_0b7f(w, id, &mut game.rng, cam, out),
         crate::moby::classes::level07::laser::CLASS => crate::moby::classes::level07::laser::draw(w, id, cam, out),
         crate::moby::classes::level07::boss::GLOW => crate::moby::classes::level07::boss::draw_0d45(w, id, &mut game.rng, cam, out),
@@ -412,12 +416,13 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         // flock (the traffic's own warp draws are not ported).
         0x0d5c => {}
         c if crate::moby::classes::flock::CLASSES.contains(&c) => crate::moby::classes::flock::draw(w, id, view, cam, out),
-        crate::moby::classes::critter::CLASS | crate::moby::classes::critter::PRISON => crate::moby::classes::critter::draw(w, id, cam, out),
+        crate::moby::classes::critter::CLASS | crate::moby::classes::critter::PRISON | crate::moby::classes::critter::TODANO => crate::moby::classes::critter::draw(w, id, cam, out),
         crate::moby::classes::thugs::SHOT => crate::moby::classes::thugs::draw_0ea7(w, id, &mut game.rng, cam, out),
         crate::moby::classes::level14::rappeller::CLASS => crate::moby::classes::level14::rappeller::draw(w, id, &mut game.rng, cam, out),
         0x0ab0 => crate::moby::classes::maktar::draw_0ab0(w, id, out),
         crate::moby::classes::maktar::NODE => crate::moby::classes::maktar::draw_0c82(w, id, cam, out),
         0x0c81 => crate::moby::classes::maktar::draw_0c81(w, id, cam, out),
+        crate::moby::classes::barrier::CLASS if first => crate::moby::classes::barrier::draw(w, id, cam, out),
         0x0a9c => crate::moby::classes::maktar::draw_0a9c(w, id, out),
         crate::moby::classes::fighters::MASTER if first => {
             let mid = w.mobys[id].pv_v(crate::moby::classes::arena::MIDDLE_AT);

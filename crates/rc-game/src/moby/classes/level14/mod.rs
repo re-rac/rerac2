@@ -2,12 +2,15 @@
 //! addresses with the port's). Each class's update is registered in [`update_for`]; crate::moby::classes::update_for
 //! asks it after its own.
 
+pub mod arcs;
+pub mod blocker;
 pub mod director;
 pub mod energy;
 pub mod fence;
 pub mod field;
 pub mod gate;
 pub mod lift;
+pub mod lift_guard;
 pub mod movers;
 pub mod pit;
 pub mod props;
@@ -28,6 +31,11 @@ pub fn draw(w: &mut crate::moby::MobyWorld, host: &dyn crate::moby::MobyHost, ga
         // Also level 19's (L19 `0x383478`, the same code).
         pit::CLASS => pit::draw(w, id, out),
         energy::CLASS => energy::draw(w, id, &mut game.rng, cam, out),
+        blocker::CLASS | blocker::CLASS_B => blocker::draw(w, id, out),
+        arcs::CLASS => {
+            let j = game.arc_jitter.1;
+            arcs::draw(w, id, &j, cam, out);
+        }
         _ => return false,
     }
     true
@@ -55,6 +63,10 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         rappeller::CLASS => Some(rappeller::update_09b4),
         lift::CLASS | lift::CLASS_B => Some(lift::update_0ae8),
         movers::BRIDGE => Some(movers::update_0ae4),
+        blocker::CLASS | blocker::CLASS_B => Some(blocker::update_0aeb),
+        lift_guard::CLASS => Some(lift_guard::update_112c),
+        // Also Endako's code (L03 `0x38bba8`, none placed there).
+        arcs::CLASS => Some(arcs::update_0b10),
         movers::RISER => Some(movers::update_0ae5),
         switch::CLASS => Some(switch::update_113b),
         gate::CLASS => Some(gate::update_113e),
