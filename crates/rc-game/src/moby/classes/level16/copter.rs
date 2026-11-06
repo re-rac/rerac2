@@ -62,8 +62,10 @@
 //! Its rows roll 40° a tick about the side row (`0x31b208` = L00 `0x321c00`). At its firing two twinkles at it
 //! (`0x3324d0` = L00 `0x33a6a0`, crate::particles::twinkle: 0.3·s → s, 0x80103080; 0.04·s → 0.4·s, white; s 8..10).
 //!
-//! Not ported: the shot's draw (`0x406ad0` → `0x406c40` twice, L30 shares it: a scrolling ribbon and two glows; the
-//! shot's own model is at a scale of 0.0001), so in flight it is not seen; the sound the rotor makes is the class's.
+//! Its draw ([`draw_0ebd`], `0x406ad0`, registered at the end of each tick it lives through): its bolt
+//! (crate::fx::trails::bolt, [`BOLT`]) twice, the shot's own model being at a scale of 0.0001.
+//!
+//! Not ported: the sound the rotor makes is the class's.
 
 use crate::hero::physics::{add, add_rot, atan2, dist, dist2, ease, euler_rows, len2, rot_dist, scale, set_len, sub, turn_ease, V3};
 use crate::moby::classes::props::{bob, seq, set_seq, wrapped};
@@ -624,4 +626,32 @@ pub fn update_0ebd(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     m.rows[2] = turn(m.rows[2], n, a);
     m.rows[0] = turn(m.rows[0], n, a);
     w.changed = true;
+    w.register_draw(id);
+}
+
+/// The shot's bolt (`0x406c40`'s words, `$gp+0x2418..+0x24ac`, `0x1b14a4`): a green head (FX 8: `0xff14ff14` →
+/// `0x80208040`, 6 back, 0.2 across), green flares (FX 0xd, turning 10° a call) and glows (FX 5, 0.75, `0x20408020`).
+pub const BOLT: crate::fx::trails::Bolt = {
+    use crate::fx::trails::{Bolt, Flare};
+    Bolt {
+        fx: [8, 0xd],
+        head: [0xff14_ff14, 0x8020_8040],
+        length: 6.0,
+        width: 0.2,
+        from: -0.0,
+        turn: 10.0,
+        flares: [
+            Flare { rgba: 0x5a14_8014, width: 0.2, from: -0.0, length: 4.0 },
+            Flare { rgba: 0x5a14_8014, width: 0.1, from: 0.75, length: 4.0 },
+            Flare { rgba: 0x3c14_8014, width: 0.4, from: 0.75, length: 4.0 },
+            Flare { rgba: 0x640a_ff0a, width: 0.2, from: 0.0, length: 0.6 },
+        ],
+        flare_end: 0x80_8080,
+        glow: (5, 0.75, 0x2040_8020),
+    }
+};
+
+/// `0x406ad0`: the shot's bolt (crate::fx::trails::shot_bolt).
+pub fn draw_0ebd(w: &mut MobyWorld, id: usize, rng: &mut crate::rng::Rng, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
+    crate::fx::trails::shot_bolt(w, id, &BOLT, rng, cam, out);
 }

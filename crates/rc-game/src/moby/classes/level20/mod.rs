@@ -8,6 +8,7 @@ pub mod fighter;
 pub mod misc;
 pub mod props;
 pub mod shooter;
+pub mod strafer;
 
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
@@ -16,6 +17,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         boss::CLASS => Some(boss::update_11e0),
         fighter::CLASS => Some(fighter::update_12f3),
         shooter::CLASS => Some(shooter::update_12ef),
+        strafer::CLASS => Some(strafer::update_12f8),
         props::SLIDER => Some(props::update_124f),
         props::CRYSTAL => Some(props::update_1269),
         props::FIELD => Some(props::update_119b),

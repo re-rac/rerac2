@@ -6,6 +6,7 @@ pub mod floaters;
 pub mod gate;
 pub mod hatchling;
 pub mod hazard;
+pub mod mortar;
 pub mod props;
 
 use crate::hero::physics::V3;
@@ -23,6 +24,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         floaters::BUOY => Some(floaters::update_08af),
         floaters::TIPPER => Some(floaters::update_0937),
         gate::CLASS => Some(gate::update_1305),
+        // Also level 8's (L08 `0x3f7ab0`).
+        mortar::CLASS => Some(mortar::update_0c1a),
         _ => None,
     }
 }

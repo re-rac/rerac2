@@ -21,11 +21,10 @@
 //!       about z. On each 256th frame (`0x1b16c8`) they are made orthonormal again (`0x3260e0`).
 //!     * Its timer `+0x18c` counting down (`0x2eed80`) flips `+0xbc` and with it its glow (0x80202020 / 0x80c0c0c0)
 //!       and the next wait (45 / 15).
-//!
-//! Not ported for 0x0c00:
-//! * its trail: its history of places and angles, and the draw registered once a frame for its group (`0x3d5e40`,
-//!   the draw `0x3d5ff8`);
-//! * the six-point table `0x2967a0` its first set-up rotates, which only that draw reads.
+//!     * Its trail's step ([`trail_step`], `0x3d5e40`).
+//!   * **Its trail** ([`draw_0c00`], `0x3d5ff8`, on the frame's first list): a ring of 8 places (`+0x80`) and turns
+//!     (`+0x100`, quaternions), the newest `+0x194`, `+0x190` of them kept, drawn through three blades
+//!     ([`blades`]) by the engine's trail (crate::fx::trails::history).
 
 use crate::hero::physics::{add, cross, scale, set_len, sub, unit, V3};
 use crate::moby::attach::{rows_of, turn};
@@ -128,7 +127,74 @@ pub fn update_0c00(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 m.glow = [0x8020_2020, 0x80c0_c0c0][m.timer as usize];
                 m.set_pv_i(0x18c, [45, 15][m.timer as usize]);
             }
+            trail_step(w, id, ctx.game.frame);
         }
         _ => {}
+    }
+}
+
+/// The trail's ring: `+0x80` its places, `+0x100` its turns (16 bytes each), `+0x190` how many are kept, `+0x194`
+/// the newest, `+0x198` the phase, `+0x19c` the frame its group's draw was registered.
+const PLACES: usize = 0x80;
+const TURNS: usize = 0x100;
+const KEPT: usize = 0x190;
+const NEWEST: usize = 0x194;
+const PHASE: usize = 0x198;
+const STAMP: usize = 0x19c;
+const RING: usize = 8;
+
+/// The motes of `id`'s group (`0x1fa660[+0x21]`; none for no group).
+fn group(w: &MobyWorld, id: usize) -> Vec<usize> {
+    usize::try_from(w.mobys[id].group).ok().and_then(|g| w.groups.get(g)).cloned().unwrap_or_default()
+}
+
+/// `0x3d5e40` (the end of state 1): once a frame (`0x1b16c8`, kept in `+0x19c` by every member of its group) the
+/// draw [`draw_0c00`] is registered for its group (the frame's first list, `0x2e7718`). The phase `+0x198` is the
+/// frame's eighth (`frame % 8 · 0.125`); at 0 the ring moves on (`+0x194` on by 1 of 8, `+0x190` up to 8). Then the
+/// newest turn is its rows' (`0x320000` → `0x31d898`, crate::quat::from_rows) and the newest place its own.
+fn trail_step(w: &mut MobyWorld, id: usize, frame: i32) {
+    if w.mobys[id].pv_i(STAMP) != frame {
+        for o in group(w, id) {
+            if let Some(m) = w.mobys.get_mut(o) { m.set_pv_i(STAMP, frame); }
+        }
+        w.register_draw_first(id);
+    }
+    let m = &mut w.mobys[id];
+    let phase = (frame % 8) as f32 * 0.125;
+    m.set_pv_f(PHASE, phase);
+    if phase == 0.0 {
+        m.set_pv_i(NEWEST, (m.pv_i(NEWEST) + 1) % RING as i32);
+        if m.pv_i(KEPT) < RING as i32 { m.set_pv_i(KEPT, m.pv_i(KEPT) + 1); }
+    }
+    let at = 16 * m.pv_i(NEWEST).clamp(0, RING as i32 - 1) as usize;
+    let q = crate::quat::from_rows(&m.rows);
+    for (k, v) in q.into_iter().enumerate() { m.set_pv_f(TURNS + at + 4 * k, v); }
+    let pos = m.pos;
+    m.set_pv_v(PLACES + at, pos);
+}
+
+/// `0x2967a0`: the trail's three blades, (3.7, ∓0.3, 0) and the same turned by 120° and 240° about z (its first
+/// set-up's `0x2ef5b8` with `0x2ef958((0, 0, 2.0943954))`, each pair from the one before).
+pub fn blades() -> [V3; 6] {
+    let r = rows_of([0.0, 0.0, f32::from_bits(0x4006_0a93)]);
+    let mut p = [[3.7, -0.3, 0.0], [3.7, 0.3, 0.0], [0.0; 3], [0.0; 3], [0.0; 3], [0.0; 3]];
+    for k in 2..6 { p[k] = through(p[k - 2], &r); }
+    p
+}
+
+/// The trail's colours (`$gp+0x1438`, `0x1b042c`): orange at alpha 0x60 to red at 0.
+pub const TRAIL_RGBA: [u32; 2] = [0x6000_80c0, 0x0000_20ff];
+
+/// `0x3d5ff8` (the first list): every member of the mote's group draws its trail (`0x2ec810(+0x198, blades, 6,
+/// +0x80, +0x100, +0x194, +0x190, TRAIL_RGBA)`, crate::fx::trails::history).
+pub fn draw_0c00(w: &MobyWorld, id: usize, out: &mut Vec<crate::fx::FxQuad>) {
+    let shape = blades();
+    for o in group(w, id) {
+        let Some(m) = w.mobys.get(o) else { continue };
+        if m.o_class != MOTE { continue; }
+        let places: Vec<V3> = (0..RING).map(|k| m.pv_v(PLACES + 16 * k)).collect();
+        let turns: Vec<crate::quat::Q> = (0..RING).map(|k| m.pv_q(TURNS + 16 * k)).collect();
+        let (head, kept) = (m.pv_i(NEWEST).max(0) as usize, m.pv_i(KEPT).max(0) as usize);
+        crate::fx::trails::history(out, m.pv_f(PHASE), &shape, &places, &turns, head, kept, TRAIL_RGBA);
     }
 }

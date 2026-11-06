@@ -196,8 +196,13 @@ fn face(w: &mut MobyWorld, id: usize, yaw: f32) {
     m.set_pv_f(MV + 0xb4, v);
 }
 
-fn face_target(w: &mut MobyWorld, id: usize) {
+/// `0x3339e0(m, +0x1f0)`: [`face`] toward the target (in the gravity frames crate::moby::frames::face_point).
+fn face_target(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
     let t = w.mobys[id].pv_v(TARGET);
+    if ctx.hero.gravity.on {
+        crate::moby::frames::face_point(w, id, t);
+        return;
+    }
     let y = yaw_to(w, id, t);
     face(w, id, y);
 }
@@ -564,14 +569,14 @@ fn state_tick(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> Option<u8> {
         }
         8 => {
             if w.mobys[id].first() { set_seq(w, id, ctx, 2, 0, 10); }
-            face_target(w, id);
+            face_target(w, id, ctx);
             aim(w, id, ctx);
             if !wrapped(w, id, ctx) { return None; }
             Some(10)
         }
         9 => {
             if w.mobys[id].first() { set_seq(w, id, ctx, 5, 0, 10); }
-            face_target(w, id);
+            face_target(w, id, ctx);
             aim(w, id, ctx);
             if 0.087_266_475 <= off_target(w, id) { return None; }
             match sub_state { 1 => Some(3), 2 => Some(10), _ => None }
@@ -642,7 +647,7 @@ fn state_tick(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> Option<u8> {
         }
         0xe => {
             if w.mobys[id].first() { set_seq(w, id, ctx, 0xd, 0, 10); }
-            face_target(w, id);
+            face_target(w, id, ctx);
             let t = ctx.host.frame_time(&w.mobys[id]);
             if (11.0..12.5).contains(&t) {
                 let dmg = w.mobys[id].pv_b(0x35) as f32;

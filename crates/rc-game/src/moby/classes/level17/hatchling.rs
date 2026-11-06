@@ -71,7 +71,7 @@
 //! = L01 `0x3eb1d0` (crate::moby::classes::death_fade), `0x312188` = L00 `0x311688` (delete).
 //!
 //! Not ported: the global gate `0x1ca140`, the floor mobys it rides (`0x324050` / `0x324020` / `0x3257b8`, as the
-//! skitter's), the head's look at its target (`0x329158` = L00 `0x327308` on `+0x350`, `+0x310` → `$gp+0x1c78`), what
+//! skitter's), `+0x310` (→ `$gp+0x1c78`, read by nothing here), what
 //! draws it in (state 9: the moby `0x1afb5c`; it goes at once, as the skitter's), and a 0x0929 pod's debris
 //! (`0x3292e8` = L03 `0x327c38`, five of class 0x0931) when it hatches; 0x0929's own update (`0x3c87e8`) is not
 //! here, and the words of it read ([`pod_ready`]: `+0x98`, `+0x9c`, `+0xa0`) are taken as it leaves them.
@@ -89,6 +89,8 @@ const POD_B: i16 = 0x0929;
 const FLASH: usize = 0x50;
 const WANDER: usize = 0x110;
 const WALK: usize = 0x140;
+/// The head aim (crate::moby::joint_aim::head).
+const HEAD_AIM: usize = 0x350;
 const HOME: usize = 0x3d0;
 const BACK: usize = 0x3e0;
 const REST: usize = 0x3f8;
@@ -181,7 +183,7 @@ fn alarm(w: &mut MobyWorld, id: usize) {
 
 /// `0x3c70f0`: a pod ready to hatch — never while Ratchet is off the ground (`0x18a160`); a 0x0920 always; a 0x0929
 /// without another pod's moby on it (`+0x9c`, as a link), still (`+0x98` 0), and without a live moby at `+0xa0`.
-fn pod_ready(w: &MobyWorld, ctx: &Ctx, p: usize) -> bool {
+pub(super) fn pod_ready(w: &MobyWorld, ctx: &Ctx, p: usize) -> bool {
     if ctx.hero.grounded_ticks == 0 { return false; }
     let m = &w.mobys[p];
     match m.o_class {
@@ -198,7 +200,7 @@ fn pod_ready(w: &MobyWorld, ctx: &Ctx, p: usize) -> bool {
 
 /// `0x3c7080`: the pod opens — a 0x0920 in state 0 to 1 (sequence 1 at once); a 0x0929 in state 0 hatches
 /// (`0x3c8738`: its sound 0, without collision, hidden, state 1; its debris not ported).
-fn pod_open(w: &mut MobyWorld, ctx: &mut Ctx, p: usize) {
+pub(super) fn pod_open(w: &mut MobyWorld, ctx: &mut Ctx, p: usize) {
     match (w.mobys[p].o_class, w.mobys[p].state) {
         (POD, 0) => {
             w.mobys[p].state = 1;
@@ -381,7 +383,7 @@ pub fn update_0b88(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     if states(w, id, ctx) { return drop_and_go(w, id, ctx); }
     if !matches!(w.mobys[id].state, 6 | 8 | 9) { walk(w, id, ctx); }
-    tail(w, id);
+    tail(w, id, ctx);
 }
 
 /// Sub 0 (module docs).
@@ -642,13 +644,15 @@ fn walk(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     m.set_pv_f(FALL, 0.0);
 }
 
-/// `0x3e5df0`: the flash, the rest and leap timers down, its ticks in the state.
-fn tail(w: &mut MobyWorld, id: usize) {
+/// `0x3e5df0`: the flash, the rest and leap timers down, its ticks in the state, its head aim (`0x329158` = L00
+/// `0x327308` on `+0x350`, list 1, 2.5: crate::moby::joint_aim::head).
+fn tail(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
     ai::flash(&mut w.mobys[id], FLASH);
     tick_i(w, id, T_REST);
     tick_s(w, id, T_LEAP);
     let m = &mut w.mobys[id];
     if m.state_ticks != -1 { m.state_ticks += 1; }
+    crate::moby::joint_aim::head(w, ctx, id, HEAD_AIM, 1, 2.5);
 }
 
 /// 0x0920 / 0x0921 (module docs).

@@ -11,6 +11,17 @@ pub mod movers;
 pub mod props;
 pub mod rocks;
 
+/// This level's draw callbacks (crate::fx): true when the moby's class is one of them.
+#[allow(clippy::too_many_arguments)]
+pub fn draw(w: &mut crate::moby::MobyWorld, _host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, _hero_state: i32, _view: &crate::particles::BSphereView, cam: crate::hero::physics::V3, id: usize, _first: bool, out: &mut Vec<crate::fx::FxQuad>, _frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
+    match w.mobys[id].o_class {
+        copter::SHOT => copter::draw_0ebd(w, id, &mut game.rng, cam, out),
+        drone::SHOT => drone::draw_0f7a(w, id, &mut game.rng, cam, out),
+        _ => return false,
+    }
+    true
+}
+
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {

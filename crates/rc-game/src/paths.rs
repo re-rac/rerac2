@@ -164,3 +164,42 @@ pub fn find_rail(paths: &[GrindPath], p: V3, exclude: Option<usize>, reach: f32,
     }
     None
 }
+
+/// `0x337888(m, path, &out, seg, dir, step)` (L01; L09 `0x33fb58`, L12 `0x347fa0`, L20 `0x358978`): the point
+/// `step` on from the place `p`'s foot on the segment `seg` → its neighbour `dir` along (the ends wrapping: the last
+/// point's next is the first going on, the first's the last going back), stepping once into the next segment when
+/// it runs past this one's end. Returns the segment the point is on.
+pub fn step(points: &[[f32; 4]], p: V3, seg: usize, dir: i32, step: f32) -> (V3, usize) {
+    let last = points.len().saturating_sub(1);
+    let next = |s: usize| if s == last { if 0 < dir { 0 } else { last.saturating_sub(1) } } else if s == 0 { if 0 < dir { 1 } else { last } } else { (s as i32 + dir) as usize };
+    let at = |i: usize| p3(&points[i.min(last)]);
+    let mut seg = seg.min(last);
+    let mut n = next(seg);
+    let to = sub(at(n), at(seg));
+    let length = len(to);
+    let mut way = set_len(to, 1.0);
+    let rel = sub(p, at(seg));
+    let mut d = rel[0] * way[0] + rel[1] * way[1] + rel[2] * way[2] + step;
+    if length < d {
+        seg = n;
+        n = next(seg);
+        way = set_len(sub(at(n), at(seg)), 1.0);
+        d -= length;
+    }
+    (add(set_len(way, d), at(seg)), seg)
+}
+
+/// `0x382850(p, path, base)` (L06; L09 `0x33f938`, L20 `0x358240`): the index of the point whose distance from `p`
+/// is nearest `base` (the original keeps the distance itself as the best, not its difference: the same at base 0).
+pub fn nearest(points: &[[f32; 4]], p: V3, base: f32) -> usize {
+    let mut best = 0;
+    let mut best_v = 1.0e11_f32;
+    for (i, q) in points.iter().enumerate() {
+        let v = len(sub(p3(q), p));
+        if (v - base).abs() < best_v {
+            best_v = v;
+            best = i;
+        }
+    }
+    best
+}

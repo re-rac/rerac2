@@ -27,7 +27,9 @@
 //! `+0xd8` the floor's surface, `+0xdc` / `+0xe0` / `+0xe2` / `+0xe4` the weave, `+0xe6` / `+0xe7` the turn sequences,
 //! `+0xe8` / `+0xe9` the walk sequences, `+0xea` the one turned from.
 //!
-//! Not ported: the gravity frames (`$gp − 0x6000`), the joint aims (`0x32db38`, `+0x48`), the dangerous floor
+//! The gravity frames (`$gp − 0x6000`) have a movement of their own: crate::moby::frames.
+//!
+//! Not ported: the joint aims (`0x32db38`, `+0x48`), the dangerous floor
 //! (`0x322058`), the helpers and decoys as targets.
 
 use super::{Ctx, Moby, MobyWorld};
@@ -200,7 +202,8 @@ fn walk(w: &mut MobyWorld, id: usize, yaw: f32, goal: V3) {
     if fl < z {
         if m.pv_s(o + 0xc2) < 2 && z - fl < 0.15 {
             let n = m.pv_v(o + 0x50);
-            let tilt = atan2(len2(n), n[2]);
+            // `0x2ef510(n.z, |n.xy|)`: the slope from upright (0 flat).
+            let tilt = atan2(n[2], len2(n));
             let into = -(vel[0] * n[0] + vel[1] * n[1] + vel[2] * n[2]);
             if 0.087_266_475 < tilt && into < vz { vz = into; }
         }

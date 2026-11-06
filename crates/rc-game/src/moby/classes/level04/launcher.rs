@@ -12,12 +12,11 @@
 //!
 //! The L04 engine functions with the port's: `0x33f8d0` the hit test, `0x341d18` / `0x341dd8` the flash's start and
 //! tick, `0x33e480` / `0x33e388` its group's members (crate::moby::MobyWorld::groups), `0x343c18` the target search
-//! ([`find`]), `0x333b18` a joint's place, `0x33e898` ground_z, `0x33cf18` / `0x33cf88` / `0x3433c8` the random
+//! (crate::moby::target_search, [`find`]), `0x333b18` a joint's place, `0x33e898` ground_z, `0x33cf18` / `0x33cf88` / `0x3433c8` the random
 //! vectors, `0x433d50` = L00 `0x3f8348` (crate::moby::blast::burst), `0x30ebb0` the glow sprite (crate::fx::sprite),
 //! `0x310cf0` the colour lerp (crate::hud::lerp_rgba), `0x340700` approach.
 //!
-//! Not ported: the decoys' list the search reads (`0x1b2630`: the port takes every 0x00cb / 0x076c moby), Ratchet's
-//! `0x18c0b4` = 0x6f exclusion, the carrier's rides on floor mobys (`0x343fe0`, as crate::moby::classes::level04::
+//! Not ported: the carrier's rides on floor mobys (`0x343fe0`, as crate::moby::classes::level04::
 //! skitter's), its revived moby's link back to it (`+0xb8`, read by nothing ported), and the arc speed it works out
 //! and keeps nowhere (`0x33fc30`).
 
@@ -61,50 +60,14 @@ fn hit(w: &mut MobyWorld, id: usize) {
     crate::moby::ai::flash(&mut w.mobys[id], FLASH);
 }
 
-/// `0x343c18(reach, m, block, cuboids, n, path)`: the target: none (2) in Ratchet's state 0x18 or outside the path's
-/// polygon (with no cuboids); else the nearest decoy in its state 3 within the reach (and the polygon) (1), else Ratchet
-/// (0). The block: its place, its angles, the aim (Ratchet: his aim point and centre; a decoy: 0.6 over it, twice).
+/// `0x343c18` (crate::moby::target_search::search): the target block from the cuboid `+0x74` (as a list of one,
+/// which tests nothing), else the path `+0x78`'s polygon, within the reach.
 fn find(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
     let m = &w.mobys[id];
-    let (mut reach, poly, cub) = (m.pv_f(REACH), m.pv_i(POLY), m.pv_i(CUBOIDS) != -1);
-    let inside = |p: V3| cub || poly == -1 || ctx.level.in_polygon(poly, p);
-    let mut found = 0;
-    let mut target = ctx.hero_moby;
-    if ctx.hero.state == 0x18 || !inside(ctx.hero.pos) {
-        target = None;
-        found = 2;
-    }
-    let here = m.pos;
-    for (k, o) in w.mobys.iter().enumerate() {
-        if !matches!(o.o_class, 0x00cb | 0x076c) || o.state != 3 { continue; }
-        let d = dist(here, o.pos);
-        if d < reach && inside(o.pos) {
-            reach = d;
-            target = Some(k);
-            found = 1;
-        }
-    }
-    let m = &mut w.mobys[id];
-    crate::moby::ai::set_link(m, T_MOBY, target);
-    m.set_pv_i(T_FOUND, found);
-    match target {
-        None => for k in 0..4 { m.set_pv_v(T_POS + 0x10 * k, [0.0; 3]); },
-        Some(t) if Some(t) == ctx.hero_moby => {
-            m.set_pv_v(T_POS, ctx.hero.pos);
-            m.set_pv_v(T_POS + 0x10, ctx.hero.rot);
-            m.set_pv_v(T_POS + 0x20, ctx.hero.aim_point);
-            m.set_pv_v(T_POS + 0x30, add(ctx.hero.pos, [0.0, 0.0, 1.0]));
-        }
-        Some(t) => {
-            let (p, r) = (w.mobys[t].pos, w.mobys[t].rot);
-            let m = &mut w.mobys[id];
-            m.set_pv_v(T_POS, p);
-            m.set_pv_v(T_POS + 0x10, r);
-            let up = add(p, [0.0, 0.0, 0.6]);
-            m.set_pv_v(T_POS + 0x30, up);
-            m.set_pv_v(T_POS + 0x20, up);
-        }
-    }
+    let (reach, poly, cub) = (m.pv_f(REACH), m.pv_i(POLY), m.pv_i(CUBOIDS));
+    let one = [cub];
+    let areas: &[i32] = if cub != -1 { &one } else { &[] };
+    crate::moby::target_search::search(w, id, ctx, T_POS, areas, poly, reach);
 }
 
 /// `0x3ef4a8`: its count out (its group's live members, and its live 0x0b66 links); −1 when its last link is a live

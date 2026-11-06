@@ -45,7 +45,8 @@
 //! and 14 the move to it with the options 0x10; at 21 the recovery. **24** the recovery: at its end the run. **25**
 //! hurt (its sub 3).
 //!
-//! **The tail** (`0x41d5e8`): its two timers, its state ticks.
+//! **The tail** (`0x41d5e8`): its two timers, its state ticks, its head aim (`0x324930` = L00 `0x327308` on
+//! `+0x2a0`, list 1, `$gp+0x2cd8` = 2.5: crate::moby::joint_aim::head).
 //!
 //! The engine functions with the port's: `0x319290` = L00 `0x31b8d0` (crate::moby::Moby::set_state), `0x318fb0` =
 //! L00 `0x31b5f0` (set_anim, crate::moby::classes::props::set_seq), `0x327900` / `0x327928` = L00 `0x32a7c8` /
@@ -59,8 +60,6 @@
 //! `0x319390` / `0x3193d0` / `0x319428` / `0x319488` / `0x3194f0` = L00 `0x31b9a0` / `0x31b9e0` / `0x31ba38` /
 //! `0x31ba98` / `0x31bb00` (crate::rng), `0x30f008` = L00 `0x311688` (delete). `$gp+0x3498` (`0x1b2488`) is the
 //! frame count.
-//!
-//! Not ported: the head aim (`0x324930` = L00 `0x327308` on `+0x2a0`, `$gp+0x2cd8` = 2.5).
 
 use crate::hero::physics::{add, add_rot, atan2, dist2, rot_dist, turn_ease, V3};
 use crate::moby::classes::death_fade;
@@ -98,6 +97,9 @@ const FOUND1: usize = 0x278;
 const FOUND2: usize = 0x27c;
 const BACK: usize = 0x280;
 const FLEE: usize = 0x290;
+const HEAD_AIM: usize = 0x2a0;
+/// `$gp+0x2cd8`: its head's scale with the enemies' big heads.
+const HEAD_SCALE: f32 = 2.5;
 
 /// `$gp+0x2cd4`: at most this many of them attacking at once (the pool `$gp+0x2cd0`, [`Globals`](super::Globals)).
 pub(super) const MOST_ATTACKERS: i32 = 4;
@@ -242,7 +244,7 @@ pub fn update_10d0(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => {}
     }
     states(w, id, ctx);
-    // `0x41d5e8`: its timers and ticks.
+    // `0x41d5e8`: its timers and ticks, its head aim.
     let m = &mut w.mobys[id];
     for o in [TIMER, TIMER2] {
         let mut t = m.pv_i(o);
@@ -250,6 +252,7 @@ pub fn update_10d0(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_i(o, t);
     }
     if m.state_ticks != -1 { m.state_ticks = m.state_ticks.wrapping_add(1); }
+    crate::moby::joint_aim::head(w, ctx, id, HEAD_AIM, 1, HEAD_SCALE);
     w.changed = true;
 }
 

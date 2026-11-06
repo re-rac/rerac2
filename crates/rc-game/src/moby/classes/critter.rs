@@ -37,7 +37,11 @@
 //! (state 0xc) on a floor of surface 1 (`+0x1d8`); its bite does 1 (not its damage byte) and none while its target is
 //! a 0x0964 and the state is under 60 ticks old, and at the bite's end it bites again within 1.25 across of the target.
 //!
-//! Not ported: the gravity frames (`0x3347e8`, level 0x1a's set-up `0x32aba0`), the head's and tail's aims (`0x3286f0`,
+//! In the gravity frames its move and face are crate::moby::frames' (`0x3347e8`, `0x333a18`); on level 0x1a its set-up
+//! keeps its rows (mode 0x100) and measures its fall height from the sphere.
+//!
+//! Not ported: the rest of the gravity frames' set-up (the drop onto the sphere `0x32aba0`, L26 `0x325d80`; the moby
+//! word `+0x9c` 3; the down `+0x300`) and its upright test (`+0x338`), the head's and tail's aims (`0x3286f0`,
 //! `0x32c1d0`; the aim angles are kept at `+0x2c0` / `+0x2c8`), the moby word `+0x9c` (3 / 0xc).
 
 use crate::hero::physics::{add, add_rot, atan2, dist, dist2, len2, sub, turn_ease, V3};
@@ -118,7 +122,15 @@ fn senses(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let weave = rng.randf_signed(18.0, 22.0);
         let phase = rng.rand_angle();
         let m = &mut w.mobys[id];
-        m.set_pv_f(0x90, m.pos[2] - 1.0);
+        // Level 0x1a with the frames on (L26 `0x3bdb60`): the upright test `+0x338` on, its rows kept (mode 0x100, for
+        // crate::moby::frames), the fall height under its height from the sphere's centre.
+        if ctx.game.level == 0x1a && ctx.hero.gravity.on {
+            m.set_pv_s(0x338, 1);
+            m.mode |= crate::moby::mode::KEEP_ROWS;
+            m.set_pv_f(0x90, ctx.hero.gravity.height(m.pos) - 1.5);
+        } else {
+            m.set_pv_f(0x90, m.pos[2] - 1.0);
+        }
         m.set_pv_i(0x218, path);
         if path != -1 { m.set_pv_i(0x13c, path); }
         m.set_pv_f(0x324, s);
@@ -176,8 +188,10 @@ fn senses(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
 }
 
-/// `0x3cfe08(m, goal, toward)`: a move to `goal`, straight there or (`toward`) offset by the spread `+0x31c`.
+/// `0x3cfe08(m, goal, toward)`: a move to `goal`, straight there or (`toward`) offset by the spread `+0x31c`; in the
+/// gravity frames (`0x1a8ff0`) their move (`0x3347e8`, crate::moby::frames::move_to).
 fn go(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3, toward: bool) -> i32 {
+    if ctx.hero.gravity.on { return crate::moby::frames::move_to(w, id, ctx, goal); }
     if toward {
         let off = w.mobys[id].pv_f(0x31c);
         ai::move_toward(w, id, ctx, off, goal)
@@ -197,8 +211,12 @@ fn face(w: &mut MobyWorld, id: usize, yaw: f32) {
     m.set_pv_f(MV + 0xb4, v);
 }
 
-/// `0x3339e0(m, point)`: [`face`] toward a point.
-fn face_point(w: &mut MobyWorld, id: usize, p: V3) {
+/// `0x3339e0(m, point)`: [`face`] toward a point (in the gravity frames crate::moby::frames::face_point).
+fn face_point(w: &mut MobyWorld, id: usize, ctx: &Ctx, p: V3) {
+    if ctx.hero.gravity.on {
+        crate::moby::frames::face_point(w, id, p);
+        return;
+    }
     let q = w.mobys[id].pos;
     face(w, id, atan2(p[0] - q[0], p[1] - q[1]));
 }
@@ -424,7 +442,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 }
             }
             let t = w.mobys[id].pv_v(TARGET);
-            face_point(w, id, t);
+            face_point(w, id, ctx, t);
             if !wrapped(w, id, ctx) { return; }
             3
         }

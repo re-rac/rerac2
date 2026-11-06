@@ -18,7 +18,8 @@
 //!
 //! **Each tick** (`0x3bec28`): nothing as Clank (`0x18c0d4` = 1). The sub-state, then the state, then the rope's
 //! sound (10, looped, in states 12, 13, 14 and 16; stopped otherwise), the head ([`head`], `0x3c0018`), the tail
-//! (`0x3c0758`: its flash, `0x3201e8`, crate::moby::ai::flash; its two timers; its state ticks) and its draw
+//! (`0x3c0758`: its flash, `0x3201e8`, crate::moby::ai::flash; its two timers; its state ticks; its head aim,
+//! `0x327308` on `+0x380`, list 5, 2.0: crate::moby::joint_aim::head) and its draw
 //! ([`draw`], `0x3c0850`).
 //!
 //! **Sub-states** (`+0x95`; the limits A = `0x32dcf0(1/450, 1/15, 0.0667°, 6°)` and B = `(1/300, 0.1, 0.0667°, 6°)`):
@@ -72,8 +73,6 @@
 //!
 //! The port keeps `+0x2c4` −1 at the set-up where the original writes 1: the original's stop tests that the
 //! channel is its own, which the port's handles do not carry.
-//!
-//! Not ported: the head aim (`0x327308` on `+0x380`, as crate::moby::classes::level19::lurker's).
 
 use std::f32::consts::{FRAC_PI_2, PI};
 
@@ -123,6 +122,8 @@ const PATH: usize = 0x370;
 const PATH_T: usize = 0x374;
 const PATH_V: usize = 0x378;
 const PATH_ON: usize = 0x37c;
+/// The head aim (list 5, 2.0 with the enemies' big heads: crate::moby::joint_aim::head).
+const HEAD_AIM: usize = 0x380;
 const AREA: usize = 0x400;
 
 /// The limits A and B (module docs).
@@ -200,6 +201,7 @@ pub fn update_09b4(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     count_s(m, TIMER);
     count_s(m, TIMER2);
     if m.state_ticks != -1 { m.state_ticks = m.state_ticks.wrapping_add(1); }
+    crate::moby::joint_aim::head(w, ctx, id, HEAD_AIM, 5, 2.0);
     w.changed = true;
     w.register_draw(id);
 }

@@ -42,10 +42,14 @@ pub mod bolts;
 pub mod claims;
 pub mod crawler;
 pub mod floater;
+pub mod frames;
 pub mod hits;
+pub mod joint_aim;
+pub mod knock;
 pub mod platform;
 pub mod shards;
 pub mod slide;
+pub mod target_search;
 
 use crate::hero::physics::{add, scale, V3};
 use crate::hero::Hero;
@@ -648,6 +652,8 @@ pub struct MobyWorld {
     pub level20: classes::level20::boss::Globals,
     /// Level 16's swinging bridges' swing (classes::level16::drawbridge::Globals).
     pub drawbridge: classes::level16::drawbridge::Globals,
+    /// Level 14's electric strands (classes::level14::fence::Globals).
+    pub fence14: classes::level14::fence::Globals,
     /// The point lights (`0x1c6ec0`), owned by the explosion lights (classes::light); the engine lights the world and
     /// the mobys with them.
     pub point_lights: crate::point_lights::PointLights,

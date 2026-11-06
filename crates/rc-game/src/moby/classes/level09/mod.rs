@@ -2,8 +2,10 @@
 //! with the port's). Each class's update is registered in [`update_for`]; crate::moby::classes::update_for asks it
 //! after its own.
 
+pub mod bolt;
 pub mod breakables;
 pub mod flyer;
+pub mod gunship;
 pub mod props;
 pub mod trooper;
 pub mod waker;
@@ -29,6 +31,9 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         super::level12::shot::CLASS => Some(super::level12::shot::update_03a6),
         waker::CLASS => Some(waker::update_0de0),
         flyer::CLASS => Some(flyer::update_0d57),
+        // L20's (`0x3cd830` / `0x412cb8`) are the same code.
+        bolt::CLASS => Some(bolt::update_05de),
+        gunship::CLASS => Some(gunship::update_0cbc),
         _ => None,
     }
 }

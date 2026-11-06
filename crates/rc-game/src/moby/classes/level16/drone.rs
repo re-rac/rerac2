@@ -45,13 +45,18 @@
 //! the next tick a small blast (`0x3e8da0` = L00 `0x3f8348`, crate::moby::blast::burst: 0.25, 25 / 20 / 20 sprites,
 //! 20 puffs, 45 streaks), gone. At its firing two twinkles at it (`0x3324d0` = L00 `0x33a6a0`).
 //!
-//! Not ported: the two joint aims (`0x40e3c0`: `0x31d6e8` = L00 `0x324208` on `+0x250` / `+0x2d0`, the head aims no
-//! class of the port has), the jets' other colours while `0x1b25c8` bit 0 is set (taken as clear: no class of the port
-//! sets it), the shot's draw (`0x4152f0`) and its own model (at a scale of 0.0001), so in flight it is not seen.
+//! Its joint aims ([`aims`], `0x40e3c0`: `0x31d6e8` = L00 `0x324208` on `+0x250` / `+0x2d0`, crate::moby::joint_aim)
+//! run in the tail before the jets.
+//!
+//! Not ported: the jets' other colours while `0x1b25c8` bit 0 is set (taken as clear: no class of the port
+//! sets it).
+//!
+//! The shot's draw ([`draw_0f7a`], `0x4152f0`, registered at the end of each tick it lives through): its bolt
+//! (crate::fx::trails::bolt, [`BOLT`]) twice, its own model being at a scale of 0.0001.
 
-use crate::hero::physics::{add, cross, dot, scale, set_len, sub, unit, V3};
+use crate::hero::physics::{add, add_rot, atan2, cross, dot, len2, scale, set_len, sub, sub_rot, unit, V3};
 use crate::moby::classes::props::{seq, set_seq};
-use crate::moby::{ai, blast, bolts, countdown, mode, shards, Ctx, Moby, MobyWorld};
+use crate::moby::{ai, blast, bolts, countdown, joint_aim, mode, shards, Ctx, Moby, MobyWorld};
 
 pub const CLASS: i16 = 0x0f35;
 pub const SHOT: i16 = 0x0f7a;
@@ -76,6 +81,9 @@ const PATH: usize = 0x24c;
 const AREA2: usize = 0x350;
 const FOUND2: usize = 0x354;
 const HEIGHT: usize = 0x358;
+/// The joint aims (crate::moby::joint_aim): its body's turn (list 0) and its gun's tilt (list 1).
+const AIM_TURN: usize = 0x250;
+const AIM_TILT: usize = 0x2d0;
 const PVARS: usize = 0x360;
 
 /// The shot's speed a tick (`0x3ed55556`: 25 a second).
@@ -182,6 +190,7 @@ pub fn update_0f35(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     tick_i(m, TIMER);
     tick_s(m, TIMER2);
     if m.state_ticks != -1 { m.state_ticks = m.state_ticks.wrapping_add(1); }
+    aims(w, id, ctx);
     jets(w, id, ctx);
     w.changed = true;
 }
@@ -273,6 +282,39 @@ fn die(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if let Some(k) = shards::spawn_whole_ball(w, ctx, WRECK, Some(id), pos, rot, 180.0, 25.0, v, 0xff) { hero_light(w, k, ctx); }
     bolts::drop(w, id, 0, 3, ctx);
     w.delete(id);
+}
+
+/// `0x40e3c0`'s joint aims: out of the rest, its joint 0 turned toward the target block's point led by Ratchet's move
+/// (`0x189f30`, × twice the distance less 1, flat) and its joint 1 tilted to it (at most 30°), at 0.5 of the springs
+/// `$gp+0x25f0` / `+0x25f4` (0.01, 0.02); in the rest, turning on by 30° a tick at 0.085 of them.
+fn aims(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    const LIMIT: f32 = f32::from_bits(0x3f06_0a93);
+    let s = if w.mobys[id].state != 4 {
+        let Some(j0) = ctx.host.joint(&w.mobys[id], 0) else { return };
+        let o = w.mobys[id].pv_v(T_POINT);
+        let n = crate::hero::physics::dist(j0, o) - 1.0;
+        let mut t = scale(ctx.hero.disp, n + n);
+        t[2] = 0.0;
+        let t = add(t, o);
+        let d = sub(t, j0);
+        let m = &mut w.mobys[id];
+        let turn = sub_rot(atan2(d[0], d[1]), m.rot[2]);
+        m.set_pv_f(AIM_TURN + joint_aim::ASK + 8, turn);
+        let Some(j1) = ctx.host.joint(&w.mobys[id], 1) else { return };
+        let d = sub(t, j1);
+        let m = &mut w.mobys[id];
+        let tilt = sub_rot(-atan2(len2(d), d[2]), m.rot[1]).clamp(-LIMIT, LIMIT);
+        m.set_pv_f(AIM_TILT + joint_aim::ASK + 4, tilt);
+        0.5
+    } else {
+        let m = &mut w.mobys[id];
+        let a = add_rot(m.pv_f(AIM_TURN + joint_aim::ANGLES + 8), LIMIT);
+        m.set_pv_f(AIM_TURN + joint_aim::ASK + 8, a);
+        f32::from_bits(0x3dae_147b)
+    };
+    let (k, d) = (f32::from_bits(0x3c23_d70a) * s, f32::from_bits(0x3ca3_d70a) * s);
+    joint_aim::aim(w, id, AIM_TURN, id, 0, k, d);
+    joint_aim::aim(w, id, AIM_TILT, id, 1, k, d);
 }
 
 /// `0x40e680` (module docs).
@@ -398,4 +440,33 @@ pub fn update_0f7a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => {}
     }
     w.changed = true;
+    w.register_draw(id);
+}
+
+/// The shot's bolt (`0x415460`'s words, `$gp+0x28c0..+0x2944`, `0x1b193c`): a red head (FX 0x1c: `0xff1414ff` →
+/// `0x80204080`, 2 back, 0.2 across), red flares and a white one (FX 8, turning 10° a call) and glows (FX 0x10, 1,
+/// `0x202020b0`).
+pub const BOLT: crate::fx::trails::Bolt = {
+    use crate::fx::trails::{Bolt, Flare};
+    Bolt {
+        fx: [0x1c, 8],
+        head: [0xff14_14ff, 0x8020_4080],
+        length: 2.0,
+        width: 0.2,
+        from: -0.0,
+        turn: 10.0,
+        flares: [
+            Flare { rgba: 0x5a14_1480, width: 0.2, from: -0.0, length: 4.0 },
+            Flare { rgba: 0x5a14_1480, width: 0.1, from: 0.75, length: 4.0 },
+            Flare { rgba: 0x3c14_1480, width: 0.4, from: 0.75, length: 4.0 },
+            Flare { rgba: 0x64ff_ffff, width: 0.2, from: 0.0, length: 0.6 },
+        ],
+        flare_end: 0x80_8080,
+        glow: (0x10, 1.0, 0x2020_20b0),
+    }
+};
+
+/// `0x4152f0`: the shot's bolt (crate::fx::trails::shot_bolt).
+pub fn draw_0f7a(w: &mut MobyWorld, id: usize, rng: &mut crate::rng::Rng, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
+    crate::fx::trails::shot_bolt(w, id, &BOLT, rng, cam, out);
 }

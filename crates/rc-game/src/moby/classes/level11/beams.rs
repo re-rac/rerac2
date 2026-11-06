@@ -23,7 +23,7 @@
 //! Not ported: the point light its first tick takes (`0x30fd98(0, 0, place, 0)`: radius 0, black, never set again),
 //! the GS test the draw sets after (`0x391158(0x47, 0x5360b)`).
 
-use crate::hero::physics::{add, add_rot, atan2, cross, len, scale, set_len, sub, V3};
+use crate::hero::physics::{add, add_rot, atan2, set_len, sub, V3};
 use crate::moby::{Ctx, MobyWorld};
 
 const POINTS: usize = 20;
@@ -130,75 +130,19 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// `0x46dbd0`: the scroll back 0.3 a frame (held above −8), then the strand (`0x46dc98(0.05, 0.4, 0.9, strand,
 /// 0x80, 0x40, points − 2)`) and the glow strand (`(0.1, 0.3, 0.1, glow strand, 0x40, 0x40, points)`). Each: a ribbon
-/// of FX 0xe (`$gp+0x3690`) 0.05 to either side across the view from point to point, 0x7f7f7f at the first alpha, its
-/// ends faded to 0, its s scrolling; and over each segment (both ends set the camera's distance of the farther one,
-/// lengthened by the third number of it at each end) a quad of FX 0x10 (`$gp+0x3694`) the second number across,
-/// 0x803040 at the second alpha, its ends faded. Additive (ALPHA 0x48).
+/// of FX 0xe (`$gp+0x3690`) the first number to either side across the view from point to point, 0x7f7f7f at the
+/// first alpha, its ends faded to 0, its s scrolling; and over each segment (both ends set the camera's distance of
+/// the farther one, lengthened by the third number of it at each end) a quad of FX 0x10 (`$gp+0x3694`) the second
+/// number across, 0x803040 at the second alpha, its ends faded. Additive (ALPHA 0x48; crate::fx::trails::strand).
 pub fn draw(w: &mut MobyWorld, id: usize, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
     let f = &mut w.level11.fence;
     let t = f.scroll - 0.3;
     f.scroll = if t <= -8.0 { t + 8.0 } else { t };
     let n = w.mobys[id].pv_i(0x2c);
     let Some(s) = f.strands.get(&id) else { return };
-    strip(out, &s.core, n - 2, f.scroll, 0.4, 0.9, 0x80, 0x40, cam);
-    strip(out, &s.glow, n, f.scroll, 0.3, 0.1, 0x40, 0x40, cam);
+    crate::fx::trails::strand(out, &s.core, n - 2, f.scroll, 0.05, 0.4, 0.9, [0x80, 0x40], &LOOK, cam);
+    crate::fx::trails::strand(out, &s.glow, n, f.scroll, 0.1, 0.3, 0.1, [0x40, 0x40], &LOOK, cam);
 }
 
-/// `0x46dc98(_, glow width, lengthen, points, core alpha, glow alpha, n)`.
-#[allow(clippy::too_many_arguments)]
-fn strip(out: &mut Vec<crate::fx::FxQuad>, p: &[V3], n: i32, scroll: f32, width: f32, lengthen: f32, a_core: u32, a_glow: u32, cam: V3) {
-    let n = n.clamp(0, p.len() as i32) as usize;
-    if n < 2 { return; }
-    let core = 0x7f_7f7f | a_core << 24;
-    let glow = 0x80_3040 | a_glow << 24;
-    let side = |a: V3, b: V3, k: f32| { let c = cross(sub(b, a), sub(a, cam)); let l = len(c); scale(c, if l != 0.0 { k / l } else { 0.0 }) };
-    let st = [[scroll, 0.0], [scroll, 1.0], [scroll + 1.0, 0.0], [scroll + 1.0, 1.0]];
-    let s0 = side(p[0], p[1], 0.05);
-    let (mut q0, mut q1) = (add(p[0], s0), sub(p[0], s0));
-    let mut rgba = [core; 4];
-    for i in 1..n - 1 {
-        let s = side(p[i], p[i + 1], 0.05);
-        let (a, b) = (add(p[i], s), sub(p[i], s));
-        if i == 1 {
-            rgba[0] = 0x7f_7f7f;
-            rgba[1] = 0x7f_7f7f;
-        } else if i == n - 2 {
-            rgba[2] = 0x7f_7f7f;
-            rgba[3] = 0x7f_7f7f;
-        } else if i == 2 {
-            rgba[0] = core;
-            rgba[1] = core;
-        }
-        out.push(crate::fx::FxQuad { fx: 0xe, additive: true, corners: [q0, q1, a, b], st, rgba });
-        (q0, q1) = (a, b);
-    }
-    let st = [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]];
-    let mut rgba = [glow; 4];
-    for i in 0..n - 2 {
-        let (mut e, mut d) = (sub(p[i], cam), sub(p[i + 1], cam));
-        let (le, ld) = (len(e), len(d));
-        if ld < le {
-            if ld != 0.0 { d = scale(d, le / ld); }
-        } else if le != 0.0 {
-            e = scale(e, ld / le);
-        }
-        let (mut a, mut b) = (add(cam, e), add(cam, d));
-        let dd = scale(sub(b, a), lengthen);
-        a = sub(a, dd);
-        b = add(b, dd);
-        let c = cross(sub(cam, a), sub(b, a));
-        let l = len(c);
-        let nn = scale(c, if l != 0.0 { width / l } else { 0.0 });
-        if i == 0 {
-            rgba[0] = 0x80_3040;
-            rgba[1] = 0x80_3040;
-        } else if i as i32 == n as i32 - 3 {
-            rgba[2] = 0x80_3040;
-            rgba[3] = 0x80_3040;
-        } else if i == 1 {
-            rgba[0] = glow;
-            rgba[1] = glow;
-        }
-        out.push(crate::fx::FxQuad { fx: 0x10, additive: true, corners: [add(a, nn), sub(a, nn), add(b, nn), sub(b, nn)], st, rgba });
-    }
-}
+/// `0x46dc98`'s textures and colours (`$gp+0x3690` / `+0x3694`, `+0x3668` / `+0x366c`).
+const LOOK: crate::fx::trails::StrandLook = crate::fx::trails::StrandLook { fx: [0xe, 0x10], rgb: [0x7f_7f7f, 0x80_3040], ends: [0x7f_7f7f, 0x80_3040] };
