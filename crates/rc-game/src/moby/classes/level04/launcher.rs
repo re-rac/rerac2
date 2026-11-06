@@ -287,7 +287,7 @@ fn step(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let r = ctx.game.rng.rand_vec(2.0, 3.0);
     let to = add([r[0], r[1], 0.0], e);
     from[2] += 1.0;
-    carry(w, ctx, k, from, [0.0, 0.0, 3.0], to, [0.0, 0.0, 3.0], [0.0; 3], 0x3c);
+    carry(w, ctx, k, from, [0.0, 0.0, 3.0], to, [0.0, 0.0, 3.0], [0.0; 3], 0x3c, None, None);
     let m = &mut w.mobys[id];
     let n = m.pv_i(SENT) + 1;
     m.set_pv_b(OUT, m.pv_b(OUT).wrapping_add(1));
@@ -298,11 +298,12 @@ fn step(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     set_seq(w, id, ctx, 1, 0, 5);
 }
 
-/// `0x30d1d0(m, from, up₀, to, up₁, rot, ticks)`: a carrier 0x0e44 for `m`, which is put at `to` with the angles
-/// `rot`, hidden without collision and kept still (mode | 0x103); the carrier keeps the arc, `m`, its mode and its
-/// colour (`| 0x80000000`), and its step `1 / ticks`.
+/// `0x30d1d0(m, from, up₀, to, up₁, rot, ticks, source, support)` (L07 `0x2e2d08`): a carrier 0x0e44 for `m`, which
+/// is put at `to` with the angles `rot`, hidden without collision and kept still (mode | 0x103); the carrier keeps the
+/// arc, `m`, its mode and its colour (`| 0x80000000`), its step `1 / ticks`, and the platforms its start (`+0x40`) and
+/// `m` (`+0x44`) ride ([`update_0e44`]).
 #[allow(clippy::too_many_arguments)]
-fn carry(w: &mut MobyWorld, ctx: &mut Ctx, m: usize, from: V3, up0: V3, to: V3, up1: V3, rot: V3, ticks: i32) {
+pub fn carry(w: &mut MobyWorld, ctx: &mut Ctx, m: usize, from: V3, up0: V3, to: V3, up1: V3, rot: V3, ticks: i32, source: Option<usize>, support: Option<usize>) {
     let c = w.create(CARRIER);
     let o = &mut w.mobys[m];
     o.pos = to;
@@ -322,6 +323,8 @@ fn carry(w: &mut MobyWorld, ctx: &mut Ctx, m: usize, from: V3, up0: V3, to: V3, 
     cm.set_pv_v(0x10, up0);
     cm.set_pv_v(0x20, to);
     cm.set_pv_v(0x30, up1);
+    crate::moby::ai::set_link(cm, 0x40, source);
+    crate::moby::ai::set_link(cm, 0x44, support);
     crate::moby::ai::set_link(cm, 0x48, Some(m));
     cm.set_pv_i(0x50, mode as i32);
     cm.set_pv_i(0x54, (amb[0] as u32 | (amb[1] as u32) << 8 | (amb[2] as u32) << 16 | 0x8000_0000) as i32);
@@ -332,8 +335,25 @@ fn carry(w: &mut MobyWorld, ctx: &mut Ctx, m: usize, from: V3, up0: V3, to: V3, 
 /// 0x0e44 (`0x43d3f8`). **0**: 1. **1**: drawn ([`draw`]); its progress `+0x4c` on by its step; at 1, 2 and a blast
 /// at its landing (0.5, bursts 20 / 40 / 20, 40 puffs, 40 streaks, its light). **2**: its moby shown with collision,
 /// its rows from its angles with the up row × the growth `+0x58`, its colour from blue (`0x800000ff`) to its own by it,
-/// the growth on by 2 a second; at 1 its moby's mode and colour back, the carrier gone.
+/// the growth on by 2 a second; at 1 its moby's mode and colour back, the carrier gone. Every tick after: the arc's
+/// start rides its source platform (`+0x40`, `0x322058`), and its moby rides its support (`+0x44`), the landing
+/// following it.
 pub fn update_0e44(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    step_0e44(w, id, ctx);
+    if id >= w.mobys.len() || 0xfd <= w.mobys[id].state { return; }
+    if let Some(p) = crate::moby::ai::link(&w.mobys[id], 0x40) {
+        if let Some((from, _)) = crate::moby::platform::ride(w, p, w.mobys[id].pv_v(0), [0.0; 3]) { w.mobys[id].set_pv_v(0, from); }
+    }
+    if let (Some(p), Some(k)) = (crate::moby::ai::link(&w.mobys[id], 0x44), crate::moby::ai::link(&w.mobys[id], 0x48)) {
+        if k >= w.mobys.len() { return; }
+        if let Some((pos, rot)) = crate::moby::platform::ride(w, p, w.mobys[k].pos, w.mobys[k].rot) {
+            (w.mobys[k].pos, w.mobys[k].rot) = (pos, rot);
+            w.mobys[id].set_pv_v(0x20, pos);
+        }
+    }
+}
+
+fn step_0e44(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     match w.mobys[id].state {
         0 => w.mobys[id].set_state(1, -1),
         1 => {

@@ -39,7 +39,7 @@
 //! hit stands for it).
 
 use crate::hero::physics::{add, add_rot, atan2, dot, euler_rows, rot_dist, scale, set_len, sub, turn_ease, V3};
-use crate::moby::classes::props::{group_alive, seq, set_seq, wrapped};
+use crate::moby::classes::props::{group_alive, set_seq, wrapped};
 use crate::moby::{ai, Ctx, MobyWorld};
 
 pub const CLASS: i16 = 0x0d2a;
