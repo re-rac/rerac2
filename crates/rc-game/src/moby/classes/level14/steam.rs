@@ -138,3 +138,28 @@ fn puffs(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, rate: f32, full: bool) {
     }
     w.mobys[id].set_pv_f(pv::ACCUM, acc);
 }
+
+pub const BOBBER: i16 = 0x0af2;
+
+/// 0x0af2 (`0x3e32e8`, 5 placed; the decomp's `func_L14_003E1DD0`): a spinner that bobs. **0**: its height kept
+/// (`+4`), its phase 0 (`+8`); 1. **1**: its yaw on by `+0` a tick, its phase on by `+0xc`, its height the kept one
+/// plus `+0x10` × the phase's sine.
+pub fn update_0af2(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
+    use crate::hero::physics::add_rot;
+    let m = &mut w.mobys[id];
+    match m.state {
+        0 => {
+            let z = m.pos[2];
+            m.set_pv_f(4, z);
+            m.set_pv_f(8, 0.0);
+            m.set_state(1, -1);
+        }
+        1 => {
+            m.rot[2] = add_rot(m.rot[2], m.pv_f(0));
+            let ph = add_rot(m.pv_f(8), m.pv_f(0xc));
+            m.set_pv_f(8, ph);
+            m.pos[2] = m.pv_f(4) + m.pv_f(0x10) * ph.sin();
+        }
+        _ => {}
+    }
+}

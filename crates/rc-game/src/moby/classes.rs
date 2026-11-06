@@ -12,6 +12,7 @@ pub mod level11;
 pub mod level12;
 pub mod level13;
 pub mod level14;
+pub mod level16;
 pub mod level17;
 pub mod level19;
 pub mod level22;
@@ -432,7 +433,7 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x0972 => Some(endako_d::update_0972),
         endako_d::NETWORK => Some(endako_d::update_0f2d),
         // The levels' own (their modules' lists).
-        _ => level04::update_for(o_class).or_else(|| level06::update_for(o_class)).or_else(|| level07::update_for(o_class)).or_else(|| level08::update_for(o_class)).or_else(|| level09::update_for(o_class)).or_else(|| level10::update_for(o_class)).or_else(|| level11::update_for(o_class)).or_else(|| level13::update_for(o_class)).or_else(|| level14::update_for(o_class)).or_else(|| level12::update_for(o_class)).or_else(|| level17::update_for(o_class)).or_else(|| level19::update_for(o_class)).or_else(|| level22::update_for(o_class)).or_else(|| level26::update_for(o_class)),
+        _ => level04::update_for(o_class).or_else(|| level06::update_for(o_class)).or_else(|| level07::update_for(o_class)).or_else(|| level08::update_for(o_class)).or_else(|| level09::update_for(o_class)).or_else(|| level10::update_for(o_class)).or_else(|| level11::update_for(o_class)).or_else(|| level13::update_for(o_class)).or_else(|| level14::update_for(o_class)).or_else(|| level16::update_for(o_class)).or_else(|| level12::update_for(o_class)).or_else(|| level17::update_for(o_class)).or_else(|| level19::update_for(o_class)).or_else(|| level22::update_for(o_class)).or_else(|| level26::update_for(o_class)),
     }
 }
 

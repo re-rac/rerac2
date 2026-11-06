@@ -3,7 +3,7 @@
 //!
 //! * **0**: shown, its drag's range 9 (`+0x88`), `+0xdc` bit 1; 1. **1**: the drag (`0x31c940` = L01 `0x31bd40`,
 //!   crate::moby::classes::tractor::drag: radius `$gp+0x1f0c`), then [`keep`] (`0x3f6ef0`).
-//! * Every tick: its scale `$gp+0x1f14` of its class's; drawn, its colour pulsing between `$gp+0x1f00` / `+0x1f04`
+//! * Every tick: its scale `$gp+0x1f14` of its class's; drawn, its glow word (`+0x78`) pulsing between `$gp+0x1f00` / `+0x1f04`
 //!   once a second (`0x31da88` = L01 `0x32c0b8`); its platform block written with the tick's move and turn.
 //!
 //! Not ported: [`keep`]'s push of Ratchet off the lift while it climbs past 202..204 with the camera outside the
@@ -43,7 +43,7 @@ pub fn update_0e30(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &mut w.mobys[id];
     if m.drawn != 0 {
         let phase = (ctx.game.frame % 60) as f32 * std::f32::consts::TAU / 60.0;
-        m.set_ambient_word(crate::moby::classes::electrolyzer::pulse_colour(phase - std::f32::consts::PI, PULSE.0, PULSE.1));
+        m.glow = crate::moby::classes::electrolyzer::pulse_colour(phase - std::f32::consts::PI, PULSE.0, PULSE.1);
     }
     let (pos, rot) = (m.pos, m.rot);
     platform::write(m, 0xa0, sub(pos, old_pos), old_rot, rot);

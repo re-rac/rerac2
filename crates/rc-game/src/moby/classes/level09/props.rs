@@ -263,7 +263,7 @@ pub const PAD: i16 = 0x0efc;
 /// 4. Otherwise, it is set off once its uid's save count is set.
 ///
 /// * **0**: its pulse's phase is random; it sinks 0.35; then 1.
-/// * **1**: its colour pulses (6° a tick; grey 32..128 by 4·sin − 3). Set off, it turns green (0x80208020), plays
+/// * **1**: its glow word (`+0x78`) pulses (6° a tick; grey 32..128 by 4·sin − 3). Set off, it turns green (0x80208020), plays
 ///   its class sound 0, counts its uid and goes to 2.
 ///
 /// Not ported: the second way it is set off — with its enable word, the level's special moby
@@ -282,7 +282,7 @@ pub fn update_0efc(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let a = crate::hero::physics::add_rot(m.pv_f(0), 0.104_719_77);
             m.set_pv_f(0, a);
             let shade = (((a.sin() * 4.0 - 3.0) * 128.0) as i32).clamp(32, 128) as u32;
-            m.set_ambient_word(0x8000_0000 | shade << 16 | shade << 8 | shade);
+            m.glow = 0x8000_0000 | shade << 16 | shade << 8 | shade;
             let on = ctx.hero.ground_moby == Some(id);
             let enabled = m.pv_i(4) != 0;
             let level = ctx.game.level.max(0) as usize;
@@ -291,7 +291,7 @@ pub fn update_0efc(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if !go { return; }
             m.set_state(2, -1);
             m.timer = 1;
-            m.set_ambient_word(0x8020_8020);
+            m.glow = 0x8020_8020;
             let uid = m.uid;
             ctx.host.play_sound(&w.mobys[id], 0, 0);
             ctx.game.count_uid(uid);

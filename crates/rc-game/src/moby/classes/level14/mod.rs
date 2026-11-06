@@ -8,6 +8,7 @@ pub mod steam;
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
         steam::CLASS => Some(steam::update_0b0d),
+        steam::BOBBER => Some(steam::update_0af2),
         _ => None,
     }
 }
