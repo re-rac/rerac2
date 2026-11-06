@@ -150,3 +150,66 @@ pub fn update_0edc(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => {}
     }
 }
+
+pub const DROPPER: i16 = 0x11ff;
+
+/// 0x11ff (`0x4231b0`, 10 placed; the decomp's `func_L19_00421E80`): a platform that drops into place.
+/// * **0**: its tuning: ease 0.55 a tick at most, the fall's push 0.01 and stop 0.05, the wait `+0x5c` + 60 ticks,
+///   the rest 1 above its floor `+8`. Its dust's settings are kept for the tail. Then 1.
+/// * **1**: once Ratchet is in cuboid `+0x00`, 2.
+/// * **2**: its sound 0 on the first tick. The rumble `+0x24` grows as the wait runs out; then 3.
+/// * **3**: it falls toward 20 below its floor, faster each tick; past the floor, 4.
+/// * **4**: on the first tick, its sound 1 and the camera's shake (slot 0: 1 for 20 ticks). It brakes to rest 1
+///   above its floor; within 0.03 of that, it rests (5).
+///
+/// Not ported: its tail `0x422238` (the dust and the rumble's shake by `+0x24`).
+pub fn update_11ff(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    use crate::hero::physics::ease;
+    let m = &mut w.mobys[id];
+    match m.state {
+        0 => {
+            m.set_pv_f(0xc, 0.0);
+            m.set_pv_f(0x24, 0.0);
+            m.set_pv_f(0x10, 0.55);
+            m.set_pv_f(0x14, 0.01);
+            m.set_pv_f(0x18, 0.05);
+            m.set_pv_i(0x1c, m.pv_i(0x5c) + 60);
+            m.set_pv_i(0x20, 60);
+            m.set_pv_f(0x28, 1.0);
+            m.set_state(1, -1);
+        }
+        1 => if ctx.level.in_cuboid(m.pv_i(0), ctx.hero.pos) { m.set_state(2, -1) },
+        2 => {
+            if m.first() { ctx.host.play_sound(&w.mobys[id], 0, 0); }
+            let m = &mut w.mobys[id];
+            let mut t = m.pv_i(0x1c);
+            let out = crate::moby::countdown(&mut t);
+            m.set_pv_i(0x1c, t);
+            if out { m.set_state(3, -1); }
+            m.set_pv_f(0x24, m.pv_f(0x24) + (60 - t) as f32 * 0.25);
+        }
+        3 => {
+            let floor = m.pv_f(8);
+            if m.pos[2] < floor { m.set_state(4, -1); }
+            m.set_pv_f(0x24, m.pv_f(0x24) + 1.5);
+            let (mut z, mut v) = (m.pos[2], m.pv_f(0xc));
+            ease(floor - 20.0, m.pv_f(0x14), 99_999.0, m.pv_f(0x10), &mut z, &mut v);
+            m.pos[2] = z;
+            m.set_pv_f(0xc, v);
+        }
+        4 => {
+            if m.first() {
+                ctx.host.play_sound(&w.mobys[id], 1, 0);
+                ctx.game.shakes.ask(0, 1.0, 20);
+            }
+            let m = &mut w.mobys[id];
+            let (floor, rest) = (m.pv_f(8), m.pv_f(0x28));
+            if (m.pos[2] - floor + rest).abs() < 0.03 { m.set_state(5, -1); }
+            let (mut z, mut v) = (m.pos[2], m.pv_f(0xc));
+            ease(floor - rest, 99_999.0, m.pv_f(0x18), m.pv_f(0x10), &mut z, &mut v);
+            m.pos[2] = z;
+            m.set_pv_f(0xc, v);
+        }
+        _ => {}
+    }
+}

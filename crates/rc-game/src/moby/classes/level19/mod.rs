@@ -13,6 +13,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         props::WATCHER => Some(props::update_0629),
         props::ICE => Some(props::update_11c7),
         props::TELEPORTER => Some(props::update_0edc),
+        props::DROPPER => Some(props::update_11ff),
         _ => None,
     }
 }
