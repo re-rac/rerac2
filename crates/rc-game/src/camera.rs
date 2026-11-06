@@ -32,7 +32,7 @@
 //!
 //! **Not ported**: D+0x250 in Giant Clank's branch of `0x4239d0` (crate::hero::giant), the focus
 //! mobys `0x1b8e84` / `0x18b270` (nothing sets them on Aranos), the stick auto-centre (`$gp+0x2540` is 0 on the disc),
-//! the knock-down view (state 0x74, mode 11), the camera's own shift `0x1b8fc0`, the magnetic walkway's branch of
+//! the knock-down view (state 0x74, mode 11), the magnetic walkway's branch of
 //! `0x4227b8` (the gravity frames' is ported: crate::gravity) and the settle after the walkway and the frames (D+0x14e:
 //! 15 ticks of re-blending once `0x18a168` / `0x1a8ff0` go off; not the water's); the other camera classes (first
 //! person `0x427bf8` needs Ratchet's camera mode 4 / 0x51, script 5, 6, the Swingshot's 7, 0x1b), the blends between
@@ -264,10 +264,13 @@ pub struct CamTweaks {
     /// `0x422690(h, rate)`: [`FollowCamera::set_dist`] / [`FollowCamera::set_pivot_h`] as its update starts).
     pub follow_dist: Option<(f32, f32)>,
     pub follow_pivot: Option<(f32, f32)>,
+    /// `0x1b8fc0`: the camera's own shift this tick (a moby's: the sinking pit's lift, crate::moby::classes::level14::
+    /// pit), added to the platform carry (`0x4278c8`) and cleared by the camera update (`0x2d9f38`).
+    pub shift: V3,
 }
 
 impl Default for CamTweaks {
-    fn default() -> Self { CamTweaks { slots: [CamTweak::default(); 32], last: -1, fov: 1.124_3, turn: None, off: [0.0; 3], blend: FovBlend::default(), follow_dist: None, follow_pivot: None } }
+    fn default() -> Self { CamTweaks { slots: [CamTweak::default(); 32], last: -1, fov: 1.124_3, turn: None, off: [0.0; 3], blend: FovBlend::default(), follow_dist: None, follow_pivot: None, shift: [0.0; 3] } }
 }
 
 /// `0x3f8fea69`: the play's field of view (the level start's `0x32c858` and the weapons put away blend back to it).
@@ -744,6 +747,7 @@ impl FollowCamera {
         if let Some((h, rate)) = tweaks.follow_pivot.take() { self.set_pivot_h(h, rate); }
         self.step(inp, tweaks);
         tweaks.off = self.off;
+        tweaks.shift = [0.0; 3];
     }
 
     /// `0x2d9f38`'s steps with the follow camera current (see [`FollowCamera::update`]).
@@ -751,7 +755,7 @@ impl FollowCamera {
         self.ticks += 1;
         self.pre_flags(inp);
         self.pre_motion(inp);
-        self.platform_carry(inp);
+        self.platform_carry(inp, tweaks.shift);
         let req = tweaks.apply(self, inp);
         self.state_tweaks(inp, req);
         self.targets(inp);
@@ -822,10 +826,11 @@ impl FollowCamera {
     /// `0x421dc8`: the tick's platform carry (`0x189f70`) moves the camera's points with Ratchet — the vertical target
     /// along the up only, the height by the moby under him when it rose more (D+0x158 / +0x15c; not on a magnetic
     /// walkway) — and turns the yaw by the carry's turn (D+0x1e0; class 0x22d after 31 updates); the rigid follow of
-    /// the slide states 0xb / 0xc. Not ported: the camera's own shift `0x1b8fc0` (nothing sets it on Aranos).
-    fn platform_carry(&mut self, inp: &CamInput) {
+    /// the slide states 0xb / 0xc. The camera's own shift `0x1b8fc0` ([`CamTweaks::shift`]) is added to the carry
+    /// (its yaw `+0xc` is not ported: no writer sets it).
+    fn platform_carry(&mut self, inp: &CamInput, shift: V3) {
         let h = inp.hero;
-        let mut d = h.carry;
+        let mut d = add(h.carry, shift);
         let magnet = h.surf.boots != 0;
         match inp.ground {
             // The frames (`0x1a8ff0`) drop the moby as the walkway does.

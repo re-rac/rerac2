@@ -669,6 +669,16 @@ pub struct MobyWorld {
     pub drawbridge: classes::level16::drawbridge::Globals,
     /// Level 14's electric strands (classes::level14::fence::Globals).
     pub fence14: classes::level14::fence::Globals,
+    /// The sinking pits' samples and grids (classes::level14::pit::Globals).
+    pub pit: classes::level14::pit::Globals,
+    /// Level 14's energy field's rays (classes::level14::energy::Globals).
+    pub energy14: classes::level14::energy::Globals,
+    /// Level 26's veil's quads (classes::level26::veil::Mesh), read by the engine at the level's start.
+    pub veil26: Option<std::sync::Arc<classes::level26::veil::Mesh>>,
+    /// The 64 tie texture matrices' ST offsets (`$gp−0x1ba0`, L09 `0x1ad450`: each 0x40 bytes, `+0x30` / `+0x34`; the
+    /// identity at the level's start, `0x3692c8`; empty: all 0), scrolled by classes::level09::scroll. The engine's tie
+    /// renderer moves the STs of the packets that use one (rc_formats::tie::TiePacket::tex_matrix).
+    pub tex_matrices: Vec<[f32; 2]>,
     /// The classes' texture scrolls (`0x310838(class, ds, dt)`, L20 `0x326a20`: every ST of the class's packets moved
     /// by (ds, dt) in 1/4096, wrapping as u16), by class: `s | t << 16`. The engine adds them to the class's STs.
     pub class_scroll: std::collections::HashMap<i16, u32>,

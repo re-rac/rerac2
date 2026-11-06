@@ -37,6 +37,7 @@
 //! | 0x63 | [`wool`] (`0x340ce8`) | (`0x340e38`) | wool: tufts slowing, falling, swaying, scattered by Ratchet (the sheep's pop) |
 //! | 0x56 | [`keyed`] (L02 `0x345d88`, L18 `0x35a848`) | (`0x33f240`) | keyframed puffs: colour and size eased along a template's keyframes (Damosel's traffic)
 //! | 0x62 | [`mote`] (`0x340a78`) | (`0x340c18`) | motes: sprites falling and turning, size and alpha stepped over the life (L14's force fields) |
+//! | 0x28 | [`vapour`] (`0x338478`) | (`0x338648`) | vapour: puffs flying, growing, splitting once, bouncing off the world and shrinking away (L17's vents) |
 //! | 0x6a, 0x6b, 0x6c | [`meteor`] (`0x341890`, `0x341bc8`, `0x342028`) | (`0x341a18`, `0x341dc0`, `0x342230`) | the Meteor Gun's burst streaks and embers, its burning's smoke |
 //!
 //! Any other type kills itself on its first update. The gravity direction (`0x18a0e0`) is (0, 0, −1): normal gravity.
@@ -58,6 +59,7 @@ pub mod smoke;
 pub mod swirl;
 pub mod type23;
 pub mod type48;
+pub mod vapour;
 pub mod water;
 pub mod wool;
 pub use pool::*;
@@ -1154,6 +1156,7 @@ pub fn update_parts(sys: &mut Particles, mobys: &crate::moby::MobyWorld, cam: [f
             meteor::EMBER => meteor::update_ember(sys, i),
             meteor::SMOKE => meteor::update_smoke(sys, i),
             mote::MOTE => mote::update(sys, i),
+            vapour::VAPOUR => vapour::update(sys, i, rng, aux.coll),
             ash::ASH => ash::update(sys, i, aux.coll, mobys.frame, mobys.view_x()),
             swirl::SWIRL => swirl::update(sys, i, mobys),
             smoke::SMOKE => smoke::update(sys, i),

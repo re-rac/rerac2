@@ -7,6 +7,7 @@ pub mod breakables;
 pub mod copter;
 pub mod drawbridge;
 pub mod drone;
+pub mod laser;
 pub mod movers;
 pub mod props;
 pub mod rocks;
@@ -18,6 +19,7 @@ pub fn draw(w: &mut crate::moby::MobyWorld, _host: &dyn crate::moby::MobyHost, g
     match w.mobys[id].o_class {
         copter::SHOT => copter::draw_0ebd(w, id, &mut game.rng, cam, out),
         drone::SHOT => drone::draw_0f7a(w, id, &mut game.rng, cam, out),
+        laser::CLASS => laser::draw(w, id, cam, out),
         _ => return false,
     }
     true
@@ -27,6 +29,7 @@ pub fn draw(w: &mut crate::moby::MobyWorld, _host: &dyn crate::moby::MobyHost, g
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
         props::SINKER => Some(props::update_0e73),
+        laser::CLASS => Some(laser::update_1162),
         props::POT => Some(props::update_11b5),
         props::BLINKER => Some(props::update_10f0),
         breakables::LAMP => Some(breakables::update_10f1),

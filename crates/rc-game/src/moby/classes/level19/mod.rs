@@ -44,6 +44,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         director::TRADER => Some(director::update_1313),
         ride_cam::CLASS => Some(ride_cam::update_1258),
         // The hovership 0x0eef and the raritanium 0x099a (L19 `0x414848` / `0x3c1cc8`) are in level 8's list.
+        // The liquid lid 0x11fe (L19 `0x422c70`) is in level 8's list, the sinking pit 0x135f (L19 `0x383478`) in level
+        // 14's.
         // Level 8's lift 0x0aaa's code (L19 `0x41fcb8`).
         0x1176 => Some(super::level08::lift::update_0aaa),
         // Level 20's fading field 0x119b's code (L19 `0x423750`).

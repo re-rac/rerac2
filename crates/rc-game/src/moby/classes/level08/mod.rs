@@ -7,6 +7,7 @@ pub mod buyer;
 pub mod breather;
 pub mod burrower;
 pub mod crystal;
+pub mod door;
 pub mod hovership;
 pub mod lift;
 pub mod mission;
@@ -38,6 +39,18 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         crystal::CARRIER => Some(crystal::update_0e78),
         // The chips: the same code as Level 12's (`0x3d49b8` = L12 `0x400850`).
         crystal::CHIP | crystal::CHIP_B => Some(super::level12::debris::update_0d66),
+        // Also level 19's (L19 `0x422c70`, the same code and data).
+        door::CLASS => Some(door::update_11fe),
         _ => None,
     }
+}
+
+/// This level's draw callbacks (crate::fx): true when the moby's class is one of them.
+#[allow(clippy::too_many_arguments)]
+pub fn draw(w: &mut crate::moby::MobyWorld, _host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, _hero_state: i32, _view: &crate::particles::BSphereView, cam: crate::hero::physics::V3, id: usize, first: bool, out: &mut Vec<crate::fx::FxQuad>, _frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
+    match w.mobys[id].o_class {
+        door::CLASS if first => door::draw(w, id, game.frame, cam, out),
+        _ => return false,
+    }
+    true
 }

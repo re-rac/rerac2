@@ -3,11 +3,13 @@
 //! asks it after its own.
 
 pub mod director;
+pub mod energy;
 pub mod fence;
 pub mod field;
 pub mod gate;
 pub mod lift;
 pub mod movers;
+pub mod pit;
 pub mod props;
 pub mod rappeller;
 pub mod screen;
@@ -23,6 +25,9 @@ pub fn draw(w: &mut crate::moby::MobyWorld, host: &dyn crate::moby::MobyHost, ga
         field::CLASS => field::draw(w, id, cam, host.camera_rows(), frame),
         sheet::CLASS => sheet::draw(w, id, &mut game.rng, out),
         screen::CLASS => screen::draw(w, id, &mut game.rng, out),
+        // Also level 19's (L19 `0x383478`, the same code).
+        pit::CLASS => pit::draw(w, id, out),
+        energy::CLASS => energy::draw(w, id, &mut game.rng, cam, out),
         _ => return false,
     }
     true
@@ -36,6 +41,9 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         steam::SEQUENCER => Some(steam::update_0b19),
         fence::CLASS => Some(fence::update_0f80),
         field::CLASS => Some(field::update_0afe),
+        // Also level 19's (L19 `0x383478`, the same code).
+        pit::CLASS => Some(pit::update_135f),
+        energy::CLASS => Some(energy::update_1164),
         sheet::CLASS => Some(sheet::update_0bff),
         screen::CLASS => Some(screen::update_12b9),
         props::HATCH => Some(props::update_0b11),

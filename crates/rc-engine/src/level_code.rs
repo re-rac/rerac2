@@ -29,4 +29,10 @@ impl LevelCode {
         let read = |addr: u32, n: usize| -> Option<Vec<u8>> { self.target.read(r.data(addr)?, n).map(<[u8]>::to_vec) };
         f(&read)
     }
+
+    /// `f` with a reader of the loaded level's own addresses (the tables of a class of that level alone).
+    pub fn with_own_reader<R>(&self, f: impl FnOnce(&dyn Fn(u32, usize) -> Option<Vec<u8>>) -> R) -> R {
+        let read = |addr: u32, n: usize| -> Option<Vec<u8>> { self.target.read(addr, n).map(<[u8]>::to_vec) };
+        f(&read)
+    }
 }

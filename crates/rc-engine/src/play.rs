@@ -536,6 +536,13 @@ fn tick(
             if mesh.is_none() { eprintln!("play: the Spiderbot's sphere tables not found in the level's overlay: no blast sphere"); }
             mesh.map(std::sync::Arc::new)
         }).flatten();
+        // Level 26's veil's quads (rc_game::moby::classes::level26::veil): its own tables in the level's overlay.
+        m.world.veil26 = (crate::level_load::level_index() == 26 && m.world.class(rc_game::moby::classes::level26::veil::CLASS).is_some()).then(|| {
+            let code = crate::level_code::LevelCode::load(&crate::level_load::extracted_root(), 26).ok()?;
+            let mesh = code.with_own_reader(|read| rc_game::moby::classes::level26::veil::Mesh::read(read));
+            if mesh.is_none() { eprintln!("play: the veil's tables not found in level 26's overlay: no veil"); }
+            mesh.map(std::sync::Arc::new)
+        }).flatten();
         // `0x3012a0`: Ratchet's parked ship from the level settings (rc_game::travel).
         {
             let host = crate::mobys::Host { lv: &lv.mobys, occl: occl.as_deref(), anim: anim.as_deref_mut(), created: &mut m.created, hero: None, hero_chains: &[], chains: Some(&m.chains), camera: p.camera.pos, camera_rows: p.camera.rows, sound: None };

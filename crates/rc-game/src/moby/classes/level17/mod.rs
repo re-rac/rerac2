@@ -14,6 +14,7 @@ pub mod misc;
 pub mod mortar;
 pub mod props;
 pub mod seller;
+pub mod vent;
 
 use crate::hero::physics::V3;
 use crate::moby::MobyWorld;
@@ -22,6 +23,7 @@ use crate::moby::MobyWorld;
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
         seller::CLASS => Some(seller::update_11a6),
+        vent::CLASS => Some(vent::update_02be),
         hazard::CHAIN | hazard::CHAIN_B => Some(hazard::update_0878),
         props::CONVEYOR => Some(props::update_0fbd),
         props::CRATE => Some(props::update_0fd7),

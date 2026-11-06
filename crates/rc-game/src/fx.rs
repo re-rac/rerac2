@@ -61,6 +61,11 @@
 //! | `0x3d5ff8` (L26, first list) | the motes 0x0c00 of a group | their trails ([`trails::history`], crate::moby::classes::level26::props::draw_0c00) |
 //! | `0x423e80` (L14) | the electric strand 0x0f80 on | its strands ([`trails::strand`], crate::moby::classes::level14::fence::draw) |
 //! | `0x3b02e8` (L09; L16, L18, L19, L20; first list) | the bolt 0x05de | its strips, glow and sparks ([`crate::moby::classes::level09::bolt::draw`]) |
+//! | `0x42fce0` (L08; L19 `0x4223e8`; first list) | the liquid lids 0x11fe | the frame's lids' layers and sheens (crate::moby::classes::level08::door::draw) |
+//! | `0x390d60` (L14; L19 `0x383a18`; the world's list `0x2e77e0`, here the first) | the sinking pit 0x135f | its 7 × 7 waving cells (crate::moby::classes::level14::pit::draw) |
+//! | `0x432150` (L14) | the energy field 0x1164 | its halo, rings, core and rays (crate::moby::classes::level14::energy::draw) |
+//! | `0x41e3b8` (L16, first list) | the sweeping laser 0x1162 | its beam (crate::moby::classes::level16::laser::draw) |
+//! | `0x3e0cf8` (L26, first list) | the veil 0x0c91 | its 64 quads in two layers (crate::moby::classes::level26::veil::draw) |
 //!
 //! **The frame's own image** (`0x2ea6c8(n)` for n < 0: a texture of a GS buffer instead of an FX texture): −1 queues a
 //! GS copy of the frame as it stands (the draw buffer `0x1a72dc` scaled by the sprites `0x138ad0` into a 256×256 CT16
@@ -432,9 +437,10 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::endako_c::SENTRY => crate::moby::classes::endako_c::draw_beam(w, id, game.frame, cam, out),
         // The levels' own (their modules' draws).
         _ => {
-            use crate::moby::classes::{level04, level06, level09, level11, level12, level13, level14, level16, level17, level19, level20, level26};
+            use crate::moby::classes::{level04, level06, level08, level09, level11, level12, level13, level14, level16, level17, level19, level20, level26};
             let _ = level04::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
                 || level06::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
+                || level08::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
                 || level09::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
                 || level11::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
                 || level13::draw(w, host, game, hero_state, view, cam, id, first, out, frame)

@@ -154,10 +154,30 @@ pub fn load_ties(core: &LevelCore, core_data: &[u8], gs_ram: &[u8], gameplay: &[
     Ok(LevelTies { classes, instances, class_of, colors, mips, mip_fallbacks, parse_time, light_time, texture_time: t0.elapsed() })
 }
 
-/// Material uniform: x = near (32; GS Q = n / z), y = MXL, z = 1 to tint by LOD (`RC_TIE_LOD_TINT=1`).
+/// Material uniform: x = near (32; GS Q = n / z), y = MXL, z = 1 to tint by LOD (`RC_TIE_LOD_TINT=1`). `st.xy`: the
+/// ST offset of the parts' texture matrix ([`TieTexMatrix`]).
 #[derive(Clone, Copy, Debug, Default, ShaderType)]
 pub struct TieParams {
     pub misc: Vec4,
+    pub st: Vec4,
+}
+
+/// A tie part whose packets go through texture matrix `k` of the 64-entry table (`$gp−0x1ba0`, L09 `0x1ad450`; every
+/// entry the identity at the level's start, `0x3692c8`): its material follows the entry's ST offset, which a level's
+/// class scrolls (rc_game::moby::MobyWorld::tex_matrices).
+#[derive(Component, Clone, Copy, Debug)]
+pub struct TieTexMatrix(pub u8);
+
+/// The texture matrices' ST offsets into the materials of the parts that use them (each changed one only).
+fn tie_tex_matrices(play: Option<Res<crate::play::Play>>, parts: Query<(&TieTexMatrix, &MeshMaterial3d<TieMaterial>)>, mut materials: ResMut<Assets<TieMaterial>>) {
+    let Some(world) = play.as_ref().and_then(|p| p.mobys.as_ref()).map(|m| &m.world) else { return };
+    for (k, mat) in &parts {
+        let st = world.tex_matrices.get(k.0 as usize).copied().unwrap_or([0.0; 2]);
+        let want = Vec4::new(st[0], st[1], 0.0, 0.0);
+        if materials.get(&mat.0).is_some_and(|m| m.params.st != want) {
+            if let Some(mut m) = materials.get_mut(&mat.0) { m.params.st = want; }
+        }
+    }
 }
 
 /// Tie material: texture × slot colour (GS MODULATE), per-instance fog, per-instance data in storage.
@@ -226,7 +246,8 @@ impl Plugin for TieRenderPlugin {
                 crate::tie_lod::update_tie_lods
                     .after(crate::occlusion::OcclusionSet)
                     .before(bevy::camera::visibility::VisibilitySystems::VisibilityPropagate),
-            );
+            )
+            .add_systems(PostUpdate, tie_tex_matrices);
     }
 }
 
@@ -262,6 +283,8 @@ struct Part {
     texture: usize,
     skey: SamplerKey,
     mesh: Handle<Mesh>,
+    /// The texture matrix of its packets ([`TieTexMatrix`]).
+    tex_matrix: Option<u8>,
     triangles: [usize; 3],
     /// The colour indices its vertices read ([`colour_index`]), and whether a vertex is black.
     slots: BTreeSet<u32>,
@@ -305,7 +328,7 @@ fn build_parts(c: &LevelTieClass, meshes: &mut Assets<Mesh>, untextured: &mut us
         slots: BTreeSet<u32>,
         black: bool,
     }
-    let mut by_key: BTreeMap<(usize, SamplerKey), B> = BTreeMap::new();
+    let mut by_key: BTreeMap<(usize, SamplerKey, Option<u8>), B> = BTreeMap::new();
     let scale = c.class.header.scale;
     let n = &c.class.colours;
     for (lod, packets) in c.class.lods.iter().enumerate() {
@@ -314,7 +337,7 @@ fn build_parts(c: &LevelTieClass, meshes: &mut Assets<Mesh>, untextured: &mut us
                 let Some(tex) = c.texture_table_index(tri.ad_gif) else { *untextured += 1; continue };
                 let Some(ad) = c.class.ad_gifs.get(tri.ad_gif as usize) else { *untextured += 1; continue };
                 let k12 = ad.tex1.data_lo as u32 & 0xfff;
-                let b = by_key.entry((tex, SamplerKey::of(ad))).or_default();
+                let b = by_key.entry((tex, SamplerKey::of(ad), pk.tex_matrix())).or_default();
                 b.tris[lod] += 1;
                 for vi in [tri.a, tri.b, tri.c] {
                     let v = *b.remap.entry((lod, pi, vi, k12)).or_insert_with(|| {
@@ -336,7 +359,7 @@ fn build_parts(c: &LevelTieClass, meshes: &mut Assets<Mesh>, untextured: &mut us
     }
     by_key
         .into_iter()
-        .map(|((texture, skey), b)| {
+        .map(|((texture, skey, tex_matrix), b)| {
             let mesh = Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::RENDER_WORLD)
                 .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, b.pos)
                 .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, b.uv)
@@ -344,7 +367,7 @@ fn build_parts(c: &LevelTieClass, meshes: &mut Assets<Mesh>, untextured: &mut us
                 .with_inserted_attribute(ATTRIBUTE_TIE_MORPH, VertexAttributeValues::Uint32(b.morph))
                 .with_inserted_attribute(ATTRIBUTE_TIE_DELTA, b.delta)
                 .with_inserted_indices(Indices::U32(b.idx));
-            Part { texture, skey, mesh: meshes.add(mesh), triangles: b.tris, slots: b.slots, black: b.black }
+            Part { texture, skey, mesh: meshes.add(mesh), tex_matrix, triangles: b.tris, slots: b.slots, black: b.black }
         })
         .collect()
 }
@@ -513,7 +536,7 @@ fn spawn_ties_on(
             })
             .clone()
     };
-    let mut mats: HashMap<(usize, SamplerKey, GsPass), Handle<TieMaterial>> = HashMap::new();
+    let mut mats: HashMap<(usize, SamplerKey, Option<u8>, GsPass), Handle<TieMaterial>> = HashMap::new();
     let mut batches: HashSet<(AssetId<Mesh>, AssetId<TieMaterial>)> = HashSet::new();
 
     for (ii, inst) in ties.instances.iter().enumerate() {
@@ -540,12 +563,12 @@ fn spawn_ties_on(
             let (image, texel_alpha, mxl) = image_for(part.texture, part.skey, images);
             for pass in gs_state::draws(gs_state::AREF_WORLD, texel_alpha, vertex_alpha) {
                 let mat = mats
-                    .entry((part.texture, part.skey, pass))
+                    .entry((part.texture, part.skey, part.tex_matrix, pass))
                     .or_insert_with(|| {
                         materials.add(TieMaterial {
                             texture: image.clone(),
                             fog: crate::game_camera::fog_buffer(),
-                            params: TieParams { misc: Vec4::new(crate::game_camera::NEAR, mxl as f32, tint, 0.0) },
+                            params: TieParams { misc: Vec4::new(crate::game_camera::NEAR, mxl as f32, tint, 0.0), st: Vec4::ZERO },
                             instances: inst_buffer.clone(),
                             lods: lod_buffer.clone(),
                             colors: colour_buffer.clone(),
@@ -563,6 +586,7 @@ fn spawn_ties_on(
                     Name::new(format!("tie {ii} class {} tex {} {pass:?}", inst.o_class, part.texture)),
                 ));
                 if !exact || swayed { e.insert(NoFrustumCulling); }
+                if let Some(k) = part.tex_matrix { e.insert(TieTexMatrix(k)); }
                 if let Some(l) = layer { e.insert(l.clone()); }
                 spawned.push(e.id());
                 st.entities += 1;
@@ -578,7 +602,7 @@ fn spawn_ties_on(
     }
     st.draw_batches = batches.len();
     st.images = image_cache.len();
-    st.blended_materials = mats.keys().filter(|k| k.2 != GsPass::Opaque).count();
+    st.blended_materials = mats.keys().filter(|k| k.3 != GsPass::Opaque).count();
     st.build = t0.elapsed();
     st
 }

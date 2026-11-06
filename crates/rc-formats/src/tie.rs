@@ -108,7 +108,9 @@ pub(crate) struct TiePacketHeader {
     pub(crate) slot_table_ofs: u8,
     /// 0xd
     pub(crate) slot_table_size: u8,
-    /// 0xe: strip count (= [`TieUnpackHeader::strip_count`]).
+    /// 0xe: strip count (= [`TieUnpackHeader::strip_count`]). TieProc's chain builder (L09 `0x36a4e0` at `0x36a668`)
+    /// reads it as flags: bit 1 sends the texture matrix `(byte & 0xfc)·0x10` of the 64-entry table (`$gp−0x1ba0`) and
+    /// calls the VU1 program at 8 instead of 6 ([`TiePacket::tex_matrix`]).
     pub(crate) strip_count: u8,
     /// 0xf: sum of [`TieStrip::vertex_count`].
     pub(crate) strip_vertex_count: u8,
@@ -592,6 +594,12 @@ fn read_colours(b: Buf, tc: &mut TieClass) -> Result<()> {
         if out != total { return invalid(format!("tie colour program of LOD {lod} writes {out} words for {total}")); }
     }
     Ok(())
+}
+
+impl TiePacket {
+    /// The texture matrix the packet's STs go through (header byte 0xe with bit 1 set: entry `byte >> 2` of the
+    /// 64-entry table, L09 `0x36a838`), None without one.
+    pub fn tex_matrix(&self) -> Option<u8> { (self.header.strip_count & 2 != 0).then_some(self.header.strip_count >> 2) }
 }
 
 /// Triangulates a packet's strips: for strip vertex `i >= 2`, `(i-2, i-1, i)` when `i % 2 == winding`,

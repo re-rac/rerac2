@@ -30,6 +30,8 @@ struct TieFog {
 struct TieParams {
     // x = near (32), y = MXL, z = 1: tint by LOD.
     misc: vec4<f32>,
+    // xy: the packet's texture matrix's ST offset (rc_formats::tie::TiePacket::tex_matrix; 0 without one).
+    st: vec4<f32>,
 }
 
 struct TieInst {
@@ -110,7 +112,7 @@ fn vertex(v: TieVertex) -> TieVertexOutput {
         world = ((*inst).model * vec4<f32>(pos, 1.0)).xyz;
     }
     out.position = position_world_to_clip(world);
-    out.uv = v.uv;
+    out.uv = v.uv + params.st.xy;
     var rgba = 0u;
     if (((v.morph >> 10u) & 1u) == 0u) {
         let first = bitcast<u32>((*inst).misc.y);

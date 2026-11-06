@@ -8,6 +8,7 @@ pub mod director;
 pub mod flyer;
 pub mod gunship;
 pub mod props;
+pub mod scroll;
 pub mod talker;
 pub mod trooper;
 pub mod waker;
@@ -27,6 +28,8 @@ pub fn draw(w: &mut crate::moby::MobyWorld, _host: &dyn crate::moby::MobyHost, g
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
         talker::CLASS => Some(talker::update_0e5e),
+        // Also level 16's (L16 `0x3eb260`, the same code).
+        scroll::CLASS => Some(scroll::update_0d06),
         breakables::CRYSTAL => Some(breakables::update_1298),
         breakables::BIG_CRYSTAL => Some(breakables::update_10e7),
         props::SPINNER => Some(props::update_0c21),
