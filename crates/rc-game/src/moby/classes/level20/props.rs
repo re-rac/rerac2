@@ -258,10 +258,7 @@ const NEST_GRAVITY: f32 = 30.0;
 ///   its flash ball, the shake), its pieces 0..8 (`0x33c568` = L00 `0x327498`, crate::moby::shards::break_into: 3..6 /
 ///   3..6), its sound 1, its bolts (`0x32fd10(m, 0, 3)`), deleted.
 ///
-/// Not ported: the brood's throw in 3 — each hidden one of the group `+0x78` (`0x3fd4f0` = L18 `0x3f8a58`) thrown
-/// (`0x3fd5f8` = L18 `0x3f8b60`) from 0.7 up in its frame at 0.1 a tick along its −y, jittered by 0.01 (`0x336918` =
-/// L00 `0x3217d8`), their `+0xb8` it: the breeder's `brood_pick` and `launch` are private to
-/// crate::moby::classes::level18::breeder.
+/// In 3 its brood is thrown first ([`throw_brood`]).
 pub fn update_11ec(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     use crate::hero::physics::add_rot;
     use crate::moby::{ai, bolts};
@@ -336,6 +333,7 @@ pub fn update_11ec(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         3 => {
+            throw_brood(w, id, ctx);
             let at = w.mobys[id].pos;
             blast::burst(w, ctx, at, &Blast { size: 1.0, bursts: [0x19, 0x14, 0x14], puffs: 0x14, streaks: 0x2d, light: true, shake: true });
             shards::break_into(w, id, ctx, (3.0, 6.0), (3.0, 6.0), 0x1ff, [0.0; 3], 0xff);
@@ -348,4 +346,23 @@ pub fn update_11ec(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     let m = &mut w.mobys[id];
     if (m.state_ticks as u16) <= 0xfffe { m.state_ticks = m.state_ticks.wrapping_add(1); }
+}
+
+/// The nest's brood thrown as it bursts: each hidden one of the group `+0x78` (`0x3fd4f0` = L18 `0x3f8a58`,
+/// crate::moby::classes::level18::breeder::brood_pick) thrown (`0x3fd5f8` = L18 `0x3f8b60`) from 0.7 up its frame at
+/// 0.1 a tick along its −y, jittered by 0.01 (`0x336918` = L00 `0x3217d8`), the nest its parent (`+0xb8`).
+fn throw_brood(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    use crate::moby::classes::level18::breeder;
+    let group = w.mobys[id].pv_i(0x78);
+    for _ in 0..64 {
+        let (Some(k), _) = breeder::brood_pick(w, group) else { break };
+        let m = &w.mobys[id];
+        let r = m.rows;
+        let at = std::array::from_fn(|i| r[2][i] * 0.7 + m.pos[i]);
+        let mut vel = std::array::from_fn(|i| -r[1][i] * 0.1);
+        crate::moby::classes::level08::tabora_ai::jitter(&mut ctx.game.rng, &mut vel, 0.01);
+        breeder::launch(w, k, at, vel);
+        if w.mobys[k].state == 1 { break; }
+        w.mobys[k].parent = Some(id);
+    }
 }

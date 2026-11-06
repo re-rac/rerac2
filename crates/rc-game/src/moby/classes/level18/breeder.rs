@@ -280,7 +280,7 @@ fn drop_and_die(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 }
 
 /// `0x3f8b60(m, at, vel)`: a throw (module docs), only from state 1 or 2.
-fn launch(w: &mut MobyWorld, k: usize, at: V3, vel: V3) {
+pub(crate) fn launch(w: &mut MobyWorld, k: usize, at: V3, vel: V3) {
     let has = blob(w);
     let m = &mut w.mobys[k];
     if m.state.wrapping_sub(1) >= 2 { return; }
@@ -320,7 +320,7 @@ fn rouse(w: &mut MobyWorld, id: usize) {
 }
 
 /// `0x3f8a58(group, &n)`: the last of the group of its kind hidden in state 1, and how many there are.
-fn brood_pick(w: &MobyWorld, group: i32) -> (Option<usize>, i32) {
+pub(crate) fn brood_pick(w: &MobyWorld, group: i32) -> (Option<usize>, i32) {
     let Some(members) = usize::try_from(group).ok().and_then(|g| w.groups.get(g)) else { return (None, 0) };
     let mut n = 0;
     let mut pick = None;
