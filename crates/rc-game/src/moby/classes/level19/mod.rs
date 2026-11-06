@@ -15,6 +15,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         props::TELEPORTER => Some(props::update_0edc),
         props::DROPPER => Some(props::update_11ff),
         props::TURN_LIFT => Some(props::update_114d),
+        // Level 20's fading field 0x119b's code (L19 `0x423750`).
+        0x1204 => Some(super::level20::props::update_119b),
         _ => None,
     }
 }
