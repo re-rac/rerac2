@@ -17,6 +17,10 @@ pub mod skill_target;
 pub mod swarm;
 pub mod tractor_block;
 pub mod turret;
+pub mod train;
+pub mod snow;
+pub mod spinner;
+pub mod deleted;
 
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
@@ -39,6 +43,10 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         laser::CLASS => Some(laser::update_0e28),
         bomb::CLASS => Some(bomb::update_0e52),
         tractor_block::CLASS => Some(tractor_block::update_0e30),
+        train::LEAD..=train::CAR_LAST => Some(train::update_11d9),
+        snow::CLASS => Some(snow::update_12ec),
+        spinner::CLASS => Some(spinner::update_0c29),
+        deleted::CLASS => Some(deleted::update_0d21),
         _ => None,
     }
 }

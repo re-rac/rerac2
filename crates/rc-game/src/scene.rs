@@ -176,6 +176,10 @@ pub struct Scenes {
     pub zoom: f32,
     pub fade: f32,
     pub fade_in: f32,
+    /// `0x1b8e6c` / `0x1b8e70` (L07 `0x1b92ac` / `0x1b92b0`): the fade's target (1 a fade out, [`Scenes::fade_out`];
+    /// 0 back in) and the ticks it holds there before it comes back.
+    pub fade_to: f32,
+    pub fade_hold: i32,
     /// `0x1b1868`: the letterbox wanted; `0x1b186c`: its bars' height (pixels, at most 0x34; `0x2e82c0`).
     pub letterbox: bool,
     pub bars: i32,
@@ -199,16 +203,36 @@ pub struct SpaceScene {
 
 impl Default for Scenes {
     fn default() -> Self {
-        Scenes { queue: Queue::default(), mode: PLAY, pending: NONE, arg: (0, 0), stack: Vec::new(), zoom: 0.0, fade: 0.0, fade_in: 0.0, letterbox: false, bars: 0, player: None, movie: None, space: None }
+        Scenes { queue: Queue::default(), mode: PLAY, pending: NONE, arg: (0, 0), stack: Vec::new(), zoom: 0.0, fade: 0.0, fade_in: 0.0, fade_to: 0.0, fade_hold: 0, letterbox: false, bars: 0, player: None, movie: None, space: None }
     }
 }
 
 impl Scenes {
-    /// `0x2d9d98` (in the camera update): the fade back in; `0x2e82c0` (each drawn frame): the letterbox's bars.
+    /// `0x2d9d98` (in the camera update; L07 `0x2cfc98`): the fade toward its target by its rate; there, once its hold
+    /// is out (`0x2eeab0`), back in (target 0); in and back at 0, the rate off. `0x2e82c0` (each drawn frame): the
+    /// letterbox's bars.
     pub fn fade_step(&mut self) {
         if self.fade_in != 0.0 {
-            approach(0.0, self.fade_in, &mut self.fade);
-            if self.fade <= 0.0 { self.fade_in = 0.0; }
+            approach(self.fade_to, self.fade_in, &mut self.fade);
+            if self.fade == self.fade_to && self.fade_hold_out() { self.fade_to = 0.0; }
+            if self.fade_to <= 0.0 && self.fade <= 0.0 { self.fade_in = 0.0; }
+        }
+    }
+
+    /// `0x2eeab0(&hold)` = 1: the hold was out already (else one down).
+    fn fade_hold_out(&mut self) -> bool {
+        if self.fade_hold == 0 { return true; }
+        self.fade_hold = self.fade_hold.max(1) - 1;
+        false
+    }
+
+    /// `0x2cfc50(n, hold)` (L07; L02 `0x2dd2e8`): a fade out to black over `n` ticks that holds `hold` ticks and comes
+    /// back in at the same rate; nothing while one is under way.
+    pub fn fade_out(&mut self, n: f32, hold: i32) {
+        if self.fade_to == 0.0 {
+            self.fade_in = 1.0 / n;
+            self.fade_to = 1.0;
+            self.fade_hold = hold;
         }
     }
 
