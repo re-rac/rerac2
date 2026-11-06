@@ -245,26 +245,49 @@ fn wave_of(w: &MobyWorld, id: usize, cs: &[Challenge]) -> Option<Wave> {
 fn waves(cs: &[Challenge], ch: i16) -> i16 { cs.get(ch as usize).map_or(0, |c| c.waves.len() as i16) }
 
 // ---------------------------------------------------------------------------------------------------------------
-// The fighters' entry points (not ported: G-LVL-009)
+// The fighters' entry points (crate::moby::classes::level11::fighters, ::brutes, ::bosses)
+
+/// The floor's plates and flame columns (Maktar's classes, crate::moby::classes::arena).
+pub const PLATE_CLASS: i16 = 0x0a03;
+pub const COLUMN_CLASS: i16 = 0x0b89;
 
 /// The fighters' starts `(m, delay, placed)` — 0x0d98 `0x44b0c8`, 0x0dcf `0x44dd60`, 0x0df4 `0x4546b0`, 0x0df7
-/// `0x4566d0`, 0x0d37 `0x438150`, 0x0df9 `0x457e90` (out of a spawner only): not ported.
-fn start(_w: &mut MobyWorld, _f: usize, _ctx: &mut Ctx, _delay: i32, _placed: bool) {}
+/// `0x4566d0`, 0x0d37 `0x438150`, 0x0df9 `0x457e90` (out of a spawner only).
+fn start(w: &mut MobyWorld, f: usize, ctx: &mut Ctx, delay: i32, placed: bool) { super::fighters::start(w, f, ctx, delay, placed) }
 
-/// The bosses' starts: 0x0d4a `0x43b190`, 0x0b3a `0x3f4448`: not ported.
-fn start_boss(_w: &mut MobyWorld, _f: usize, _ctx: &mut Ctx) {}
+/// The bosses' starts: 0x0d4a `0x43b190`, 0x0b3a `0x3f4448`.
+fn start_boss(w: &mut MobyWorld, f: usize, ctx: &mut Ctx) {
+    match w.mobys[f].o_class {
+        D4A => super::bosses::start_d4a(w, f, ctx),
+        B3A => super::bosses::start_b3a(w, f, ctx),
+        _ => {}
+    }
+}
 
 /// The pools (`0x442a18`'s calls): 0x0d98 `0x44b2a0`, 0x0dcf `0x44df28`, 0x0df4 `0x454850`, 0x0df7 `0x456830`, 0x0df9
-/// `0x457f98`, 0x0d37 `0x4382b8`, 0x0d4a `0x43b430`, 0x0d4b `0x43c368`, 0x0b3a `0x3f45a8`: not ported.
-fn pool(_w: &mut MobyWorld, _f: usize, _ctx: &mut Ctx) {}
+/// `0x457f98`, 0x0d37 `0x4382b8`, 0x0d4a `0x43b430`, 0x0d4b `0x43c368`, 0x0b3a `0x3f45a8`.
+fn pool(w: &mut MobyWorld, f: usize, ctx: &mut Ctx) { super::fighters::pool(w, f, ctx) }
 
 /// A fighter out of the arena (`0x4439c0`): 0x0d98 its death `0x44b398(m, 0, 0)`; 0x0dcf / 0x0df4 / 0x0df7 / 0x0d37
 /// its bolts (`0x443288(m, 0, −1)` = Maktar's `0x3fd7e8`: `0x31ee88(m, 0, 3)`) and its pool; 0x0df9 its bolts and the
 /// death fade into its pool (`0x4148d0` = crate::moby::classes::death_fade::start); 0x0d4b its pool when `0x43c040`
-/// holds. The bolts are dropped here; the rest waits on the fighters.
+/// holds (past its state 3).
 fn die_out(w: &mut MobyWorld, f: usize, ctx: &mut Ctx) {
-    if matches!(w.mobys[f].o_class, DCF | DF4 | DF7 | DF9 | D37) { crate::moby::bolts::drop(w, f, 0, 3, ctx); }
-    pool(w, f, ctx);
+    match w.mobys[f].o_class {
+        D98 => super::brutes::die_d98(w, f, ctx, false, false),
+        DCF | DF4 | DF7 | D37 => {
+            super::fighters::bolts(w, f, ctx);
+            pool(w, f, ctx);
+        }
+        DF9 => {
+            super::fighters::bolts(w, f, ctx);
+            crate::moby::classes::death_fade::start(w, f, ctx, 0.0, Some(super::brutes::pool_df9));
+        }
+        D4B => {
+            if 4 <= w.mobys[f].state { pool(w, f, ctx); }
+        }
+        _ => {}
+    }
 }
 
 /// The fighters' turn words (`0x442ba0`).
@@ -732,7 +755,7 @@ fn deal_turns(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
 }
 
 /// `0x2a8af0`: inside the polygon (crossings of a ray along x).
-fn in_polygon(pts: &[[f32; 4]], p: V3) -> bool {
+pub(super) fn in_polygon(pts: &[[f32; 4]], p: V3) -> bool {
     let n = pts.len();
     let mut inside = false;
     for k in 0..n {

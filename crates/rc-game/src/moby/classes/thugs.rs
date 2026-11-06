@@ -15,7 +15,7 @@
 //! engaged, `+0x270` a path it takes once (`+0x27c` set when it has), `+0x280` it fires crouched; `+0x284` its
 //! shots a burst less a random 0..1 (`+0x288` this burst's, `+0x28c` fired); `+0x290` a path to a stand (state 14),
 //! `+0x294` hidden until the moby `+0x298` is gone, then it comes in by the teleport-in carrier along the path
-//! `+0x29c`; `+0x2a0` it walks on walls ([`crawl`]); `+0x2a8` it rides the walkway section `+0x2ac` (0x0d65) with its
+//! `+0x29c`; `+0x2a0` it walks on walls ([`crawl`], module docs); `+0x2a8` it rides the walkway section `+0x2ac` (0x0d65) with its
 //! gates `+0x360` / `+0x364` (0x0d95 / 0x0d97) opened at the end; `+0x2b0` a patrol path; `+0x2bc` it follows the
 //! drone `+0x2d4` (0x0f35) along the path `+0x2c0`, `+0x2d8` sidestepping at `+0x2dc`° (state 11); `+0x2c4` it plays
 //! rock-paper-scissors with `+0x2c8`, its throw `+0x2cc` (0 rock, 1 paper, 2 scissors); `+0x2d0` hidden at first;
@@ -77,10 +77,12 @@
 //!
 //! The heavy trooper 0x0ea4 beside it: [`update_0ea4`].
 //!
-//! Not ported: the wall walk of `+0x2a0` (the heavy's `+0x2a4`; 4 placed on L13; the path walk `0x40ada8`, its move `0x40ab60` with
-//! `0x40a0a0` / `0x40a2c8` / `0x409c40` / `0x409ee8` / `0x409b08` turning the moby onto the surface under it, the
-//! turn toward Ratchet `0x40b9e8` → `0x40a3b0`, and the word `0x1a79f8` it tests against 0x45): those troopers stand
-//! where they are when they would walk ([`crawl`]).
+//! **The wall walk** (`+0x2a0`, the heavy's `+0x2a4`; 4 troopers and 5 heavies placed on L13): along its paths
+//! [`crawl`] (`0x40ada8`), to its points the move (`0x40ab60`, crate::moby::frames::move_on_walls, which turns it onto
+//! the surface under it: the decomp's v1.01 `0x409b08` / `0x409c40` / `0x409ee8` / `0x40a0a0` / `0x40a2c8` are our
+//! `0x40b070` the floor, `0x40b1a8` the walk, `0x40b450` the body, `0x40b608` the ground, `0x40b830` a push-out),
+//! within 0.9 of a cover point crouched (the heavy 0.5); firing, after the face the turn toward Ratchet in its own
+//! frame ([`crawl_face`], `0x40b9e8` → `0x40b918`).
 
 use crate::hero::physics::{add, add_rot, atan2, dist2, len2, rot_dist, set_len, sub, V3};
 use crate::moby::classes::props::{seq, set_seq, wrapped};
@@ -273,12 +275,41 @@ fn stand_seq(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if ctx.game.rng.randi(3) == 1 { set_seq(w, id, ctx, 4, 0, 10); }
 }
 
-/// The wall walk's moves (not ported, module docs): the trooper stays; never at its goal.
-fn crawl(_w: &mut MobyWorld, _id: usize, _ctx: &mut Ctx) -> bool { false }
+/// `0x40ada8(m, path)`: the wall walk along a path (crate::moby::frames::move_on_walls; onto it, [`path_set`], when
+/// it is not the block's `+0xc4`). Its test of the planet word `0x1a79f8` against 0x45 (no planet's) never holds, so
+/// it walks to the path's last point (`+0xca`) outright; within 0.5 across of it, its index `+0xc8` steps toward the
+/// last, and once there it is at its end.
+fn crawl(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, path: i32) -> bool {
+    let m = &mut w.mobys[id];
+    if m.pv_i(0x18) == 0 { return false; }
+    let o = ai::mv(m);
+    if m.pv_i(o + 0xc4) != path + 1 { path_set(m, ctx, path, -1, 0); }
+    let Some(pts) = usize::try_from(path).ok().and_then(|p| ctx.level.paths.get(p)).filter(|p| !p.is_empty()) else { return false };
+    let last = w.mobys[id].pv_s(o + 0xca);
+    let p = pts[(last.max(0) as usize).min(pts.len() - 1)];
+    let goal = [p[0], p[1], p[2]];
+    crate::moby::frames::move_on_walls(w, id, ctx, goal);
+    let m = &mut w.mobys[id];
+    if 0.5 < dist2(m.pos, goal) { return false; }
+    let i = m.pv_s(o + 0xc8);
+    if last == i { return true; }
+    m.set_pv_s(o + 0xc8, if last < i { i - 1 } else { i + 1 });
+    false
+}
+
+/// `0x40b9e8`: on walls, the wall walk's turn toward Ratchet in its own frame (crate::moby::frames::turn_walls).
+fn crawl_face(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
+    let m = &mut w.mobys[id];
+    if !crawls(m) || m.pv_i(0x18) == 0 { return; }
+    let o = ai::mv(m);
+    let (v, rows) = (sub(ctx.hero.pos, m.pos), m.rows);
+    crate::moby::frames::turn_walls(m, o, v, &rows);
+    w.changed = true;
+}
 
 /// Along a path (`0x336a68`), or with `+0x2a0` the wall walk's.
 fn walk(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, path: i32) -> bool {
-    if crawls(&w.mobys[id]) { crawl(w, id, ctx) } else { ai::follow_path(w, id, ctx, path) }
+    if crawls(&w.mobys[id]) { crawl(w, id, ctx, path) } else { ai::follow_path(w, id, ctx, path) }
 }
 
 /// It walks on walls: the trooper's `+0x2a0`, the heavy's `+0x2a4`.
@@ -287,7 +318,7 @@ fn crawls(m: &Moby) -> bool { m.pv_i(if m.o_class == HEAVY { H_CRAWLS } else { C
 /// To a point (`0x335760`), or on walls the wall walk's.
 fn go_to(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3) {
     if crawls(&w.mobys[id]) {
-        crawl(w, id, ctx);
+        crate::moby::frames::move_on_walls(w, id, ctx, goal);
     } else {
         let p = w.mobys[id].pos;
         ai::move_step(w, id, ctx, atan2(goal[0] - p[0], goal[1] - p[1]), goal);
@@ -715,7 +746,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         0xe => {
             let path = w.mobys[id].pv_i(STAND_PATH);
             if w.mobys[id].pv_i(CRAWLS) != 0 {
-                if crawl(w, id, ctx) {
+                if crawl(w, id, ctx, path) {
                     engage_fire(w, id, ctx, 10, 2);
                     w.mobys[id].set_pv_i(STAND_PATH, -1);
                 }
@@ -741,6 +772,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         0x14 => {
             face_target(w, id, ctx);
+            crawl_face(w, id, ctx);
             if ai::reached(w, id, ctx, 1.0) { shoot(w, id, ctx); }
             if wrapped(w, id, ctx) {
                 let m = &w.mobys[id];
@@ -757,6 +789,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         0x15 => if 0x79 <= ticks { sight(w, id, ctx) },
         0x16 => {
             face_target(w, id, ctx);
+            crawl_face(w, id, ctx);
             if ai::reached(w, id, ctx, 3.0) { shoot(w, id, ctx); }
             if wrapped(w, id, ctx) {
                 let m = &w.mobys[id];
@@ -772,6 +805,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         0x19 => {
             face_target(w, id, ctx);
+            crawl_face(w, id, ctx);
             if ai::reached(w, id, ctx, 3.0) { shoot(w, id, ctx); }
             let m = &w.mobys[id];
             if wrapped(w, id, ctx) && m.pv_i(BURST) == m.pv_i(FIRED) {
@@ -1656,7 +1690,7 @@ fn h_states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         0xf => {
             let path = w.mobys[id].pv_i(H_STAND_PATH);
             let done = if crawls(&w.mobys[id]) {
-                crawl(w, id, ctx)
+                crawl(w, id, ctx, path)
             } else {
                 let at = ai::follow_path(w, id, ctx, path);
                 at || dist2(w.mobys[id].pos, target_pos(w, id, ctx)) < 8.0
@@ -1685,6 +1719,7 @@ fn h_states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         0x15 => {
             face_target(w, id, ctx);
+            crawl_face(w, id, ctx);
             if ai::reached(w, id, ctx, 1.0) && h_on_target(&w.mobys[id]) && h_lob(w, id, ctx, 0.5, true) {
                 let m = &mut w.mobys[id];
                 m.set_pv_i(H_FIRED, m.pv_i(H_FIRED) + 1);
@@ -1700,6 +1735,7 @@ fn h_states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         0x18 => {
             face_target(w, id, ctx);
+            crawl_face(w, id, ctx);
             if ai::reached(w, id, ctx, 1.0) && h_on_target(&w.mobys[id]) {
                 let m = &mut w.mobys[id];
                 m.set_pv_i(H_FIRED, m.pv_i(H_FIRED) + 1);
@@ -1709,6 +1745,7 @@ fn h_states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         0x16 => {
             face_target(w, id, ctx);
+            crawl_face(w, id, ctx);
             if ai::reached(w, id, ctx, 1.0) && h_lob(w, id, ctx, f32::from_bits(0x3ed5_5556), true) {
                 let m = &mut w.mobys[id];
                 m.set_pv_i(H_FIRED, m.pv_i(H_FIRED) + 1);

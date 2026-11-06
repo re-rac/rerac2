@@ -41,8 +41,20 @@
 //! (`0x3339e0`), crate::moby::classes::keeper's face; L26's 0x0c8e calls the move outright
 //! (crate::moby::classes::level26::spinner).
 //!
+//! **The troopers' wall walk** ([`move_on_walls`], L13 `0x40ab60`, the decomp's `func_L13_004095F8`; its copies L14
+//! `0x414ee0` and L16 `0x3f9630`, which no placed moby reaches) is a level copy of the move for
+//! crate::moby::classes::thugs' troopers on walls, run whether the frames are on or not (off, the up is (0, 0, 1) and
+//! the heights the distances from the centre copy, as above). It differs in:
+//! * the upright (`0x40af08` → `0x40ab10` → `0x40aa38`): toward the normal of the surface under it (a line along its
+//!   row 2 from 0.1 above to 3 below, flags 2; none, no turn), a twentieth of the way (`cross · 0.05`, not ½);
+//! * the turn (`0x40b918`): eased by 0.2° / 0.2° to at most 17° a tick (not the block's), the rows times the yaw's
+//!   (`0x2efa00(rows, rows, R)`: about world z, not their own);
+//! * after a pause the reset leaves the stuck ticks and sets every bit of `+0x9c` but bit 1 (its `or` with −3);
+//! * the stuck ticks are cleared (not counted down) when it is not stuck; no fall kill;
+//! * at its end, a line along row 2 from 0.1 above to 3 below (flags 2) puts it on what it meets.
+//!
 //! Not ported: the profile counters (`0x333cb0`), the floor moby's carry (`0x3335b0`, flag 0x40; as in
-//! [`ai::move_step`]), the cylinder mode (`0x1a8ff4`).
+//! [`ai::move_step`]; the wall walk's `0x40b020`), the cylinder mode (`0x1a8ff4`).
 
 use super::{ai, Ctx, Moby, MobyWorld};
 use crate::gravity::{to_local, Gravity};
@@ -63,9 +75,21 @@ fn with_z(v: V3, inv: &[V3; 3], rows: &[V3; 3], z: f32) -> V3 {
     crate::gravity::to_world(l, rows)
 }
 
+/// Which copy of the move runs (module docs).
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Kind {
+    /// The gravity frames' (L02 `0x334830`).
+    Sphere,
+    /// The troopers' wall walk (L13 `0x40ab60`).
+    Walls,
+}
+
 /// `0x32ae08(rows, up, out)`: the quaternion that turns row 2 toward `up` (module docs).
-pub fn upright(rows: &[V3; 3], up: V3) -> Q {
-    let a = scale(cross(set_len(up, 1.0), rows[2]), 0.5);
+pub fn upright(rows: &[V3; 3], up: V3) -> Q { upright_by(rows, up, 0.5) }
+
+/// [`upright`] with the cross product scaled by `k` (the wall walk's `0x40aa38`: 0.05).
+fn upright_by(rows: &[V3; 3], up: V3, k: f32) -> Q {
+    let a = scale(cross(set_len(up, 1.0), rows[2]), k);
     let w = -(1.0 - dot(a, a)).sqrt();
     [a[0], a[1], a[2], w]
 }
@@ -79,6 +103,18 @@ fn turn_by(m: &mut Moby, o: usize, v: V3, inv: &[V3; 3]) -> f32 {
     turn_ease(f, m.pv_f(o + 0x14), m.pv_f(o + 0x18), std::f32::consts::PI, &mut a, &mut s, 0);
     m.set_pv_f(o + 0xb4, s);
     m.rows = turn(&rows_of([0.0, 0.0, s]), &m.rows);
+    f.abs() - s.abs()
+}
+
+/// `0x40b918(m, block, v, t)`: the wall walk's turn (module docs) toward the local yaw of `v` in the frame `inv`.
+/// Returns |yaw| − |speed|.
+pub(crate) fn turn_walls(m: &mut Moby, o: usize, v: V3, inv: &[V3; 3]) -> f32 {
+    let f = yaw_in(v, inv);
+    let (mut a, mut s) = (0.0, m.pv_f(o + 0xb4));
+    let fine = f32::from_bits(0x3b64_c38a);
+    turn_ease(f, fine, fine, f32::from_bits(0x3e98_825c), &mut a, &mut s, 0);
+    m.set_pv_f(o + 0xb4, s);
+    m.rows = turn(&m.rows, &rows_of([0.0, 0.0, s]));
     f.abs() - s.abs()
 }
 
@@ -131,12 +167,14 @@ fn slope(g: &Gravity, p: V3, n: V3) -> f32 {
 }
 
 /// `0x333e30` (module docs): the turn, the walk, the vertical.
-fn walk(w: &mut MobyWorld, id: usize, ctx: &Ctx, goal: V3, v: V3, inv: &[V3; 3]) {
+fn walk(w: &mut MobyWorld, id: usize, ctx: &Ctx, goal: V3, v: V3, inv: &[V3; 3], kind: Kind) {
     let g = &ctx.hero.gravity;
     let m = &mut w.mobys[id];
     let o = ai::mv(m);
     let opts = m.pv_i(o + 0x38) as u32;
-    if opts & 0x10 == 0 { turn_by(m, o, v, inv); }
+    if opts & 0x10 == 0 {
+        if kind == Kind::Walls { turn_walls(m, o, v, inv); } else { turn_by(m, o, v, inv); }
+    }
     let heading = if opts & 0x10 == 0 { yaw_in(v, inv).abs() } else { 0.0 };
     let mut want = [0.0f32; 3];
     if heading <= m.pv_f(o + 0x30) {
@@ -189,7 +227,7 @@ fn push_out(w: &mut MobyWorld, id: usize, ctx: &Ctx) -> bool {
 }
 
 /// `0x3340d8` (module docs): the move and its push-outs.
-fn body(w: &mut MobyWorld, id: usize, ctx: &Ctx, from: V3, inv: &[V3; 3]) {
+fn body(w: &mut MobyWorld, id: usize, ctx: &Ctx, from: V3, inv: &[V3; 3], kind: Kind) {
     let m = &mut w.mobys[id];
     let o = ai::mv(m);
     m.pos = add(m.pos, m.pv_v(o + 0xa0));
@@ -221,7 +259,9 @@ fn body(w: &mut MobyWorld, id: usize, ctx: &Ctx, from: V3, inv: &[V3; 3]) {
             v = with_z(v, inv, &m.rows, 0.0);
         }
         m.set_pv_v(o + 0xa0, v);
-        if m.pv_f(o + 0xb0) < m.pv_f(o + 0x28) * 0.5 { stuck += 1 } else { crate::moby::countdown(&mut stuck); }
+        if m.pv_f(o + 0xb0) < m.pv_f(o + 0x28) * 0.5 { stuck += 1 } else if kind == Kind::Walls { stuck = 0 } else { crate::moby::countdown(&mut stuck); }
+    } else if kind == Kind::Walls {
+        stuck = 0;
     } else {
         crate::moby::countdown(&mut stuck);
     }
@@ -230,7 +270,7 @@ fn body(w: &mut MobyWorld, id: usize, ctx: &Ctx, from: V3, inv: &[V3; 3]) {
 }
 
 /// `0x3342a0` (module docs): the ground and the flags.
-fn ground(w: &mut MobyWorld, id: usize, ctx: &Ctx, goal: V3, from: V3) {
+fn ground(w: &mut MobyWorld, id: usize, ctx: &Ctx, goal: V3, from: V3, kind: Kind) {
     floor(w, id, ctx);
     let g = &ctx.hero.gravity;
     let m = &mut w.mobys[id];
@@ -271,7 +311,7 @@ fn ground(w: &mut MobyWorld, id: usize, ctx: &Ctx, goal: V3, from: V3) {
     let d = dist(m.pos, goal);
     m.set_pv_f(o + 0xcc, d);
     if d <= m.pv_f(o + 0x34) { let f = m.pv_i(o + 0x94); m.set_pv_i(o + 0x94, f | 0x80); }
-    if opts & 0x200 != 0 && m.pv_f(o + 0x90) < m.pos[2] {
+    if kind == Kind::Sphere && opts & 0x200 != 0 && m.pv_f(o + 0x90) < m.pos[2] {
         if let Some(r) = ai::react_of(m) {
             if g.height(m.pos) < m.pv_f(r + 0x40) - 0.5 {
                 let p = m.pos;
@@ -284,15 +324,36 @@ fn ground(w: &mut MobyWorld, id: usize, ctx: &Ctx, goal: V3, from: V3) {
 
 /// `0x3347e8(m, goal)` → `0x334830(m, goal, goal − place)`: the frame's move in the gravity frames (module docs);
 /// returns the flags (`+0x94`; 8 without the block).
-pub fn move_to(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3) -> i32 {
+pub fn move_to(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3) -> i32 { mover(w, id, ctx, goal, Kind::Sphere) }
+
+/// L13 `0x40ab60(m, goal)`: the troopers' wall walk (module docs); returns the flags (8 without the block).
+pub fn move_on_walls(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3) -> i32 { mover(w, id, ctx, goal, Kind::Walls) }
+
+/// The line along row 2 from 0.1 above its place to 3 below (flags 2): what it meets.
+fn under(w: &MobyWorld, id: usize, ctx: &Ctx) -> Option<crate::collision::CollOutput> {
+    let m = &w.mobys[id];
+    let a = add(m.pos, set_len(m.rows[2], 0.1));
+    let b = add(m.pos, set_len(m.rows[2], -3.0));
+    ctx.coll.and_then(|c| crate::collision::coll_line_m(c, ctx.scene, a, b, crate::collision::QueryFlags(2), Some(id)))
+}
+
+fn mover(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3, kind: Kind) -> i32 {
     let frame = ctx.game.frame;
-    let m = &mut w.mobys[id];
+    let m = &w.mobys[id];
     if m.pv_i(0x18) == 0 { return 8; }
     let o = ai::mv(m);
     if frame == m.pv_i(o + 0xbc) { return m.pv_i(o + 0x94); }
     let v = sub(goal, m.pos);
     let inv = m.rows;
-    let q = upright(&m.rows, ctx.hero.gravity.up_at(m.pos));
+    let q = match kind {
+        Kind::Sphere => upright(&m.rows, ctx.hero.gravity.up_at(m.pos)),
+        // `0x40af08` (none met: −row 2, which turns nothing).
+        Kind::Walls => {
+            let up = under(w, id, ctx).map_or(scale(m.rows[2], -1.0), |h| set_len(h.normal, 1.0));
+            upright_by(&m.rows, up, 0.05)
+        }
+    };
+    let m = &mut w.mobys[id];
     m.rows = turn_rows(&m.rows, q);
     let vel = rotate(q, m.pv_v(o + 0xa0));
     m.set_pv_v(o + 0xa0, vel);
@@ -303,16 +364,23 @@ pub fn move_to(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3) -> i32 {
     if 1 < frame - last || last == 0 {
         floor(w, id, ctx);
         let m = &mut w.mobys[id];
-        m.set_pv_i(o + 0x80, 0);
+        if kind == Kind::Sphere {
+            m.set_pv_i(o + 0x80, 0);
+            m.set_pv_i(o + 0x9c, m.pv_i(o + 0x9c) & !2);
+        } else {
+            m.set_pv_i(o + 0x9c, m.pv_i(o + 0x9c) | -3);
+        }
         m.set_pv_b(o + 0xea, 0xff);
-        m.set_pv_i(o + 0x9c, m.pv_i(o + 0x9c) & !2);
         m.set_pv_f(o + 0xb4, 0.0);
         m.set_pv_v(o + 0xa0, [0.0; 3]);
     }
     w.mobys[id].set_pv_i(o + 0xbc, frame);
-    walk(w, id, ctx, goal, v, &inv);
-    body(w, id, ctx, from, &inv);
-    ground(w, id, ctx, goal, from);
+    walk(w, id, ctx, goal, v, &inv, kind);
+    body(w, id, ctx, from, &inv, kind);
+    ground(w, id, ctx, goal, from, kind);
+    if kind == Kind::Walls {
+        if let Some(h) = under(w, id, ctx) { w.mobys[id].pos = h.point; }
+    }
     w.changed = true;
     w.mobys[id].pv_i(o + 0x94)
 }

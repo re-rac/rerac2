@@ -685,6 +685,8 @@ pub struct MobyWorld {
     /// The point lights (`0x1c6ec0`), owned by the explosion lights (classes::light); the engine lights the world and
     /// the mobys with them.
     pub point_lights: crate::point_lights::PointLights,
+    /// The arc beams' slot table (crate::fx::beams: Tabora's `0x1b39a0..`, Dobbo's `0x1b35e0..`).
+    pub beams: crate::fx::beams::Beams,
     /// What `0x3228f8` reads of Ratchet's hand (crate::upgrades::hitter_item), kept by the item pass.
     pub hitters: crate::upgrades::Hitters,
 }

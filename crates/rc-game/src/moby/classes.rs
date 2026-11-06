@@ -78,6 +78,7 @@ pub mod synthenoid;
 pub mod teleport;
 pub mod tie_lights;
 pub mod telepad;
+pub mod museum_pad;
 pub mod maktar;
 pub mod maktar_hints;
 pub mod maktar_pads;
@@ -313,7 +314,7 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x0e89 => Some(oozla::update_0e89),
         0x0578 => Some(weather::update),
         teleport::CLASS => Some(teleport::update),
-        critter::CLASS => Some(critter::update),
+        critter::CLASS | critter::TODANO => Some(critter::update),
         dropship::CLASS => Some(dropship::update),
         explosion::CLASS => Some(explosion::update),
         // Damosel's traffic (L18 `0x3fcb78`): 0x0d5c is in the flocks' class switches, but its update is the traffic's.
@@ -389,6 +390,7 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x0c8f => Some(maktar::update_0c8f),
         0x0a57 => Some(maktar::update_0a57),
         telepad::CLASS => Some(telepad::update),
+        museum_pad::CLASS => Some(museum_pad::update),
         crate::ship::LASER_CLASS => Some(crate::ship::update_laser),
         space::FIGHTER | space::GUNSHIP => Some(space::update_fighter),
         crate::ship::MISSION_CLASS => Some(crate::ship::update_mission),

@@ -1317,7 +1317,7 @@ const LOCK_BANDS: [(f32, f32); 3] = [(2.5, 4.5), (2.3, 2.7), (4.3, 4.7)];
 
 /// `0x413460`, the lock's draw: a ring of light about its up axis, twice (the second 6 higher). The frame is its rows
 /// with the first 4 long (turned to the camera's side) and the second 10, at its place. Each ring is 16 segments of
-/// −π/16 (`0x2f07e8`: a half turn) of seven bands (`0x2f0750`): the main band 2.5..4.5 (effect 5, texture (½, ½),
+/// −π/16 (`0x2f07e8`, [`crate::fx::spin`]) of seven bands (`0x2f0750`): the main band 2.5..4.5 (effect 5, texture (½, ½),
 /// colour `sin([0xb])` of the way from 0x60203040 to 0x40203040) and six bars of effect 0x0e (texture scrolled by
 /// `[0xa]`): 2.3..2.7 and 4.3..4.7 (`sin([0xb])` of 0x40408080 → 0x60408080), the same pair drawn apart by 2·`[8]`
 /// and by 2·`[9]` (0x60408080 fading out as the phase goes past 0.2, in before it). The alphas × its fade `[7]`.
@@ -1348,20 +1348,14 @@ pub fn draw_0c81(w: &MobyWorld, id: usize, cam: crate::hero::physics::V3, out: &
         (0xe, c9, LOCK_BANDS[1], (-2.0 * s9, -2.0 * s9)),
         (0xe, c9, LOCK_BANDS[2], (2.0 * s9, 2.0 * s9)),
     ];
-    let world = |x: f32, y: f32, z: f32| -> crate::hero::physics::V3 { std::array::from_fn(|j| x * r0[j] + y * r1[j] + z * r2[j] + m.pos[j]) };
-    let step = -std::f32::consts::PI / 16.0;
+    let st_of = |fx: usize| if fx == 5 { [[0.5, 0.5]; 4] } else { [[scroll, 0.0], [scroll, 1.0], [1.0 + scroll, 0.0], [1.0 + scroll, 1.0]] };
+    let turn = crate::moby::attach::rows_of([0.0, 0.0, -std::f32::consts::PI / 16.0]);
     for lift in [0.0, 6.0] {
-        for &(fx, c, (lo, hi), (dlo, dhi)) in &bands {
-            let st = if fx == 5 { [[0.5, 0.5]; 4] } else { [[scroll, 0.0], [scroll, 1.0], [1.0 + scroll, 0.0], [1.0 + scroll, 1.0]] };
+        let mut ps = bands.map(|(fx, c, (lo, hi), (dlo, dhi))| {
             let (zl, zh) = (lo + dlo + lift, hi + dhi + lift);
-            for k in 1..=16 {
-                let (a, b) = (step * k as f32, step * (k + 1) as f32);
-                let corner = |ang: f32, z: f32| world(-ang.sin(), ang.cos(), z);
-                // The pair turned last leads: odd steps draw (b, a), even (a, b), as `0x2f07e8` turns them in turn.
-                let (p, q) = if k % 2 == 1 { (b, a) } else { (a, b) };
-                out.push(crate::fx::FxQuad { fx, additive: true, corners: [corner(p, zl), corner(p, zh), corner(q, zl), corner(q, zh)], st, rgba: [c; 4] });
-            }
-        }
+            crate::fx::spin::Packet::new(fx, c, st_of(fx), [[0.0, 1.0, zl], [0.0, 1.0, zh], [0.0, 1.0, zl], [0.0, 1.0, zh]])
+        });
+        crate::fx::spin::spin(out, &mut ps, &turn, 16, &[r0, r1, r2], m.pos);
     }
 }
 

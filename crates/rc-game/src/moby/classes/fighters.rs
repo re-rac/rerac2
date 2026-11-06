@@ -666,8 +666,9 @@ fn round_plates_with(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, group: usize, 
 
 /// The flame jet (sequence 0xd, in view): from joint 4 along its second row — each tick three flame sprites (and,
 /// within 3 of its target, three spheres of 0.3 doing `+0x34`, each of the three times) and two smoke puffs; the
-/// jet of 0x0b0a's ([`super::enemies`]) with a life of 9.
-fn flame(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, d: f32) {
+/// jet of 0x0b0a's ([`super::enemies`]) with a life of 9. Joba's 0x0df4 (crate::moby::classes::level11::fighters)
+/// has the same jet inline in its update (`0x452bb0`, sequence 12).
+pub(super) fn flame(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, d: f32) {
     let at = w.mobys[id].pos;
     if ctx.view.is_some_and(|v| v.culled(128.0, [at[0], at[1], at[2], 2.0])) { return; }
     let Some((r, t0)) = ctx.host.joint_matrix(&w.mobys[id], 4) else { return };
@@ -1653,9 +1654,13 @@ fn pool_0b22(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// `0x3f62d8(angle, m, parts, sparks, 0)`: each part at its joint, its rows turned by `angle` about z (rows · Rz);
 /// with `sparks`, one tick in six a spark pair off it (`0x3f5f48`).
-fn spin_parts_b22(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, angle: f32, sparks: bool) {
+fn spin_parts_b22(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, angle: f32, sparks: bool) { spin_parts_at(w, id, ctx, PARTS_B22, angle, sparks) }
+
+/// [`spin_parts_b22`] for parts kept at `at` (at joints 0 and 1; Joba's 0x0dcf, crate::moby::classes::level11::
+/// fighters: L11 `0x451490`).
+pub(super) fn spin_parts_at(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, at: usize, angle: f32, sparks: bool) {
     let rz = crate::moby::attach::rows_of([0.0, 0.0, angle]);
-    for (p, j) in super::enemies::parts(w, id, PARTS_B22).into_iter().zip(PART_JOINTS_B22) {
+    for (p, j) in super::enemies::parts(w, id, at).into_iter().zip(PART_JOINTS_B22) {
         let Some(p) = p else { continue };
         super::enemies::place_part(w, id, p, j, ctx);
         let r = w.mobys[p].rows;
