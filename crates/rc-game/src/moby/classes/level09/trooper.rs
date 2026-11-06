@@ -44,8 +44,12 @@
 //!
 //! Not ported: on Dobbo, the flag `$gp−0x5fb0` cleared when the moby that last hurt it (`+0xc0`) is neither Ratchet
 //! nor in one of the states `0x3280e0` names (nothing the port has reads it; `+0xc0` is still let go); the colours
-//! Tabora and L20 give it (`0x3fa4d0`), the path lengths written into the points' `w` (`0x33fa50`), the big-head
-//! cheat (`0x323718`) and the debug prints.
+//! Tabora and L20 give it (`0x3fa4d0`), the path lengths written into the points' `w` (`0x33fa50`) and the debug
+//! prints.
+//!
+//! Its aims (crate::moby::joint_aim): the turret's on `+0x210` and the guns' on `+0x320` / `+0x3a0` (`0x3206a0` = L00
+//! `0x324208`, 0.02 / 0.3, on the turret's lists 3 and 7 / 8); in [`timers`] the head aim on `+0x430` (`0x323718` =
+//! L00 `0x327308`, the turret's list 4, 1.9).
 
 use crate::hero::physics::{add, add_rot, atan2, dist, dist2, dot, len2, rot_dist, scale, set_len, sub, sub_rot, turn_ease, V3};
 use crate::moby::blast::{self, Blast};
@@ -102,6 +106,8 @@ const HIDDEN: usize = 0x31d;
 pub const UPD: usize = 0x31e;
 const FIRST: usize = 0x31f;
 const AIM_GUNS: [usize; 2] = [0x320, 0x3a0];
+/// The head aim's record (crate::moby::joint_aim), hung on the turret.
+const HEAD_AIM: usize = 0x430;
 const TIER: usize = 0x420;
 const KIND: usize = 0x424;
 const FLYING: usize = 0x428;
@@ -792,25 +798,10 @@ fn aim_point(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].set_pv_v(T_POINT, p);
 }
 
-/// `0x3206a0`'s spring on the joint list `list` of `dst` from the block `b` of `id`'s pvars (asks cleared after).
+/// `0x3206a0` = L00 `0x324208`: the aim record at `b` of `id`'s pvars sprung (`k`, 0.3) and hung on `dst`'s joint list
+/// `list` (crate::moby::joint_aim::aim).
 fn aim(w: &mut MobyWorld, id: usize, b: usize, dst: usize, list: u8, k: f32) {
-    let mut a = [0.0; 3];
-    let m = &mut w.mobys[id];
-    let t: [f32; 3] = std::array::from_fn(|i| m.pv_f(b + 0x60 + 4 * i));
-    let idle = t == [0.0; 3] && (0..3).all(|i| m.pv_f(b + 0x40 + 4 * i).abs() < 0.005);
-    if !idle {
-        for i in 0..3 {
-            let (mut x, mut v) = (m.pv_f(b + 0x40 + 4 * i), m.pv_f(b + 0x50 + 4 * i));
-            crate::hero::physics::turn_spring(t[i], k, 0.3, 0.0, &mut x, &mut v, 0);
-            m.set_pv_f(b + 0x40 + 4 * i, x);
-            m.set_pv_f(b + 0x50 + 4 * i, v);
-            m.set_pv_f(b + 0x60 + 4 * i, 0.0);
-            a[i] = x;
-        }
-    }
-    let d = &mut w.mobys[dst];
-    d.manips.retain(|x| x.0 != list);
-    if !idle { d.manips.push((list, crate::quat::from_rows(&crate::hero::physics::euler_rows(a)))); }
+    crate::moby::joint_aim::aim(w, id, b, dst, list, k, f32::from_bits(0x3e99_999a));
 }
 
 /// `0x3fa598`: the turret with its colour at its joint 0, turned toward `+0x2ec` (its limits), playing at its speed;
@@ -922,7 +913,7 @@ fn guns_update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 }
 
 /// `0x3f9d28`: alarmed, the alert timer at least 600..1000 when under [`ALERT_LOW`]; the calm timer held at [`CALM`]
-/// while the alert one runs; the timers down; its ticks in the state.
+/// while the alert one runs; the timers down; its ticks in the state; the head aim.
 fn timers(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].pv_b(ALARMED) != 0 {
         w.mobys[id].set_pv_b(ALARMED, 0);
@@ -932,6 +923,8 @@ fn timers(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     for off in [T_2E2, T_BURST, T_CALM] { tick_s(w, id, off); }
     let m = &mut w.mobys[id];
     if m.state_ticks != -1 { m.state_ticks += 1; }
+    // The head aim on the turret's list 4 (1.9): crate::moby::joint_aim::head_on.
+    if let Some(t) = turret(w, id) { crate::moby::joint_aim::head_on(w, ctx, id, HEAD_AIM, t, 4, f32::from_bits(0x3ff3_3333)); }
 }
 
 /// 0x0d0f (module docs).

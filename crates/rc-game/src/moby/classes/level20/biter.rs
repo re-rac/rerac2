@@ -30,7 +30,8 @@
 //! 0x4000000); once its speed across falls under 0.05 it slows by 1/360 a tick to a stop: 1 (sub 1); under its kill
 //! height back to 6.
 //!
-//! **The tail** (`0x441690`): its state ticks.
+//! **The tail** (`0x441690`): its state ticks; the head aim (`0x33c3d8` = L00 `0x327308` on `+0x2b0`, list 2,
+//! `$gp+0x2fe4` = 2.5: crate::moby::joint_aim::head).
 //!
 //! The engine functions with the port's: `0x330820` = L00 `0x31b8d0` (crate::moby::Moby::set_state), `0x330540` =
 //! L00 `0x31b5f0` (set_anim), `0x33faa8` / `0x33fad0` = L00 `0x32a7c8` / `0x32a7f0` (the first tick of the state /
@@ -47,8 +48,7 @@
 //! 15, the throw's velocity, a spin of sin 6° about `up × velocity`, no sound) and the throw's spin `+0x288`; its
 //! collision back and targeted. In state 7 the body flies (`0x2f01f0` = L00 `0x2dc1f0`, crate::moby::shards::ball_at).
 //!
-//! Not ported: in a scene the deletion once the loaded part (`0x1bdc70`, set by `0x319ba8`) is 5 or more; the head's
-//! aim (`0x33c3d8` = L00 `0x327308` on `+0x2b0`, 2.5); the moby word `+0x9c` = 1 of the throw. The frame slice uses its
+//! Not ported: in a scene the deletion once the loaded part (`0x1bdc70`, set by `0x319ba8`) is 5 or more; the moby word `+0x9c` = 1 of the throw. The frame slice uses its
 //! index for the moby's address `>> 8`.
 
 use crate::hero::physics::{add, approach, atan2, dist2, euler_rows, len2, set_len2, V3};
@@ -72,6 +72,10 @@ const AREA: usize = 0x270;
 const ATTACKING: usize = 0x280;
 const SIDE: usize = 0x284;
 const SPIN: usize = 0x288;
+/// The head aim's record (crate::moby::joint_aim).
+const HEAD_AIM: usize = 0x2b0;
+/// `$gp+0x2fe4`: the head's scale with the enemies' big heads.
+const HEAD_SCALE: f32 = 2.5;
 
 /// `$gp+0x2fa0` / `+0x2fa4` / `+0x2fa8`: the circling's speed and the run's (a second), the walk's gain (a second²).
 const CIRCLE_SPEED: f32 = 7.0;
@@ -384,8 +388,9 @@ pub fn update_119e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         _ => {}
     }
-    // `0x441690`: its ticks.
+    // `0x441690`: its ticks, its head aim.
     let m = &mut w.mobys[id];
     if m.state_ticks != -1 { m.state_ticks = m.state_ticks.wrapping_add(1); }
+    crate::moby::joint_aim::head(w, ctx, id, HEAD_AIM, 2, HEAD_SCALE);
     w.changed = true;
 }

@@ -59,6 +59,7 @@
 //! | `0x406ad0` / `0x4152f0` (L16) | the gunship's shot 0x0ebd / the drone's shot 0x0f7a | their bolts ([`trails::shot_bolt`]) |
 //! | `0x3d5ff8` (L26, first list) | the motes 0x0c00 of a group | their trails ([`trails::history`], crate::moby::classes::level26::props::draw_0c00) |
 //! | `0x423e80` (L14) | the electric strand 0x0f80 on | its strands ([`trails::strand`], crate::moby::classes::level14::fence::draw) |
+//! | `0x3b02e8` (L09; L16, L18, L19, L20; first list) | the bolt 0x05de | its strips, glow and sparks ([`crate::moby::classes::level09::bolt::draw`]) |
 //!
 //! **The frame's own image** (`0x2ea6c8(n)` for n < 0: a texture of a GS buffer instead of an FX texture): −1 queues a
 //! GS copy of the frame as it stands (the draw buffer `0x1a72dc` scaled by the sprites `0x138ad0` into a 256×256 CT16
@@ -430,9 +431,10 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::endako_c::SENTRY => crate::moby::classes::endako_c::draw_beam(w, id, game.frame, cam, out),
         // The levels' own (their modules' draws).
         _ => {
-            use crate::moby::classes::{level04, level06, level11, level12, level13, level14, level16, level17, level19, level26};
+            use crate::moby::classes::{level04, level06, level09, level11, level12, level13, level14, level16, level17, level19, level26};
             let _ = level04::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
                 || level06::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
+                || level09::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
                 || level11::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
                 || level13::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
                 || level12::draw(w, host, game, hero_state, view, cam, id, first, out, frame)

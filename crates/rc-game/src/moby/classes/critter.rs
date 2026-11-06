@@ -41,8 +41,7 @@
 //! keeps its rows (mode 0x100) and measures its fall height from the sphere.
 //!
 //! Not ported: the rest of the gravity frames' set-up (the drop onto the sphere `0x32aba0`, L26 `0x325d80`; the moby
-//! word `+0x9c` 3; the down `+0x300`) and its upright test (`+0x338`), the head's and tail's aims (`0x3286f0`,
-//! `0x32c1d0`; the aim angles are kept at `+0x2c0` / `+0x2c8`), the moby word `+0x9c` (3 / 0xc).
+//! word `+0x9c` 3; the down `+0x300`) and its upright test (`+0x338`), the moby word `+0x9c` (3 / 0xc).
 
 use crate::hero::physics::{add, add_rot, atan2, dist, dist2, len2, sub, turn_ease, V3};
 use crate::hud::lerp_rgba;
@@ -537,8 +536,11 @@ fn drop_in(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
 }
 
-/// `0x3cfe60`: its timers `+0x310` / `+0x312` down, its state's ticks on (the head's and tail's aims not ported).
-fn tail(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
+/// `0x3cfe60`: its timers `+0x310` / `+0x312` down, its state's ticks on; the head's aim on its record `+0x260`
+/// (crate::moby::joint_aim): `0x3286f0` = L00 `0x324208` (list 0, 0.03 / 0.3; the turn [`aim`] asked for), then
+/// `0x32c1d0` = L00 `0x327308` (list 0, 1.8).
+fn tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    use crate::moby::joint_aim;
     let m = &mut w.mobys[id];
     for off in [0x310, 0x312] {
         let mut t = m.pv_s(off) as i32;
@@ -546,7 +548,12 @@ fn tail(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
         m.set_pv_s(off, t as i16);
     }
     if m.state_ticks != -1 { m.state_ticks = m.state_ticks.wrapping_add(1); }
+    joint_aim::aim(w, id, HEAD_AIM, id, 0, f32::from_bits(0x3cf5_c28f), f32::from_bits(0x3e99_999a));
+    joint_aim::head(w, ctx, id, HEAD_AIM, 0, f32::from_bits(0x3fe6_6666));
 }
+
+/// The head's aim record (crate::moby::joint_aim; [`aim`] asks its turn, `+0x2c0` / `+0x2c8`).
+const HEAD_AIM: usize = 0x260;
 
 /// `0x3d0398` (module docs).
 fn glow(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {

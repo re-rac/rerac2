@@ -10,6 +10,17 @@ pub mod props;
 pub mod trooper;
 pub mod waker;
 
+/// This level's draw callbacks (crate::fx): true when the moby's class is one of them. The bolt's is also L16's,
+/// L18's, L19's and L20's.
+#[allow(clippy::too_many_arguments)]
+pub fn draw(w: &mut crate::moby::MobyWorld, _host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, _hero_state: i32, _view: &crate::particles::BSphereView, cam: crate::hero::physics::V3, id: usize, first: bool, out: &mut Vec<crate::fx::FxQuad>, _frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
+    match w.mobys[id].o_class {
+        bolt::CLASS if first => bolt::draw(w, id, &mut game.rng, cam, out),
+        _ => return false,
+    }
+    true
+}
+
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {

@@ -54,7 +54,8 @@
 //! ([`die`], `0x3f8928`): health 0, state 19, untargeted, a life used; with lives left (or a runner) back into the
 //! pool through the fade (crate::moby::classes::death_fade, `0x406eb8` = L01 `0x3eb1d0`), else faded out. The
 //! **tail** ([`tail`]): its ticks, the facing cleared, its shadow (`0x338b78` = L00 `0x31da58`, within 24 of the
-//! camera, range 0x16), outside 5..1018 gone.
+//! camera, range 0x16), outside 5..1018 gone; the head aim (`0x341e28` = L00 `0x327308` on `+0x2b0`, list 2, 1.8:
+//! crate::moby::joint_aim::head).
 //!
 //! **The move** ([`movement`], by its sequence `+0x42`): the push-out option (2) cleared each tick. Sequences 0..3,
 //! 6..8, 10: the hop back's move (16), the run (14: its speed toward the goal, turned at the limits, `0x347ad8` = L07
@@ -79,7 +80,7 @@
 //! path step, [`path_step`]).
 //!
 //! Not ported: the collision's first primitive's byte `+0x12` (`0x32c990`: 3 at the set-up and a throw, 2 when a
-//! runner wakes), the head's aim (`0x341e28` = L00 `0x327308` on `+0x2b0`; the framework's aims are not ported). The
+//! runner wakes). The
 //! throw's bounce reflects off the push-out's direction: the game's off the last collision normal (`0x1bfbc0`), which
 //! the port's push-out does not keep. The frames' slices (`frame & 7` / `& 0x3f` against the moby's address `>> 8`)
 //! use its index.
@@ -131,6 +132,10 @@ const BACKWARD: usize = 0x29c;
 const KILL_Z: usize = 0x2a0;
 const BOUNCE_MOST: usize = 0x2a4;
 const SETTLED: usize = 0x2a6;
+/// The head aim's record (crate::moby::joint_aim).
+const HEAD_AIM: usize = 0x2b0;
+/// The head's scale with the enemies' big heads (the tail's 1.8).
+const HEAD_SCALE: f32 = f32::from_bits(0x3fe6_6666);
 /// `$gp+0x13e0`: where a thrown one starts above its breeder.
 const THROW_FROM: V3 = [0.0, 0.0, 0.5];
 
@@ -1039,5 +1044,7 @@ fn tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     crate::shadow_volumes::probe_near(w, id, ctx, 24.0, 0x16);
     let p = w.mobys[id].pos;
     if p.iter().any(|&c| !(5.0..=1018.0).contains(&c)) { die(w, id, ctx, false); }
+    // `0x341e28` = L00 `0x327308`: the head aim.
+    crate::moby::joint_aim::head(w, ctx, id, HEAD_AIM, 2, HEAD_SCALE);
 }
 

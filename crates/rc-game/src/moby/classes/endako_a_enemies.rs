@@ -31,14 +31,14 @@
 //!
 //! **The tail** (`0x41e570`): the timers `+0x2d0` / `+0x2d2` down, its ticks; while drawn its eyes' colour pulses
 //! (`+0x2e8`: calm green, wary yellow, chasing red; eased 0.2 a tick) on its glow word and a glow there (94500, 0.1
-//! toward the camera, at (0.33, 0, 0.075), 2 ticks).
+//! toward the camera, at (0.33, 0, 0.075), 2 ticks), then the head aim (`0x327aa8` = L00 `0x327308` on `+0x210`,
+//! list 0, 1.8: crate::moby::joint_aim::head).
 //!
 //! With Ratchet steering Endako's crane (state 0x31, crate::moby::classes::endako_crane) states 3 and 4 face the
 //! crane (`0x18b650`) instead of him, and its deaths (the frame's damage and the knock's fall) count toward skill
 //! point 0x1c (crate::moby::classes::endako_c::crane_kill, `$gp − 0x5fac`).
 //!
-//! Not ported: the eyes' glow on joint 0 (the port's glows take the rows), the head's aim
-//! (`0x327308`, 1.8 at `+0x210`), the spawn spot's world test (`0x2df8d8`: only the mobys there are looked at), state 9
+//! Not ported: the eyes' glow on joint 0 (the port's glows take the rows), the spawn spot's world test (`0x2df8d8`: only the mobys there are looked at), state 9
 //! without a spawn cuboid (the game reads before the cuboid table; here straight to the chase).
 
 use crate::hero::physics::{add, add_rot, atan2, dist2, turn_ease, V3};
@@ -51,6 +51,8 @@ const HEALTH: usize = 0x20;
 const MV: usize = 0x50;
 const REACT: usize = 0x140;
 const TARGET: usize = 0x1f0;
+/// The head aim's record (crate::moby::joint_aim).
+const HEAD_AIM: usize = 0x210;
 const FENCE: usize = 0x290;
 const AREA: usize = 0x294;
 const BIG: usize = 0x29c;
@@ -498,4 +500,6 @@ fn tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             crate::particles::glow_def(sys, &mut ctx.game.rng, 94_500.0, 0.1, [f32::from_bits(0x3ea8_f5c3), 0.0, f32::from_bits(0x3d99_999a)], id, pos, far, false, glow, 2, 1);
         }
     }
+    // `0x327aa8` = L00 `0x327308`: the head aim (list 0, 1.8).
+    crate::moby::joint_aim::head(w, ctx, id, HEAD_AIM, 0, f32::from_bits(0x3fe6_6666));
 }

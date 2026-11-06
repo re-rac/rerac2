@@ -67,7 +67,9 @@
 //!
 //! **The tail** ([`tail`]): its ticks and `+0x804`; the body on its joint 0 at its speed, the gun on the body's joint 2
 //! (`0x340050` = L00 `0x3253f0`, crate::moby::classes::enemies::place_part), the inner body on the body's joint 0 with
-//! its angles; from state 2 a beam's tick ([`beam`], `0x434950`); its shadow within 24 (range 0x16).
+//! its angles; from state 2 a beam's tick ([`beam`], `0x434950`); its shadow within 24 (range 0x16); with an inner body
+//! the head aim (`0x341e28` = L00 `0x327308`, the record `+0x810` on the inner body's list 5, 2.5:
+//! crate::moby::joint_aim::head_on).
 //!
 //! **The beam** ([`beam`], `+0x806`): 0 at rest (its sound let go). 1 (from 10's start, 5 ticks): the sphere 0.2 at the
 //! gun's joint 0 (its damage byte, flags 0x10001), then 2 with the loop sound 1 at the target. 2 (5 ticks): the tip
@@ -86,8 +88,7 @@
 //!
 //! Not ported: the lob's shot (`0x4346c0`: the spit 0x0f9e, `0x438f90`, and its two sprites; its class sound 7 and
 //! the reload are), the draws (`0x302130`: the beam's ribbons `0x435060` with their wave `0x435618`, the glows
-//! `0x434408`, the bodiless one's `0x4364b0` and its smoke `0x4365d0`), the beam's sparks (`0x435f88`), the inner
-//! body's aim (`0x341e28` = L00 `0x327308` on `+0x810`; the framework's aims are not ported). Its state 7 does not
+//! `0x434408`, the bodiless one's `0x4364b0` and its smoke `0x4365d0`), the beam's sparks (`0x435f88`). Its state 7 does not
 //! open the hatch 0x1151: the opener's callers are 0x0ef4's `0x3f9510` (state 7 there) and `0x3fbd90`.
 
 use crate::hero::physics::{add, approach, atan2, dist2, rot_dist, scale, sub, turn_ease, V3};
@@ -169,6 +170,8 @@ const FACING: usize = 0x808;
 const CRAWL: usize = 0x80a;
 const DROP_WAIT: usize = 0x80c;
 const HURT_ONCE: usize = 0x80e;
+/// The head aim's record (crate::moby::joint_aim), hung on the inner body.
+const HEAD_AIM: usize = 0x810;
 const PVARS: usize = 0x820;
 
 /// `$gp`-free data at `0x1b1510`: the body's break thresholds (health, over its most × 255).
@@ -1143,6 +1146,8 @@ fn tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if 2 <= st && !gone(st) && !lobs(w, id) && link(w, id, GUN_L).is_some() { beam(w, id, ctx); }
     if w.mobys[id].drawn != 0 { crate::shadow_volumes::probe_near(w, id, ctx, 24.0, 0x16); }
     w.mobys[id].set_pv_s(FACING, 0);
+    // `0x341e28` = L00 `0x327308`: the head aim, on the inner body's list 5.
+    if let Some(k) = link(w, id, INNER_L) { crate::moby::joint_aim::head_on(w, ctx, id, HEAD_AIM, k, 5, 2.5); }
 }
 
 /// `0x434950` (module docs).

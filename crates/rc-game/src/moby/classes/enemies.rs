@@ -343,8 +343,8 @@ pub fn update_099c(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 // bite's turn; 0xe after a bite: farther than 4, the fight (0x1c), else sequence 7.
 //
 // Not ported: its sounds but the two, the pieces' burning (`0x3d8f70`, with `+0x2b4`), the
-// head's and tail's aims (`0x324208` / `0x327308`, the joint records `+0x3d0` / `+0x450`), the
-// emerge flash (`0x3d8920`), the gravity frames. Its glows and wire are draw callbacks (crate::fx); its flame jet is
+// turns its movement block asks of its head's and tail's aim records (`+0x158` / `+0x15c` point at `+0x3d0` /
+// `+0x450`: the framework's aims, crate::moby::ai), the emerge flash (`0x3d8920`), the gravity frames. Its glows and wire are draw callbacks (crate::fx); its flame jet is
 // particles ([`bite`]).
 
 /// The burrowers' deaths (0x0b0a `0x3d6ea0`, 0x0b0b `0x3d9870`): no collision, out of the target list; a blast 0.75
@@ -830,7 +830,8 @@ pub fn update_0b0a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         _ => {}
     }
-    // `0x3d81e0`: its flash, the timers and the state's ticks.
+    // `0x3d81e0`: its flash, the timers, the head's and tail's aims (crate::moby::joint_aim: `+0x3d0` on list 5 and
+    // `+0x450` on list 6, 0.03 / 0.3), the state's ticks and the head aim (`+0x3d0`, list 5, 2.5).
     let m = &mut w.mobys[id];
     ai::flash(m, 0x50);
     for o in [0x270, 0x272] {
@@ -838,7 +839,12 @@ pub fn update_0b0a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         crate::moby::countdown(&mut t);
         m.set_pv_s(o, t as i16);
     }
+    let (k, d) = (f32::from_bits(0x3cf5_c28f), f32::from_bits(0x3e99_999a));
+    crate::moby::joint_aim::aim(w, id, 0x3d0, id, 5, k, d);
+    crate::moby::joint_aim::aim(w, id, 0x450, id, 6, k, d);
+    let m = &mut w.mobys[id];
     if m.state_ticks != -1 { m.state_ticks = m.state_ticks.wrapping_add(1); }
+    crate::moby::joint_aim::head(w, ctx, id, 0x3d0, 5, 2.5);
     w.changed = true;
     // `0x2e7920(0x3d8340)`: its glows and wire (crate::fx).
     w.register_draw(id);
@@ -871,8 +877,8 @@ pub fn update_0b0a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 // in the flight.
 //
 // Not ported: its sounds but the two, the parts'
-// sparks (`0x3dbc20`), the bite's trail (`0x3dbde8`, `0x3dbe88`, `0x3dc100`), the head's
-// aims (`0x324208`, `0x327308`), the draw callbacks, the scene's hiding (`0x1a8f00` = 2).
+// sparks (`0x3dbc20`), the bite's trail (`0x3dbde8`, `0x3dbe88`, `0x3dc100`), the turns
+// asked of its head's and tail's aim records (`+0x530` / `+0x5b0`; the framework's aims), the draw callbacks, the scene's hiding (`0x1a8f00` = 2).
 
 const PART: i16 = 0x0aa2;
 const PART_JOINTS: [usize; 2] = [0, 2];
@@ -1517,6 +1523,13 @@ pub fn update_0b0b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         crate::moby::countdown(&mut t);
         m.set_pv_s(o, t as i16);
     }
+    // The head's and tail's aims (crate::moby::joint_aim: `+0x530` on list 7, `+0x5b0` on list 8, 0.03 / 0.3), then
+    // after the ticks the head aim (`+0x530`, list 7, 2.5).
+    let (k, d) = (f32::from_bits(0x3cf5_c28f), f32::from_bits(0x3e99_999a));
+    crate::moby::joint_aim::aim(w, id, 0x530, id, 7, k, d);
+    crate::moby::joint_aim::aim(w, id, 0x5b0, id, 8, k, d);
+    let m = &mut w.mobys[id];
     if m.state_ticks != -1 { m.state_ticks = m.state_ticks.wrapping_add(1); }
+    crate::moby::joint_aim::head(w, ctx, id, 0x530, 7, 2.5);
     w.changed = true;
 }

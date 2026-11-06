@@ -74,12 +74,11 @@
 //! at once) and logs its state changes on stdout.
 //!
 //! Not ported:
-//! * The pilot's second aim (`0x327aa8`), the hero word `0x18a03e`
-//!   (0xf0) of its taunt, the line's start held for its stream (`0x330128`: the port's dialogue starts at once; the
-//!   pilot's sequence 1 starts with the line).
+//! * The hero word `0x18a03e` (0xf0) of its taunt, the line's start held for its stream (`0x330128`: the port's
+//!   dialogue starts at once; the pilot's sequence 1 starts with the line).
 //! * A laser carried by a moby (`+0x40`: the boss gives none).
 
-use crate::hero::physics::{add, add_rot, approach, approach_angle, atan2, cross, dist, ease_speed, euler_rows, len, len2, scale, set_len, sub, sub_rot, turn_ease, turn_spring, unit, V3};
+use crate::hero::physics::{add, add_rot, approach, approach_angle, atan2, cross, dist, ease_speed, euler_rows, len, len2, scale, set_len, sub, sub_rot, turn_ease, unit, V3};
 use crate::moby::{ai, countdown, mode, Ctx, Moby, MobyWorld};
 use super::props::{seq, wrapped};
 
@@ -154,8 +153,8 @@ mod pv {
     pub const STINGER_END: usize = 0xb8;
     /// The follow camera's turn speed toward it (`0x3f7b28`).
     pub const CAM_TURN: usize = 0xcc;
-    /// The turrets' and the pilot's aim blocks (`0x325588`): `+0x48` the turn, `+0x58` its speed, `+0x68` the turn
-    /// asked for this tick.
+    /// The turrets' and the pilot's aim records (`0x325588`, crate::moby::joint_aim): `+0x48` the turn, `+0x58` its
+    /// speed, `+0x68` the turn asked for this tick.
     pub const AIM_GUN: [usize; 2] = [0x110, 0x190];
     pub const AIM_PILOT: usize = 0x210;
     pub const PLACE: usize = 0x290;
@@ -251,22 +250,11 @@ fn set_manip(m: &mut Moby, list: u8, q: Option<crate::quat::Q>) {
     if let Some(q) = q { m.manips.push((list, q)); }
 }
 
-/// `0x325588(0.03, 0.3, who, block, list)`: the aim block's turn springs toward the turn asked for (`0x320570`, the
-/// angle spring: 0.03, damping 0.3) and turns joint list `list` of `who` about its z (the original's manipulator node);
-/// asked for nothing and back within 0.005, the node goes. Only its z is ever asked for here.
+/// `0x325588(who, block, list, 0.03, 0.3)` = L00 `0x324208` (crate::moby::joint_aim::aim): the aim block at `b` of
+/// `holder`'s pvars sprung toward the turn asked for and hung on joint list `list` of `who`. Only its z is ever asked
+/// for here.
 fn aim(w: &mut MobyWorld, holder: usize, b: usize, who: usize, list: u8) {
-    let m = &mut w.mobys[holder];
-    let t = m.pv_f(b + 0x68);
-    let (mut a, mut v) = (m.pv_f(b + 0x48), m.pv_f(b + 0x58));
-    if t == 0.0 && a.abs() < 0.005 {
-        if let Some(x) = w.mobys.get_mut(who) { set_manip(x, list, None); }
-        return;
-    }
-    turn_spring(t, 0.03, 0.3, 0.0, &mut a, &mut v, 0);
-    m.set_pv_f(b + 0x48, a);
-    m.set_pv_f(b + 0x58, v);
-    m.set_pv_f(b + 0x68, 0.0);
-    if let Some(x) = w.mobys.get_mut(who) { set_manip(x, list, Some(crate::quat::axis_angle(a, [0.0, 0.0, 1.0]))); }
+    crate::moby::joint_aim::aim(w, holder, b, who, list, f32::from_bits(0x3cf5_c28f), f32::from_bits(0x3e99_999a));
 }
 
 fn log(w: &MobyWorld, id: usize, what: &str) {
@@ -1008,6 +996,8 @@ fn pilot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let yaw = sub_rot(atan2(hero[0] - pos[0], hero[1] - pos[1]), rot[2]);
         w.mobys[id].set_pv_f(pv::AIM_PILOT + 0x68, yaw);
         aim(w, id, pv::AIM_PILOT, p, 0);
+        // `0x327aa8` = L00 `0x327308`: the head aim on the same block (list 0, 2.5).
+        crate::moby::joint_aim::head_on(w, ctx, id, pv::AIM_PILOT, p, 0, 2.5);
     }
     w.changed = true;
     if wrapped(w, p, ctx) && seq(w, p, ctx) == 1 { ctx.host.set_anim(&w.mobys[p], 0, 0, 10); }

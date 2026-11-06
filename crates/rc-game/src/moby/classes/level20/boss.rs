@@ -9,7 +9,7 @@
 //! height 0.5, steps 2 / 2, slope π), target `+0x1f0` (the search's area `+0x220`). Groups: `+0x218` the crates,
 //! `+0x21c` the biters, `+0x23c` the fighters, `+0x240` the shooters, `+0x244` woken at the last stage; `+0x210` the
 //! roll's fence path, `+0x230` the pool's cuboid, `+0x234` the arena's six points (a path), `+0x238` the prize's moby,
-//! `+0x248` the end's checkpoint cuboid; `+0x298` the throws' yaw (half of it), `+0x2b8` the head's turn. `+0x17d0` a
+//! `+0x248` the end's checkpoint cuboid; `+0x250` the head's aim record (`+0x298` its yaw, half of it the throws', `+0x2b8` the turn asked). `+0x17d0` a
 //! goal, `+0x17e0` where it holds still, `+0x17f0` the camera's ease, `+0x17f4` the sub-state of the last pick,
 //! `+0x17f8` the rolls left, `+0x17fc` its prey (a link), `+0x1800` / `+0x1804` its tilt (x / y), `+0x1808` the spit's
 //! frame, `+0x180c` the spit's wait, `+0x1810` the crates' wait, `+0x1828` the health of the next stage, `+0x182c` the
@@ -50,8 +50,10 @@
 //! stop 1.5): there facing Ratchet → 25. **25** a look about (sequence 0x13 or 0x14), then 24.
 //!
 //! **The tail** ([`tail`], `0x444ae8`): out of sub 6 the boss bar (picture 10); the fighters brought in
-//! ([`fighters_in`]); the crates' wait; held where it was (its tilt, about `(0, 0, 5)` in its frame); its shadow,
-//! its ticks. Out of state 2 its voice is let go.
+//! ([`fighters_in`]); the head's aim on its record `+0x250` (`0x339480` = L00 `0x324208`, list 0, 0.015 / 0.3:
+//! crate::moby::joint_aim, the turn asked `+0x2b8`, the angle sprung `+0x298`); the crates' wait; held where it was
+//! (its tilt, about `(0, 0, 5)` in its frame); its shadow, its ticks; the head aim (`0x33c3d8` = L00 `0x327308`, list
+//! 0, 1.3). Out of state 2 its voice is let go.
 //!
 //! The engine functions with the port's: `0x330820` (set_state), `0x330540` (set_anim), `0x33faa8` (first),
 //! `0x3267e0` (the frame time), `0x342e38` = L00 `0x32dcf0` (crate::moby::ai::senses), `0x332230` = L00 `0x31d180`
@@ -70,7 +72,7 @@
 //! eaten prey's flight to its mouth (`0x444cd8`, `0x444e50`); the spawns of 7 (0x119d, `0x4408b0`), 8 (L03
 //! `0x3d09d0`), 10 (0x12ee, `0x44b518`) and 11 (0x12f7, `0x44c648`); the end of the gulp (`0x445720`) and Ratchet's
 //! state 0x8c in it and in the roll and leap (pushed up, his `+0x1e0` / `+0x1f0`); the camera (`0x443dd8`) and its
-//! shakes (`0x1bbe00`); the head's aims (`0x339480` = L00 `0x324208` on `+0x250`, `0x33c3d8` on `+0x2b8`); the
+//! shakes (`0x1bbe00`); the
 //! spit's mouth particles (`0x34afd8`); the roll's touch of the classes 0x1366 / 0x1367; the crates' `+0x36`; the
 //! arrivals' effects (`0x39d1b8`, `0x3007d0`); `0x1b2b68` (its height − 2 in sub 6); the moby word `+0x9c`; the
 //! debug switches `$gp+0x3084..+0x30ac` (all 0). A prey is any moby here (the original asks for one of the level's).
@@ -110,6 +112,8 @@ mod pv {
     pub const WAKE: usize = 0x244;
     pub const AIM_YAW: usize = 0x298;
     pub const HEAD: usize = 0x2b8;
+    /// The head's aim record (crate::moby::joint_aim; `HEAD` is its asked turn's z).
+    pub const HEAD_AIM: usize = 0x250;
     pub const SPOT: usize = 0x17d0;
     pub const HOLD: usize = 0x17e0;
     pub const LAST: usize = 0x17f4;
@@ -427,7 +431,7 @@ fn throw_origin(w: &MobyWorld, id: usize, ctx: &mut Ctx, f: f32) -> (V3, V3, f32
     (pos, vel, f * r)
 }
 
-/// `0x445ff0(m, p)`: the head's turn toward `p`, within ±60° (for its aim, not ported).
+/// `0x445ff0(m, p)`: the head's turn toward `p`, within ±60° (asked of its aim, crate::moby::joint_aim).
 fn head_at(w: &mut MobyWorld, id: usize, p: V3) {
     let t = sub_rot(yaw_to(w, id, p), w.mobys[id].rot[2]).clamp(-1.047_197_6, 1.047_197_6);
     w.mobys[id].set_pv_f(pv::HEAD, t);
@@ -638,6 +642,8 @@ fn tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         ctx.game.boss_icon = 10;
         fighters_in(w, id, ctx);
     }
+    // `0x339480` = L00 `0x324208`: the head's aim (list 0, 0.015 / 0.3; its turn `+0x2b8`).
+    crate::moby::joint_aim::aim(w, id, pv::HEAD_AIM, id, 0, f32::from_bits(0x3c75_c28f), f32::from_bits(0x3e99_999a));
     if 0 < w.mobys[id].pv_i(pv::CRATE_WAIT) {
         let mut t = w.mobys[id].pv_i(pv::CRATE_WAIT);
         let over = countdown(&mut t);
@@ -663,6 +669,8 @@ fn tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &mut w.mobys[id];
     m.shadow_dir = 2;
     if (m.state_ticks as u16) <= 0xfffe { m.state_ticks = m.state_ticks.wrapping_add(1); }
+    // `0x33c3d8` = L00 `0x327308`: the head aim (list 0, `$gp+0x3124` = 1.3).
+    crate::moby::joint_aim::head(w, ctx, id, pv::HEAD_AIM, 0, f32::from_bits(0x3fa6_6666));
     w.changed = true;
 }
 

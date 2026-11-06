@@ -20,7 +20,12 @@
 //!
 //! Users: the two aims of crate::moby::classes::level16::drone, crate::moby::classes::level09::gunship and
 //! crate::moby::classes::level20::strafer; the head aims of crate::moby::classes::level19::lurker,
-//! crate::moby::classes::level14::rappeller and crate::moby::classes::level17::hatchling.
+//! crate::moby::classes::level14::rappeller and crate::moby::classes::level17::hatchling; the head aims of
+//! crate::moby::classes::level20::biter, crate::moby::classes::level18::breeder, crate::moby::classes::level18::stalker
+//! (on its inner body, [`head_on`]) and crate::moby::classes::endako_a_enemies; the aims and head aims of
+//! crate::moby::classes::critter, crate::moby::classes::beast, the burrowers of crate::moby::classes::enemies,
+//! crate::moby::classes::level20::boss, crate::moby::classes::endako_boss and the troopers of
+//! crate::moby::classes::level09::trooper and crate::moby::classes::level12::trooper.
 
 use super::{ai, Ctx, MobyWorld};
 use crate::hero::physics::{euler_rows, turn_spring, V3};
@@ -103,8 +108,12 @@ pub fn aim(w: &mut MobyWorld, id: usize, b: usize, owner: usize, list: u8, k: f3
 
 /// `0x327308(owner, rec, scale, list, 1)`: the head record at `b` of `id`'s pvars asked for `scale` with the enemies'
 /// big heads on (cheat byte 7), else 1; not at it yet, aimed (0.03, 0.3) on `id`'s joint list `list`.
-pub fn head(w: &mut MobyWorld, ctx: &Ctx, id: usize, b: usize, list: u8, scale: f32) {
+pub fn head(w: &mut MobyWorld, ctx: &Ctx, id: usize, b: usize, list: u8, scale: f32) { head_on(w, ctx, id, b, id, list, scale); }
+
+/// [`head`] with the record in `id`'s pvars hung on another moby's joint list (`0x327308`'s owner not the record's
+/// holder: crate::moby::classes::level18::stalker's inner body).
+pub fn head_on(w: &mut MobyWorld, ctx: &Ctx, id: usize, b: usize, owner: usize, list: u8, scale: f32) {
     let s = if ctx.game.cheat(crate::cheats::cheat::ENEMY_HEADS) { scale } else { 1.0 };
     w.mobys[id].set_pv_f(b + SCALE, s);
-    if s != w.mobys[id].pv_f(b + NOW_SCALE) { aim(w, id, b, id, list, f32::from_bits(0x3cf5_c28f), f32::from_bits(0x3e99_999a)); }
+    if s != w.mobys[id].pv_f(b + NOW_SCALE) { aim(w, id, b, owner, list, f32::from_bits(0x3cf5_c28f), f32::from_bits(0x3e99_999a)); }
 }

@@ -20,10 +20,17 @@
 //! start height), rocking up to 2° (`0x31a3c0`: `+0x2a0` by 0.05, `+0x2a4` by 0.01 a tick); above the water (−0.2) it
 //! carries Ratchet (`0x322668`, without its turn).
 //!
-//! Not ported: the neck's and tail's aims (`0x324208` at the joint blocks `+0x90..`, `0x327308` at `+0x300`), the
-//! splashes and ripples (`0x339b60`), the pad rumble (`0x2d6d60` / `0x2d6f38`, its handle `+0x2f0`).
+//! **The joint aims** (crate::moby::joint_aim): from state 2 after the rocking the three records `+0x90` / `+0x110` /
+//! `+0x190` aimed on lists 0..2 (`0x31a0e0` = L00 `0x324208`, 0.02 / 0.3), then in every state the head aim on
+//! `+0x300` (`0x31cfa0` = L00 `0x327308`, list 4, 2.5). Waiting within 10 of Ratchet the records turn toward his centre
+//! from its joint 0 (a third of the yaw each, within ±130°; the pitch on the first, within ±30°); on the ride toward
+//! the path 6 points on (the yaw off its facing: the first's x all of it and z half, the second's y a third, the
+//! third's y minus half).
+//!
+//! Not ported: the splashes and ripples (`0x339b60`), the pad rumble (`0x2d6d60` / `0x2d6f38`, its handle `+0x2f0`).
 
 use crate::hero::physics::{add, add_rot, approach, atan2, dist, dist2, ease, ease_speed, len, len2, rot_dist, scale, sub, sub_rot, turn_ease, V3};
+use crate::moby::joint_aim::ASK;
 use crate::moby::{carry_hero, Ctx, MobyWorld};
 use super::leaper::{play, seq_a};
 use super::props::{seq, wrapped};
@@ -38,6 +45,9 @@ const T: usize = 0x2b0;
 const TV: usize = 0x2bc;
 /// The camera tweak's slot + 1 (0: none).
 const CAM: usize = 0x2ac;
+/// The three joint aims' records (crate::moby::joint_aim; the neck's first) and the head aim's.
+const NECK: usize = 0x90;
+const HEAD_AIM: usize = 0x300;
 
 /// A path's points.
 fn path(ctx: &Ctx, i: i32) -> Option<Vec<[f32; 4]>> { usize::try_from(i).ok().and_then(|i| ctx.level.paths.get(i)).filter(|p| 2 <= p.len()).cloned() }
@@ -78,6 +88,13 @@ fn release_cam(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// 0x09fc (`0x3bb338`).
 pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    states(w, id, ctx);
+    // `0x31cfa0` = L00 `0x327308`: the head aim, in every state.
+    crate::moby::joint_aim::head(w, ctx, id, HEAD_AIM, 4, 2.5);
+}
+
+/// The states, the float and the joint aims (module docs).
+fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let water = ctx.game.water_z;
     let m = &w.mobys[id];
     let (Some(ride), Some(back)) = (path(ctx, m.pv_i(RIDE)), path(ctx, m.pv_i(BACK))) else { return };
@@ -133,6 +150,19 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                         let blend = ctx.game.rng.rand_range(10, 20);
                         play(w, id, ctx, 0, 0, blend);
                     }
+                    // The neck's turn toward his centre (`0x189f00`) from its joint 0: the yaw (within ±130°) a
+                    // third on each record, the pitch (within ±30°) on the first.
+                    let m = &w.mobys[id];
+                    let at = ctx.host.joint(m, 0).unwrap_or(m.pos);
+                    let d = sub(add(ctx.hero.pos, [0.0, 0.0, 1.0]), at);
+                    let lim = f32::from_bits(0x4011_361f);
+                    let yaw = sub_rot(atan2(d[0], d[1]), m.rot[2]).clamp(-lim, lim);
+                    let lim = f32::from_bits(0x3f06_0a93);
+                    let pitch = (-atan2(len2(d), d[2])).clamp(-lim, lim);
+                    let m = &mut w.mobys[id];
+                    m.set_pv_f(NECK + ASK + 4, pitch);
+                    let third = yaw * f32::from_bits(0x3eaa_aaab);
+                    for k in (0..3).rev() { m.set_pv_f(NECK + 0x80 * k + ASK, third); }
                 } else if wrapped(w, id, ctx) && ctx.game.rng.randi(1) == 0 {
                     match seq_a(w, id, ctx) {
                         0 => {
@@ -175,6 +205,17 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let (pos, _, yaw) = along(&ride, t);
             m.pos = pos;
             m.rot[2] = add_rot(m.rot[2], sub_rot(yaw, m.rot[2]) * 0.5);
+            // The turn toward the path 6 points on: its yaw off the facing on the neck (all of it, half), the body (a
+            // third) and the tail (minus half).
+            if t + 6.0 < (n - 1) as f32 {
+                let (p, _, _) = along(&ride, t + 6.0);
+                let d = sub(p, m.pos);
+                let a = sub_rot(atan2(d[0], d[1]), m.rot[2]);
+                m.set_pv_f(NECK + ASK, a);
+                m.set_pv_f(NECK + ASK + 8, a * 0.5);
+                m.set_pv_f(NECK + 0x80 + ASK + 4, a * f32::from_bits(0x3eaa_aaab));
+                m.set_pv_f(NECK + 0x100 + ASK + 4, -a * 0.5);
+            }
             let (s, c) = m.rot[2].sin_cos();
             let ahead = add(m.pos, [c * 10.0, s * 10.0, 0.0]);
             m.set_pv_f(T, t);
@@ -270,6 +311,9 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     m.rot[1] = 0.034_906_59 * a.sin() * b.cos();
     m.set_pv_f(0x2a0, add_rot(a, 0.05));
     m.set_pv_f(0x2a4, add_rot(b, 0.01));
+    // `0x31a0e0` = L00 `0x324208`: the three joint aims (lists 0..2, 0.02 / 0.3).
+    for k in 0..3 { crate::moby::joint_aim::aim(w, id, NECK + 0x80 * k, id, k as u8, f32::from_bits(0x3ca3_d70a), f32::from_bits(0x3e99_999a)); }
+    let m = &w.mobys[id];
     let (pos, yaw) = (m.pos, m.rot[2]);
     if water - 0.2 < pos[2] { carry_hero(ctx, id, old, yaw, pos, yaw); }
 }
