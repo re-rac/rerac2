@@ -52,14 +52,20 @@
 //! `0x309b08` = L00 `0x2ef318` (through the rows), `0x30a1a0` = L00 `0x2ef9b0` (the transpose), `0x30a650` = L00
 //! `0x2efe60` (add_rot), `0x30a7f0` = L00 `0x2f0000` (crate::hud::lerp_rgba), `0x37c5d8` = L00 `0x3602f0`.
 //!
-//! Not ported: the warp's draws (6 and 7, drawn: `0x302130(0x3feaa0)`, `0x302130(0x3fdea8)`, `0x301f28(0x3feba0)`)
-//! and its puffs at the warp's point (`0x3fe1e0`), 0x0d9b's exhaust (`0x3fe0b8`): both on the particle burst `0x35a848`
-//! = L02 `0x345d88` the port lacks. A leader's collision is shared as its flag (the game copies its pointer `+0x98`).
+//! **Its particles** (`0x35a848` = L02 `0x345d88`, crate::particles::keyed): on the warps' first ticks, drawn, 1..5
+//! puffs at the warp's point ([`warp_puffs`], `0x3fe1e0`); 0x0d9b's exhaust every tick of its run ([`exhaust`],
+//! `0x3fe0b8`).
+//!
+//! Not ported: the warp's draws (6 and 7, drawn: `0x302130(0x3feaa0)`, `0x302130(0x3fdea8)`, `0x301f28(0x3feba0)`;
+//! strips and a glow of the warp's size and colour, not the particles). A leader's collision is shared as its flag
+//! (the game copies its pointer `+0x98`).
 
 use crate::hero::physics::{add, add_rot, dist, scale, set_len, sub, V3};
 use crate::moby::blast::{self, Blast};
 use crate::moby::hits::HitTemplate;
 use crate::moby::{Ctx, MobyWorld};
+use crate::moby::classes::level08::tabora_ai::jitter;
+use crate::particles::keyed::{keyed, Keys};
 
 pub const CAR: i16 = 0x11cf;
 pub const RAM: i16 = 0x0d9b;
@@ -121,6 +127,13 @@ const WARP_IN_LEN: f32 = 0.032_34;
 /// `0x3fdcfc`: the drop's floor.
 const FLOOR: f32 = 85.0;
 const NO_LIMIT: f32 = 5_627.925;
+/// `$gp+0x15d0`: the exhaust's place in its frame.
+const EXHAUST_AT: V3 = [8.0, 0.0, 1.5];
+/// `$gp+0x16b8` (`0x1b06a8`): the exhaust's template: dark blue → grey → dark, 300 → 400 → 600, over 15 ticks.
+static EXHAUST_KEYS: Keys = Keys { colors: &[0x0000_2030, 0x7f60_6060, 0x0023_2323, 0], sizes: &[300, 400, 600, 0], times: &[0, 5, 15, 0], last: 3, life: 15, scale: 1.0 };
+/// `$gp+0x16f0` (`0x1b06e0`): the warp's puffs' template: white → orange → yellow → white, 0 → 3000 → 1000 → 0, over
+/// 60 ticks.
+static PUFF_KEYS: Keys = Keys { colors: &[0x00ff_ffff, 0x4060_3000, 0x7fff_ff00, 0x00ff_ffff], sizes: &[0, 3000, 1000, 0], times: &[0, 15, 45, 60], last: 4, life: 60, scale: 1.0 };
 const PER_TICK: f32 = 0.016_666_668;
 
 /// `0x2ef318`: `v` through the rows.
@@ -318,6 +331,7 @@ fn ram(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             w.deliver_hit_any(t, &tmpl, [tp[0], tp[1], tp[2], 1.0]);
         }
     }
+    exhaust(w, id, ctx);
     if w.mobys[id].drawn == 0 || (ctx.game.frame & 0xf) as usize != id & 0xf { return; }
     for _ in 0..SPARKS {
         let m = &w.mobys[id];
@@ -333,6 +347,38 @@ fn ram(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 crate::particles::rec::set_ff(&mut sys.pool.recs[i], 0x2c, -0.008_333_334);
             }
         }
+    }
+}
+
+/// `0x3fe0b8`: 0x0d9b's exhaust: 1..2 puffs at [`EXHAUST_AT`] in its frame jittered 0.5, the one velocity (first
+/// straight up) set to 8..12 a second and jittered 1/15 for each, additive or not at random, turning −2..2.
+fn exhaust(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
+    let (rows, pos) = (w.mobys[id].rows, w.mobys[id].pos);
+    let g = &mut ctx.game.rng;
+    let mut v: V3 = [0.0, 0.0, 1.0];
+    for _ in 0..g.randi(2) + 1 {
+        let mut p = add(through(EXHAUST_AT, &rows), pos);
+        jitter(g, &mut p, 0.5);
+        v = set_len(v, g.randf(8.0, 12.0) * PER_TICK);
+        jitter(g, &mut v, 0.066_666_67);
+        let additive = g.randi(2) != 0;
+        let spin = g.rand_range(-2, 2);
+        if let Some(sys) = ctx.parts.as_deref_mut() { keyed(sys, g, p, v, &EXHAUST_KEYS, additive, spin); }
+    }
+}
+
+/// `0x3fe1e0`: the warp's puffs: 1..5 at the warp's point jittered 0.5, the one velocity (first none) jittered
+/// 1/120 for each, additive, turning −5..5.
+fn warp_puffs(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
+    let at = w.mobys[id].pv_v(WARP_AT);
+    let g = &mut ctx.game.rng;
+    let mut v: V3 = [0.0; 3];
+    for _ in 0..g.randi(5) + 1 {
+        let mut p = at;
+        jitter(g, &mut p, 0.5);
+        jitter(g, &mut v, 0.008_333_334);
+        let spin = g.rand_range(-5, 5);
+        if let Some(sys) = ctx.parts.as_deref_mut() { keyed(sys, g, p, v, &PUFF_KEYS, true, spin); }
     }
 }
 
@@ -358,6 +404,7 @@ fn warp_out(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_v(VEL, set_len(m.rows[0], WARP_OUT_SPEED.0 * PER_TICK));
         m.mode |= 8;
         ctx.host.play_sound_of(&w.mobys[id], SOUNDS, 1, 0);
+        if w.mobys[id].drawn != 0 { warp_puffs(w, id, ctx); }
     } else if w.mobys[id].timer == 0 {
         let m = &mut w.mobys[id];
         m.rows[0] = scale(m.rows[0], STRETCH[k] * PER_TICK + 1.0);
@@ -407,6 +454,7 @@ fn warp_in(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_v(WARP_AT, at);
         m.set_pv_v(VEL, set_len(m.rows[0], s * (PER_TICK * WARP_IN_SPEED[k])));
         m.mode |= 8;
+        if w.mobys[id].drawn != 0 { warp_puffs(w, id, ctx); }
         ctx.host.play_sound_of(&w.mobys[id], SOUNDS, 1, 0);
     } else if w.mobys[id].timer == 1 {
         let m = &mut w.mobys[id];

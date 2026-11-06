@@ -1398,3 +1398,12 @@ fn chase(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 pub fn update_0d0e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].drawn != 0 { crate::shadow_volumes::probe_near(w, id, ctx, 24.0, 0x16); }
 }
+
+/// A trooper sent away by a director (L20 `0x40a998`'s steps on each one of a group: crate::moby::classes::level20::
+/// director): its `+0x20` 0, out of its group's shooters (`0x3f8878`), its turret and guns gone (`0x3f8c60`), deleted.
+pub fn dismiss(w: &mut MobyWorld, id: usize) {
+    w.mobys[id].set_pv_i(H, 0);
+    release(w, id);
+    drop_parts(w, id);
+    w.delete(id);
+}

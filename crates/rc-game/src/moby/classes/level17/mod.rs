@@ -57,6 +57,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
 pub fn draw(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, hero_state: i32, view: &crate::particles::BSphereView, cam: V3, id: usize, first: bool, out: &mut Vec<crate::fx::FxQuad>, frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
     match w.mobys[id].o_class {
         carrier::CARRIER => { carrier::draw_08b1(w, id, cam, out); true }
+        lobber::SHOT => { lobber::draw_0ea5(w, id, &mut game.rng, cam, out); true }
         _ => false,
     }
 }

@@ -35,6 +35,7 @@
 //! | 0x4e | [`swirl`] (`0x33d968`) | (`0x33daf8`) | swirls: twinkles flying their way, circling and closing on a moby they follow (the Sheepinator's beam) |
 //! | 0x16 | [`smoke`] (`0x335a90`) | (`0x331048`) | smoke puffs growing and rising, coloured over the life (R&C1's type 22; the sheep's pop) |
 //! | 0x63 | [`wool`] (`0x340ce8`) | (`0x340e38`) | wool: tufts slowing, falling, swaying, scattered by Ratchet (the sheep's pop) |
+//! | 0x56 | [`keyed`] (L02 `0x345d88`, L18 `0x35a848`) | (`0x33f240`) | keyframed puffs: colour and size eased along a template's keyframes (Damosel's traffic)
 //! | 0x6a, 0x6b, 0x6c | [`meteor`] (`0x341890`, `0x341bc8`, `0x342028`) | (`0x341a18`, `0x341dc0`, `0x342230`) | the Meteor Gun's burst streaks and embers, its burning's smoke |
 //!
 //! Any other type kills itself on its first update. The gravity direction (`0x18a0e0`) is (0, 0, −1): normal gravity.
@@ -44,6 +45,7 @@ pub mod ash;
 pub mod cinder;
 pub mod dust;
 pub mod foot_dust;
+pub mod keyed;
 pub mod lava;
 pub mod line;
 pub mod meteor;
@@ -1139,6 +1141,7 @@ pub fn update_parts(sys: &mut Particles, mobys: &crate::moby::MobyWorld, cam: [f
             EMBER => update_ember(sys, i, rng, mobys.frame),
             cinder::CINDER => cinder::update(sys, i, rng, mobys.frame),
             dust::DUST => dust::update(sys, i),
+            keyed::KEYED => keyed::update(sys, i),
             foot_dust::PUFF => foot_dust::update(sys, i),
             foot_dust::PRINT => foot_dust::update_print(sys, i),
             lava::SPARK => lava::update_spark(sys, i, aux.coll),

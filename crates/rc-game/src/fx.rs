@@ -56,6 +56,7 @@
 //! | `0x3fac68` (L02) | the Spiderbot 0x0b58 | its blast's sphere ([`FrameQuad`], [`crate::moby::classes::spiderbot::draw_blast`]) |
 //! | `0x4034c8` | the upgraded Spiderbot 0x0e79 | its blast's sphere and its charge's marker ([`crate::moby::classes::spiderbot_plus::draw_marker`]) |
 //! | `0x405658` / `0x406038` | its shot 0x0eaa / shell 0x0eab | sprites and streaks ([`crate::moby::classes::spiderbot_plus::draw_shot`], [`crate::moby::classes::spiderbot_plus::draw_lob`]) |
+//! | `0x40d968` (L17; L12 `0x409640`, L13 `0x40e3e8`) | the lobbers' glob 0x0ea5 | its bolt ([`trails::bolt`], crate::moby::classes::level17::lobber::draw_0ea5) |
 //! | `0x406ad0` / `0x4152f0` (L16) | the gunship's shot 0x0ebd / the drone's shot 0x0f7a | their bolts ([`trails::shot_bolt`]) |
 //! | `0x3d5ff8` (L26, first list) | the motes 0x0c00 of a group | their trails ([`trails::history`], crate::moby::classes::level26::props::draw_0c00) |
 //! | `0x423e80` (L14) | the electric strand 0x0f80 on | its strands ([`trails::strand`], crate::moby::classes::level14::fence::draw) |
@@ -431,7 +432,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::endako_c::SENTRY => crate::moby::classes::endako_c::draw_beam(w, id, game.frame, cam, out),
         // The levels' own (their modules' draws).
         _ => {
-            use crate::moby::classes::{level04, level06, level09, level11, level12, level13, level14, level16, level17, level19, level26};
+            use crate::moby::classes::{level04, level06, level09, level11, level12, level13, level14, level16, level17, level19, level20, level26};
             let _ = level04::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
                 || level06::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
                 || level09::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
@@ -442,7 +443,8 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
                 || level19::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
                 || level14::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
                 || level16::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
-                || level26::draw(w, host, game, hero_state, view, cam, id, first, out, frame);
+                || level26::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
+                || level20::draw(w, host, game, hero_state, view, cam, id, first, out, frame);
         }
     }
 }

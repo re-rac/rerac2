@@ -4,6 +4,7 @@
 
 pub mod bolt;
 pub mod breakables;
+pub mod director;
 pub mod flyer;
 pub mod gunship;
 pub mod props;
@@ -47,6 +48,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         // L20's (`0x3cd830` / `0x412cb8`) are the same code.
         bolt::CLASS => Some(bolt::update_05de),
         gunship::CLASS => Some(gunship::update_0cbc),
+        director::CLASS => Some(director::update_0c2b),
         _ => None,
     }
 }

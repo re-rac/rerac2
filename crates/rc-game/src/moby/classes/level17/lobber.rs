@@ -60,7 +60,8 @@
 //! **The glob** ([`update_0ea5`]): along its velocity each tick; a line to its next place (flags 0, its hit — its
 //! damage, flags 1 — on what it meets): the world, a 0.6 sphere of its damage pushed 3 its way (flags 0x10001); a moby
 //! not its owner, the same pushed 1.5; its owner, on it goes; after 240 ticks a 0.6 sphere (`0x31e3a8`) all the same.
-//! Then a blast (size 0.75, 3 / 3 / 3, 3 puffs, 3 streaks) and gone.
+//! Then a blast (size 0.75, 3 / 3 / 3, 3 puffs, 3 streaks) and gone. Each tick it flies on, its draw is registered
+//! ([`draw_0ea5`], `0x40d968`, the same code and data in L12 / L13 / L16: a bolt along its velocity, crate::fx::trails).
 //!
 //! The engine functions with the port's: `0x31c380` (set_state), `0x31c0a0` (set_anim, crate::moby::classes::props::
 //! set_seq), `0x32d7b8` / `0x32d7e0` (the first tick of the state / sub), `0x330be8` = L00 `0x32dcf0` (crate::moby::
@@ -73,8 +74,8 @@
 //! (delete).
 //!
 //! Not ported: the class word `+0x46` the set-up sets (5), the write `0x3e6388` makes into the level's path data (its
-//! path's first point onto the ground 0.5 up when within 10 over it: the level's paths are read only here), the
-//! glob's draw (`0x2e89d0(0x40d968)`), and the messages `0x2a5e70` prints. `0x3e6150`'s line to the point past its
+//! path's first point onto the ground 0.5 up when within 10 over it: the level's paths are read only here) and the
+//! messages `0x2a5e70` prints. `0x3e6150`'s line to the point past its
 //! path's end (the game reads the next path's header there) is taken as blocked.
 
 use crate::hero::physics::{add, approach_angle, atan2, dist, dist2, len, rot_dist, scale, set_len, sub, V3};
@@ -818,6 +819,8 @@ pub fn update_0ea5(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 }
             }
             w.mobys[id].pos = next;
+            // `0x2e89d0(0x40d968, m)`.
+            w.register_draw(id);
         }
         1 => {
             let pos = w.mobys[id].pos;
@@ -826,4 +829,33 @@ pub fn update_0ea5(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         _ => {}
     }
+}
+
+/// The glob's bolt (`0x40dad8`'s words, `$gp+0x2820..+0x28a0` and `0x1b18a4`; the same in L12 / L13 / L16): a white
+/// head 10 back fading to 0x80204080 (FX 0x35, then the tail to nothing), grey flares (FX 0x38, turning 10° a call)
+/// and a blue glow (FX 0x31, 0.75).
+const BOLT: crate::fx::trails::Bolt = {
+    use crate::fx::trails::{Bolt, Flare};
+    Bolt {
+        fx: [0x35, 0x38],
+        head: [0xffff_ffff, 0x8020_4080],
+        length: 10.0,
+        width: 0.2,
+        from: -0.0,
+        turn: 10.0,
+        flares: [
+            Flare { rgba: 0x5a80_8080, width: 0.2, from: -0.0, length: 4.0 },
+            Flare { rgba: 0x5a80_8080, width: 0.1, from: 0.75, length: 4.0 },
+            Flare { rgba: 0x3c80_8080, width: 0.4, from: 0.75, length: 4.0 },
+            Flare { rgba: 0x64ff_ffff, width: 0.2, from: 0.0, length: 0.6 },
+        ],
+        flare_end: 0x80_8080,
+        glow: (0x31, 0.75, 0x2020_4080),
+    }
+};
+
+/// `0x40d968`: the glob's draw, its bolt along its velocity (crate::fx::trails::shot_bolt: the glob's pvars `+0x00`
+/// its velocity, `+0x1c` the flares' spin, `+0x28` the scroll).
+pub fn draw_0ea5(w: &mut MobyWorld, id: usize, rng: &mut crate::rng::Rng, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
+    crate::fx::trails::shot_bolt(w, id, &BOLT, rng, cam, out);
 }

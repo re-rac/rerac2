@@ -2,6 +2,7 @@
 //! addresses with the port's). Each class's update is registered in [`update_for`]; crate::moby::classes::update_for
 //! asks it after its own.
 
+pub mod director;
 pub mod fence;
 pub mod gate;
 pub mod lift;
@@ -36,6 +37,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         movers::RISER => Some(movers::update_0ae5),
         switch::CLASS => Some(switch::update_113b),
         gate::CLASS => Some(gate::update_113e),
+        director::CLASS => Some(director::update_10ff),
         super::critter::PRISON => Some(super::critter::update),
         _ => None,
     }

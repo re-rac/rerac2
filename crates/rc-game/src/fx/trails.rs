@@ -3,7 +3,9 @@
 //! class that calls it (their draw callbacks, crate::fx).
 //!
 //! * [`bolt`] (L16 `0x406c40` / `0x415460`, L30 `0x404dc0` / `0x40ee50`): a shot drawn along its velocity. Users:
-//!   L16's gunship shot 0x0ebd and drone shot 0x0f7a ([`shot_bolt`], their callbacks `0x406ad0` / `0x4152f0`).
+//!   L16's gunship shot 0x0ebd and drone shot 0x0f7a ([`shot_bolt`], their callbacks `0x406ad0` / `0x4152f0`); the
+//!   lobbers' glob 0x0ea5 (L17 `0x40dad8` from `0x40d968`, L12 `0x4097b0`, L13 `0x40e558`, L16 `0x3fd028`;
+//!   crate::moby::classes::level17::lobber::draw_0ea5).
 //! * [`history`] (`0x2ec810`, L26 `0x2ece08`): a trail through the last places and turns of a moby. User: L26's
 //!   mote 0x0c00.
 //! * [`strand`] (L11 `0x46dc98`, L14 `0x423f60`): a scrolling core and a camera-facing halo through a path of

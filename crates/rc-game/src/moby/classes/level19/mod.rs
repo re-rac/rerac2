@@ -3,6 +3,7 @@
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
 
 pub mod den;
+pub mod director;
 pub mod floe;
 pub mod frozen;
 pub mod lurker;
@@ -17,6 +18,8 @@ use crate::moby::MobyWorld;
 pub struct Globals {
     /// `$gp+0x2cd0`: the lurkers attacking (at most lurker::MOST_ATTACKERS; emptied by each one's set-up).
     pub attackers: i32,
+    /// `$gp+0x2f6c` / `+0x2f70`: the level's census (director::census).
+    pub census: crate::moby::director::Census,
 }
 
 /// This level's class updates.
@@ -36,6 +39,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         switches::CLEARER => Some(switches::update_1205),
         switches::SPINNER => Some(switches::update_11f4),
         switches::PLANET_SCENE => Some(switches::update_1267),
+        director::TALKER => Some(director::update_1254),
+        director::TRADER => Some(director::update_1313),
         // Level 8's lift 0x0aaa's code (L19 `0x41fcb8`).
         0x1176 => Some(super::level08::lift::update_0aaa),
         // Level 20's fading field 0x119b's code (L19 `0x423750`).

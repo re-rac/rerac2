@@ -191,11 +191,13 @@ pub struct Particles {
     pub(crate) time: TimeBase,
     /// `part_defs`: spawners take `*def[n]` as the first frame.
     pub defs: Option<PartDefs>,
+    /// The templates type-0x56 records point at (`+0x30`, crate::particles::keyed), each added at its first spawn.
+    pub(crate) keys: Vec<&'static super::keyed::Keys>,
 }
 
 impl Particles {
     /// Level-init state.
-    pub fn new(defs: Option<PartDefs>) -> Self { Particles { pool: PartPool::new(), time: TimeBase::NTSC, defs } }
+    pub fn new(defs: Option<PartDefs>) -> Self { Particles { pool: PartPool::new(), time: TimeBase::NTSC, defs, keys: Vec::new() } }
 
     pub(crate) fn create_part(&mut self, ty: u8) -> Option<usize> { self.pool.create_part(ty) }
 

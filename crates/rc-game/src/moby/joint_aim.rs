@@ -7,7 +7,7 @@
 //!
 //! **The record** (offsets from its start): `+0x00` the joint list, `+0x01` hung on, `+0x10` the quaternion,
 //! `+0x20..+0x28` its scale (all three the same), `+0x40` the angles, `+0x50` their speeds, `+0x60` the turn asked
-//! for (cleared by each aim), `+0x70` the scale asked for (back to 1 after each aim), `+0x78` its owner. Taken off,
+//! for (cleared by each aim; its z also asked by a movement block pointing at the record, crate::moby::ai::joint_turns), `+0x70` the scale asked for (back to 1 after each aim), `+0x78` its owner. Taken off,
 //! `+0x00..+0x40` are cleared (so the scale reads 0).
 //!
 //! **The head aim** asks for the scale (the enemies' big heads, cheat byte 7 `0x1a7a4f`: the class's own scale, else

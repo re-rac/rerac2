@@ -41,6 +41,7 @@ pub mod blast;
 pub mod bolts;
 pub mod claims;
 pub mod crawler;
+pub mod director;
 pub mod floater;
 pub mod frames;
 pub mod hits;
@@ -649,6 +650,8 @@ pub struct MobyWorld {
     pub convoy: classes::level07::train::Globals,
     /// Level 11's globals (classes::level11::Globals).
     pub level11: classes::level11::Globals,
+    /// Level 18's director's globals (classes::level18::director::Globals).
+    pub level18: classes::level18::director::Globals,
     /// Level 19's globals (classes::level19::Globals).
     pub level19: classes::level19::Globals,
     /// Level 20's boss's globals (classes::level20::boss::Globals).

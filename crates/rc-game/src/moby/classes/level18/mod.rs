@@ -4,6 +4,7 @@
 
 pub mod breakables;
 pub mod breeder;
+pub mod director;
 pub mod dropship;
 pub mod hatch;
 pub mod props;
@@ -34,6 +35,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         props::SHELL => Some(props::update_12bf),
         props::ORB => Some(props::update_124a),
         props::SWING => Some(props::update_0f54),
+        director::CLASS => Some(director::update_0f01),
         _ => None,
     }
 }

@@ -343,8 +343,7 @@ pub fn update_099c(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 // bite's turn; 0xe after a bite: farther than 4, the fight (0x1c), else sequence 7.
 //
 // Not ported: its sounds but the two, the pieces' burning (`0x3d8f70`, with `+0x2b4`), the
-// turns its movement block asks of its head's and tail's aim records (`+0x158` / `+0x15c` point at `+0x3d0` /
-// `+0x450`: the framework's aims, crate::moby::ai), the emerge flash (`0x3d8920`), the gravity frames. Its glows and wire are draw callbacks (crate::fx); its flame jet is
+// emerge flash (`0x3d8920`), the gravity frames. Its glows and wire are draw callbacks (crate::fx); its flame jet is
 // particles ([`bite`]).
 
 /// The burrowers' deaths (0x0b0a `0x3d6ea0`, 0x0b0b `0x3d9870`): no collision, out of the target list; a blast 0.75
@@ -402,6 +401,9 @@ fn checks_0b0a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
         m.set_pv_f(0x120, 1.136_6);
         m.set_pv_f(0x140, 0.523_598_8);
         m.set_pv_f(0x13c, 0.005_555_556);
+        // The movement block's aim records (`+0x158` / `+0x15c`, crate::moby::ai::joint_turns): the head and the tail.
+        m.set_pv_i(0x158, 0x3d0);
+        m.set_pv_i(0x15c, 0x450);
         m.set_pv_f(0x84, 0.004_166_667);
         m.set_pv_f(0x9c, 0.4);
         for o in [0xcc, 0xcd, 0xce, 0xcf, 0xd2] { m.set_pv_b(o, 0xff); }
@@ -877,8 +879,7 @@ pub fn update_0b0a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 // in the flight.
 //
 // Not ported: its sounds but the two, the parts'
-// sparks (`0x3dbc20`), the bite's trail (`0x3dbde8`, `0x3dbe88`, `0x3dc100`), the turns
-// asked of its head's and tail's aim records (`+0x530` / `+0x5b0`; the framework's aims), the draw callbacks, the scene's hiding (`0x1a8f00` = 2).
+// sparks (`0x3dbc20`), the bite's trail (`0x3dbde8`, `0x3dbe88`, `0x3dc100`), the draw callbacks, the scene's hiding (`0x1a8f00` = 2).
 
 const PART: i16 = 0x0aa2;
 const PART_JOINTS: [usize; 2] = [0, 2];
@@ -1005,6 +1006,9 @@ fn checks_0b0b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
         m.set_pv_f(0x120, 1.553_343);
         m.set_pv_f(0x140, 0.523_598_8);
         m.set_pv_f(0x13c, 0.005_555_556);
+        // The movement block's aim records (`+0x158` / `+0x15c`, crate::moby::ai::joint_turns): the head and the tail.
+        m.set_pv_i(0x158, 0x530);
+        m.set_pv_i(0x15c, 0x5b0);
         m.set_pv_f(0x118, 0.9);
         ai::senses(m, 0.003_333_333_5, 0.100_000_01, 0.001_163_553, 0.104_719_76);
         m.set_pv_v(0x200, m.pos);

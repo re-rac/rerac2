@@ -4,17 +4,29 @@
 
 pub mod biter;
 pub mod boss;
+pub mod director;
 pub mod fighter;
 pub mod misc;
 pub mod props;
 pub mod shooter;
 pub mod strafer;
 
+/// This level's draw callbacks (crate::fx): true when the moby's class is one of them.
+#[allow(clippy::too_many_arguments)]
+pub fn draw(w: &mut crate::moby::MobyWorld, _host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, _hero_state: i32, _view: &crate::particles::BSphereView, _cam: crate::hero::physics::V3, id: usize, first: bool, _out: &mut Vec<crate::fx::FxQuad>, _frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
+    match w.mobys[id].o_class {
+        director::CLASS if !first => director::draw(w, game, id),
+        _ => return false,
+    }
+    true
+}
+
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
         biter::CLASS => Some(biter::update_119e),
         boss::CLASS => Some(boss::update_11e0),
+        director::CLASS => Some(director::update_0c36),
         fighter::CLASS => Some(fighter::update_12f3),
         shooter::CLASS => Some(shooter::update_12ef),
         strafer::CLASS => Some(strafer::update_12f8),

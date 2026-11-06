@@ -19,7 +19,7 @@
 //! `+0x10` the steepest slope, `+0x14..0x28` the limits, `+0x2c` the gravity, `+0x30` the turn left before it walks,
 //! `+0x34` the stop distance, `+0x38` options (1 no ledge test, 2 the push-out's flags, 4 no gravity, 0x10 no turn, 0x40
 //! the turn sequences, 0x80 the walk speed on the sequence, 0x100 no floor test, 0x200 the fall kill), `+0x3c` the
-//! fence path (−1), `+0x48` / `+0x4c` aim joints, `+0x50` the floor's normal, `+0x60` the last push point, `+0x70` the
+//! fence path (−1), `+0x48` / `+0x4c` two aim records (relative, 0 none: [`joint_turns`]), `+0x50` the floor's normal, `+0x60` the last push point, `+0x70` the
 //! push-out, `+0x80` the stuck ticks, `+0x84` the pushing moby, `+0x88` the floor moby, `+0x8c` its kind, `+0x90` the
 //! floor's height, `+0x94` / `+0x98` the flags now and before, `+0x9c` the state (1 fenced, 2 turning in place),
 //! `+0xa0` the velocity, `+0xb0` its speed across, `+0xb4` the turn speed, `+0xbc` the frame it last moved, `+0xc0` /
@@ -29,8 +29,12 @@
 //!
 //! The gravity frames (`$gp − 0x6000`) have a movement of their own: crate::moby::frames.
 //!
-//! Not ported: the joint aims (`0x32db38`, `+0x48`), the dangerous floor
-//! (`0x322058`), the helpers and decoys as targets.
+//! * **Joint turns** `0x32db38` ([`joint_turns`], the last of each move): the turn toward the goal's yaw asked of the
+//!   aim records the movement block points at (`+0x48` / `+0x4c`), which the class's own aims then spring
+//!   (crate::moby::joint_aim). The pointers are the classes' set-ups' (the burrowers 0x0b0a / 0x0b0b of
+//!   crate::moby::classes::enemies: their head and tail records).
+//!
+//! Not ported: the dangerous floor (`0x322058`), the helpers and decoys as targets.
 
 use super::{Ctx, Moby, MobyWorld};
 use crate::hero::physics::*;
@@ -451,8 +455,33 @@ pub fn move_step(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, yaw: f32, goal: V3
     walk(w, id, yaw, goal);
     move_body(w, id, ctx, from);
     ground(w, id, ctx, goal, from);
+    joint_turns(&mut w.mobys[id], o, yaw);
     w.changed = true;
     w.mobys[id].pv_i(o + 0x94)
+}
+
+/// `0x32db38(m, block, yaw)`: the turn the movement block at `o` asks of its aim records (`+0x48` / `+0x4c`, pvar
+/// offsets, 0 none; crate::moby::joint_aim's asked z `+0x68`): unless option 0x10 (no turn), `yaw` less its facing
+/// (`0x2efea8`) held to ±π/2 (`0x3fc90fdc`; mirrored, the other way), shared evenly between the records there are,
+/// each added (`0x2efe60`) to its record's asked turn, which is held to ±π/2.
+pub fn joint_turns(m: &mut Moby, o: usize, yaw: f32) {
+    // A word past the pvars (a pointer the port never set) is taken as none.
+    let at = |m: &Moby, k: usize| usize::try_from(m.pv_i(o + k)).ok().filter(|&b| b != 0 && b + 0x6c <= m.pvars.len());
+    let (a, b) = (at(&*m, 0x48), at(&*m, 0x4c));
+    if (a.is_none() && b.is_none()) || m.pv_i(o + 0x38) & 0x10 != 0 { return; }
+    let (wa, wb) = (if a.is_some() { 1.0f32 } else { 0.0 }, if b.is_some() { 1.0f32 } else { 0.0 });
+    let inv = 1.0 / (wa + wb);
+    let (wa, wb) = (wa * inv, wb * inv);
+    let k = f32::from_bits(0x3fc9_0fdc);
+    let mut d = sub_rot(yaw, m.rot[2]);
+    if k < d { d = k; } else if d < -k { d = -k; }
+    if m.mode & super::mode::MIRROR != 0 { d = -d; }
+    for (r, wt) in [(a, wa), (b, wb)] {
+        let Some(r) = r else { continue };
+        let mut t = add_rot(d * wt, m.pv_f(r + 0x68));
+        if k < t { t = k; } else if t < -k { t = -k; }
+        m.set_pv_f(r + 0x68, t);
+    }
 }
 
 /// `0x33fa98(m, v)` (L11; no L00 twin found): the move by the velocity `v` alone — the movement block's velocity and
