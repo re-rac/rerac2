@@ -8,6 +8,7 @@ pub mod floe;
 pub mod frozen;
 pub mod lurker;
 pub mod props;
+pub mod ride_cam;
 pub mod switches;
 
 use crate::hero::physics::V3;
@@ -41,6 +42,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         switches::PLANET_SCENE => Some(switches::update_1267),
         director::TALKER => Some(director::update_1254),
         director::TRADER => Some(director::update_1313),
+        ride_cam::CLASS => Some(ride_cam::update_1258),
+        // The hovership 0x0eef and the raritanium 0x099a (L19 `0x414848` / `0x3c1cc8`) are in level 8's list.
         // Level 8's lift 0x0aaa's code (L19 `0x41fcb8`).
         0x1176 => Some(super::level08::lift::update_0aaa),
         // Level 20's fading field 0x119b's code (L19 `0x423750`).

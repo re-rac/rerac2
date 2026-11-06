@@ -44,6 +44,7 @@ pub mod script;
 pub mod states;
 pub mod surface;
 pub mod swing;
+pub mod vehicle;
 pub mod walk;
 pub mod wall;
 pub mod water;
@@ -423,6 +424,8 @@ pub struct Hero {
     pub body: body::BodyBlock,
     /// Giant Clank's block (`0x18b694`, `0x18a002`, `0x18aa1c`, the level's record `0x1b18a0`: [`giant`]).
     pub giant: giant::GiantBlock,
+    /// The vehicle block (`0x18b650..0x18b668`: [`vehicle`]).
+    pub vehicle: vehicle::VehicleBlock,
 }
 
 /// A hit Ratchet's body deals (`0x2e14b0` + `0x31d4c8`): a sphere, the damage, the flags, the direction.
@@ -462,6 +465,7 @@ impl Hero {
             ground_yaw: 0.0, slide_yaw: 0.0, slide_bank: 0.0, slide_hold: 0, slide_vel: [0.0; 2], slide_speed: 0.0, stagger: 0, rot_vel: [0.0; 2], bonk_yaw: 0.0, push: [0.0; 3], gravity: Default::default(), swing: Default::default(), swing_cooldown: 0, gear: Default::default(), grind: Default::default(), water: Default::default(), no_menu: 0, rng: Default::default(), state_req: None, anim_req: None, walk_to: Default::default(), fidget_rest: [0; 4], fidget_gap: 0, no_update: false, hits_out: Vec::new(), sounds: Vec::new(), level_sounds: Vec::new(), loops: Vec::new(), loop_stops: Vec::new(), loops_off: false, posture: Default::default(), layers: Default::default(), aim_point: [0.0; 3], unported_seen: Vec::new(), warps: 0,
             body: Default::default(),
             giant: Default::default(),
+            vehicle: Default::default(),
         }
     }
 
@@ -652,6 +656,7 @@ pub fn hero_update(hero: &mut Hero, env: &Env, anim: &mut dyn AnimCtl) -> HeroTi
     hero.items.held = env.pad.held;
     hero.items.pressed = env.pad.pressed;
     hero.items.square_recent = env.pad.pressed_within(crate::pad::button::SQUARE, 3).is_some();
+    hero.vehicle.square = env.pad.pressure[7].to_f32();
     if let Some(r) = hero.state_req.take() { hero.set_state(anim, env, r.id, r.play); }
     if let Some((blend, seq, frame)) = hero.anim_req.take() { hero.set_anim(anim, blend, seq, frame); }
     anim.advance(Pf::f(hero.anim_speed));

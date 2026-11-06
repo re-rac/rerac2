@@ -10,6 +10,7 @@ pub mod drone;
 pub mod movers;
 pub mod props;
 pub mod rocks;
+pub mod turret;
 
 /// This level's draw callbacks (crate::fx): true when the moby's class is one of them.
 #[allow(clippy::too_many_arguments)]
@@ -39,6 +40,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         copter::SHOT => Some(copter::update_0ebd),
         drone::CLASS => Some(drone::update_0f35),
         drone::SHOT => Some(drone::update_0f7a),
+        turret::GUN => Some(turret::update_10ee),
         _ => None,
     }
 }

@@ -7,6 +7,7 @@ pub mod buyer;
 pub mod breather;
 pub mod burrower;
 pub mod crystal;
+pub mod hovership;
 pub mod lift;
 pub mod props;
 pub mod seesaw;
@@ -26,6 +27,9 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         props::GLOWING => Some(props::update_0988),
         props::PICKUP => Some(props::update_0e5b),
         lift::CLASS => Some(lift::update_0aaa),
+        // Also level 19's (L19 `0x414848` / `0x3c1cc8`, the same code and data).
+        hovership::HOVERSHIP => Some(hovership::update_0eef),
+        hovership::RARITANIUM => Some(hovership::update_099a),
         seesaw::CLASS => Some(seesaw::update_090d),
         crystal::CRYSTAL => Some(crystal::update_096a),
         crystal::LEFT => Some(crystal::update_08c4),
