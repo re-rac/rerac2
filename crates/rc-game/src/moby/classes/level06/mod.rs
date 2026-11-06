@@ -20,6 +20,7 @@
 //!   `0x21ecc4` and the path points' `w`), 0x1240 (`0x465f18`: the level's table `0x1b21c4`, `0x47c358`).
 
 pub mod arc_shot;
+pub mod barrel;
 pub mod brawler;
 pub mod breakables;
 pub mod gate;
@@ -74,6 +75,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         pole::CLASS => Some(pole::update_12c4),
         gate::CLASS => Some(gate::update_031a),
         0x0307 => Some(pole::update_0307),
+        barrel::CLASS => Some(barrel::update_08b8),
         _ => None,
     }
 }

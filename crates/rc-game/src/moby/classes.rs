@@ -380,7 +380,8 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x0953..=0x0956 | 0x0971 => Some(space::update_asteroid),
         crate::ship::MISSILE_CLASS => Some(crate::ship::update_missile),
         space::SHIELD_PICKUP | space::BOLT_PICKUP => Some(space::update_pickup),
-        pickup::CLASS => Some(pickup::update),
+        // 0x0ae0: a placed pickup (L25 `0x3da5f8`, 1 placed), the same update.
+        pickup::CLASS | 0x0ae0 => Some(pickup::update),
         nanotech::CLASS => Some(nanotech::update),
         crate::vendor::CLASS => Some(vendor::update),
         // Endako (endakoA).

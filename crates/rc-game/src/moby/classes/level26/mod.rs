@@ -2,6 +2,7 @@
 //! addresses with the port's). Each class's update is registered in [`update_for`]; crate::moby::classes::update_for
 //! asks it after its own.
 
+pub mod node;
 pub mod props;
 
 /// This level's class updates.
@@ -9,6 +10,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
         props::FLOATER => Some(props::update_0af4),
         props::MOTE => Some(props::update_0c00),
+        node::CLASS => Some(node::update_0a79),
         _ => None,
     }
 }

@@ -389,6 +389,44 @@ pub fn whole_ball(w: &mut MobyWorld, id: usize, b: usize, gravity: f32, vel: V3,
     m.set_pv_f(b + RADIUS, m.bsphere[3] * k);
 }
 
+/// `0x2dbff8(gravity, m, 0, -1, vel, spin, sound)` on moby `id`'s own pvars (block `+0x00`): the whole moby thrown in
+/// place — no collision (`+0x98` 0), mode 0x100; the velocity and spin, the floor's loss 0.45 (least 1/30), 0.5, sin
+/// 0.75°, the gravity (/3600), the weight's turn, 180 ticks, the sound, no contacts; its pivot its bounding sphere
+/// (`+0x00`, /1024) back into its frame, its radius the sphere's; its points its collision blob's, as [`spawn_whole`]'s.
+/// Its source is the moby itself here (the original leaves `+0x54` as its pvars held it). It ticks with
+/// [`step_in_place`] (`0x2dc1f0`).
+pub fn whole_in_place(w: &mut MobyWorld, id: usize, gravity: f32, vel: V3, spin: Q, sound: u8) {
+    let n = w.class(w.mobys[id].o_class).map_or(0, |c| c.coll_points.len());
+    let m = &mut w.mobys[id];
+    if m.pvars.len() < BLOCK { m.pvars.resize(BLOCK, 0); }
+    m.has_collision = false;
+    m.mode |= mode::KEEP_ROWS;
+    m.set_pv_v(VEL, vel);
+    m.set_pv_q(SPIN, spin);
+    m.set_pv_f(LOSS, f32::from_bits(0x3ee6_6666));
+    m.set_pv_f(LEAST, f32::from_bits(0x3d08_8889));
+    m.set_pv_f(0x40, 0.5);
+    m.set_pv_f(0x44, f32::from_bits(0x3c56_7752));
+    m.set_pv_f(GRAVITY, gravity * 0.000_277_777_8);
+    m.set_pv_f(WEIGHT, f32::from_bits(0x3ae4_c38a));
+    m.set_pv_s(LIFE, 0xb4);
+    m.pvars[SOUND] = sound;
+    m.pvars[MODE] = 0;
+    m.pvars[POINTS] = n as u8;
+    m.pvars[COUNT] = 0;
+    m.set_pv_i(0x30, 0);
+    m.set_pv_i(SOURCE, id as i32);
+    let k = 0.000_976_562_5;
+    let c = [m.bsphere[0] * k, m.bsphere[1] * k, m.bsphere[2] * k];
+    let d = sub(c, m.pos);
+    let rows = m.rows;
+    m.set_pv_v(PIVOT, [dot(d, rows[0]), dot(d, rows[1]), dot(d, rows[2])]);
+    m.set_pv_f(RADIUS, m.bsphere[3] * k);
+}
+
+/// `0x2dc1f0` on a moby set up by [`whole_in_place`]: true when its life is over (or it left the world).
+pub fn step_in_place(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool { step(w, id, ctx) }
+
 /// `0x2dc1f0` on the block at `b` of moby `id`'s pvars (modes 1 and 3 share `0x2dc518`, [`ball`]): true when its life
 /// is over or it left the world.
 pub fn ball_at(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, b: usize) -> bool { ball_in(w, id, ctx, b) }
