@@ -1295,6 +1295,7 @@ fn death_reset(p: &mut Play, lv: &crate::level_load::LoadedLevel) {
     p.game.restart();
     p.mobys = None;
     p.hero = Hero::spawn(at, rot[2]);
+    p.hero.gravity = level_gravity(lv);
     p.hero.hp = p.game.max_health;
     p.hero.damage.armour = armour;
     p.anim = RatchetAnim { curves: &rc_game::hero::CURVES, ..RatchetAnim::new(&lv.mobys.anim[p.class]) };
@@ -2967,6 +2968,14 @@ fn game_fog(play: Option<ResMut<Play>>, fog: Option<ResMut<crate::game_camera::G
     if fog.fog != lf || fog.particle_far12 != far { *fog = crate::game_camera::GameFog::new(lf, far); }
 }
 
+/// The level settings' gravity sphere (rc_game::gravity::Gravity::from_settings).
+fn level_gravity(lv: &crate::level_load::LoadedLevel) -> rc_game::gravity::Gravity {
+    let s = rc_formats::disc::gameplay::level_settings(&lv.gameplay).ok().flatten();
+    let g = s.map(rc_game::gravity::Gravity::from_settings).unwrap_or_default();
+    if g.on { println!("play: the level's gravity sphere on about ({:.1}, {:.1}, {:.1})", g.centre[0], g.centre[1], g.centre[2]); }
+    g
+}
+
 /// The hero at Ratchet's instance (class 0).
 fn start(lv: &crate::level_load::LoadedLevel) -> Option<Play> {
     let m = &lv.mobys;
@@ -2978,6 +2987,7 @@ fn start(lv: &crate::level_load::LoadedLevel) -> Option<Play> {
     let inst = &m.instances[instance];
     let scale = m.placed.get(instance).copied().flatten().map_or(1.0, |pl| pl.scale);
     let mut hero = Hero::spawn(inst.position, inst.rotation[2]);
+    hero.gravity = level_gravity(lv);
     hero.hp = rc_game::game::GameState::default().max_health;
     let camera = FollowCamera::new(&cam_input(&hero, lv.collision.as_ref(), [0.0; 2]));
     println!("play: Ratchet at ({:.1}, {:.1}, {:.1}), yaw {:.2}: game tick on", inst.position[0], inst.position[1], inst.position[2], inst.rotation[2]);

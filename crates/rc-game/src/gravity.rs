@@ -27,9 +27,10 @@
 //! camera's up (`0x2d9760`) and its frame branches (`0x421dc8`, `0x4227b8`, `0x4239d0`), the shadow probes'
 //! frame branch (`0x31da58`, `0x2a97d8`).
 //!
-//! Not ported: the cylinder mode (`0x1a8ff4`, `0x1a9000`, `0x3263d0`; no consumer yet), the level settings' sphere
-//! (`0x3012a0`; no level known to use it), Ratchet's frame mode 1 (the magnetic walkways with the Gravity Boots
-//! `0x18a168`, the states 0x3b / 0x6d / 0x6e and `0x18a038`: their own smoothed normal `0x18a110` / `0x18a11c`), the
+//! The level settings' sphere ([`Gravity::from_settings`]) is set at Ratchet's spawns (the Jamming Array has one).
+//!
+//! Not ported: the cylinder mode (`0x1a8ff4`, `0x1a9000`, `0x3263d0`; no consumer yet), Ratchet's frame mode 1 (the
+//! magnetic walkways with the Gravity Boots `0x18a168`, the states 0x3b / 0x6d / 0x6e and `0x18a038`: their own smoothed normal `0x18a110` / `0x18a11c`), the
 //! other readers (listed in docs/plan/gaps.md G-LVL-003).
 
 use crate::hero::physics::{dist, dot, len, scale, sub, unit, V3};
@@ -81,6 +82,19 @@ impl Default for Gravity {
 }
 
 impl Gravity {
+    /// The level's own sphere: the level load (`0x3012a0`) turns the flag on when the settings' word after the death
+    /// height (`+0x2c`) is set, with the centre `+0x30` (w 1) into `0x1b1a90`. Ratchet's set-up (`0x2a4fa8`, L26)
+    /// then copies that centre and its w into his block (`0x189ed0`), so down is toward it.
+    pub fn from_settings(settings: &[u8]) -> Gravity {
+        let f = |o: usize| settings.get(o..o + 4).map_or(0.0, |b| f32::from_le_bytes(b.try_into().unwrap()));
+        let mut g = Gravity::default();
+        if settings.get(0x2c..0x30).is_some_and(|b| b != [0; 4]) {
+            let c = [f(0x30), f(0x34), f(0x38)];
+            (g.on, g.height_centre, g.centre, g.inward) = (true, c, c, true);
+        }
+        g
+    }
+
     /// `0x2d37a0`'s sphere part: mode 2 while the sphere is on (the walkways' mode 1 is not ported).
     pub fn frame_mode(&self) -> u8 { if self.on { 2 } else { 0 } }
 

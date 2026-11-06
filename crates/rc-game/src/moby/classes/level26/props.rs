@@ -26,9 +26,6 @@
 //! * its trail: its history of places and angles, and the draw registered once a frame for its group (`0x3d5e40`,
 //!   the draw `0x3d5ff8`);
 //! * the six-point table `0x2967a0` its first set-up rotates, which only that draw reads.
-//!
-//! The level settings that turn the sphere on at the load (`0x3014a8`) are not ported (crate::gravity), so the mote
-//! stays hidden.
 
 use crate::hero::physics::{add, cross, scale, set_len, sub, unit, V3};
 use crate::moby::attach::{rows_of, turn};

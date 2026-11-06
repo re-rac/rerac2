@@ -45,10 +45,13 @@
 //! centre `0x1b1d10` is crate::gravity::Gravity::height_centre. The L23 copies read the same values from `$gp+0x50`
 //! further on.
 //!
+//! **The rocks** it throws when it breaks ([`throw_rocks`], `0x3f6778`, L23 `0x3fd940`, before the dust):
+//! (60 / the camera's distance; above 2.2, 2.7)² · height · 0.55 of them, at most the free moby slots (`0x1b1fc0`,
+//! crate::moby::MobyWorld::free_slots) · 0.15. Each one is a 0x0a80 (`0x3d1e68`, L23 `0x3d9518`,
+//! crate::moby::classes::level16::rocks::spawn) at its share of the height up the column, ±(that factor plus a tenth
+//! of its height) across, with random angles.
+//!
 //! Not ported:
-//! * the rocks it throws when it breaks (`0x3f6778`, L23 `0x3fd940`: (60 / the camera's distance, at most 2.2, else
-//!   2.7)² · height · 0.55 of them, at most `0x1b1fc0` · 0.15, each class 0x0a80 made by `0x3d1e68` (L23 `0x3d9518`,
-//!   the decomp's `func_L16_003C3A10`)): the port has no class 0x0a80;
 //! * the level's explosion at it (L22 `0x3a4f80` → `0x3a4df8`: a pool of 50 a kind of three effect classes,
 //!   `0x3fc6f8` / `0x3fdc80` / `0x3fe6e8`; L23 its own `0x41dcd8`): no port of either;
 //! * its shrubs hidden and shown with its ties (`0x1b25f8 + 0x20·i` `+0x16` bit 0): the port has no hidden shrubs;
@@ -390,6 +393,7 @@ fn hide(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// State 2 (module docs).
 fn destroy(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     ctx.host.play_level_sound_after(None, 0x10, 0);
+    throw_rocks(w, id, ctx);
     dust(w, id, ctx, true);
     let n = count(&w.mobys[id]);
     for base in [pv::LAYERS, pv::DEBRIS] {
@@ -400,6 +404,28 @@ fn destroy(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let ties = w.mobys[id].pv_i(pv::TIES);
     if 0 <= ties { ties_hidden(w, ties, true); }
     w.mobys[id].state = 3;
+}
+
+/// `0x3f6778` (L23 `0x3fd940`): the rocks of its break (module docs, "The rocks").
+fn throw_rocks(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let mut f = 60.0 / dist(ctx.host.camera_pos(), w.mobys[id].pos);
+    if f32::from_bits(0x400c_cccd) < f { f = f32::from_bits(0x402c_cccd); }
+    let height = w.mobys[id].pv_f(pv::HEIGHT);
+    let n = f * f * height * f32::from_bits(0x3f0c_cccd);
+    let step = height / n;
+    let n = n.min(w.free_slots() as f32 * f32::from_bits(0x3e19_999a));
+    let mut i = 0;
+    while (i as f32) < n {
+        let up = i as f32 * step;
+        let across = f + up * 0.1;
+        let g = &mut ctx.game.rng;
+        let (x, y) = (g.randf_signed(0.0, across), g.randf_signed(0.0, across));
+        let rot = [g.rand_angle(), g.rand_angle(), g.rand_angle()];
+        let (rows, pos) = (w.mobys[id].rows, w.mobys[id].pos);
+        let at = add(to_world([x, y, up], &rows), pos);
+        crate::moby::classes::level16::rocks::spawn(w, ctx, id, at, rot);
+        i += 1;
+    }
 }
 
 /// `0x3f6b28(m, full)` (L23 `0x3fdcf0`): height · 7.29 · [`DUST_DENSITY`] puffs (a fifth of them without `full`) up
