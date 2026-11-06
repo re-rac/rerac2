@@ -51,6 +51,17 @@ pub fn angles_of(r: &[V3; 3]) -> V3 {
 /// The rows `a` turned by `r` (`0x2efa00(out, a, r)`: each row times `r`).
 pub fn turn(a: &[V3; 3], r: &[V3; 3]) -> [V3; 3] { a.map(|row| to_world(row, r)) }
 
+/// A moby turned by `angles` in its own frame about its own point `pivot` (L14 `0x334b60`, the decomp's
+/// `func_002B4090`): the new rows `rows_of(angles)` through the old, its place moved by the pivot's shift and its
+/// angles those of the new rows (`0x320000`). Its rows are left for the caller.
+pub fn pivot_turn(m: &mut super::Moby, angles: V3, pivot: V3) {
+    let m0 = rows_of(m.rot);
+    let m1 = turn(&rows_of(angles), &m0);
+    let (a, b) = (to_world(pivot, &m0), to_world(pivot, &m1));
+    m.pos = std::array::from_fn(|k| m.pos[k] + a[k] - b[k]);
+    m.rot = angles_of(&m1);
+}
+
 /// World rows / point into the frame `c` (rows, orthonormal) and back.
 fn to_local(v: V3, c: &[V3; 3]) -> V3 { [dot(v, c[0]), dot(v, c[1]), dot(v, c[2])] }
 fn to_world(l: V3, c: &[V3; 3]) -> V3 { std::array::from_fn(|k| l[0] * c[0][k] + l[1] * c[1][k] + l[2] * c[2][k]) }

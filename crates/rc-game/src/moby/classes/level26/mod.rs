@@ -8,6 +8,7 @@ pub mod props;
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
         props::FLOATER => Some(props::update_0af4),
+        props::MOTE => Some(props::update_0c00),
         _ => None,
     }
 }
