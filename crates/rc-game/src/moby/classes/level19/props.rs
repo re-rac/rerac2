@@ -102,3 +102,51 @@ pub fn update_11c7(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     m.mode = (m.mode | 0x41) & 0xefff;
     m.has_collision = false;
 }
+
+pub const TELEPORTER: i16 = 0x0edc;
+
+/// 0x0edc (`0x4131e0`, 8 placed; the decomp's v2.00 `func_US2_L19_004131DC`): a pad that takes Ratchet to the
+/// level's other chunk.
+/// * **1**: Ratchet standing on it (`0x322d28`) gets the prompt (owner 8): `+8` picks 0x134c, 0x134e or (anything
+///   else) 0x134b. △ with that prompt showing starts the trip: 2.
+/// * **2**: the screen fades out over 30 ticks. After 32 ticks:
+///   * the chunk switches to `+0x00`, with music `+0x10` (`0x303530`);
+///   * Ratchet is put at cuboid `+4`'s place and angles;
+///   * then 3.
+/// * **3**: the screen fades back in; then 1.
+///
+/// Not ported: Ratchet held still during the trip (his state 2), the Hacker's state test (`0x1b9a90 + 0x86` ≠ 5),
+/// and the loop sound `+0x18` stopped at the end.
+pub fn update_0edc(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    if w.mobys[id].state == 0 {
+        let m = &mut w.mobys[id];
+        m.update_dist = 0xff;
+        m.set_state(1, -1);
+        m.set_pv_i(0x18, -1);
+    }
+    match w.mobys[id].state {
+        1 => {
+            if ctx.hero.ground_moby != Some(id) { return; }
+            let text = match w.mobys[id].pv_i(8) { 0 => 0x134c, 1 => 0x134e, _ => 0x134b };
+            let lease = ctx.game.prompt.request(8, text, 1);
+            if lease != 0 && ctx.hero.items.pressed & crate::pad::button::TRIANGLE != 0 && ctx.hero.state == 0 {
+                w.mobys[id].state_ticks = 0;
+                ctx.game.scenes.fade_out(30.0, 0x20);
+                w.mobys[id].set_state(2, -1);
+            }
+        }
+        2 => {
+            let m = &mut w.mobys[id];
+            let t = m.state_ticks;
+            m.state_ticks = t.wrapping_add(1);
+            if 0x20 <= t {
+                let (chunk, track, at) = (m.pv_i(0), m.pv_i(0x10), m.pv_i(4));
+                ctx.switch_chunk(chunk, track);
+                if let Some((pos, rot)) = ctx.level.cuboid_place(at) { ctx.hero.teleport(pos, rot); }
+                w.mobys[id].set_state(3, -1);
+            }
+        }
+        3 => if ctx.game.scenes.fade <= 0.0 { w.mobys[id].set_state(1, -1) },
+        _ => {}
+    }
+}
