@@ -203,11 +203,12 @@ impl Hero {
         if !floor { self.vel = self.with_flat_len(self.vel, 0.0); }
     }
 
-    /// `0x2b56f8` in mode 2: the capsule is a sphere of his radius 0.77 up his moby's up row (`0x2d3c40(0.77)`), up to
-    /// 8 passes (flags 0x24) and the hero-only groups; `false` when the total push exceeds 1.5·r.
+    /// `0x2b56f8` in mode 2: the capsule is a sphere of his radius 0.77 up his moby's up row (`0x2d3c40(0.77)`; Giant
+    /// Clank, `0x18c0d4` = 2: 5 up, L00 `0x2b581c`, L22 `0x2ba1f4`), up to 8 passes (flags 0x24) and the hero-only
+    /// groups; `false` when the total push exceeds 1.5·r.
     pub(super) fn frame_capsule_try(&mut self, env: &Env) -> bool {
         let old = self.pos;
-        let off = scale(self.gravity.moby_rows[2], 0.77);
+        let off = scale(self.gravity.moby_rows[2], if self.mode == 2 { 5.0 } else { 0.77 });
         self.pos = add(self.pos, off);
         let r = self.cap_radius;
         let flags = QueryFlags::exclude_surface(0) | QueryFlags::MOBY_SUBMASK;

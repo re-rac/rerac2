@@ -211,6 +211,8 @@ impl Hero {
                     let busy = self.items.thrown != 0;
                     // Held past 31 ticks only under the first-person camera's view lock.
                     if (held & button::L1 != 0 || busy) && (self.view_lock != 0 || self.timer < 0x1f) { return None; }
+                    // Giant Clank: back to his idle (L22 `0x2ce468(0)`).
+                    if self.mode == 2 { return self.idle_state(); }
                     if held & button::R1 != 0 { return Some(4); }
                 }
                 if self.set_state(anim, env, 0, false) {

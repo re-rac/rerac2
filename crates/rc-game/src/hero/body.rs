@@ -1,5 +1,7 @@
 //! The body switch (`0x18c0d4` ≠ 0): the player's control moved onto another moby — Clank's body (1) on Endako —
-//! and back to Ratchet (L03 `0x2b8508` / `0x2b8718`, the same code on every level that has a body).
+//! and back to Ratchet (L03 `0x2b8508` / `0x2b8718`, the same code on every level that has a body; Giant Clank (2) on
+//! the orbit levels, L22 `0x2b7200`: his capsule 5.25 / 4.45 / 3.75 and his health `0x18b694` = 1200,
+//! crate::hero::giant).
 //!
 //! **`0x2b8508(body, state, moby)`**: a use of the hand item over (`0x2b5208`), the wrench asked for (`0x18c0d6`), the
 //! items' last update (`0x2b7a20`), Ratchet's moby (`0x18aa38`) and his items hidden (`0x2d3d88`), his looping sounds
@@ -93,7 +95,7 @@ impl Hero {
         self.body.moby = Some(moby);
         self.body.changes.push(Change::To(moby));
         // `0x2b8f18`, then the top and the bottom at their targets.
-        let (top, bottom, r) = if body == 1 { CLANK_CAPSULE } else { (0.8, 0.7, 0.45) };
+        let (top, bottom, r) = match body { 1 => CLANK_CAPSULE, 2 => super::giant::CAPSULE, _ => (0.8, 0.7, 0.45) };
         (self.cap_top_target, self.cap_bottom_target, self.cap_radius_target) = (top, bottom, r);
         (self.cap_top, self.cap_bottom) = (top, bottom);
         self.anim_speed = 1.0;
@@ -102,6 +104,8 @@ impl Hero {
             self.body.ratchet_hp = self.hp as i16;
             self.hp = self.body.clank_hp.min(4);
         }
+        // Giant Clank: his own health `0x18b694` (Ratchet's stays).
+        if body == 2 { self.giant.hp = super::giant::START_HP; }
         self.request_state(state, true);
     }
 
@@ -120,11 +124,13 @@ impl Hero {
         if self.state != 0x61 || !in_scene { self.request_state(0, true); }
     }
 
-    /// `0x2c8e30`: the idle state of the body playing (Ratchet 0, Clank 0x3f; the others none).
+    /// `0x2c8e30` (L22 `0x2ce468`): the idle state of the body playing (Ratchet 0, Clank 0x3f, Giant Clank 0x56; the
+    /// others none).
     pub fn idle_state(&self) -> Option<i32> {
         match self.mode {
             0 => Some(0),
             1 => Some(0x3f),
+            2 => Some(0x56),
             _ => None,
         }
     }
@@ -133,6 +139,8 @@ impl Hero {
 /// After the hero's tick while a body plays (`0x2a65d8` has no item pass): the hits the body's states dealt this tick
 /// (Clank's punch, `0x2ba8e0` case 0x4d), as the item pass delivers Ratchet's ([`crate::hero::items::item_pass`]).
 pub fn body_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
+    // Giant Clank's hits (crate::hero::giant).
+    if ctx.hero.mode == 2 { super::giant::pass(world, ctx); }
     for h in std::mem::take(&mut ctx.hero.hits_out) {
         let t = crate::moby::hits::HitTemplate::new(h.damage, ctx.hero_moby, h.flags, [h.dir[0], h.dir[1], h.dir[2], 0.0]);
         let mut c = h.centre;

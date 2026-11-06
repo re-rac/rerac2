@@ -30,7 +30,7 @@
 //! by writing the follow record's yaw script directly (Endako's boss, its mod vendor 0x0ddc) go through [`CamTurn`]
 //! ([`CamTweaks::turn_toward`]).
 //!
-//! **Not ported**: the body cameras (Giant Clank's branch of `0x4239d0`: the hero is never Giant Clank yet), the focus
+//! **Not ported**: D+0x250 in Giant Clank's branch of `0x4239d0` (crate::hero::giant), the focus
 //! mobys `0x1b8e84` / `0x18b270` (nothing sets them on Aranos), the stick auto-centre (`$gp+0x2540` is 0 on the disc),
 //! the knock-down view (state 0x74, mode 11), the camera's own shift `0x1b8fc0`, the magnetic walkway's branch of
 //! `0x4227b8` (the gravity frames' is ported: crate::gravity) and the settle after the walkway and the frames (D+0x14e:
@@ -172,8 +172,8 @@ fn dec_timer(t: &mut i16) -> i32 {
 }
 
 /// `0x427990` / `0x427a70`: the point the camera looks at, the feet + Ratchet's up axis · 1.6 (Clank 0.75, Giant Clank
-/// 9.5).
-pub fn target_point(hero: &Hero) -> V3 { add(hero.pos, scale(hero.rows[2], 1.6)) }
+/// 9.5: crate::first_person::eye_height).
+pub fn target_point(hero: &Hero) -> V3 { add(hero.pos, scale(hero.rows[2], crate::first_person::eye_height(hero))) }
 
 /// What the camera reads each tick besides the hero.
 #[derive(Clone, Copy)]
@@ -897,6 +897,22 @@ impl FollowCamera {
                 }
             }
             self.sph_scale = 0.6;
+        }
+        // Giant Clank (`0x18c0d4` = 2; L22 `0x424dd0`, L23 `0x43a408`, the values `$gp+0x274c..` / L23 `$gp+0x2dfc..`):
+        // the look height 9, the distance 12 and the pivot 15 (unless D+0x250 is 2 or more: not kept, 0 here), snapped
+        // behind him in the camera's first two updates (`0x1b9004`); running toward the camera does not pull it in; the
+        // sphere chain at scale 2, step 0.14.
+        if h.mode == 2 {
+            self.set_look_h(9.0, 0.005, false);
+            self.set_dist(12.0, 0.003, true);
+            self.set_pivot_h(15.0, 0.003);
+            if self.ticks < 2 {
+                (self.dist, self.pivot_h, self.look_h) = (12.0, 15.0, 9.0);
+                (self.pivot_h_s, self.look_h_s) = (15.0, 9.0);
+                self.snap(inp);
+            }
+            self.lock_toward();
+            (self.sph_scale, self.sph_step) = (2.0, 0.14);
         }
         if h.state == 0x81 {
             self.look_from_s = 1;

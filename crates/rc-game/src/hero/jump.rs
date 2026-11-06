@@ -7,8 +7,9 @@
 //! pad (classes 0x9b9 / 0xf05 under the feet), 0x6e the jump on a magnetic walkway, 0x66 out of quicksand (group
 //! 0x19), 0x12 out of the water, 0x45 / 0x48 the swing and climb jumps, 0x89 the scripted leap; the packs' 10 (the
 //! Heli-Pack's long jump), 0xf (its high jump: the rotors lift 49/3600 a tick from tick 35 for 36 ticks), 0x10 (the
-//! Thruster-Pack's boost: its target speed 0.19, 0.095 above 1.4) and 0xd (its high jump, 4 high). 0xc, 0x5b and 0x92
-//! take only the shared defaults.
+//! Thruster-Pack's boost: its target speed 0.19, 0.095 above 1.4) and 0xd (its high jump, 4 high); Giant Clank's 0x5b
+//! (L22's SetState `0x2c9b20`: 4.2 high, 120 at most over 90 ticks of ✕; crate::hero::giant). 0xc and 0x92 take only
+//! the shared defaults.
 //!
 //! **Height.** The entry sets a minimum and maximum height, the gravity 0.00825 (descending: 0.009652 for 7), the
 //! takeoff tick and the ramp. While ✕ is held (and for the first tick), up to the ramp's end, the height aimed at
@@ -169,6 +170,11 @@ impl Hero {
                 std(j);
                 (j.air_speed, j.f_apex, j.f_land, j.hmax, j.hmin, j.ramp, j.no_double, j.f34c) = (0.116_024_04, 30.0, 12.0, 2.75, 2.7, 5, 1, 1);
             }
+            0x5b => {
+                // Giant Clank's jump (L22 `0x2c9b20`; its transitions are crate::hero::giant's).
+                (j.takeoff, j.bottom, j.f_hold, j.f_apex, j.f_land, j.hmin, j.hmax, j.ramp) = (0xc, 0.6, 17.0, 22.0, 40.0, 4.2, 120.0, 90);
+                (j.g, j.air_turn, j.g_down, j.terminal, j.f334, j.air_speed) = (0.010_277_778, 0.078_539_826, 0.019_444_445, 0.950_000_05, 2.0, 0.295_000_02);
+            }
             0x45 => {
                 (j.takeoff, j.air_speed, j.bottom, j.f_hold, j.f_apex, j.f_land) = (3, 0.033_333_335, 0.6, 15.0, 24.0, 12.0);
                 (j.hmax, j.hmin, j.ramp, j.g, j.dec) = (1.35, 1.3, 0xe, 0.006_944_444_5, 0.013_888_889);
@@ -269,6 +275,10 @@ impl Hero {
             }
             0x45 => {
                 self.set_anim(anim, 5.0, 7, 5);
+                Entry::Done
+            }
+            0x5b => {
+                self.set_anim(anim, 7.0, 4, 3);
                 Entry::Done
             }
             10 => Entry::Anim(5.0, 0x12, 0),

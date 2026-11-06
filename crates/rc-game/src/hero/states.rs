@@ -69,6 +69,8 @@ impl Hero {
         if matches!(id, 0x16..=0x1a | 0x93) { self.items.tucked = true; }
         if NO_MENU.contains(&id) { self.no_menu = 1; }
         if NO_ITEMS.contains(&id) { self.items.no_use = 1; }
+        // `0x2c9b20` case 0 with Giant Clank's body: his idle instead (`0x2ce468(0)`).
+        if id == 0 && self.mode == 2 { return self.set_state(anim, env, 0x56, true); }
         let entry = match module_of(id) {
             Module::Ground => self.ground_entry(anim, env, id, play),
             Module::Walk => self.walk_entry(anim, env, id, play),
@@ -82,6 +84,7 @@ impl Hero {
             Module::Swing => self.swing_entry(anim, env, id, play),
             Module::Water => self.water_entry(anim, env, id, play),
             Module::Clank => self.clank_entry(anim, env, id, play),
+            Module::Giant => self.giant_entry(anim, env, id, play),
             Module::Script => self.script_entry(anim, env, id, play),
             Module::Gear => self.gear_entry(anim, env, id, play),
             Module::Grind => self.grind_entry(anim, env, id, play),
@@ -168,6 +171,7 @@ impl Hero {
             Module::Swing => self.phys_swing(env, anim),
             Module::Water => self.phys_water(env, anim),
             Module::Clank => self.phys_clank(env, anim),
+            Module::Giant => self.phys_giant(env, anim),
             Module::Script => self.phys_script(env, anim),
             Module::Gear => self.phys_gear(env, anim),
             Module::Grind => self.phys_grind(env, anim),
@@ -181,6 +185,8 @@ impl Hero {
     /// `0x2cb650`: the current state's transitions (the prologue's checks that apply to every state: below the
     /// level's death height `0x1b1a68` with more than 2 above the ground → 0x74, not ported).
     pub fn transitions(&mut self, env: &Env, anim: &mut dyn AnimCtl) {
+        // Giant Clank (`0x18c0d4` = 2): his hit intake and states (crate::hero::giant).
+        if self.mode == 2 { return self.giant_transitions(env, anim); }
         // The prologue: the hit intake, no health, the fall out of the level; the item trigger (`0x2c96d0`: the wrench).
         if self.transitions_prologue(env, anim) { return; }
         if self.swingshot_trigger(env, anim) { return; }
@@ -206,6 +212,7 @@ impl Hero {
             Module::Swing => self.trans_swing(env, anim),
             Module::Water => self.trans_water(env, anim),
             Module::Clank => self.trans_clank(env, anim),
+            Module::Giant => None,
             Module::Script => self.trans_script(env, anim),
             Module::Gear => self.trans_gear(env, anim),
             Module::Grind => self.trans_grind(env, anim),

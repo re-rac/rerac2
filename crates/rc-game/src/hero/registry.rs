@@ -38,6 +38,8 @@ pub enum Module {
     Water,
     /// `misc.rs`: the stagger 0x26 / 0x2f, the slide 0x30, the mud 0x76, the bonk 0x77.
     Misc,
+    /// `giant.rs`: Giant Clank (`0x18c0d4` = 2: 0x56..0x5a, 0x5d..0x5f; his jump 0x5b is the jump group's).
+    Giant,
     /// Not ported yet.
     Unported,
 }
@@ -74,7 +76,9 @@ pub const STATES: &[StateInfo] = &[
     s(0x3f, 0, Clank, true), s(0x40, 1, Clank, true), s(0x41, 2, Clank, true), s(0x42, 7, Clank, true),
     s(0x43, 0x14, Clank, true), s(0x44, 2, Clank, true), s(0x45, 4, Jump, true), s(0x46, 3, Clank, true),
     s(0x47, 3, Clank, true), s(0x48, 4, Jump, true), s(0x49, 3, Clank, true), s(0x4a, 3, Clank, true),
-    s(0x4b, 5, Clank, true), s(0x4d, -1, Clank, true), s(0x4e, 2, Clank, true), s(0x5b, 4, Jump, true),
+    s(0x4b, 5, Clank, true), s(0x4d, -1, Clank, true), s(0x4e, 2, Clank, true), s(0x56, 0, Giant, true), s(0x57, 1, Giant, true),
+    s(0x58, 2, Giant, true), s(0x59, 7, Giant, true), s(0x5a, 7, Giant, true), s(0x5b, 4, Jump, true), s(0x5d, 6, Giant, true),
+    s(0x5e, 6, Giant, true), s(0x5f, 0x14, Giant, true),
     s(0x60, -1, Script, true), s(0x61, 0x18, Script, true), s(0x62, 1, Script, true), s(0x63, 1, Script, true),
     s(0x64, 0, Script, true), s(0x65, 0x19, Damage, true), s(0x66, 0x19, Jump, true), s(0x67, 0x14, Damage, true),
     s(0x6d, 6, Melee, true), s(0x6e, 4, Jump, true), s(0x6f, 9, Script, true), s(0x70, 1, Walk, true),

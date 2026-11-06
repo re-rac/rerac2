@@ -4,6 +4,7 @@
 
 pub mod asteroid;
 pub mod debris;
+pub mod giant;
 pub mod director;
 pub mod props;
 
@@ -14,6 +15,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         debris::DUST => Some(debris::update_0cb6),
         asteroid::CLUSTER => Some(asteroid::update),
         props::HIDDEN => Some(props::update_0a6c),
+        giant::BODY => Some(giant::update_027d),
         director::CLASS => Some(director::update_133a),
         _ => None,
     }
