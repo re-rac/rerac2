@@ -11,7 +11,7 @@
 //!   update, the camera; Ratchet's instance gets his position and rows (`MobyOcclusion::drive`) and his animation
 //!   state (`MobyAnim`); the camera goes to `PlayView`.
 //!
-//! Environment: `RC_PLAY=0` (no tick), `RC_PLAY_FLY=1` (start on the fly camera; Tab switches), `RC_PLAY_TRACE=1`
+//! Environment: `RC_PLAY=0` (no tick), `RC_PLAY_TICKS=n` (dev: exit after `n` ticks), `RC_PLAY_FLY=1` (start on the fly camera; Tab switches), `RC_PLAY_TRACE=1`
 //! (one line per tick: state, position, velocity, air ticks, sequence), `RC_SCENES=0` (the scenes count as seen),
 //! `RC_HERO_AT=x,y,z,yaw` (Ratchet's start), `RC_GRAVITY_AT=x,y,z` (the gravity frames pinned on about a centre), `RC_GIVE_ITEMS=a,b,…` (the items had, the last in the hand; 2 / 3 give Clank on the back with the Heli-Pack / Thruster-Pack), `RC_CHEATS=a,b,…` (those cheat bytes on), `RC_ITEM_ROWS=item:row,…` / `RC_WEAPON_XP=item:points,…` (weapons' rows and experience, rc_game::upgrades).
 
@@ -46,6 +46,7 @@ impl Plugin for PlayPlugin {
             .add_systems(FixedUpdate, (game_fog, tick, pause_tick, level_sounds).chain().after(crate::card::CardStep))
             .add_systems(Update, (draw_created, draw_hud, move_instances, ship_screen.after(draw_created), crate::overlay_mobys::assign_layers.after(draw_created)))
             .add_systems(Update, crate::puzzle_view::apply)
+            .add_systems(Update, play_ticks_exit)
             .add_systems(PostUpdate, draw_canopy.before(bevy::asset::AssetEventSystems))
             .add_systems(PostUpdate, draw_shots.before(bevy::asset::AssetEventSystems))
             .add_systems(PostUpdate, occlusion_mode.before(crate::occlusion::OcclusionSet))
@@ -2984,6 +2985,18 @@ fn level_gravity(lv: &crate::level_load::LoadedLevel) -> rc_game::gravity::Gravi
     let g = s.map(rc_game::gravity::Gravity::from_settings).unwrap_or_default();
     if g.on { println!("play: the level's gravity sphere on about ({:.1}, {:.1}, {:.1})", g.centre[0], g.centre[1], g.centre[2]); }
     g
+}
+
+/// `RC_PLAY_TICKS=n` (dev builds): the run ends once the game has ticked `n` times, so a headless run without a
+/// screenshot closes its window on its own.
+fn play_ticks_exit(play: Option<Res<Play>>, mut limit: Local<Option<Option<u64>>>, mut exit: MessageWriter<AppExit>) {
+    if !cfg!(feature = "dev") { return; }
+    let n = *limit.get_or_insert_with(|| std::env::var("RC_PLAY_TICKS").ok().and_then(|v| v.trim().parse::<u64>().ok()));
+    let (Some(n), Some(p)) = (n, play) else { return };
+    if n <= p.ticks {
+        println!("play: RC_PLAY_TICKS {n} reached: exiting");
+        exit.write(AppExit::Success);
+    }
 }
 
 /// The hero at Ratchet's instance (class 0).

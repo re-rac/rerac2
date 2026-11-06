@@ -758,6 +758,10 @@ impl MobyWorld {
             }
             m.rot = b.rotation;
             m.group = b.group as i8;
+            // `0x30d810` (L08; the loop's `*(u16 *)(class + 0x44) |= record[0x1c]`): the record's mode bits go into
+            // its class's header too, so the class's later mobys (`InitMobyInstance` reads `+0x44`: the created and
+            // the thrown, as crate::moby::classes::level17::mortar's) carry them — the framework's 0x20 among them.
+            if let Some(c) = self.classes.iter_mut().find(|c| c.o_class == b.o_class as i16) { c.mode |= b.mode_bits as u16; }
             m.mode |= b.mode_bits as u16;
             (m.light, m.ambient) = (b.light_word(), b.ambient_rgb());
             m.instance = Some(i);

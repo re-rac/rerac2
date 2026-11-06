@@ -1,7 +1,8 @@
 //! R&C2's enemy framework (L00): the blocks an enemy's pvars hold and the shared routines that work on them. The
 //! enemies address everything as offsets into their pvars, and the framework finds its blocks through the pointer
 //! words at the pvars' start (kept relative here: [`Block`]): `[0]` the health block, `[0xc]` the target block,
-//! `[0x10]` the reaction block, `[0x18]` the movement block. Only mobys with mode 0x20 take part.
+//! `[0x10]` the reaction block, `[0x18]` the movement block. The damage (and the target search) take only mobys with mode 0x20; the movement
+//! only needs its block (`[0x18]` set).
 //!
 //! * **Senses** `0x32dcf0`: the movement block's turn (`+0x14` accel, `+0x18` brake, `+0x1c` most) and walk (`+0x20` /
 //!   `+0x24` accel, `+0x28` most) limits.
@@ -435,7 +436,8 @@ fn ground(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3, from: V3) {
 pub fn move_step(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, yaw: f32, goal: V3) -> i32 {
     let frame = ctx.game.frame;
     let m = &mut w.mobys[id];
-    if m.mode & AI == 0 { return 8; }
+    // `0x2b5d28`: the movement block's pointer (`[0x18]`), not the mode, gates the move.
+    if m.pv_i(0x18) == 0 { return 8; }
     let o = mv(m);
     if frame == m.pv_i(o + 0xbc) { return m.pv_i(o + 0x94); }
     m.set_pv_i(o + 0x98, m.pv_i(o + 0x94));
@@ -503,7 +505,7 @@ pub fn move_by(w: &mut MobyWorld, id: usize, ctx: &Ctx, v: V3) -> i32 {
 /// side swapped every `+0xe2..+0xe4` ticks).
 pub fn move_toward(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, offset: f32, goal: V3) -> i32 {
     let m = &mut w.mobys[id];
-    if m.mode & AI == 0 { return 8; }
+    if m.pv_i(0x18) == 0 { return 8; }
     let o = mv(m);
     let mut yaw = add_rot(atan2(goal[0] - m.pos[0], goal[1] - m.pos[1]), offset);
     if m.pv_f(o + 0xdc) != 0.0 {
