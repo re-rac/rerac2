@@ -90,6 +90,35 @@ impl Default for MessageBox {
     }
 }
 
+/// The format with two numbers (`vsprintf` with two arguments, L08 `0x33e1e0`): the first `%d` / `%i` / `%u` takes
+/// `n[0]`, the later ones `n[1]`.
+fn format2(fmt: &[u8], n: [i32; 2]) -> Vec<u8> {
+    let mut out = Vec::new();
+    let (mut i, mut k) = (0, 0);
+    while i < fmt.len() {
+        let c = fmt[i];
+        if c == b'%' && i + 1 < fmt.len() {
+            match fmt[i + 1] {
+                b'd' | b'i' | b'u' => {
+                    out.extend_from_slice(n[k.min(1)].to_string().as_bytes());
+                    k += 1;
+                    i += 2;
+                    continue;
+                }
+                b'%' => {
+                    out.push(b'%');
+                    i += 2;
+                    continue;
+                }
+                _ => {}
+            }
+        }
+        out.push(c);
+        i += 1;
+    }
+    out
+}
+
 /// `0x115da8(out, format, n)`: the format's `%d` / `%i` (and `%%`) filled.
 fn format(fmt: &[u8], n: i32) -> Vec<u8> {
     let mut out = Vec::new();
@@ -248,6 +277,8 @@ pub enum Request {
     /// The text by id formatted with `n` (`0x115da8`) into the second box (L01 `0x325830`: its `0x2ed8b8` →
     /// `0x3049d0` = L00 `0x30eff8`).
     SecondFormatted { text: i32, n: i32, ticks: Option<i32> },
+    /// The same with two numbers (crate::moby::talk::say).
+    SecondFormatted2 { text: i32, n: [i32; 2], ticks: Option<i32> },
 }
 
 impl Boxes {
@@ -261,6 +292,7 @@ impl Boxes {
                 Request::Text { text: t, ticks } => self.first.show_text(text(t), ticks, glyphs),
                 Request::Second { text: t, ticks } => self.second.show_second(text(t), ticks, glyphs),
                 Request::SecondFormatted { text: t, n, ticks } => self.second.show_second(&format(text(t), n), ticks, glyphs),
+                Request::SecondFormatted2 { text: t, n, ticks } => self.second.show_second(&format2(text(t), n), ticks, glyphs),
             }
         }
         self.first.tick(glyphs);

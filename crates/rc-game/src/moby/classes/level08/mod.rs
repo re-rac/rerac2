@@ -3,6 +3,7 @@
 //! after its own.
 
 pub mod breakables;
+pub mod buyer;
 pub mod breather;
 pub mod burrower;
 pub mod crystal;
@@ -14,6 +15,8 @@ pub mod tabora_ai;
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
+        // Also level 19's (L19 `0x42afa8`, the same code and data).
+        buyer::CLASS => Some(buyer::update_0e3e),
         breakables::CLASS_12AA | breakables::CLASS_129C | breakables::CLASS_129E => Some(breakables::update_12aa),
         breakables::CLASS_12D0 => Some(breakables::update_12d0),
         breakables::CLASS_129F => Some(breakables::update_129f),

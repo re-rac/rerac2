@@ -49,6 +49,7 @@ pub mod knock;
 pub mod platform;
 pub mod shards;
 pub mod slide;
+pub mod talk;
 pub mod target_search;
 
 use crate::hero::physics::{add, scale, V3};
@@ -612,6 +613,8 @@ pub struct MobyWorld {
     pub zodiac: classes::zodiac::Arcs,
     /// The Sheepinator's globals: its light, loop sound, beam and the flock (classes::sheepinator).
     pub sheep: classes::sheepinator::Mem,
+    /// The talking NPCs' level globals (talk).
+    pub talk: talk::Mem,
     /// The camera's rows (`0x1b8f70`: forward, left, up) as the last moby loop saw them, for the particles that read
     /// the view matrix `0x1b8c00` ([`MobyWorld::view_x`]).
     pub cam_rows: [V3; 3],

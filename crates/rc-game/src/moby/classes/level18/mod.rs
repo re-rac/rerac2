@@ -7,12 +7,14 @@ pub mod breeder;
 pub mod dropship;
 pub mod hatch;
 pub mod props;
+pub mod seller;
 pub mod stalker;
 pub mod traffic;
 
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
+        seller::CLASS => Some(seller::update_1292),
         breeder::CLASS => Some(breeder::update_0b69),
         breakables::PANEL_A | breakables::PANEL_B | breakables::PANEL_C => Some(breakables::update_122c),
         breakables::GLOW_PANEL => Some(breakables::update_1184),

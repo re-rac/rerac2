@@ -1949,15 +1949,26 @@ pub fn update_0a1e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 ///   the Tractor Beam his (`0x2e99e8` / `0x3186d0`: L00's `0x2f46e0` / `0x3227d8`), the message 0x1226 (`0x31d0e0`), the
 ///   help 0x9bc in slot 0x13 (`0x2ea578`); the prop and the seller gone.
 /// * **3** (short of bolts; more than the price → 4) and **4** (enough; fewer → the counter shown, 3): while Ratchet can
-///   talk to it ([`can_talk`], 2.5) the bolt counter shows and the second message box the price in the text 0x1300
+///   talk to it (crate::moby::talk::can_talk, 2.5) the bolt counter shows and the second message box the price in the text 0x1300
 ///   (3) or 0x12fe (4) (`0x325830`); in 4 a △ press (`0x138324 & 0x10`) queues the sale's scene 0x28 and starts it: 5.
+///
+/// * **Every tick** (not deleted): its idle and look (crate::moby::talk::idle / look: looking in sequence 0, no
+///   fidget, the pitch within ±10°, `0x3d4804..0x3d4bb8`; the aims `0x31a0e0`).
 ///
 /// Not ported: the talk record it marks (`0x325980(0x3259d8(m))`: the level's talk list `0x1c5d20` / `0x28ead0`, its
 /// record `0x139a34 + 0x10·i`; the missions' kinds 4 and 5 read it), its prop's set-up and joint (`0x309b28`,
-/// `0x315f20`, `0x31a700(m, prop, 2, 0)`), its head and body turning to Ratchet (the joint aims `0x31a0e0` with the
-/// timers `+0x114` / `+0x118` / `+0x11e` and its idle sequence `0x311358`: no joint aims in the port), the scene flag
-/// `0x1b22a8`, the camera `0x42d968` of `+0x12c` and the autosave `0x303030` after the sale (as the Dynamo's).
+/// `0x315f20`, `0x31a700(m, prop, 2, 0)`), the scene flag `0x1b22a8`, the camera `0x42d968` of `+0x12c` and the
+/// autosave `0x303030` after the sale (as the Dynamo's).
 pub fn update_0ace(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    use crate::moby::talk::{self, Layout, Timer};
+    const LOOK: Layout = Layout { look_seq: 0, fidget: None, idle: 0x11e, seen: Timer::Word(0x114), glance: Timer::Word(0x118), pitch: 0.174_532_95 };
+    states_0ace(w, id, ctx);
+    if 0x80 <= w.mobys[id].state { return; }
+    talk::idle(w, id, ctx, &LOOK);
+    talk::look(w, id, ctx, &LOOK);
+}
+
+fn states_0ace(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     use crate::hero::items::TRACTOR;
     const ZONE: usize = 0x120;
     const PROP: usize = 0x128;
@@ -2027,7 +2038,7 @@ pub fn update_0ace(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 ctx.game.show_bolts = Some(0xb4);
                 return w.mobys[id].set_state(3, -1);
             }
-            if !can_talk(w, id, ctx, 2.5, 10) { return; }
+            if !crate::moby::talk::can_talk(w, id, ctx, 2.5, 10) { return; }
             ctx.game.show_bolts = Some(0xb4);
             let text = if state == 3 { 0x1300 } else { 0x12fe };
             ctx.game.messages.push(crate::msgbox::Request::SecondFormatted { text, n: price, ticks: Some(1) });
@@ -2038,17 +2049,6 @@ pub fn update_0ace(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         _ => {}
     }
-}
-
-/// `0x3258c0(r, moby, n)`: Ratchet can talk to `id`: not in states 0x1c / 0x31, with health, on the ground (`0x18a160`
-/// ticks, no air ticks `0x18a16e`), not in movement group 3, the game in play (`$gp−0x60b0`), within 2·r of it (3D),
-/// the level running `n` frames or more (`0x1b2088`, L00's `0x1b1948`).
-fn can_talk(w: &MobyWorld, id: usize, ctx: &Ctx, r: f32, n: i32) -> bool {
-    let h = &*ctx.hero;
-    if h.state == 0x1c || h.state == 0x31 || h.hp == 0 || h.grounded_ticks == 0 || h.air_ticks != 0 || h.group == 3 { return false; }
-    if ctx.game.scenes.mode != crate::scene::PLAY { return false; }
-    if r + r < crate::hero::physics::dist(w.mobys[id].pos, h.pos) { return false; }
-    n <= w.frame
 }
 
 /// 0x061c (`0x3a6fb8`, 22 placed): a rider on a path of the swamp (pvars: `+0x50` the path, `+0x54` its height a tick,
