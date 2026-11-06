@@ -4,19 +4,25 @@
 
 pub mod director;
 pub mod fence;
+pub mod field;
 pub mod gate;
 pub mod lift;
 pub mod movers;
 pub mod props;
 pub mod rappeller;
+pub mod screen;
+pub mod sheet;
 pub mod steam;
 pub mod switch;
 
 /// This level's draw callbacks (crate::fx): true when the moby's class is one of them.
 #[allow(clippy::too_many_arguments)]
-pub fn draw(w: &mut crate::moby::MobyWorld, _host: &dyn crate::moby::MobyHost, _game: &mut crate::game::GameState, _hero_state: i32, _view: &crate::particles::BSphereView, cam: crate::hero::physics::V3, id: usize, _first: bool, out: &mut Vec<crate::fx::FxQuad>, _frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
+pub fn draw(w: &mut crate::moby::MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, _hero_state: i32, _view: &crate::particles::BSphereView, cam: crate::hero::physics::V3, id: usize, _first: bool, out: &mut Vec<crate::fx::FxQuad>, frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
     match w.mobys[id].o_class {
         fence::CLASS => fence::draw(w, id, cam, out),
+        field::CLASS => field::draw(w, id, cam, host.camera_rows(), frame),
+        sheet::CLASS => sheet::draw(w, id, &mut game.rng, out),
+        screen::CLASS => screen::draw(w, id, &mut game.rng, out),
         _ => return false,
     }
     true
@@ -29,6 +35,9 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         steam::BOBBER => Some(steam::update_0af2),
         steam::SEQUENCER => Some(steam::update_0b19),
         fence::CLASS => Some(fence::update_0f80),
+        field::CLASS => Some(field::update_0afe),
+        sheet::CLASS => Some(sheet::update_0bff),
+        screen::CLASS => Some(screen::update_12b9),
         props::HATCH => Some(props::update_0b11),
         props::FLAP => Some(props::update_0ae7),
         rappeller::CLASS => Some(rappeller::update_09b4),

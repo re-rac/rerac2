@@ -1038,6 +1038,7 @@ fn tick(
             if m.update.is_some() || m.drive {
                 o.drive(ii, m.pos, m.rows, m.scale, crate::mobys::moby_lights(&lv.mobys, m.rows, m.light, m.ambient).as_ref(), hidden);
                 o.game_look(ii, m.alpha, m.mode, m.glow, m.draw_dist, m.shine);
+                if let Some(&k) = mobys.world.class_scroll.get(&m.o_class) { o.set_scroll(ii, k); }
                 // A placed moby's modifiers pose it (rc_game::moby::Moby::manips, `joint_scales`, `joint_moves`: Endako's
                 // boss's rotor and turrets, its crane's arm). Without any, its slot is left alone.
                 if !(m.manips.is_empty() && m.joint_scales.is_empty() && m.joint_moves.is_empty() && m.joint_nodes.is_empty()) {
@@ -1387,6 +1388,7 @@ fn puzzle_frame(p: &mut Play, lv: &crate::level_load::LoadedLevel, occl: Option<
             if m.update.is_some() || m.drive {
                 o.drive(ii, m.pos, m.rows, m.scale, crate::mobys::moby_lights(&lv.mobys, m.rows, m.light, m.ambient).as_ref(), hidden);
                 o.game_look(ii, m.alpha, m.mode, m.glow, m.draw_dist, m.shine);
+                if let Some(&k) = mobys.world.class_scroll.get(&m.o_class) { o.set_scroll(ii, k); }
             } else {
                 o.set_hidden(ii, hidden);
             }
@@ -2145,6 +2147,7 @@ fn scene_tick(p: &mut Play, lv: &mut crate::level_load::LoadedLevel, commands: &
             if m.update.is_some() || m.drive {
                 o.drive(ii, m.pos, m.rows, m.scale, crate::mobys::moby_lights(&lv.mobys, m.rows, m.light, m.ambient).as_ref(), hidden);
                 o.game_look(ii, m.alpha, m.mode, m.glow, m.draw_dist, m.shine);
+                if let Some(&k) = mobys.world.class_scroll.get(&m.o_class) { o.set_scroll(ii, k); }
             } else {
                 o.set_hidden(ii, hidden);
                 o.set_shine(ii, m.shine);

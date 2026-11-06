@@ -32,8 +32,7 @@
 //!   * **3**: its uid marked gone (crate::game::GameState::uid_gone), deleted.
 //!
 //! Not ported for 0x124f: the switch back of the hero's form at its end (`0x2c5b50(0)`, with `+0x90`; level 20's
-//! own, which the port lacks). For 0x119b: the scroll of its class's texture coordinates (`0x326a20` = L00
-//! `0x310838`: 0x10 a tick on s, back by 0x1000), and the point light `+0x0a` freed at its end (`0x312160` = L00
+//! own, which the port lacks). For 0x119b: the point light `+0x0a` freed at its end (`0x312160` = L00
 //! `0x2fdc48`; this code never takes one).
 
 use crate::hero::physics::{add, scale, sub};
@@ -225,11 +224,14 @@ pub fn update_119b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         _ => {}
     }
-    // Its scroll: on by 0x10 a tick, back by 0x1000 past it (the class's texture scroll is not ported).
+    // Its scroll: on by 0x10 a tick, back by 0x1000 past it; its class's texture coordinates moved the same
+    // (`0x326a20` = L00 `0x310838`: 0x10 on s, −0xff0 at the wrap; every placed one moves the shared class).
     let m = &mut w.mobys[id];
-    let mut s = m.pv_s(8).wrapping_add(0x10);
-    if 0x1000 < s { s -= 0x1000; } else if s < 0 { s += 0x1000; }
+    let (mut s, mut step) = (m.pv_s(8).wrapping_add(0x10), 0x10);
+    if 0x1000 < s { s -= 0x1000; step = -0xff0; } else if s < 0 { s += 0x1000; step = 0x1010; }
     m.set_pv_s(8, s);
+    let class = m.o_class;
+    w.scroll_class(class, step, 0);
 }
 
 pub const NEST: i16 = 0x11ec;

@@ -1909,6 +1909,17 @@ impl MobyOcclusion {
         }
     }
 
+    /// Gameplay instance `ii`'s class texture scroll (rc_game::moby::MobyWorld::class_scroll: `s | t << 16`) into its
+    /// record's `misc.w`, which moby.wgsl adds to the STs.
+    pub fn set_scroll(&mut self, ii: usize, scroll: u32) {
+        let at = ii * RECORD_SIZE + 204;
+        let Some(dst) = self.records.get_mut(at..at + 4) else { return };
+        if dst[..] != scroll.to_le_bytes()[..] {
+            dst.copy_from_slice(&scroll.to_le_bytes());
+            self.records_dirty = true;
+        }
+    }
+
     /// The `MobyAnim` instance of gameplay instance `ii` (None without geometry).
     pub fn anim_index(&self, ii: usize) -> Option<usize> { self.anim_index.get(ii).copied().flatten() }
 

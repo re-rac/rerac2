@@ -667,6 +667,9 @@ pub struct MobyWorld {
     pub drawbridge: classes::level16::drawbridge::Globals,
     /// Level 14's electric strands (classes::level14::fence::Globals).
     pub fence14: classes::level14::fence::Globals,
+    /// The classes' texture scrolls (`0x310838(class, ds, dt)`, L20 `0x326a20`: every ST of the class's packets moved
+    /// by (ds, dt) in 1/4096, wrapping as u16), by class: `s | t << 16`. The engine adds them to the class's STs.
+    pub class_scroll: std::collections::HashMap<i16, u32>,
     /// The point lights (`0x1c6ec0`), owned by the explosion lights (classes::light); the engine lights the world and
     /// the mobys with them.
     pub point_lights: crate::point_lights::PointLights,
@@ -898,6 +901,13 @@ impl MobyWorld {
 
     /// `0x2e7920(callback, moby)`: the moby's draw callback runs after this tick (crate::fx).
     pub fn register_draw(&mut self, id: usize) { self.draws.push(id); }
+
+    /// `0x310838(class, ds, dt)`: class `o_class`'s texture scroll moved ([`MobyWorld::class_scroll`]).
+    pub fn scroll_class(&mut self, o_class: i16, ds: i32, dt: i32) {
+        let w = self.class_scroll.entry(o_class).or_insert(0);
+        let (s, t) = ((*w as u16).wrapping_add(ds as u16), ((*w >> 16) as u16).wrapping_add(dt as u16));
+        *w = s as u32 | (t as u32) << 16;
+    }
 
     /// The view matrix's first row (`0x1b8c00`, built by `0x2e4818` from the camera's rows: −left.x, −up.x, forward.x).
     pub fn view_x(&self) -> V3 { [-self.cam_rows[1][0], -self.cam_rows[2][0], self.cam_rows[0][0]] }
