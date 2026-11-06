@@ -16,6 +16,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         props::FIELD => Some(props::update_0e60),
         props::MOVER => Some(props::update_094d),
         props::PAD => Some(props::update_0efc),
+        props::LAUNCH_PAD => Some(props::update_0e80),
         0x0ccb => Some(super::level04::misc::update_empty),
         _ => None,
     }
