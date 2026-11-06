@@ -2,10 +2,19 @@
 //! the L00 ones the port knows them by where they differ). Each class's update is registered in [`update_for`] and
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
 
+pub mod den;
+pub mod lurker;
 pub mod props;
 
 use crate::hero::physics::V3;
 use crate::moby::MobyWorld;
+
+/// The level's globals its classes share.
+#[derive(Clone, Debug, Default)]
+pub struct Globals {
+    /// `$gp+0x2cd0`: the lurkers attacking (at most lurker::MOST_ATTACKERS; emptied by each one's set-up).
+    pub attackers: i32,
+}
 
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
@@ -15,6 +24,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         props::TELEPORTER => Some(props::update_0edc),
         props::DROPPER => Some(props::update_11ff),
         props::TURN_LIFT => Some(props::update_114d),
+        lurker::CLASS => Some(lurker::update_10d0),
+        den::CLASS => Some(den::update_1177),
         // Level 20's fading field 0x119b's code (L19 `0x423750`).
         0x1204 => Some(super::level20::props::update_119b),
         _ => None,
