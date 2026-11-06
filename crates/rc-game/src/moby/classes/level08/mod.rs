@@ -9,6 +9,7 @@ pub mod burrower;
 pub mod crystal;
 pub mod hovership;
 pub mod lift;
+pub mod mission;
 pub mod props;
 pub mod seesaw;
 pub mod tabora_ai;
@@ -27,6 +28,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         props::GLOWING => Some(props::update_0988),
         props::PICKUP => Some(props::update_0e5b),
         lift::CLASS => Some(lift::update_0aaa),
+        mission::CLASS => Some(mission::update_0c2a),
         // Also level 19's (L19 `0x414848` / `0x3c1cc8`, the same code and data).
         hovership::HOVERSHIP => Some(hovership::update_0eef),
         hovership::RARITANIUM => Some(hovership::update_099a),
