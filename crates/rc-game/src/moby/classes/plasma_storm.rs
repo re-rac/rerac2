@@ -67,8 +67,13 @@
 //! ball point 0.4 out along joint 0's x wobbling, `$gp+0x5b0` / `$gp+0x5b4`), its ball point's glints 0.185625·spin and
 //! 0.084375·spin, the points beside it from a circle in the hand's x-z plane (`0x3a3838`), its own arcs (`0x3a3568`).
 //!
-//! Not ported: the gravity frames' trackers and bends (`0x37f538` / `0x37f618` / `0x37f5f8`, `0x380e08` / `0x380ec0`),
-//! the lock cheat (`0x18b270`), the GS test register the draws set
+//! The Lock On mod's lock is the tick's aim (`0x18b270` → `0x18aa18`, crate::moby::lock_on).
+//!
+//! The gravity frames (crate::gravity): the storm keeps a tracker (`+0x50`, `0x37f538(storm, 0, 1, 1, 1)`) that turns its
+//! velocity after each step (`0x37f618`); its place and velocity ride the level's moving frame (`0x380e08` /
+//! `0x380ec0`); its last bursts go along the frames' up (`0x37ecc0`) and the tracker is given back (`0x37f5f8`).
+//!
+//! Not ported: the GS test register the draws set
 //! (`0x37c948`), the ball point's spring (`0x31ec88`: the update resets it every tick, so the draw always snaps), the
 //! words `$gp+0x5a8` / `$gp+0x5ac` the shot writes and nothing reads.
 
@@ -76,7 +81,7 @@ use super::plasma_coil::{self, Arc, HandArc, Wobble};
 use crate::hero::items::{row, ItemRow, PLASMA_COIL};
 use crate::hero::physics::{add, add_rot, cross, dot, euler_rows, len, scale, set_len, sub, sub_rot, unit, V3};
 use crate::moby::hits::HitTemplate;
-use crate::moby::{aim, countdown, mode, Ctx, MobyWorld};
+use crate::moby::{aim, countdown, lock_on, mode, Ctx, MobyWorld};
 use crate::point_lights::PointLight;
 use rc_formats::moby_anim::JointModifier;
 
@@ -179,6 +184,8 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     } else {
         ctx.hero.items.look_wait = 0x28;
     }
+    // The Lock On mod's lock as the aim (crate::moby::lock_on).
+    lock_on::mirror(w, ctx);
     match w.mobys[id].state {
         0 => start(w, id, ctx),
         1 => {
@@ -330,6 +337,8 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, slot: i32, at: V3, d
         m.set_pv_i(0x58, 0);
         m.state = 0;
     }
+    let k = crate::gravity::track(w, ctx.hero, id, None, [1.0; 3]);
+    w.mobys[id].set_pv_i(0x50, k);
     w.coil.storm.count += 1;
     let light = w.point_lights.alloc(PointLight { color: LIGHT, intensity: 0.0, pos: at, radius: 0.0 }).map_or(-1, |s| s as i32);
     w.mobys[id].set_pv_i(0x5c, light);
@@ -399,9 +408,10 @@ pub fn update_ball(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         3 if w.mobys[id].pv_i(0x54) == 0 && w.mobys[id].pv_i(0x58) == 0 => {
             let mut at = w.mobys[id].pos;
-            let up = ctx.hero.gravity.up_at(at);
+            let up = crate::gravity::up(ctx.hero, at);
             burst(ctx, &mut at, up, 6, 0x72ff);
             burst(ctx, &mut at, up, 6, 0xff_0000);
+            crate::gravity::untrack(w, w.mobys[id].pv_i(0x50));
             w.claims.release(id);
             w.coil.storm.count -= 1;
             let light = w.mobys[id].pv_i(0x5c);
@@ -428,6 +438,11 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> Option<usize> {
     let mut vel = w.mobys[id].pv_v(0);
     let mut bend = w.mobys[id].pv_v(0x20);
     let mut pos = add(was, vel);
+    // The tracker's turn at the new place (`0x37f618(+0x50, vel, 0)`), then the moving frame's ride of the place and
+    // the velocity (`0x380e08` / `0x380ec0`).
+    vel = crate::gravity::turn(w, ctx.hero, w.mobys[id].pv_i(0x50), vel, Some(pos));
+    pos = crate::gravity::ride(w, pos);
+    vel = crate::gravity::ride_dir(w, vel);
     if len(vel) != 0.0 && len(bend) != 0.0 { vel = crate::quat::turn_toward(f32::from_bits(0x3d99_999a), vel, bend); }
     let size = w.mobys[id].pv_f(0x4c);
     let hit = ctx.coll.and_then(|c| crate::collision::coll_sphere_m(c, ctx.scene, pos, size, crate::collision::QueryFlags(0), Some(id)));

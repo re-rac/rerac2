@@ -57,7 +57,8 @@ impl Hero {
     pub(super) fn jump_entry(&mut self, anim: &mut dyn AnimCtl, env: &Env, id: i32, play: bool) -> Entry {
         // From a bounce pad's top every jump is the bounce; on a magnetic walkway the magnetic jump.
         if id != 0x81 && BOUNCE_PADS.contains(&self.ground_class) { return Entry::Return(self.set_state(anim, env, 0x81, true)); }
-        if id != 0x6e && self.surf.boots == 1 && id != 0xe && id != 0x38 { return Entry::Return(self.set_state(anim, env, 0x6e, true)); }
+        // `0x2c6288`: not in the gravity's cylinder mode (crate::gravity).
+        if id != 0x6e && self.surf.boots == 1 && id != 0xe && id != 0x38 && !self.gravity.cylinder { return Entry::Return(self.set_state(anim, env, 0x6e, true)); }
         if self.prev_state == 0x11 && !self.wall.high { self.wall.count = self.wall.count.saturating_add(1) } else { self.wall.count = 0 }
         // An updraft under him: the float.
         if self.gear.updraft != 0 { return Entry::Return(self.set_state(anim, env, 0x82, true)); }

@@ -10,7 +10,7 @@
 //! sent to its twin 0x1d (`0x2c4560(0x1d, 1)`); its sequence run out, back to 1 (`0x31b760(hand, 1, 0, 2, 0)`); the
 //! muzzle ([`muzzle`], `0x3ff780`: 0.28 along its row 0 and −0.85 along its row 1); outside the twin `0x18c354` is set
 //! to 0x28, in it counted down; the throw from the muzzle (`0x37e328(1.6, 10, 0.25 a tick, 14.6 a second², ..)`, no
-//! target (the lock cheat's `0x18b270` only): 10 ahead of Ratchet, or with L1 the camera's look;
+//! target (the Lock On mod's lock `0x18b270` only, crate::moby::lock_on): 10 ahead of Ratchet, or with L1 the camera's look;
 //! crate::moby::classes::gravity_bomb::launch_with) and the arc followed to where it lands (`0x37e988`,
 //! crate::moby::classes::gravity_bomb::landing_with) for the marker ([`draw_marker`], `0x3ff990` → `0x37dfc0(1, ..)`).
 //! The cooldown runs down (`0x2eeb40`); run out this tick with a bomb left: its class sound 3. The use's ticks out
@@ -61,9 +61,14 @@
 //! The weapon mod (`0x3f9f70(m, 0x4c upgraded / 0x25, the hand)`, crate::moby::weapon_mods): Acid on every moby the
 //! bomb touched and on the moby a bomblet hit (not a crate).
 //!
-//! Not ported: the pad rumble (`0x2d6d60` / `0x2d6f38`); the lock cheat
-//! (`0x18b270`); the gravity frames and the moving frames (`0x326448`'s other gravities, `0x380e08`, `0x37f538` /
-//! `0x37f618` / `0x37f5f8`: the port's crate::gravity stands in for the up); the write-only word `0x1b2b64` (0x14 at the
+//! The gravity frames (crate::gravity): the bomb and each bomblet ride the level's moving frame (`0x380e08`), keep a
+//! tracker (`0x37f538(m, 0, 1, 1, 1)`, `+0x30` / `+0x28`) that turns their velocity each move (`0x37f618`), and fall
+//! along the frames' up (`0x37ec68`); the tracker is given back when they go.
+//!
+//! A throw starts the pad's rumble (`0x2d6d60(0x29f1d0)`, `+0x28`; crate::rumble), stopped after it
+//! (crate::rumble::weapon_stop).
+//!
+//! Not ported: the write-only word `0x1b2b64` (0x14 at the
 //! start and at an empty press); the blasts' heat shimmer (crate::moby::blast). The sweep's flag `+0x50` (a moby of
 //! class type 5 bounces) is left unset by both callers (the stack's leftovers): taken as 0. The bomb's fourth bounce
 //! puts it at the sweep's sphere centre (`0x1bf1b0`), which a line hit leaves from an earlier query: the line's point
@@ -73,7 +78,8 @@ use crate::collision::QueryFlags;
 use crate::hero::items::{row, BOUNCER};
 use crate::hero::physics::{add, cross, dist, dot, len, scale, set_len, sub, unit, V3};
 use crate::moby::hits::HitTemplate;
-use crate::moby::{aim, countdown, mode, Ctx, MobyWorld};
+use crate::moby::{aim, countdown, lock_on, mode, Ctx, MobyWorld};
+use crate::rumble;
 use crate::quat::{axis_angle, mul, Q};
 
 /// The hand's class (item 0x25's row `+0x04`), the upgraded hand's (rows 0x4c / 0x61 / 0x62), the bomb's and the bomblet's.
@@ -150,6 +156,9 @@ mod pv {
     pub const BOUNCES: usize = 0x24;
     pub const SMOKE: usize = 0x28;
     pub const UP: usize = 0x2c;
+    /// The bomb's tracker (crate::gravity::track; the bomblet's at `+0x28`).
+    pub const TRACKER: usize = 0x30;
+    pub const LET_TRACKER: usize = 0x28;
     /// The bomblet's.
     pub const LIFE: usize = 0x20;
     pub const ARMING: usize = 0x22;
@@ -217,7 +226,9 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         ctx.hero.items.look_wait = 0x28;
         true
     };
-    let vel = super::gravity_bomb::launch_with(ctx, LEAST, REACH, SPEED, GRAVITY, from, None);
+    // The throw's target: the Lock On mod's lock while it lives (crate::moby::lock_on::live).
+    let target = lock_on::live(w, ctx).map(|t| w.mobys[t].pos);
+    let vel = super::gravity_bomb::launch_with(ctx, LEAST, REACH, SPEED, GRAVITY, from, target);
     let found = super::gravity_bomb::landing_with(w, ctx, id, from, vel, GRAVITY);
     {
         let m = &mut w.mobys[id];
@@ -252,7 +263,11 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if let Some(b) = throw(w, ctx, id, from, vel) { w.mobys[b].parent = Some(id); }
             ctx.hero.items.use_start(ctx.hero.group);
             w.mobys[id].set_pv_i(hand::USE, USE_TICKS);
+            // The pad's rumble (`0x2d6d60(0x29f1d0)`, crate::rumble).
+            let h = ctx.game.rumble.start(&rumble::pattern::BOUNCER);
+            w.mobys[id].set_pv_i(0x28, h);
         }
+        rumble::weapon_stop(w, id, ctx, 0x28, true);
         w.bouncer.cooldown = shot;
     }
     w.register_draw(id);
@@ -334,6 +349,8 @@ fn throw(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, at: V3, vel: V3) -> Opti
     m.set_pv_i(pv::SMOKE, SMOKE_TICKS);
     m.set_pv_q(pv::SPIN, axis_angle(spin, rows[1]));
     m.scale *= BOMB_SCALE[up];
+    let slot = crate::gravity::track(w, ctx.hero, id, None, [1.0; 3]);
+    w.mobys[id].set_pv_i(pv::TRACKER, slot);
     w.rebuild(id, &*ctx.host);
     w.changed = true;
     Some(id)
@@ -356,7 +373,7 @@ struct Swept {
 fn sweep(w: &MobyWorld, ctx: &Ctx, id: usize, from: V3, to: V3, vel: V3, radius: f32, keep: f32, floor: f32, pass: &[i16]) -> Swept {
     let none = Swept { res: 0, at: to, vel, surface: -1, centre: to };
     let Some(c) = ctx.coll else { return none };
-    let up = ctx.hero.gravity.up_at(w.mobys[id].pos);
+    let up = crate::gravity::up(ctx.hero, w.mobys[id].pos);
     let hit = crate::collision::coll_sphere_m(c, ctx.scene, to, radius, QueryFlags(0), Some(id)).map(|h| (h.pushed_centre.unwrap_or(h.point), h))
         .or_else(|| w.coll_line(ctx, from, to, 0, Some(id)).map(|h| (h.point, h)));
     let Some((at, h)) = hit else { return none };
@@ -382,15 +399,19 @@ fn shadow(w: &mut MobyWorld, ctx: &Ctx, size: f32, id: usize) {
 pub fn update_bomb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let up = (w.mobys[id].pv_i(pv::UP) != 0) as usize;
     let shadow_size = if up != 0 { BOMB_SHADOW * UPGRADED } else { BOMB_SHADOW };
+    let world_up = ctx.hero.gravity.up_at(w.mobys[id].pos);
+    // On the level's moving frame (`0x380e08`).
+    w.mobys[id].pos = crate::gravity::ride(w, w.mobys[id].pos);
     match w.mobys[id].state {
         0 => {
             let Some(r) = row(ctx.game, BOUNCER).copied() else { return };
-            let world_up = ctx.hero.gravity.up_at(w.mobys[id].pos);
             let old = w.mobys[id].pos;
             let to = add(old, w.mobys[id].pv_v(pv::VEL));
             w.mobys[id].pos = to;
-            // `0x37ec68(14.6/3600, pos, vel)`: the fall along the up at the new place.
-            let vel = sub(w.mobys[id].pv_v(pv::VEL), scale(ctx.hero.gravity.up_at(to), GRAVITY));
+            // `0x37f618(+0x30, vel, 0)`: the tracker's turn at the new place; `0x37ec68(14.6/3600, pos, vel)`: the
+            // fall along the frames' up there.
+            let vel = crate::gravity::turn(w, ctx.hero, w.mobys[id].pv_i(pv::TRACKER), w.mobys[id].pv_v(pv::VEL), None);
+            let vel = sub(vel, scale(crate::gravity::up(ctx.hero, to), GRAVITY));
             w.mobys[id].set_pv_v(pv::VEL, vel);
             // The smoke while its ticks run: three puffs along the step, `(n / 50)·65000 + 10000` large.
             let mut n = w.mobys[id].pv_i(pv::SMOKE);
@@ -493,7 +514,7 @@ fn burst(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         s += f32::from_bits(0x3e99_999a);
     }
     // The frame about the up (`0x37ecc0`): (z, z, −(x + y)) made unit, the up × it, the up.
-    let n = ctx.hero.gravity.up_at(pos);
+    let n = crate::gravity::up(ctx.hero, pos);
     let a = unit([n[2], n[2], -(n[0] + n[1])]);
     let b = cross_ba(a, n);
     for k in 0..BOMBLETS {
@@ -505,6 +526,7 @@ fn burst(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let v = add(add(scale(a, v[0]), scale(b, v[1])), scale(n, v[2]));
         if let Some(c) = bomblet(w, ctx, pos, v, k, up) { w.mobys[c].parent = owner; }
     }
+    crate::gravity::untrack(w, w.mobys[id].pv_i(pv::TRACKER));
     w.delete(id);
 }
 
@@ -536,6 +558,8 @@ fn bomblet(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, vel: V3, k: i32, up: usize)
     m.set_pv_i(pv::LET_UP, up as i32);
     m.set_pv_s(pv::ARMING, BOMBLET_ARMING + k as i16);
     m.scale *= BOMBLET_SCALE[up];
+    let slot = crate::gravity::track(w, ctx.hero, id, None, [1.0; 3]);
+    w.mobys[id].set_pv_i(pv::LET_TRACKER, slot);
     w.rebuild(id, &*ctx.host);
     w.changed = true;
     Some(id)
@@ -544,12 +568,16 @@ fn bomblet(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, vel: V3, k: i32, up: usize)
 /// `0x40abb0` (module docs).
 pub fn update_bomblet(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let up = (w.mobys[id].pv_i(pv::LET_UP) != 0) as usize;
+    let world_up = ctx.hero.gravity.up_at(w.mobys[id].pos);
+    // On the level's moving frame (`0x380e08`).
+    w.mobys[id].pos = crate::gravity::ride(w, w.mobys[id].pos);
     if w.mobys[id].state == 0 {
-        let world_up = ctx.hero.gravity.up_at(w.mobys[id].pos);
         let old = w.mobys[id].pos;
         let to = add(old, w.mobys[id].pv_v(pv::VEL));
         w.mobys[id].pos = to;
-        let vel = sub(w.mobys[id].pv_v(pv::VEL), scale(ctx.hero.gravity.up_at(to), GRAVITY));
+        // The tracker's turn (`0x37f618(+0x28, vel, 0)`) and the fall along the frames' up, as the bomb's.
+        let vel = crate::gravity::turn(w, ctx.hero, w.mobys[id].pv_i(pv::LET_TRACKER), w.mobys[id].pv_v(pv::VEL), None);
+        let vel = sub(vel, scale(crate::gravity::up(ctx.hero, to), GRAVITY));
         let s = sweep(w, ctx, id, old, to, vel, BOMBLET_RADIUS[up], BOMBLET_BOUNCE, NEVER_FLOOR, &[0, HAND_CLASS, BOMB]);
         let kind = surface_kind(s.surface);
         w.mobys[id].pos = s.at;
@@ -597,6 +625,7 @@ pub fn update_bomblet(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let size = if up != 0 { f32::from_bits(0x4019_999a) } else { f32::from_bits(0x3f19_999a) };
             let b = crate::moby::blast::Blast { size, bursts: [6, 5, 6], puffs: 8, streaks: 10, light: false, shake: false };
             crate::moby::blast::burst(w, ctx, pos, &b);
+            crate::gravity::untrack(w, w.mobys[id].pv_i(pv::LET_TRACKER));
             w.delete(id);
             return;
         }

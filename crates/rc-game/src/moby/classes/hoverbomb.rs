@@ -42,8 +42,14 @@
 //! Its glow in the hand (`0x2a7ed8`'s case 0x19, crate::hero::items): its word pulses `0xff5f5f5f` .. `0xffdfdfdf` and
 //! it sheds a glow sprite at (0.05, −0.45, 0).
 //!
-//! Not ported: the lock cheat (`0x18b270`, `0x32b4d0`), the gravity frames' trackers and bends (`0x37f538` /
-//! `0x37f618` / `0x37f5f8`, `0x380e08`, the way flattened along the frame's up at the launch), the camera's flag the
+//! Both hands take the Lock On mod's lock as the tick's aim (`0x18b270` → `0x18aa18`, crate::moby::lock_on).
+//!
+//! The gravity frames (crate::gravity): the bomb keeps a tracker (`+0x48`, `0x37f538(bomb, 0, 1, 1, 1)`) that turns its
+//! velocity at the tick's start (`0x37f618`) and is given back when it goes (`0x37f5f8`); still in the world's box it
+//! rides the level's moving frame at the tick's end (`0x380e08`).
+//!
+//! Not ported: the launch's aim at the lock (`0x32b4d0`), the way flattened along the frame's up at the launch (the
+//! sphere on, `0x3aaff0`), the camera's flag the
 //! steering sets (`0x428588`: the current camera of class 4 or 0x51 marked), the bounce sound's volume (`0x3605f0`'s
 //! f12), the blast's screen flash (crate::moby::blast). The bomb's
 //! steering's lag and set-off rules read the item held, 0x19 or 0x46 (0x46 is a row, never an item: as the original).
@@ -65,7 +71,7 @@
 use crate::hero::items::{row, ItemRow, HOVERBOMB};
 use crate::hero::physics::{add, add_rot, dot, len, scale, set_len, sub, unit, V3};
 use crate::moby::hits::HitTemplate;
-use crate::moby::{countdown, Ctx, MobyWorld};
+use crate::moby::{countdown, lock_on, Ctx, MobyWorld};
 
 /// The hand's class (item 0x19's row `+0x04`) and the bomb's (`+0x50`).
 pub const HAND_CLASS: i16 = 0xa5b;
@@ -120,6 +126,8 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.state = 1;
     }
     if ctx.hero.state == 1 { ctx.hero.request_state(0x1d, true); }
+    // The Lock On mod's lock as the aim (crate::moby::lock_on).
+    lock_on::mirror(w, ctx);
     if let Some(a) = ctx.host.anim(&w.mobys[id]) {
         if a.seq_a == a.seq_b && a.flags & 2 != 0 { ctx.host.set_anim(&w.mobys[id], 1, 0, 10); }
     }
@@ -210,6 +218,8 @@ pub fn update_tetra(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.state = 1;
     }
     if ctx.hero.state == 1 { ctx.hero.request_state(0x1d, true); }
+    // The Lock On mod's lock as the aim (crate::moby::lock_on).
+    lock_on::mirror(w, ctx);
     if let Some(a) = ctx.host.anim(&w.mobys[id]) {
         if a.seq_a == a.seq_b && a.flags & 2 != 0 { ctx.host.set_anim(&w.mobys[id], 1, 0, 6); }
     }
@@ -389,6 +399,8 @@ fn spawn_fused(w: &mut MobyWorld, ctx: &mut Ctx, speed: f32, damage: f32, height
         m.set_pv_i(0x40, -1);
         m.set_pv_i(0x44, 0);
     }
+    let k = crate::gravity::track(w, ctx.hero, id, None, [1.0; 3]);
+    w.mobys[id].set_pv_i(0x48, k);
     // The line from Ratchet at the muzzle's height to the muzzle.
     let hero = ctx.hero_moby.and_then(|h| w.mobys.get(h)).map_or(ctx.hero.pos, |h| h.pos);
     let met = w.coll_line(ctx, [hero[0], hero[1], at[2]], at, 0, ctx.hero_moby);
@@ -398,6 +410,7 @@ fn spawn_fused(w: &mut MobyWorld, ctx: &mut Ctx, speed: f32, damage: f32, height
     let e = crate::moby::blast::Explosion { flags: 0x81_0001, flash: 6.0, flash2: 3.0, near: 9.0, light: 15.0, embers: 10, billows: 3, flares: 9, sound: -1, shake: true, debris: 1, lod: 0, ..Default::default() };
     crate::moby::blast::explode(w, ctx, Some(id), None, &e);
     hit(w, ctx, id, o.point);
+    crate::gravity::untrack(w, w.mobys[id].pv_i(0x48));
     w.delete(id);
     None
 }
@@ -429,6 +442,9 @@ pub fn update_bomb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let up = ctx.hero.gravity.up_at(w.mobys[id].pos);
     let age = w.mobys[id].pv_s(0x14) + 1;
     w.mobys[id].set_pv_s(0x14, age);
+    // `0x37f618(+0x48, vel, 0)`: the tracker's turn at its place.
+    let v = crate::gravity::turn(w, ctx.hero, w.mobys[id].pv_i(0x48), w.mobys[id].pv_v(0), None);
+    w.mobys[id].set_pv_v(0, v);
     let start = w.mobys[id].pos;
     let mut pos = add(start, w.mobys[id].pv_v(0));
     w.mobys[id].pos = pos;
@@ -529,6 +545,7 @@ pub fn update_bomb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             };
             crate::moby::blast::burst(w, ctx, at, &b);
             hit(w, ctx, id, at);
+            crate::gravity::untrack(w, w.mobys[id].pv_i(0x48));
             w.delete(id);
             return;
         }
@@ -552,9 +569,11 @@ pub fn update_bomb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     let p = w.mobys[id].pos;
     if p.iter().all(|&x| (2.0..=1021.0).contains(&x)) {
+        w.mobys[id].pos = crate::gravity::ride(w, p);
         if !ctx.hero.gravity.on { crate::shadows::request(w, ctx, 0.5, id); }
     } else {
         stop_sound(w, id, ctx);
+        crate::gravity::untrack(w, w.mobys[id].pv_i(0x48));
         w.delete(id);
     }
 }

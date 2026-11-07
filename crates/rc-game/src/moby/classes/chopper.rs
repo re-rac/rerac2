@@ -67,9 +67,13 @@
 //! (crate::fx::ribbon: FX 0x17 and 0xe three times as wide, `0xff5050` / `0xff1010` at a random 0.5..1 of 0x7f / 0x30).
 //!
 //! The weapon mod: Acid on the moby a blade hits (`0x3f9f70(m, 0x41 upgraded / 0x16, the hand)`, crate::moby::weapon_mods).
+//! The Lock On mod's lock (`0x18b270`, crate::moby::lock_on) wins the hand's aim (`0x325f90`) and the blades' targets.
 //!
-//! Not ported: the gravity frames' bends (`0x380e08`, `0x37f538` /
-//! `0x37f618`, the velocity flattened along the up), the lock a cheat or the Lock-On mod holds (`0x18b270`), the
+//! The gravity frames (crate::gravity): the blade keeps a tracker (`+0x6c`, `0x37f538(blade, 0, 1, 1, 1)`) that turns
+//! its velocity each tick (`0x37f618`) and is given back when it goes (`0x37f5f8`); its place and home point ride the
+//! level's moving frame (`0x380e08`).
+//!
+//! Not ported: the velocity flattened along the up, the after-images' points' ride of the moving frame (`0x41eda0`), the
 //! after-images' one-ghost setting (`0x1adb0c`: two here), the trail slot's other users (the Lava Gun's class
 //! `0x41b198`: their eviction frees this slot's after-images, [`Pool::slot`]). 
 //!
@@ -81,7 +85,7 @@ use crate::hero::items::{row, ItemRow, CHOPPER};
 use crate::hero::physics::{add, add_rot, cross, dist, dot, len, scale, set_len, sub, sub_rot, unit, V3};
 use crate::moby::afterimage::Record;
 use crate::moby::hits::HitTemplate;
-use crate::moby::{aim, countdown, mode, Ctx, MobyWorld};
+use crate::moby::{aim, countdown, lock_on, mode, Ctx, MobyWorld};
 
 /// The hand's class (item 0x16's row `+0x04`) and the blade's (`+0x50`).
 pub const HAND_CLASS: i16 = 0x879;
@@ -265,7 +269,7 @@ fn aim(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let dir = crate::moby::classes::shot::polar(1.0, h.rot[2], h.rot[1]);
         let wide = ctx.game.level == 1 && w.mobys[id].pv_link(0x14).and_then(|t| w.mobys.get(t)).is_some_and(|t| (0xa8d..=0xa8e).contains(&t.o_class));
         let cone = aim::Cone { yaw: if wide { 0.305_432_68 } else { 0.174_532_95 }, pitch: 0.349_065_9, range: 30.0, near_pitch: 0.785_398_2, near_yaw: 0.610_865_3 };
-        let found = aim::search(w, ctx, cone, from, dir, false);
+        let found = aim::search_lock(w, ctx, cone, from, dir, false);
         let m = &mut w.mobys[id];
         match found {
             None => {
@@ -368,10 +372,11 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, at: V3, look: bool, 
             if let Some((_, a)) = aim::health(w, n) { w.mobys[id].pos = add(w.mobys[n].pos, scale(up, a)); }
             Some(n)
         }
-        None if !first => {
+        // The Lock On mod's lock while not deleted (crate::moby::lock_on::held), else the search.
+        None if !first => lock_on::held(w, ctx).or_else(|| {
             let cone = aim::Cone { yaw: 0.174_532_95, pitch: 0.349_065_9, range: 30.0, near_pitch: 0.0, near_yaw: 0.0 };
             aim::search(w, ctx, cone, pos, rows[0], false)
-        }
+        }),
         None => lock,
     };
     w.mobys[id].set_pv_i(0x14, target.map_or(0, |t| t as i32));
@@ -429,8 +434,17 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, at: V3, look: bool, 
         let p = m.pos;
         m.set_pv_v(0x70, p);
     }
+    // `0x37f538(blade, 0, 1, 1, 1)`: its tracker (`+0x6c`).
+    let k = crate::gravity::track(w, ctx.hero, id, None, [1.0; 3]);
+    w.mobys[id].set_pv_i(0x6c, k);
     w.rebuild(id, &*ctx.host);
     Some(id)
+}
+
+/// The blade gone: its tracker given back (`0x37f5f8`), deleted.
+fn blade_gone(w: &mut MobyWorld, id: usize) {
+    crate::gravity::untrack(w, w.mobys[id].pv_i(0x6c));
+    w.delete(id);
 }
 
 /// `0x41f3f0(blade, point, up)`: the way turned toward `point` — within 1.5 half of the angle at once; else by a
@@ -518,13 +532,17 @@ fn stop_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 pub fn update_blade(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let (class, slot) = (w.mobys[id].pv_i(0x50) as i16, w.mobys[id].pv_i(0x3c) as usize);
     if !w.chopper.holds(class, slot) {
-        w.delete(id);
+        blade_gone(w, id);
         return;
     }
     let Some(r) = cur_row(ctx.game).copied() else { return };
     let lv = level(ctx.game);
+    let up = ctx.hero.gravity.up_at(w.mobys[id].pos);
+    // Its place and its home point on the level's moving frame (`0x380e08`).
+    w.mobys[id].pos = crate::gravity::ride(w, w.mobys[id].pos);
+    let home = crate::gravity::ride(w, w.mobys[id].pv_v(0x40));
+    w.mobys[id].set_pv_v(0x40, home);
     let start = w.mobys[id].pos;
-    let up = ctx.hero.gravity.up_at(start);
     // The home point turned about Ratchet with the platform's turn.
     {
         let hp = ctx.hero.pos;
@@ -539,7 +557,7 @@ pub fn update_blade(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             drop_trail(w, id);
             stop_sound(w, id, ctx);
             crate::moby::blast::smoke_burst(w, ctx, 0.5, 5.0, Some(id), start, -1);
-            w.delete(id);
+            blade_gone(w, id);
             return;
         }
         _ => return,
@@ -558,7 +576,7 @@ pub fn update_blade(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         // `0x40490fdc`: just past π (all round, crate::moby::aim).
         let pi = f32::from_bits(0x4049_0fdc);
         let cone = aim::Cone { yaw: pi, pitch: pi, range: 12.0, near_pitch: pi, near_yaw: pi };
-        let t = aim::search(w, ctx, cone, start, w.mobys[id].pv_v(0), true);
+        let t = lock_on::held(w, ctx).or_else(|| aim::search(w, ctx, cone, start, w.mobys[id].pv_v(0), true));
         let m = &mut w.mobys[id];
         m.set_pv_i(0x14, t.map_or(0, |t| t as i32));
         if t.is_some() {
@@ -586,7 +604,9 @@ pub fn update_blade(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         };
         bend = steer(w, id, p, up);
     }
-    let vel = w.mobys[id].pv_v(0);
+    // `0x37f618(+0x6c, vel, 0)`: the tracker's turn at its place.
+    let vel = crate::gravity::turn(w, ctx.hero, w.mobys[id].pv_i(0x6c), w.mobys[id].pv_v(0), None);
+    w.mobys[id].set_pv_v(0, vel);
     let d = unit(vel);
     let mut tmpl = HitTemplate::new(r.damage, Some(id), 0x10000, [d[0], d[1], d[2], NO_KNOCK_LIMIT]);
     tmpl.kind = (BLADE as u16 as u32) << 16 | 0x101;
@@ -595,7 +615,7 @@ pub fn update_blade(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if to.iter().any(|&c| !(2.0..=1021.0).contains(&c)) {
         drop_trail(w, id);
         stop_sound(w, id, ctx);
-        w.delete(id);
+        blade_gone(w, id);
         return;
     }
     let free = w.mobys[id].pv_s(0x18) != 0;

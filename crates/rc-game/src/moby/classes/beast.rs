@@ -27,15 +27,33 @@
 //! the path 6 points on (the yaw off its facing: the first's x all of it and z half, the second's y a third, the
 //! third's y minus half).
 //!
-//! Not ported: the splashes and ripples (`0x339b60`), the pad rumble (`0x2d6d60` / `0x2d6f38`, its handle `+0x2f0`).
+//! **The pad's rumble** (crate::rumble, L01 `0x2cc4d0` / `0x2cc6a8`), each only while Ratchet stands on it: woken,
+//! [`RUMBLE_WAKE`]; off on the ride, [`RUMBLE_RIDE`] (its handle `+0x2f0`); at the ride's end its held channel stops
+//! (the handle −1) and [`RUMBLE_DIVE`].
+//!
+//! Not ported: the splashes and ripples (`0x339b60`).
 
 use crate::hero::physics::{add, add_rot, approach, atan2, dist, dist2, ease, ease_speed, len, len2, rot_dist, scale, sub, sub_rot, turn_ease, V3};
 use crate::moby::joint_aim::ASK;
 use crate::moby::{carry_hero, Ctx, MobyWorld};
+use crate::rumble::{one, rec, Pattern, NONE};
 use super::leaper::{play, seq_a};
 use super::props::{seq, wrapped};
 
 /// The ride and return paths, the target moby and its range.
+/// L01 `0x297380`: the wake's rumble (both motors, the cosine and ramps, staggered by their delays).
+pub const RUMBLE_WAKE: Pattern = [
+    rec(5, 0, 0, 0, 0, 5, 0, 5, 0, 50, 25), rec(4, 0, 0, 0, 5, 10, 5, 5, 0, 120, 60), rec(3, 0, 0, 0, 10, 20, 0, 10, 0, 140, 70),
+    rec(1, 0, 1, 0, 0, 5, 1, 1, 1, 100, 25), rec(3, 0, 1, 0, 5, 10, 6, 1, 1, 180, 60), rec(4, 0, 1, 0, 10, 20, 1, 2, 2, 200, 70), NONE, NONE,
+];
+/// L01 `0x297400`: the ride's start, with a held multiplier on the big motor (stopped at the ride's end).
+pub const RUMBLE_RIDE: Pattern = [
+    rec(1, 0, 1, 0, 0, 20, 0, 20, 0, 200, 100), rec(1, 0, 0, 0, 5, 20, 0, 5, 5, 100, 50), rec(1, 1, 1, 1, 5, 10, 0, 10, 0, 75, 35),
+    NONE, NONE, NONE, NONE, NONE,
+];
+/// L01 `0x297480`: the dive's jolt (the big motor, 10 frames).
+pub const RUMBLE_DIVE: Pattern = one(rec(1, 0, 1, 0, 0, 10, 0, 0, 0, 225, 100));
+
 const RIDE: usize = 0x290;
 const BACK: usize = 0x294;
 const TARGET: usize = 0x298;
@@ -176,6 +194,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 }
             }
             if woken || riding {
+                if riding { ctx.game.rumble.start(&RUMBLE_WAKE); }
                 play(w, id, ctx, 2, 5, 3);
                 w.mobys[id].set_state(3, -1);
             }
@@ -183,6 +202,10 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         3 => {
             if wrapped(w, id, ctx) {
+                if riding {
+                    let h = ctx.game.rumble.start(&RUMBLE_RIDE);
+                    w.mobys[id].set_pv_i(0x2f0, h);
+                }
                 play(w, id, ctx, 3, 0, 6);
                 let m = &mut w.mobys[id];
                 m.set_pv_f(0x2cc, 10.0);
@@ -221,9 +244,11 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.set_pv_f(T, t);
             m.set_pv_f(TV, v);
             if (n - 1) as f32 <= t {
+                ctx.game.rumble.stop_held();
+                w.mobys[id].set_pv_i(0x2f0, -1);
+                if riding { ctx.game.rumble.start(&RUMBLE_DIVE); }
                 play(w, id, ctx, 6, 0, 10);
                 let m = &mut w.mobys[id];
-                m.set_pv_i(0x2f0, -1);
                 m.state_ticks = 0;
                 m.state = 5;
                 m.set_pv_i(0x2c0, 0x14);

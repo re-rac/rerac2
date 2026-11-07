@@ -457,6 +457,8 @@ fn make_plus_bot(w: &mut MobyWorld, ctx: &mut Ctx, pos: V3, vel: V3) -> Option<u
     m.set_pv_v(PLUS.vel, vel);
     m.set_pv_i(PLUS.warps, ctx.hero.warps as i32);
     spiderbot_plus::init(m);
+    // `0x37f538(bot, 0, 1, 1, 1)` into `0x1b2ba8`.
+    w.spiderbot.tracker = crate::gravity::track(w, ctx.hero, id, None, [1.0; 3]);
     w.rebuild(id, &*ctx.host);
     w.changed = true;
     Some(id)
@@ -483,7 +485,12 @@ pub fn update_bot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     // Its down: the gravity's (`0x3864f0` / `0x32aa88`, crate::gravity::Gravity::up_at), or on surface 2 the
     // surface's (`0x1b4284`).
-    let mut down = scale(ctx.hero.gravity.up_at(w.mobys[id].pos), -1.0);
+    // (The upgraded bot's before it lands: the frames' up `0x37ecc0`, crate::gravity::up.)
+    let mut down = if plus && w.mobys[id].state < 2 {
+        scale(crate::gravity::up(ctx.hero, w.mobys[id].pos), -1.0)
+    } else {
+        scale(ctx.hero.gravity.up_at(w.mobys[id].pos), -1.0)
+    };
     {
         let (p, up) = (w.mobys[id].pos, w.mobys[id].rows[2]);
         let hit = w.coll_line(ctx, add(p, scale(up, HALF)), sub(p, up), 2, Some(id));
@@ -576,7 +583,10 @@ pub fn update_bot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if ctx.hero.state == 0x1c { ctx.hero.request_state(0, true); }
             if ctx.game.cameras.current_class() == CAMERA_CLASS { camera_release(&mut ctx.game.cameras); }
             // The upgraded bot: its guns' charge sound and joint nodes let go (`0x37f110`).
-            if plus { spiderbot_plus::release(w, id, ctx); }
+            if plus {
+                spiderbot_plus::release(w, id, ctx);
+                crate::gravity::untrack(w, w.spiderbot.tracker);
+            }
             // `0x311b10(0, 0)`.
             ctx.game.screen_callback = None;
             w.delete(id);
@@ -640,7 +650,19 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, plus: bool) -> bool {
     let from = m.pos;
     let mut vel = m.pv_v(l.vel);
     m.pos = add(m.pos, vel);
-    vel[2] -= GRAVITY;
+    if plus {
+        // The upgraded bot's (`0x4010a0`): the tracker's turn at the new place (`0x37f618`), the moving frame's ride
+        // of the place and the velocity (`0x380e08` / `0x380ec0`), the fall along the frames' up (`0x37ec68`).
+        let k = w.spiderbot.tracker;
+        vel = crate::gravity::turn(w, ctx.hero, k, vel, None);
+        let p = crate::gravity::ride(w, w.mobys[id].pos);
+        vel = crate::gravity::ride_dir(w, vel);
+        vel = sub(vel, scale(crate::gravity::up(ctx.hero, p), GRAVITY));
+        w.mobys[id].pos = p;
+    } else {
+        vel[2] -= GRAVITY;
+    }
+    let m = &mut w.mobys[id];
     m.set_pv_v(l.vel, vel);
     let to = m.pos;
     let hit = w.coll_line(ctx, from, to, 0, Some(id));
@@ -863,8 +885,16 @@ fn fall(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
     let m = &mut w.mobys[id];
     let from = m.pos;
     let mut vel = m.pv_v(l.vel);
-    let to = add(from, vel);
-    vel[2] -= FALL_GRAVITY;
+    let mut to = add(from, vel);
+    if w.mobys[id].o_class == PLUS_BOT {
+        // The upgraded bot's (`0x4010a0`): the fall along the frames' up (`0x37ec68`), then the moving frame's ride of
+        // the place and the velocity (`0x380e08` / `0x380ec0`).
+        vel = sub(vel, scale(crate::gravity::up(ctx.hero, to), FALL_GRAVITY));
+        to = crate::gravity::ride(w, to);
+        vel = crate::gravity::ride_dir(w, vel);
+    } else {
+        vel[2] -= FALL_GRAVITY;
+    }
     let (r, at, surface) = sweep(w, ctx, id, from, to, &mut vel);
     let m = &mut w.mobys[id];
     m.pos = at;
@@ -971,10 +1001,12 @@ pub struct Blast {
     pub wobbles: Vec<[f32; 2]>,
     pub barrels: [f32; 2],
     pub charge_sound: i32,
+    /// `0x1b2ba8`: the upgraded bot's tracker (crate::gravity::track; −1 none).
+    pub tracker: i32,
 }
 
 impl Default for Blast {
-    fn default() -> Self { Blast { mesh: None, wobbles: Vec::new(), barrels: [0.0, std::f32::consts::PI], charge_sound: -1 } }
+    fn default() -> Self { Blast { mesh: None, wobbles: Vec::new(), barrels: [0.0, std::f32::consts::PI], charge_sound: -1, tracker: -1 } }
 }
 
 /// `0x3fac68` → `0x3facb0`, the bot's draw (a second-list callback, every tick): while the blast's reach is under 8,

@@ -63,8 +63,13 @@
 //! The weapon mod: Shock on the moby a missile strikes and on each its splash touches (`0x4126b8(m, 0x43 upgraded /
 //! 0x18, the hand)`, crate::moby::weapon_mods).
 //!
-//! Not ported: the lock cheat (`0x18b270` → `0x18aa18`), the gravity
-//! frames and moving frames (`0x380e08`, `0x37f538` / `0x37f618` / `0x37f5f8`), the light word copied at the make
+//! The gravity frames (crate::gravity): the missile rides the level's moving frame at the tick's start (`0x380e08`),
+//! keeps a tracker (`+0x70`, `0x37f538(m, 0, 1, 1, 1)`) that turns its velocity after the target search (`0x37f618`) and
+//! gives it back when it goes (`0x37f5f8`).
+//!
+//! Both hands take the Lock On mod's lock as the tick's aim (`0x18b270` → `0x18aa18`, crate::moby::lock_on).
+//!
+//! Not ported: the light word copied at the make
 //! (`0x313330` → `+0x38`, unread), the 0x13a0 blast's heat shimmer (its `+0x18`, crate::moby::blast). The missile's
 //! loop sound is let go when it goes (the engine frees a deleted moby's sounds); the word `0x25c5cc` both hands set to
 //! 0.1 each tick (no reader found).
@@ -84,7 +89,7 @@ use crate::collision::QueryFlags;
 use crate::hero::items::{row, ItemRow, SEEKER};
 use crate::hero::physics::{add, add_rot, cross, dist, dot, len, scale, set_len, spring, sub, unit, V3};
 use crate::moby::hits::HitTemplate;
-use crate::moby::{aim, countdown, Ctx, MobyWorld};
+use crate::moby::{aim, countdown, lock_on, Ctx, MobyWorld};
 
 /// The hand's class (item 0x18's row `+0x04`) and the missile's (`0x3ab8f8`).
 pub const HAND_CLASS: i16 = 0x5ce;
@@ -119,6 +124,8 @@ mod pv {
     pub const T2: usize = 0x56;
     pub const LIFT_V: usize = 0x58;
     pub const SOUND: usize = 0x5c;
+    /// Its tracker (crate::gravity::track).
+    pub const TRACKER: usize = 0x70;
     pub const LOCK: usize = 0x74;
     pub const LOCK_WAIT: usize = 0x78;
     pub const LIFT: usize = 0x7c;
@@ -181,6 +188,8 @@ pub fn update_plus(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     let class_scale = w.class(w.mobys[id].o_class).map_or(1.0, |c| c.scale);
     w.mobys[id].scale = class_scale * PLUS_SIZE;
+    // The Lock On mod's lock as the aim (crate::moby::lock_on).
+    lock_on::mirror(w, ctx);
     if ctx.hero.state == 1 { ctx.hero.request_state(0x1d, true); }
     let look = ctx.hero.state == 0x1d;
     if look {
@@ -239,6 +248,8 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     let class_scale = w.class(w.mobys[id].o_class).map_or(1.0, |c| c.scale);
     w.mobys[id].scale = class_scale * HAND_SIZE;
+    // The Lock On mod's lock as the aim (crate::moby::lock_on).
+    lock_on::mirror(w, ctx);
     if ctx.hero.state == 1 { ctx.hero.request_state(0x1d, true); }
     let look = ctx.hero.state == 0x1d;
     if look {
@@ -317,6 +328,8 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, pos: V3, vel: V3, lock: Option<us
     m.mode |= crate::moby::mode::KEEP_ROWS;
     m.rows = [r0, r1, r2];
     ctx.host.set_anim(&w.mobys[id], 2, 0, 0);
+    let k = crate::gravity::track(w, ctx.hero, id, None, [1.0; 3]);
+    w.mobys[id].set_pv_i(pv::TRACKER, k);
     Some(id)
 }
 
@@ -342,12 +355,14 @@ fn target_point(w: &MobyWorld, id: usize, ctx: &Ctx, t: usize) -> V3 {
 fn gone(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let s = w.mobys[id].pv_i(pv::SOUND);
     if s != -1 && ctx.host.sound_playing(s) { ctx.host.stop_sound(s); }
+    crate::gravity::untrack(w, w.mobys[id].pv_i(pv::TRACKER));
     w.delete(id);
 }
 
 /// `0x3abb40` (module docs).
 pub fn update_missile(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].pvars.resize(crate::moby::PVAR_BYTES, 0);
+    w.mobys[id].pos = crate::gravity::ride(w, w.mobys[id].pos);
     let start = w.mobys[id].pos;
     if moby_at(w, id, pv::TARGET).is_none() && w.mobys[id].pv_i(pv::TARGET) == -1 {
         let mut found = None;
@@ -384,6 +399,8 @@ pub fn update_missile(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     let target = moby_at(w, id, pv::TARGET);
     let up = ctx.hero.gravity.up_at(w.mobys[id].pos);
+    let v = crate::gravity::turn(w, ctx.hero, w.mobys[id].pv_i(pv::TRACKER), w.mobys[id].pv_v(pv::VEL), None);
+    w.mobys[id].set_pv_v(pv::VEL, v);
     match w.mobys[id].state {
         0 => {
             {

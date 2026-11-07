@@ -11,7 +11,7 @@
 //! loads the level again, crate::ship), the "all ships put away" flag set (`0x37b188(1)`: every ship's start puts
 //! it away), the boost not slowed; the missions won (`0x1395b8 + 0x61..0x64`, Hrugis `+0x66..`, Gorn `+0x6b..`:
 //! [`crate::game::GameState::flags`]) and the first win still to come (their first byte 0); the no-fly volumes (`lib
-//! +0x90` = 4, the pvars 1..4; not ported, as in the library).
+//! +0x90` = 4, the pvars 1..4: [`super::NO_FLY`], the library's check [`super`]'s `no_fly`).
 //!
 //! **Each tick** (state 1): the tick's leading group (`0x37add0`, [`super::leader`]); the help panel 230 up
 //! (`0x30d710`); on the first tick the moby at `+0x28` hooked (`0x33f318`, `+0xbe` bit 2) and the frames counted from
@@ -49,10 +49,12 @@
 //!
 //! The reward asks for the autosave once the win is counted (`0x325a28(0, −1)`, crate::game::GameState::autosave).
 //!
-//! Not ported: the mission's HUD and pause items (`0x41f478`), the second help 0xa18 (Hrugis / Gorn, `0x380780`), the fog's restore on the reset, the
+//! Hrugis's and Gorn's second help 0xa18 at the level's first, fifth and tenth death (`0x380780`: no ship weapon past
+//! the lasers).
+//!
+//! Not ported: the mission's HUD and pause items (`0x41f478`), the fog's restore on the reset, the
 //! sound stopped on the reward (the ship's `+0x270`), Hrugis's 75 clouds (`0x427150(75, 16)`) and its first
-//! mission's two arcs (`0x39ea50`), the gate race's spark pickup (`0x42e6b0`, class 0x126c) and the gates' own
-//! update and draw (class 0x114a: its colour `+8`, on `+0xc`).
+//! mission's two arcs (`0x39ea50`).
 
 use super::{activate_group, escort, leader_of, put_away_all, set_lib_i};
 use crate::hero::physics::{add, atan2, cross, dist, dot, len2, scale, sub, unit, V3};
@@ -68,7 +70,7 @@ pub const GORN: i16 = 0x119f;
 /// (`+0x2388`), the first tick's hook done (`+0x2384`), the help shown (`+0x2390`), the results up (`+0x23a0`), the
 /// failure on (`+0x2394`), the first win to come (`+0x23a4`), Gorn's end cut done (`+0x257c`); the gate race's gates
 /// (their path points + 1), their mobys (+ 1), the next point, the misses, the last tick's two dots, its ticks
-/// (`0x1b3550`); the timers (the original's pvars).
+/// (`0x1b3550`), the platinum bolt it made (+ 1, `$gp+0x236c`); the timers (the original's pvars).
 mod pv {
     pub const SELECTED: usize = 0x200;
     pub const MENU: usize = 0x204;
@@ -91,6 +93,8 @@ mod pv {
     pub const DOT_SHIP: usize = 0x248;
     pub const DOT_CAM: usize = 0x24c;
     pub const RACE_TICKS: usize = 0x250;
+    pub const BOLT: usize = 0x254;
+    pub const HELPED_2: usize = 0x258;
     pub const T_RESULTS: usize = 0x260;
     pub const T_MISSION: usize = 0x264;
     pub const T_FAIL: usize = 0x268;
@@ -192,6 +196,7 @@ fn start(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, lv: &Level) {
     m.set_pv_i(super::WAVES, 0);
     m.set_pv_i(super::HELD, 0);
     m.set_pv_i(super::ALL_AWAY, 1);
+    m.set_pv_i(super::NO_FLY, 4);
     w.changed = true;
 }
 
@@ -215,6 +220,13 @@ fn run(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, lv: &Level) {
         return;
     }
     if get(w, id, pv::HELPED) == 0 && ctx.game.help(0xa17, 0x6e) { set(w, id, pv::HELPED, 1); }
+    // Hrugis's and Gorn's second help (L10 `0x422b14`, L15 `0x42f53c`): at this level's first, fifth or tenth death
+    // (`0x13a148 + 4·level`, crate::game::GameState::deaths) with no ship weapon past the lasers (`0x380780`: the
+    // weapon slots 2..5 and 8..14 had, L10 `0x2a3c50`; the port's ship has none), 0xa18 once.
+    let deaths = usize::try_from(ctx.game.level).ok().and_then(|l| ctx.game.deaths.get(l)).copied().unwrap_or(0);
+    if w.mobys[id].o_class != FELTZIN && get(w, id, pv::HELPED_2) == 0 && matches!(deaths, 1 | 5 | 10) && ctx.game.help(0xa18, 0x6f) {
+        set(w, id, pv::HELPED_2, 1);
+    }
     let quiet = !out(w, id, pv::T_QUIET);
     set(w, id, super::PASSIVE, quiet as i32);
     set(w, id, super::HELD, 0);
@@ -526,8 +538,8 @@ fn gorn_with_big_ship(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, lv: &Level) {
     if leader_of(w, BIG).map_or(0, |l| super::alive(w, l)) == 0 && 6 <= ctx.game.frame { reward(w, id, ctx, lv, 2); }
 }
 
-/// The gate class (`0x29efd0(0x114a)`).
-pub const GATE: i16 = 0x114a;
+/// The gate class (`0x29efd0(0x114a)`, [`super::gate`]).
+pub const GATE: i16 = super::gate::CLASS;
 
 /// A gate at path point `i`: its place and frame (along the path to the next point; the last one's from the one
 /// before; left across it and the level's up, up from those).
@@ -577,7 +589,8 @@ fn drop_gate(w: &mut MobyWorld, m: i32) {
 /// positive and changed since the last tick): within 1.25 of it a pass (the ship's sound 15, the cruise 0.5 faster)
 /// else a miss (0.75 slower, counted), and the next gate. No gate left, the reward; the escort at its route's end
 /// (`0x418ce8`) or 12 misses, the failure (0x3074). The first gate green while the next follows (0x40008000; the
-/// last 0x4000c6ff), the next 0x40808000.
+/// last 0x4000c6ff), the next 0x40808000 (the gates' update and ring: [`super::gate`]). At the last gate with none
+/// missed, the level's platinum bolt 0 there ([`super::platinum`], class 0x126c), deleted at the next race's start.
 fn gate_race(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, lv: &Level) {
     let path = usize::try_from(get(w, id, 0x20)).ok().and_then(|p| ctx.level.paths.get(p)).cloned().unwrap_or_default();
     if get(w, id, pv::SET_UP) == 0 {
@@ -586,6 +599,12 @@ fn gate_race(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, lv: &Level) {
             drop_gate(w, m);
         }
         for o in [pv::GATE_A, pv::GATE_B, pv::MOBY_A, pv::MOBY_B, pv::NEXT, pv::MISSES, pv::RACE_TICKS] { set(w, id, o, 0); }
+        // The last race's platinum bolt (`$gp+0x236c`) deleted (the original's pointer, kept after the bolt is taken:
+        // here only while it is still that bolt).
+        if let Some(b) = usize::try_from(get(w, id, pv::BOLT) - 1).ok().filter(|&b| w.mobys.get(b).is_some_and(|m| m.o_class == super::platinum::CLASS && m.state < 0x80)) {
+            w.delete(b);
+        }
+        set(w, id, pv::BOLT, 0);
         w.mobys[id].set_pv_f(pv::DOT_SHIP, -1.0);
         w.mobys[id].set_pv_f(pv::DOT_CAM, -1.0);
         set(w, id, pv::SET_UP, 1);
@@ -648,6 +667,14 @@ fn gate_race(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, lv: &Level) {
         if let Some(g) = usize::try_from(get(w, id, o) - 1).ok().filter(|&g| g < w.mobys.len()) {
             w.mobys[g].set_pv_i(0xc, 1);
             w.mobys[g].set_pv_i(8, colour as i32);
+        }
+    }
+    // The last gate with none missed: the level's platinum bolt 0 at it, once a race (`0x42e6b0(gate, 0, −1, −1)`,
+    // [`super::platinum::make`]; none once found).
+    if last && get(w, id, pv::MISSES) == 0 && get(w, id, pv::BOLT) == 0 {
+        if let Some(g) = usize::try_from(get(w, id, pv::MOBY_A) - 1).ok().filter(|&g| g < w.mobys.len()) {
+            let at = w.mobys[g].pos;
+            if let Some(b) = super::platinum::make(w, ctx, at, 0, -1, -1) { set(w, id, pv::BOLT, b as i32 + 1); }
         }
     }
 }

@@ -39,17 +39,42 @@
 //!
 //! The level settings' sphere ([`Gravity::from_settings`]) is set at Ratchet's spawns (the Jamming Array has one).
 //!
-//! Not ported: the cylinder mode (`0x1a8ff4`, `0x1a9000`, `0x3263d0`; no consumer yet; it would force mode 1), the
-//! camera's walkway branch (`0x4227b8`, G-CAM-003), the other readers (listed in docs/plan/gaps.md G-LVL-003).
+//! **The cylinder mode** (`0x1a8ff4`, [`Gravity::cylinder`]): set with the flag by Joba's arena master (L11 0x0d8a,
+//! crate::moby::classes::level11::arena) in the ring's waves above 480. The up is toward the vertical axis through
+//! [`AXIS`] (`0x1a9000`, boot data no code writes), flat ([`cylinder_up`], `0x3263d0`); the heights are 100 less the
+//! distance from that point; Ratchet's frame mode is 1 (on mud 0), his down away from the axis, and the walkway's
+//! state 0x6e is not forced on him (`0x2c6288`, `0x2cbe4c`).
+//!
+//! **The frames' up** ([`up`], `0x37ecc0`): the readers that also follow the walkways take Ratchet's moby's up row
+//! there (the boots' flag `0x18a168`, the cylinder off), else [`Gravity::up_at`].
+//!
+//! **The trackers** ([`Trackers`], `0x2319e0`: 0x80 slots of 0x20 bytes): a shot or a missile keeps the up it last saw
+//! ([`track`] `0x37f538` takes one, [`untrack`] `0x37f5f8` gives it back) and each tick its velocity is turned with the
+//! up's turn since ([`turn`], `0x37f618`), by a weight per gravity (the sphere's, the cylinder's, the walkway's).
+//!
+//! **The moving frame** (`$gp−0x14e4`, L00 `0x1adb0c`; a level copy each): the platform the effects ride with —
+//! [`ride`] (`0x380e08`, a place), [`ride_dir`] (`0x380ec0`, a direction) and [`ride_carry`] (`0x380e58`, a place plus
+//! a point's move) through crate::moby::platform. Every level clears it at its start (`0x37f858`); only Level 7's
+//! convoy sets it (the car Ratchet rides, crate::moby::classes::level07::train::Globals::riding).
+//!
+//! Not ported: the camera's walkway branch (`0x4227b8`, G-CAM-003), Ratchet's lean in the frames (`0x2b7820`), the
+//! other readers (listed in docs/plan/gaps.md G-LVL-003).
 
-use crate::hero::physics::{dist, dot, len, scale, sub, unit, V3};
+use crate::hero::physics::{add, cross, dist, dot, len, scale, set_len, sub, unit, V3};
+use crate::hero::Hero;
+use crate::moby::{platform, MobyWorld};
+
+/// `0x1a9000`: the cylinder mode's axis point (551, 674, 499.8).
+pub const AXIS: V3 = [551.0, 674.0, f32::from_bits(0x43f9_e666)];
 
 /// The gravity frames' state. Lives in Ratchet's block (crate::hero::Hero::gravity): the readers outside the hero
 /// (the class updates, the camera, the shadows) reach it through him.
 #[derive(Clone, Copy, Debug)]
 pub struct Gravity {
-    /// `0x1a8ff0`: the sphere on.
+    /// `0x1a8ff0`: the frames on.
     pub on: bool,
+    /// `0x1a8ff4`: the cylinder mode (with `on`): the up toward the axis through [`AXIS`].
+    pub cylinder: bool,
     /// `0x189ed0`: the sphere's centre; `0x189edc` > 0 (`inward`): down is toward it.
     pub centre: V3,
     pub inward: bool,
@@ -86,6 +111,7 @@ impl Default for Gravity {
     fn default() -> Self {
         Gravity {
             on: false,
+            cylinder: false,
             centre: [0.0; 3],
             inward: false,
             height_centre: [0.0; 3],
@@ -116,11 +142,15 @@ impl Gravity {
         g
     }
 
-    /// `0x2d37a0`'s sphere part: mode 2 while the sphere is on (the walkways' mode 1: crate::hero::Hero::frame_mode).
-    pub fn frame_mode(&self) -> u8 { if self.on { 2 } else { 0 } }
+    /// `0x2d37a0`'s sphere part: mode 2 while the sphere is on, the cylinder off (the walkways' and the cylinder's
+    /// mode 1: crate::hero::Hero::frame_mode).
+    pub fn frame_mode(&self) -> u8 { if self.on && !self.cylinder { 2 } else { 0 } }
 
-    /// `0x326820(p)` (L02 `0x32ad88`): the height in the frames — the distance from the centre `0x1b1a90`.
-    pub fn height(&self, p: V3) -> f32 { dist(p, self.height_centre) }
+    /// `0x326820(p)` (L02 `0x32ad88`): the height in the frames — the distance from the centre `0x1b1a90`; in the
+    /// cylinder mode 100 less the distance from [`AXIS`].
+    pub fn height(&self, p: V3) -> f32 {
+        if self.cylinder { 100.0 - dist(p, AXIS) } else { dist(p, self.height_centre) }
+    }
 
     /// `0x2b4a08`'s end in mode 2: the down at `p`, toward the centre (`0x189edc` > 0) or away from it.
     pub fn down_at(&self, p: V3) -> V3 {
@@ -128,12 +158,149 @@ impl Gravity {
         if self.inward { d } else { scale(d, -1.0) }
     }
 
-    /// `0x326448(p, out, 1)` / L02 `0x3864f0`: the up at `p` — (0, 0, 1) with the frames off, else away from the
-    /// centre (toward it when `0x189edc` ≤ 0). The Gravity Boots' magnetic walkway (Ratchet's up row) is not ported.
+    /// `0x326448(p, out, 1)` / L02 `0x3864f0`: the up at `p` — (0, 0, 1) with the frames off, toward the axis in the
+    /// cylinder mode ([`cylinder_up`]), else away from the centre (toward it when `0x189edc` ≤ 0). The walkways'
+    /// up (Ratchet's up row) is [`up`]'s.
     pub fn up_at(&self, p: V3) -> V3 {
         if !self.on { return [0.0, 0.0, 1.0]; }
+        if self.cylinder { return cylinder_up(p); }
         scale(self.down_at(p), -1.0)
     }
+}
+
+/// `0x3263d0(p, out, 1)`: the cylinder mode's up at `p` — toward the axis through [`AXIS`], flat (`0x3263d0(p, out,
+/// 0)`, the down, is its negation).
+pub fn cylinder_up(p: V3) -> V3 {
+    let d = sub(AXIS, p);
+    unit([d[0], d[1], 0.0])
+}
+
+/// What the frames' readers outside the hero take of him: his gravity block and the boots' flag `0x18a168`
+/// (crate::hero::surface's `boots`, the walkways), copied (crate::particles::PartAux carries one).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Frames {
+    pub gravity: Gravity,
+    pub walkway: bool,
+}
+
+impl Frames {
+    pub fn of(hero: &Hero) -> Frames { Frames { gravity: hero.gravity, walkway: hero.surf.boots != 0 } }
+
+    /// `0x37ecc0(p, out)`: the frames' up at `p` with the walkways — Ratchet's moby's up row (`+0xe0`) on the boots'
+    /// flag with the cylinder off; the cylinder's up; the sphere's; else (0, 0, 1).
+    pub fn up(&self, p: V3) -> V3 {
+        let g = &self.gravity;
+        if self.walkway && !g.cylinder { return g.moby_rows[2]; }
+        if g.cylinder { return cylinder_up(p); }
+        if g.on { return scale(g.down_at(p), -1.0); }
+        [0.0, 0.0, 1.0]
+    }
+}
+
+/// `0x37ecc0(p, out)`: [`Frames::up`] of Ratchet's.
+pub fn up(hero: &Hero, p: V3) -> V3 { Frames::of(hero).up(p) }
+
+/// The trackers' slot count (`0x2319e0`, 0x80 of 0x20 bytes).
+pub const TRACKERS: usize = 0x80;
+
+/// A tracker: `+0x00` the up it last saw, `+0x10` / `+0x14` / `+0x18` its weights in the sphere, the cylinder and on
+/// the walkways, `+0x1c` its owner (a moby; none: free).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Tracker {
+    pub up: V3,
+    pub weights: [f32; 3],
+    pub owner: Option<usize>,
+}
+
+/// `0x2319e0`: the trackers (crate::moby::MobyWorld::trackers).
+#[derive(Clone, Debug)]
+pub struct Trackers(pub Vec<Tracker>);
+
+impl Default for Trackers {
+    fn default() -> Self { Trackers(vec![Tracker::default(); TRACKERS]) }
+}
+
+impl Tracker {
+    /// `0x37f538`'s slot: `owner`'s, with the three weights and the up at `at` — Ratchet's moby's up row on the boots'
+    /// flag `0x18a168`, else [`Gravity::up_at`].
+    pub fn new(hero: &Hero, owner: usize, at: V3, weights: [f32; 3]) -> Tracker {
+        let up = if hero.surf.boots != 0 { hero.gravity.moby_rows[2] } else { hero.gravity.up_at(at) };
+        Tracker { up, weights, owner: Some(owner) }
+    }
+
+    /// `0x37f618` on this slot with its owner at `origin` ([`turn`]).
+    pub fn turn(&mut self, hero: &Hero, dir: V3, origin: V3) -> V3 {
+        let g = &hero.gravity;
+        let walkway = hero.surf.boots != 0;
+        if !g.on && !g.cylinder && !walkway { return dir; }
+        let mut weight = 1.0;
+        if walkway { weight = if g.cylinder { self.weights[1] } else { self.weights[2] }; } else if g.cylinder { weight = self.weights[1]; }
+        if g.on { weight = self.weights[0]; }
+        let old = self.up;
+        let length = len(dir);
+        let new = if walkway && !g.cylinder { g.moby_rows[2] } else { g.up_at(origin) };
+        self.up = new;
+        let d = set_len(dir, 1.0);
+        // `0x2eef88(out, old, new)`: new × old.
+        let axis = cross(new, old);
+        let a = -dot(old, new) * (weight * 0.5);
+        let (s, c) = a.sin_cos();
+        let q = [axis[0] * s, axis[1] * s, axis[2] * s, c];
+        let r = crate::quat::mul(crate::quat::mul(q, [d[0], d[1], d[2], 0.0]), [-q[0], -q[1], -q[2], c]);
+        set_len([r[0], r[1], r[2]], length)
+    }
+}
+
+/// `0x37f538(owner, at, sphere, cylinder, walkway)`: the first free tracker for `owner` ([`Tracker::new`]; `at` none:
+/// the owner's place). −1 when all are taken.
+pub fn track(w: &mut MobyWorld, hero: &Hero, owner: usize, at: Option<V3>, weights: [f32; 3]) -> i32 {
+    let at = at.unwrap_or_else(|| w.mobys.get(owner).map_or([0.0; 3], |m| m.pos));
+    let Some(i) = w.trackers.0.iter().position(|t| t.owner.is_none()) else { return -1 };
+    w.trackers.0[i] = Tracker::new(hero, owner, at, weights);
+    i as i32
+}
+
+/// `0x37f5f8(i)`: tracker `i` given back (none below 0).
+pub fn untrack(w: &mut MobyWorld, i: i32) {
+    if let Some(t) = usize::try_from(i).ok().and_then(|i| w.trackers.0.get_mut(i)) { t.owner = None; }
+}
+
+/// `0x37f618(i, dir, at)`: `dir` turned with the up's turn at `at` (none: the owner's place) since tracker `i` last
+/// looked, by its weight — the sphere's with the frames on, else the cylinder's, else the walkway's (the boots' flag
+/// `0x18a168`); nothing with none of them, `i` below 0 or no owner. The new up is Ratchet's moby's up row on the
+/// walkways (the cylinder off), else [`Gravity::up_at`]. The turn is the game's: the quaternion of `new × old` by
+/// `sin(a)` and `cos(a)` with `a = −(old · new) · weight / 2`, as `q · dir · q̄`, back to `dir`'s length.
+pub fn turn(w: &mut MobyWorld, hero: &Hero, i: i32, dir: V3, at: Option<V3>) -> V3 {
+    let g = &hero.gravity;
+    if i < 0 || (!g.on && !g.cylinder && hero.surf.boots == 0) { return dir; }
+    let Some(t) = w.trackers.0.get(i as usize).copied() else { return dir };
+    let origin = match at {
+        Some(p) => p,
+        None => match t.owner.and_then(|o| w.mobys.get(o)) {
+            Some(m) => m.pos,
+            None => return dir,
+        },
+    };
+    w.trackers.0[i as usize].turn(hero, dir, origin)
+}
+
+/// `$gp−0x14e4` (L00 `0x1adb0c`): the level's moving frame (module docs).
+pub fn moving_frame(w: &MobyWorld) -> Option<usize> { w.convoy.riding }
+
+/// `0x380e08(out, p)`: `p` riding the level's moving frame this tick (`0x322058`'s place, crate::moby::platform::ride;
+/// its angles unread), else `p`.
+pub fn ride(w: &MobyWorld, p: V3) -> V3 {
+    moving_frame(w).and_then(|f| platform::ride(w, f, p, [0.0; 3])).map_or(p, |(q, _)| q)
+}
+
+/// `0x380ec0(v, v)`: `v` turned by the moving frame's turn this tick (`0x3221c8`, crate::moby::platform::turn_dir),
+/// else `v`.
+pub fn ride_dir(w: &MobyWorld, v: V3) -> V3 { moving_frame(w).and_then(|f| platform::turn_dir(w, f, v)).unwrap_or(v) }
+
+/// `0x380e58(out, base, p)`: `base` plus how far `p` moved riding the moving frame this tick (`0x3222a8`,
+/// crate::moby::platform::carry), else `base`.
+pub fn ride_carry(w: &MobyWorld, base: V3, p: V3) -> V3 {
+    moving_frame(w).and_then(|f| platform::carry(w, f, p)).map_or(base, |m| add(base, m))
 }
 
 /// A vector into the frame of `rows` (row i = image of axis i): `0x2ef340(out, v, transpose)`.

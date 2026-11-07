@@ -54,7 +54,8 @@
 //! * at its end, a line along row 2 from 0.1 above to 3 below (flags 2) puts it on what it meets.
 //!
 //! Not ported: the profile counters (`0x333cb0`), the floor moby's carry (`0x3335b0`, flag 0x40; as in
-//! [`ai::move_step`]; the wall walk's `0x40b020`), the cylinder mode (`0x1a8ff4`).
+//! [`ai::move_step`]; the wall walk's `0x40b020`). The cylinder mode (`0x1a8ff4`) comes through
+//! [`Gravity::height`] and [`Gravity::up_at`] (the fall `0x32ab80` along `0x326448(p, out, 0)`).
 
 use super::{ai, Ctx, Moby, MobyWorld};
 use crate::gravity::{to_local, Gravity};
@@ -196,7 +197,7 @@ fn walk(w: &mut MobyWorld, id: usize, ctx: &Ctx, goal: V3, v: V3, inv: &[V3; 3],
         let h = g.height(m.pos);
         let fl = m.pv_f(o + 0x90);
         if fl < h {
-            vel = add(vel, set_len(g.down_at(m.pos), m.pv_f(o + 0x2c)));
+            vel = add(vel, set_len(scale(g.up_at(m.pos), -1.0), m.pv_f(o + 0x2c)));
             if m.pv_s(o + 0xc0) == 0 { let f = m.pv_i(o + 0x94); m.set_pv_i(o + 0x94, f | 0x20); }
         } else {
             let mut vz = to_local(vel, inv)[2];

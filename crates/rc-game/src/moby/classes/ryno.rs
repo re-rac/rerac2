@@ -79,10 +79,16 @@
 //!
 //! Its glow in the hand (`0x2a7ed8`'s case 0x2c): crate::hero::items.
 //!
-//! Not ported: the pad rumble (`0x2d6d60(0x296060)` / `0x2d6f38`; its stop's `0x2af848` only runs while the use is
-//! over, where it does nothing), the lock cheat (`0x18b270`), the missile's homing (its `+0x10` target is cleared by the
-//! make and set by nothing: the branch `0x40bafc..0x40bda0` never runs), the gravity frames and moving frames
-//! (`0x37f538` / `0x37f618` / `0x37f5f8`, `0x380e08`), the projectile list `0x1b1f30` (`0x3216e0` / `0x321760`); the
+//! A volley starts the pad's rumble (`0x2d6d60(0x296060)`, `+0x24`; crate::rumble), stopped once the use is over
+//! (its stop's `0x2af848` then does nothing). The Lock On mod's lock (crate::moby::lock_on) is the tick's aim, the
+//! shot's target before the picks, and hides the picks' reticles.
+//!
+//! The gravity frames (crate::gravity): the missile keeps a tracker (`+0x54`, `0x37f538(m, 0, 1, 1, 1)`) that turns its
+//! way each tick (`0x37f618`), rides the level's moving frame after its step (`0x380e08`) and gives the tracker back when
+//! it goes (`0x37f5f8`).
+//!
+//! Not ported: the missile's homing (its `+0x10` target is cleared by the
+//! make and set by nothing: the branch `0x40bafc..0x40bda0` never runs), the projectile list `0x1b1f30` (`0x3216e0` / `0x321760`); the
 //! 0x139c moby's own update and draw (`0x415850` / `0x4158d0`: its life of 60 ticks,
 //! the heat shimmer and screen flash, as crate::moby::blast leaves the 0x13a0's) and its danger area (`0x1adb0c`, 0
 //! here); the normal and the ground under the blow-up (`0x31ce20`), which the explosion does not take.
@@ -91,7 +97,8 @@ use crate::collision::QueryFlags;
 use crate::hero::items::{row, ItemRow, MINIROCKET};
 use crate::hero::physics::{add, add_rot, cross, dist, len, scale, set_len, sub, unit, V3};
 use crate::moby::hits::HitTemplate;
-use crate::moby::{aim, countdown, Ctx, MobyWorld};
+use crate::moby::{aim, countdown, lock_on, Ctx, MobyWorld};
+use crate::rumble;
 use crate::point_lights::PointLight;
 
 /// The hand's class (item 0x2c's row `+0x04`), the missile's (`0x40b348`) and the explosion's (`0x415520`).
@@ -155,6 +162,8 @@ mod pv {
     pub const DIR: usize = 0x30;
     pub const OFFSET: usize = 0x40;
     pub const SOUND: usize = 0x50;
+    /// Its tracker (crate::gravity::track).
+    pub const TRACKER: usize = 0x54;
 }
 
 /// The missiles' trail slots: the next (`$gp+0x1f88`) and each slot's four points (`0x255b20 + 0x40·k`).
@@ -228,6 +237,8 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_i(hv::RUMBLE, -1);
     }
     cooldown(w, id);
+    // The Lock On mod's lock as the aim (crate::moby::lock_on).
+    lock_on::mirror(w, ctx);
     if ctx.hero.state == 1 { ctx.hero.request_state(0x1d, true); }
     let ok = if ctx.hero.state == 0x1d { countdown(&mut ctx.hero.items.look_wait) } else {
         ctx.hero.items.look_wait = 0x28;
@@ -243,7 +254,9 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let from = w.mobys[id].pos;
     let list = aim::search_list_except(w, ctx, SEARCH, from, dir, true, 0x20, &[], &EXCLUDED);
     let cam = ctx.host.camera_pos();
-    for &t in &list {
+    // With the Lock On mod's lock held, no reticles on the picks.
+    let marks = ctx.hero.items.lock.is_none();
+    for &t in list.iter().filter(|_| marks) {
         let at = aim::aim_point(w, t);
         let d = dist(cam, w.mobys[t].pos);
         crate::hud::marker(&mut ctx.game.markers, (0.9 - d * 0.006_666_667 * 0.65).abs(), id, 0xff0f_ff0f, Some(at), 0x26);
@@ -251,12 +264,16 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let it = ctx.hero.items;
     if ctx.game.scenes.mode == crate::scene::PLAY && w.mobys[id].pv_f(hv::COOL) == 0.0 && it.no_use == 0 && it.held & it.trigger != 0 && 0x16 < it.item_ticks && ok {
         if let Some(r) = cur_row(ctx.game).copied() {
+            lock_on::mirror(w, ctx);
             if ctx.hero.items.has_ammo(ctx.game) {
                 fire(w, id, ctx, &list);
             } else if it.pressed & it.trigger != 0 || w.mobys[id].pv_i(hv::FLAG) == 1 {
                 ctx.host.play_sound(&w.mobys[id], 2, 0);
                 w.mobys[id].set_pv_i(hv::FLAG, 0);
             }
+            // The rumble's stop (crate::rumble::weapon_stop, no ammo test): ○ is held here, so only once the use is
+            // over; its `0x2af848` then does nothing.
+            rumble::weapon_stop(w, id, ctx, hv::RUMBLE, false);
             w.mobys[id].set_pv_f(hv::COOL, 1.0 / r.rate);
         }
     }
@@ -273,8 +290,9 @@ fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, list: &[usize]) {
     burst(w, id, ctx);
     ctx.host.set_anim(&w.mobys[id], 2, 0, 1);
     ctx.host.set_anim_speed(&w.mobys[id], 0.9);
-    // The rumble's handle (`0x2d6d60` gives its slot): the rumble itself is not ported.
-    w.mobys[id].set_pv_i(hv::RUMBLE, 0);
+    // The pad's rumble (`0x2d6d60(0x296060)`, crate::rumble).
+    let h = ctx.game.rumble.start(&rumble::pattern::RYNO);
+    w.mobys[id].set_pv_i(hv::RUMBLE, h);
     let at = muzzle(w, id);
     let pick = match blank {
         Some(b) => Some(b),
@@ -471,6 +489,9 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, muzzle: V3, aimh: f3
     }
     let e = exhaust_point(&w.mobys[id]);
     w.ryno.points[n as usize][0] = e;
+    // `0x37f538(missile, 0, 1, 1, 1)`: its tracker.
+    let k = crate::gravity::track(w, ctx.hero, id, None, [1.0; 3]);
+    w.mobys[id].set_pv_i(pv::TRACKER, k);
     w.rebuild(id, &*ctx.host);
     w.mobys[id].scale *= 2.5;
     Some(id)
@@ -496,7 +517,9 @@ pub fn update_missile(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let h = ctx.host.play_sound(&w.mobys[id], 1, 4);
         w.mobys[id].set_pv_i(pv::SOUND, h);
     }
-    // Its rows from its way, then the corkscrew.
+    // Its way turned by its tracker (`0x37f618(+0x54, way, 0)`), its rows from it, then the corkscrew.
+    let d = crate::gravity::turn(w, ctx.hero, w.mobys[id].pv_i(pv::TRACKER), w.mobys[id].pv_v(pv::DIR), None);
+    w.mobys[id].set_pv_v(pv::DIR, d);
     {
         let m = &mut w.mobys[id];
         let r0 = m.pv_v(pv::DIR);
@@ -518,7 +541,10 @@ pub fn update_missile(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let speed = m.pv_f(pv::SPEED);
         m.pos = add(m.pos, scale(m.rows[0], speed));
     }
+    // The step on the level's moving frame (`0x380e08`).
+    w.mobys[id].pos = crate::gravity::ride(w, w.mobys[id].pos);
     if !w.mobys[id].pos.iter().all(|&c| (2.0..=1021.0).contains(&c)) {
+        crate::gravity::untrack(w, w.mobys[id].pv_i(pv::TRACKER));
         w.delete(id);
         return;
     }
@@ -580,11 +606,13 @@ pub fn update_missile(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             crate::moby::blast::explode(w, ctx, None, Some(at), &e);
         }
         blast(w, id, ctx, spared);
+        crate::gravity::untrack(w, w.mobys[id].pv_i(pv::TRACKER));
         w.delete(id);
         return;
     }
     if count_s(w, id, pv::LIFE) || 60.0 < dist(w.mobys[id].pos, ctx.hero.pos) {
         stop_sound(w, id, ctx);
+        crate::gravity::untrack(w, w.mobys[id].pv_i(pv::TRACKER));
         w.delete(id);
     }
 }

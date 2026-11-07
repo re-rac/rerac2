@@ -12,8 +12,9 @@
 //! (`0x2b4a08`'s end), the pull and the flat part along the ground's normal, the up's spring to the ground's normal
 //! (softly while `0x18a038` counts in the air) about a point 0.8 up him in the air.
 //!
-//! Not ported: the jump attack's frame fall cap (`0x2ba8e0`: −1.1667 instead of −0.6167 with the frames on), the
-//! cylinder mode's branches (`0x1a8ff4`: mode 1 forced, its down `0x3263d0`).
+//! The cylinder mode (`0x1a8ff4`, crate::gravity): mode 1 forced, its down away from the axis (`0x3263d0(p, out, 0)`).
+//!
+//! Not ported: the jump attack's frame fall cap (`0x2ba8e0`: −1.1667 instead of −0.6167 with the frames on).
 
 use super::physics::*;
 use super::Hero;
@@ -22,14 +23,14 @@ use crate::gravity::{rotate, to_local, to_world};
 
 impl Hero {
     /// `0x2d37a0`: the frame mode at the tick's start — the walkway flag `0x18a168` (crate::hero::surface's `boots`),
-    /// 2 with the sphere on (the cylinder `0x1a8ff4` off); 1 in the states 0x3b, 0x6d, 0x6e (not on mud `0x18b2ba`),
-    /// while `0x18a038` counts, or idle (0) under 4 air ticks on the magnetic flag `0x18b2b7` with the Gravity Boots
-    /// `0x1a7b13`; 1 on mud is 0.
+    /// 2 with the sphere on (the cylinder `0x1a8ff4` off); 1 in the cylinder mode, in the states 0x3b, 0x6d, 0x6e (not
+    /// on mud `0x18b2ba`), while `0x18a038` counts, or idle (0) under 4 air ticks on the magnetic flag `0x18b2b7` with
+    /// the Gravity Boots `0x1a7b13`; 1 on mud is 0.
     pub fn frame_mode(&self, env: &Env) -> u8 {
         let mut m = self.surf.boots;
-        if self.gravity.on { m = 2; }
+        if self.gravity.on && !self.gravity.cylinder { m = 2; }
         let s = self.state;
-        if s == 0x3b || (s == 0x6e && !self.surf.mud) || s == 0x6d || self.gravity.walkway_hold != 0
+        if self.gravity.cylinder || s == 0x3b || (s == 0x6e && !self.surf.mud) || s == 0x6d || self.gravity.walkway_hold != 0
             || (self.surf.magnet && env.boots && s == 0 && self.air_ticks < 4)
         {
             m = 1;
@@ -37,9 +38,11 @@ impl Hero {
         if m == 1 && self.surf.mud { 0 } else { m }
     }
 
-    /// `0x2b4a08`'s end in mode 1: the walkways' down `0x18a110` while its word `0x18a11c` is above 0 (`0x31eb18`: one
-    /// down toward 0), else the ground's normal `0x18a0c0` turned over.
+    /// `0x2b4a08`'s end in mode 1: in the cylinder mode away from the axis (`0x3263d0(pos, out, 0)`); the walkways'
+    /// down `0x18a110` while its word `0x18a11c` is above 0 (`0x31eb18`: one down toward 0), else the ground's normal
+    /// `0x18a0c0` turned over.
     pub(super) fn walkway_down(&mut self) -> V3 {
+        if self.gravity.cylinder { return scale(crate::gravity::cylinder_up(self.pos), -1.0); }
         let g = &mut self.gravity;
         if g.walkway_k != 0.0 {
             approach(0.0, 1.0, &mut g.walkway_k);

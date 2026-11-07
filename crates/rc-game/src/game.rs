@@ -49,6 +49,9 @@ pub struct GameState {
     /// `0x1a7bf0`: per level, visited (the level start sets 1; the save page's load starts a new game from a save of
     /// level 0 not visited yet).
     pub visited: Vec<u8>,
+    /// `0x13a148 + 4·level`: the deaths on each level (`0x2b31f0` counts one; the space missions' second help 0xa18
+    /// at the first, fifth and tenth, crate::moby::classes::space::mission).
+    pub deaths: Vec<u32>,
     /// The Electrolyzer's puzzle: its screen's draw, the light set it writes, the view's tangent it holds
     /// (crate::moby::classes::electrolyzer).
     pub puzzle: crate::moby::classes::electrolyzer::PuzzleState,
@@ -301,6 +304,8 @@ pub struct GameState {
     /// and the checkpoint's copy of it (the block's copy, L09 `0x21ea00`).
     pub state_log: Vec<crate::save::LogEntry>,
     pub checkpoint_log: Vec<crate::save::LogEntry>,
+    /// The pad's rumble channels and motors (`0x1b8b80`, crate::rumble): the weapons start and stop them.
+    pub rumble: crate::rumble::Rumble,
 }
 
 /// The flag bytes `0x1395b8..0x139685` ([`GameState::flags`]): the save's global chunk 5 (0xcd bytes).
@@ -319,10 +324,10 @@ impl Default for GameState {
             bolts: 0, raritanium: 0, max_health: 4, level: 0, occlusion: 0, crate_sound_frame: -100, pickup_sound_frame: -100, level_sounds: Vec::new(), bolt_bank: 0, xp_bank: 0, xp: 0, uid_bits: vec![0; 0x400],
             show_bolts: None, show_health: None, rng: Default::default(), recent_breaks: 0, last_break_frame: -1000, frame: 0,
             clank: false, thruster: false, boots: false, charge_boots: false, grind_boots: false, nanotech: [false; 10], level_xp: [0; 2], death_z: None, boss_bar: None, boss_icon: 0, orbit_ticks: 0, side_meter: Default::default(), shadow: Default::default(), water_base: 0.0, water_z: 0.0, water_scroll: [[0.0; 2]; 2], water_cam: [0.0; 3], missions: vec![0; 0x200], mission_area: 0, cam_tweaks: Default::default(), shakes: Default::default(), uid_pending: vec![0; 0x800], uid_dead: vec![0; 0x800], mission_table: vec![0; 0x100],
-            mission_xp: vec![0; 0x30], mission_bolts: vec![0; 0x30], checkpoint: None, checkpoint_bits: Vec::new(), checkpoint_chunk: 0, last_checkpoint: None, messages: Vec::new(), help_state: 0, help_req: None, help_counts: vec![0; 0x100], help_shift: 0, help_shift_ticks: 0, help_aux: vec![0; 0x100], help_last: vec![0; 0x100], help_levels: vec![0; 0x100], help_queue: Vec::new(), help_close: None, hint_flags: [0; 5], no_item_area: false, variant: 0, chunk_request: None, items: vec![0; 0x40], quick_select: vec![0; 28], planets: vec![0; 0x1c], travel: Default::default(), ring: [0; 8], ammo: vec![0; 0x50], held: 0, wrench_out: false, trail_phase: 0.0, view_far: 1024.0, sky: Default::default(), markers: Vec::new(), scenes_seen: vec![false; 0x100], scenes: Default::default(), cameras: Default::default(), ship_parts: Vec::new(), underwater: false, fog: Default::default(), fog_flash: Default::default(), area_ask: Vec::new(), area_hero: Vec::new(), next_level: None, next_level_save: false, bolt_help_done: false, space_bolts: 0, space_bolts_shown: 0, rider_hits: 0, store_left: 0, path_openings: Vec::new(), robot_blast_frame: 0, arc_jitter: (0, [[0.0; 3]; 16]), skill_points: [0; crate::skill_points::LEN], cheats: [0; crate::cheats::LEN], race_times: [0; 10], play_time: 0, visited: vec![0; 0x1c], puzzle: Default::default(), hacker: Default::default(),
+            mission_xp: vec![0; 0x30], mission_bolts: vec![0; 0x30], checkpoint: None, checkpoint_bits: Vec::new(), checkpoint_chunk: 0, last_checkpoint: None, messages: Vec::new(), help_state: 0, help_req: None, help_counts: vec![0; 0x100], help_shift: 0, help_shift_ticks: 0, help_aux: vec![0; 0x100], help_last: vec![0; 0x100], help_levels: vec![0; 0x100], help_queue: Vec::new(), help_close: None, hint_flags: [0; 5], no_item_area: false, variant: 0, chunk_request: None, items: vec![0; 0x40], quick_select: vec![0; 28], planets: vec![0; 0x1c], travel: Default::default(), ring: [0; 8], ammo: vec![0; 0x50], held: 0, wrench_out: false, trail_phase: 0.0, view_far: 1024.0, sky: Default::default(), markers: Vec::new(), scenes_seen: vec![false; 0x100], scenes: Default::default(), cameras: Default::default(), ship_parts: Vec::new(), underwater: false, fog: Default::default(), fog_flash: Default::default(), area_ask: Vec::new(), area_hero: Vec::new(), next_level: None, next_level_save: false, bolt_help_done: false, space_bolts: 0, space_bolts_shown: 0, rider_hits: 0, store_left: 0, path_openings: Vec::new(), robot_blast_frame: 0, arc_jitter: (0, [[0.0; 3]; 16]), skill_points: [0; crate::skill_points::LEN], cheats: [0; crate::cheats::LEN], race_times: [0; 10], play_time: 0, visited: vec![0; 0x1c], deaths: vec![0; 0x1c], puzzle: Default::default(), hacker: Default::default(),
             stock: [0xff; crate::vendor::STOCK_SLOTS], challenge: false, rac1_weapons: 0, vendor_open: None, vendor_virtual: None, vendor_phase: [0.0; 3], vendor_beam: [0.0; 2], prompt: Default::default(),
             armor: 0, crystals: 0, moonstones: 0, armor_offer: 0, mods_available: [0; 0x38], mods_bought: [0; 0x38], platinum_spent: 0, platinum_found: 0, platinum: vec![0; 0x70], flags: vec![0; FLAGS_LEN], arena_menu: None, arena_hud: None, arena_wipe: None, arena_results: None, arena_on: false, arena_drop: -1, fade_black: 0.0, fade_white: 0.0, screen_callback: None, hud_slots: Default::default(), held_fade: None, upgrades: Default::default(),
-            talk_records: vec![Default::default(); crate::moby::talk::RECORDS], npc_busy: false, autosave_ask: None, state_log: Vec::new(), checkpoint_log: Vec::new(),
+            talk_records: vec![Default::default(); crate::moby::talk::RECORDS], npc_busy: false, autosave_ask: None, state_log: Vec::new(), checkpoint_log: Vec::new(), rumble: Default::default(),
         }
     }
 }
@@ -384,6 +389,7 @@ impl GameState {
             scenes_seen: old.scenes_seen,
             play_time: old.play_time,
             visited: old.visited,
+            deaths: old.deaths,
             stock: old.stock,
             challenge: old.challenge,
             rac1_weapons: old.rac1_weapons,
@@ -685,6 +691,11 @@ impl GameState {
         self.state_log = if self.checkpoint.is_some() { self.checkpoint_log.clone() } else { Vec::new() };
         self.uid_pending.iter_mut().for_each(|p| *p = 0);
         if self.checkpoint.is_some() { self.switch_chunk(self.checkpoint_chunk); }
+    }
+
+    /// `0x2b31f0`'s count: a death on this level.
+    pub fn count_death(&mut self) {
+        if let Some(d) = usize::try_from(self.level).ok().and_then(|l| self.deaths.get_mut(l)) { *d += 1; }
     }
 
     /// The count + 1 (saturating at 7).

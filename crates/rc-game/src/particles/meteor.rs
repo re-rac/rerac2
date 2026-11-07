@@ -16,7 +16,7 @@
 //! / 12 → 0..0.0125 over phase 0 (the end's in phase 1); it rises along `up` at that and drifts along `across` by `drift`
 //! × t² (phase 1: `drift`).
 //!
-//! Not ported: the gravity frames' bends (`0x380e08`).
+//! Each tick each first rides the level's moving frame (`0x380e08`, crate::gravity::ride).
 
 use super::{rec, Particles};
 use crate::hud::lerp_rgba;
@@ -147,8 +147,9 @@ fn age(sys: &mut Particles, i: usize, ticks: usize, phase: usize, bit: u8) {
 }
 
 /// `0x341a18` (module docs).
-pub fn update_streak(sys: &mut Particles, i: usize) {
+pub fn update_streak(sys: &mut Particles, i: usize, mobys: &crate::moby::MobyWorld) {
     let r = &mut sys.pool.recs[i];
+    rec::set_v3(r, 0x10, crate::gravity::ride(mobys, rec::v3(r, 0x10)));
     let way = rec::v3(r, 0x20);
     let t = 1.0 - rec::i16(r, 0xa) as f32 / r[0x31] as f32;
     let a = r[0x32];
@@ -168,8 +169,9 @@ pub fn update_streak(sys: &mut Particles, i: usize) {
 }
 
 /// `0x341dc0` (module docs).
-pub fn update_ember(sys: &mut Particles, i: usize) {
+pub fn update_ember(sys: &mut Particles, i: usize, mobys: &crate::moby::MobyWorld) {
     let r = &mut sys.pool.recs[i];
+    rec::set_v3(r, 0x10, crate::gravity::ride(mobys, rec::v3(r, 0x10)));
     let way = rec::v3(r, 0x20);
     let v0 = r[0x35] as f32 * 0.007_812_5;
     let mut speed = r[0x36] as f32 * 0.007_812_5;
@@ -202,8 +204,9 @@ pub fn update_ember(sys: &mut Particles, i: usize) {
 }
 
 /// `0x342230` (module docs).
-pub fn update_smoke(sys: &mut Particles, i: usize) {
+pub fn update_smoke(sys: &mut Particles, i: usize, mobys: &crate::moby::MobyWorld) {
     let r = &mut sys.pool.recs[i];
+    rec::set_v3(r, 0x10, crate::gravity::ride(mobys, rec::v3(r, 0x10)));
     let (up, across) = (rec::v3(r, 0x20), rec::v3(r, 0x30));
     let flags = r[0x2d];
     let g = (r[0x2c] & 0xf) as u32;

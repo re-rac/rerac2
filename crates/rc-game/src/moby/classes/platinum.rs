@@ -36,13 +36,15 @@ const DEG_S: f32 = 0.000_290_888_25;
 /// The message `0x31d0e0(0x124b)`.
 const FOUND_TEXT: i32 = 0x124b;
 
-fn slot(ctx: &Ctx, k: i32) -> Option<usize> {
+pub(crate) fn slot(ctx: &Ctx, k: i32) -> Option<usize> {
     let l = usize::try_from(ctx.game.level).ok()?;
     let k = usize::try_from(k).ok()?;
     Some(l * 4 + k).filter(|&i| i < ctx.game.platinum.len())
 }
 
-fn found(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+/// Found: the message 0x124b, bolt `[0]` of the level counted found, the autosave (also the space levels' bolt,
+/// crate::moby::classes::space::platinum).
+pub(crate) fn found(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     ctx.game.messages.push(crate::msgbox::Request::Text { text: FOUND_TEXT, ticks: None });
     if let Some(i) = slot(ctx, w.mobys[id].pv_i(0)) {
         if ctx.game.platinum[i] == 0 { ctx.game.platinum_found += 1; }

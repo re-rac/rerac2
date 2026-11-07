@@ -47,6 +47,7 @@ impl Plugin for PlayPlugin {
             .add_systems(Update, (draw_created, draw_hud, move_instances, ship_screen.after(draw_created), crate::overlay_mobys::assign_layers.after(draw_created)))
             .add_systems(Update, crate::puzzle_view::apply)
             .add_systems(Update, play_ticks_exit)
+            .add_systems(FixedUpdate, pad_rumble.after(tick))
             .add_systems(PostUpdate, draw_canopy.before(bevy::asset::AssetEventSystems))
             .add_systems(PostUpdate, draw_shots.before(bevy::asset::AssetEventSystems))
             .add_systems(PostUpdate, occlusion_mode.before(crate::occlusion::OcclusionSet))
@@ -684,6 +685,10 @@ fn tick(
     };
     // The mirror cheat (byte 4, rc_game::cheats): the sticks' x and ← / → swapped (`0x3306b0`).
     p.pad.update(Some(&input.bytes()), p.game.cheat(rc_game::cheats::cheat::MIRROR));
+    // `0x2d73a0`: the rumble's channels mixed into the pad's motors, in play, the pause and the movies alike, while the
+    // Vibration option (rc_game::menus::opt, the card's save data) is on (rc_game::rumble; [`pad_rumble`] plays them).
+    let vibration = card.as_deref().is_none_or(|c| c.save.u8(rc_game::save::Scope::Global, rc_game::menus::opt::VIBRATION) != 0);
+    p.game.rumble.tick(vibration);
     // The pause: the game stops while its pages run ([`pause_tick`]); the frame count goes on (the pad script reads it).
     // A movie its Movies pages started plays (the movie mode below) with the pause waiting.
     if p.pause.is_some() && !movie_over_pause(p) {
@@ -1050,7 +1055,7 @@ fn tick(
     if p.hero.mode == 0 { rc_game::hero::layers::upkeep(&mut p.hero, &p.anim.ctl(class)); }
     // `UpdateParts` (`0x331150`), after the hero.
     if let Some(s) = parts.as_deref_mut() {
-        let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, hero_speed: p.hero.eff_len, coll: Some(coll), rain: mobys.world.weather.aux(&mobys.level, &p.game) };
+        let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, hero_speed: p.hero.eff_len, coll: Some(coll), rain: mobys.world.weather.aux(&mobys.level, &p.game), frames: rc_game::gravity::Frames::of(&p.hero) };
         rc_game::particles::update_parts(&mut s.sys, &mobys.world, p.camera.pos, p.hero.pos, &mut p.game.rng, &aux);
     }
     // The draw callbacks the updates registered, called by the frame's draw (rc_game::fx).
@@ -1194,7 +1199,10 @@ fn tick(
             f.draw_scrape(f.pos, &mut p.game.rng, &mut p.fx_quads);
             if 0 < p.game.space_bolts_shown { p.game.space_bolts_shown -= 1; }
             // `0x2c63f0`: the ship's death starts the fight again; `0x307bf0(2, 1)`: the fight won, Maktar Nebula.
-            if f.restart && p.game.next_level.is_none() { p.game.go_to_level(p.game.level, false); }
+            if f.restart && p.game.next_level.is_none() {
+                p.game.count_death();
+                p.game.go_to_level(p.game.level, false);
+            }
             if f.done && p.game.next_level.is_none() {
                 // `0x1a7c09` = 1 (Wupash's byte of `0x1a7bf0`): the galactic map's way to Maktar (`0x33c0c0`) no longer
                 // goes through the fight.
@@ -1341,7 +1349,10 @@ fn tick(
     // `0x2b31f0`'s respawn request: the level restarts from the checkpoint (the spawn points', else Ratchet's start):
     // the objects spawn again by their rules (the ones gone for good stay out), Ratchet there with full health. The
     // fade is not ported.
-    if p.hero.damage.dead && p.death_fade.is_none() { p.death_fade = Some(0); }
+    if p.hero.damage.dead && p.death_fade.is_none() {
+        p.game.count_death();
+        p.death_fade = Some(0);
+    }
 }
 
 /// `0x2e7c90(0x10)`'s frames.
@@ -1397,7 +1408,7 @@ fn puzzle_frame(p: &mut Play, lv: &crate::level_load::LoadedLevel, occl: Option<
     (p.fx_quads_first, p.fx_quads, p.frame_quads) = (Vec::new(), Vec::new(), Vec::new());
     p.game.markers.clear();
     if let Some(s) = parts.as_deref_mut() {
-        let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, hero_speed: p.hero.eff_len, coll: Some(coll), rain: mobys.world.weather.aux(&mobys.level, &p.game) };
+        let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, hero_speed: p.hero.eff_len, coll: Some(coll), rain: mobys.world.weather.aux(&mobys.level, &p.game), frames: rc_game::gravity::Frames::of(&p.hero) };
         rc_game::particles::update_parts(s, &mobys.world, p.camera.pos, p.hero.pos, &mut p.game.rng, &aux);
     }
     let id = usize::try_from(p.game.scenes.arg.0).ok().filter(|&i| mobys.world.mobys.get(i).is_some_and(|m| m.state < 0x80 && matches!(m.o_class, rc_game::moby::classes::electrolyzer::CLASS | rc_game::moby::classes::hacker_panel::CLASS | rc_game::moby::classes::level21::hacking::CLASS)));
@@ -1477,7 +1488,7 @@ fn upgrade_frame(p: &mut Play, lv: &crate::level_load::LoadedLevel, occl: Option
     (p.fx_quads_first, p.fx_quads, p.frame_quads) = (Vec::new(), Vec::new(), Vec::new());
     p.game.markers.clear();
     if let Some(s) = parts.as_deref_mut() {
-        let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, hero_speed: p.hero.eff_len, coll: Some(coll), rain: mobys.world.weather.aux(&mobys.level, &p.game) };
+        let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, hero_speed: p.hero.eff_len, coll: Some(coll), rain: mobys.world.weather.aux(&mobys.level, &p.game), frames: rc_game::gravity::Frames::of(&p.hero) };
         rc_game::particles::update_parts(s, &mobys.world, rc_game::menus::upgrade::EYE, p.hero.pos, &mut p.game.rng, &aux);
     }
     let mut host = crate::mobys::Host { lv: &lv.mobys, occl: occl.as_deref(), anim: anim.as_deref_mut(), created: &mut mobys.created, hero: None, hero_chains: &[], chains: Some(&mobys.chains), camera: p.camera.pos, camera_rows: p.camera.rows, sound: None };
@@ -2248,7 +2259,7 @@ fn scene_tick(p: &mut Play, lv: &mut crate::level_load::LoadedLevel, commands: &
     let ship = p.game.scenes.player.as_ref().and_then(|pl| pl.actors.iter().map(|a| a.0).find(|&a| mobys.world.mobys.get(a).is_some_and(|m| m.o_class == 0xd54)));
     canopy_tick(mobys, lv, occl.as_deref(), anim.as_deref_mut(), ship, frame.camera.eye, p.game.scenes.mode);
     if let Some(sys) = parts.as_deref_mut() {
-        let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, hero_speed: p.hero.eff_len, coll: Some(coll), rain: mobys.world.weather.aux(&mobys.level, &p.game) };
+        let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, hero_speed: p.hero.eff_len, coll: Some(coll), rain: mobys.world.weather.aux(&mobys.level, &p.game), frames: rc_game::gravity::Frames::of(&p.hero) };
         rc_game::particles::update_parts(sys, &mobys.world, frame.camera.eye, p.hero.pos, &mut p.game.rng, &aux);
     }
     // The frame's draw calls the callbacks the scene tick's updates registered too (rc_game::fx): the enemies hidden
@@ -3083,6 +3094,32 @@ fn level_gravity(lv: &crate::level_load::LoadedLevel) -> rc_game::gravity::Gravi
 
 /// `RC_PLAY_TICKS=n` (dev builds): the run ends once the game has ticked `n` times, so a headless run without a
 /// screenshot closes its window on its own.
+/// The game's rumble (rc_game::rumble's motor levels: the small motor as the host's weak one, the big as its strong
+/// one) on every connected gamepad. A level change goes to the pad (stop, then the new levels for a quarter second);
+/// steady levels are renewed every 12 ticks; no rumble tick this tick (the front end, a flight, no game) stops it.
+fn pad_rumble(
+    play: Option<Res<Play>>,
+    pads: Query<Entity, With<bevy::input::gamepad::Gamepad>>,
+    mut out: MessageWriter<bevy::input::gamepad::GamepadRumbleRequest>,
+    mut last: Local<([f32; 2], u32, u32)>,
+) {
+    use bevy::input::gamepad::{GamepadRumbleIntensity, GamepadRumbleRequest};
+    let want = play.as_deref().filter(|p| p.game.rumble.frames != last.2).map_or([0.0; 2], |p| p.game.rumble.levels());
+    if let Some(p) = play.as_deref() { last.2 = p.game.rumble.frames; }
+    if want == last.0 && (want == [0.0; 2] || last.1 < 12) {
+        last.1 += 1;
+        return;
+    }
+    for pad in &pads {
+        out.write(GamepadRumbleRequest::Stop { gamepad: pad });
+        if want != [0.0; 2] {
+            let intensity = GamepadRumbleIntensity { weak_motor: want[0], strong_motor: want[1] };
+            out.write(GamepadRumbleRequest::Add { gamepad: pad, duration: std::time::Duration::from_millis(250), intensity });
+        }
+    }
+    (last.0, last.1) = (want, 0);
+}
+
 fn play_ticks_exit(play: Option<Res<Play>>, mut limit: Local<Option<Option<u64>>>, mut exit: MessageWriter<AppExit>) {
     if !cfg!(feature = "dev") { return; }
     let n = *limit.get_or_insert_with(|| std::env::var("RC_PLAY_TICKS").ok().and_then(|v| v.trim().parse::<u64>().ok()));

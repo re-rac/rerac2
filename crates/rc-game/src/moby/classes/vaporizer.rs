@@ -72,9 +72,12 @@
 //! The weapon mod: Shock on each moby the impact touches (`0x4126b8(m, 0x42, the source's owner)`,
 //! crate::moby::weapon_mods).
 //!
-//! Not ported: the pad rumble (`0x2d6d60(0x296a60)` / `0x2d6f38`), the lock cheat (`0x18b270`), the LOD ranges the zoom
-//! widens (`0x36a1c0`, `$gp−0x4ef0`), the moving frames (`$gp−0x14e4`: the shot's mode 2 and its aim straight at a lock
-//! or the scope's target, `0x380e58` / `0x380e08`), the gravity frames' up (`0x326448`: world up), the impact's base-row branch (green twinkles: the shot is only made
+//! In the ready state the Lock On mod's lock is the aim (crate::moby::lock_on::mirror); a shot starts the pad's rumble
+//! (`0x2d6d60(0x296a60)`, `+0x1c`), stopped at the ready state's end (crate::rumble::weapon_stop).
+//!
+//! Not ported: the LOD ranges the zoom
+//! widens (`0x36a1c0`, `$gp−0x4ef0`), the moving frames' aims (`$gp−0x14e4`: the shot's mode 2 and its aim straight at a lock
+//! or the scope's target; its start's carry `0x380e58` and the ended shot's ride `0x380e08` are crate::gravity's), the gravity frames' up (`0x326448`: world up), the impact's base-row branch (green twinkles: the shot is only made
 //! by the upgraded hand). The base rifle shot's upgraded impact (`0x3a9668` → `0x320538`) has no caller with an upgraded
 //! row (the upgrade swaps the hand to this one).
 
@@ -83,7 +86,8 @@ use crate::first_person::Tune;
 use crate::hero::items::{row, ItemRow, PULSE};
 use crate::hero::physics::{add, add_rot, cross, len, scale, set_len, sub, unit, V3};
 use crate::moby::hits::HitTemplate;
-use crate::moby::{aim, countdown, Ctx, MobyWorld};
+use crate::moby::{aim, countdown, lock_on, Ctx, MobyWorld};
+use crate::rumble;
 use crate::point_lights::PointLight;
 use super::pulse_rifle::{self, Beam, BeamLook, BEAMS};
 
@@ -280,6 +284,8 @@ fn start(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 fn ready(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, fp: bool) {
     if ctx.hero.state == 1 { ctx.hero.request_state(0x1d, true); }
     if fp { w.mobys[id].set_pv_s(0, 1); }
+    // The Lock On mod's lock as the aim (crate::moby::lock_on).
+    lock_on::mirror(w, ctx);
     let begin = w.mobys[id].pv_f(8);
     if !fp {
         if w.mobys[id].pv_s(0) != 0 {
@@ -317,7 +323,10 @@ fn ready(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, fp: bool) {
     if it.no_use == 0 && it.pressed & it.trigger != 0 && ok {
         if ctx.hero.items.take_ammo(ctx.game, 1) {
             ctx.hero.items.use_start(ctx.hero.group);
+            // The pad's rumble (`0x2d6d60(0x296a60)`, crate::rumble).
+            let h = ctx.game.rumble.start(&rumble::pattern::VAPORIZER);
             let m = &mut w.mobys[id];
+            m.set_pv_i(0x1c, h);
             m.set_pv_s(2, 2);
             m.state = 2;
             ctx.host.set_anim(&w.mobys[id], 2, 0, 0);
@@ -325,6 +334,8 @@ fn ready(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, fp: bool) {
             ctx.host.play_sound(&w.mobys[id], 1, 0);
         }
     }
+    rumble::weapon_stop(w, id, ctx, 0x1c, true);
+    lock_on::mirror(w, ctx);
 }
 
 /// The light's tail of `0x3e4e98` (module docs).
@@ -398,6 +409,9 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, pos: V3, vel: V3, slot: i32, mode
     let mut b = w.vapor.next_beam;
     if 3 < b { b = 0; }
     w.vapor.next_beam = (b + 1) % 3;
+    // `0x380e58(vel, vel, pos)`: plus its start's move on the level's moving frame (crate::gravity::ride_carry).
+    let moved = crate::gravity::ride_carry(w, vel, pos);
+    w.mobys[id].set_pv_v(0, moved);
     {
         let m = &mut w.mobys[id];
         m.pvars.resize(crate::moby::PVAR_BYTES, 0);
@@ -406,7 +420,6 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, pos: V3, vel: V3, slot: i32, mode
         m.drawn = 1;
         m.pos = pos;
         m.state = 0;
-        m.set_pv_v(0, vel);
         m.set_pv_i(0x10, life);
         m.set_pv_f(0x14, 1.0 / life as f32);
         m.set_pv_s(0x1a, slot as i16);
@@ -455,6 +468,8 @@ pub fn update_shot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         return;
     }
     if w.mobys[id].state == 2 {
+        // Ended: on the level's moving frame (`0x380e08`).
+        w.mobys[id].pos = crate::gravity::ride(w, w.mobys[id].pos);
         tail(w, id, ctx);
         return;
     }

@@ -29,15 +29,23 @@
 //! 90 ticks and fading over 55 (`0x3f13d8` / `0x3f1618`, `0x3f1b00`), and the shockwave mesh twice (`0x3f0f18`,
 //! `0x3f1180`; the tables the level's overlay carries, [`DomeMesh`]). The blast goes once its last flare has.
 //!
-//! Not ported: the target held by `0x18b270` (nothing sets it on Aranos), the gravity frames and moving frames of
-//! the throw and the arc (`0x326448`'s other gravities, `0x37f538` / `0x37f618`, `0x380e08` / `0x380ec0`: nothing on
-//! Aranos; down is `(0, 0, −1)` here), the rumble, the trail, the hit the ground line
+//! The bomb's gravity frames (crate::gravity): its tracker (`+0x34`, [`throw`]'s `0x37f538(bomb, 0, 1, 1, 1)`, turned each
+//! tick, given back when it goes), the moving frame's ride of its place and velocity (`0x380e08` / `0x380ec0`), the
+//! fall and the floor test along the frames' up (`0x37ec68`, `0x37edb8`) and the arc's own tracker ([`landing_hit`]);
+//! the blasts ride the moving frame (`0x380e08`).
+//!
+//! The Lock On mod's lock (`0x18b270`, crate::moby::lock_on) is the throw's target over the search's; a throw starts
+//! the pad's rumble (crate::rumble).
+//!
+//! Not ported: the throw's aim in the frames (`0x37e328`'s
+//! `0x326448`: down is `(0, 0, −1)` there), the trail, the hit the ground line
 //! under a moby delivers (`0x3efda0`'s `0x2de878(.., 6, target)` passes the moby as its hit template).
 
 use crate::hero::items::{row, GRAVITY_BOMB};
 use crate::hero::physics::{add, add_rot, cross, dot, len, scale, set_len, sub, V3};
 use crate::moby::hits::HitTemplate;
-use crate::moby::{aim, countdown, mode, Ctx, MobyWorld};
+use crate::moby::{aim, countdown, lock_on, mode, Ctx, MobyWorld};
+use crate::rumble;
 
 /// The hand's, the bomb's and the blast's classes.
 pub const HAND_CLASS: i16 = 0xce3;
@@ -78,16 +86,18 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if let Some(a) = ctx.host.anim(&w.mobys[id]) {
         if a.seq_a == a.seq_b && a.flags & 2 != 0 { ctx.host.set_anim(&w.mobys[id], 1, 0, 2); }
     }
-    // The aim: in the look stance its wait; else the search.
+    // The aim: the Lock On mod's lock while it lives (crate::moby::lock_on::live); in the look stance its wait; else,
+    // without the lock, the search.
     let hero_state = ctx.hero.state;
-    let mut target = None;
+    let mini = w.mobys[id].o_class == MINI_HAND;
+    let mut target = lock_on::live(w, ctx);
     let look_ok = if matches!(hero_state, 0x1d | 1) {
         countdown(&mut ctx.hero.items.look_wait)
     } else {
         ctx.hero.items.look_wait = 0x28;
         let (sp, cp) = ctx.hero.rot[1].sin_cos();
         let (sy, cy) = ctx.hero.rot[2].sin_cos();
-        target = aim::search(w, ctx, CONE, hand, [cy * cp, sy * cp, sp], false);
+        if target.is_none() { target = aim::search(w, ctx, CONE, hand, [cy * cp, sy * cp, sp], false); }
         true
     };
     if hero_state == 1 { ctx.hero.request_state(0x1d, true); }
@@ -114,6 +124,8 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         if w.mobys[id].pv_f(0x20) == 0.0 && it.no_use == 0 && it.held & it.trigger != 0 && look_ok && 0x17 <= it.item_ticks {
             if ctx.hero.items.take_ammo(ctx.game, 1) {
                 ctx.hero.items.use_start(ctx.hero.group);
+                // The pad's rumble (`0x2d6d60(0x29ae30)`, the Mini-Nuke's `0x295fe0`; crate::rumble): no handle kept.
+                ctx.game.rumble.start(if mini { &rumble::pattern::MINI_NUKE } else { &rumble::pattern::GRAVITY_BOMB });
                 ctx.host.set_anim(&w.mobys[id], 2, 0, 2);
                 throw(w, ctx, id, hand, vel);
                 ctx.host.play_sound(&w.mobys[id], 0, 0);
@@ -122,6 +134,9 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 ctx.host.play_sound(&w.mobys[id], 1, 0);
             }
         }
+        // The rumble's stop (crate::rumble::weapon_stop) on the word `+0x2c`, which no start sets (0 from the
+        // create, then −1).
+        rumble::weapon_stop(w, id, ctx, 0x2c, true);
     }
     // `0x2eeb40(+0x20)`.
     let c = w.mobys[id].pv_f(0x20);
@@ -210,20 +225,27 @@ pub fn landing_with(w: &MobyWorld, ctx: &Ctx, id: usize, from: V3, vel: V3, grav
 /// Thermanator's aim (crate::moby::classes::thermanator).
 pub fn landing_hit(w: &MobyWorld, ctx: &Ctx, id: usize, from: V3, vel: V3, gravity: f32) -> Option<(V3, V3, Option<usize>)> {
     if ctx.hero.state == 0x6f || ctx.game.scenes.mode != crate::scene::PLAY { return None; }
+    // Its own tracker (`0x37f538(record, 0, 1, 1, 1)` on a stack record whose place follows the arc), turned each step
+    // (`0x37f618`), and the fall along the frames' up at the new place (`0x37ec68`). The slot is given back within the
+    // call (`0x37f5f8`): a local one stands in (with the table full the original's arc would not turn).
     let (mut p, mut v) = (from, vel);
-    for _ in 0..300 {
+    let mut tracker = crate::gravity::Tracker::new(ctx.hero, id, from, [1.0; 3]);
+    let mut out = None;
+    'arc: for _ in 0..300 {
         let a = p;
         for _ in 0..10 {
+            v = tracker.turn(ctx.hero, v, p);
             p = add(p, v);
-            v[2] -= gravity;
+            v = sub(v, scale(crate::gravity::up(ctx.hero, p), gravity));
         }
         if let Some(h) = w.coll_line(ctx, a, p, 0x12, Some(id)) {
             let n = crate::hero::physics::unit(h.normal);
             let cam = ctx.host.camera_pos();
-            return Some((add(cam, scale(sub(h.point, cam), 0.94)), n, h.moby));
+            out = Some((add(cam, scale(sub(h.point, cam), 0.94)), n, h.moby));
+            break 'arc;
         }
     }
-    None
+    out
 }
 
 /// `0x3f0190`: the bomb (class 0xce4) at the hand with the throw's velocity, two spins of 3°..6° a tick, a hundredth
@@ -250,6 +272,9 @@ fn throw(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, at: V3, vel: V3) {
     m.set_pv_f(0x14, spins[1]);
     m.set_pv_i(0x18, 0);
     m.set_pv_i(0x30, hand as i32);
+    // `0x37f538(bomb, 0, 1, 1, 1)`: its tracker (`+0x34`).
+    let slot = crate::gravity::track(w, ctx.hero, id, None, [1.0; 3]);
+    w.mobys[id].set_pv_i(0x34, slot);
     w.rebuild(id, &*ctx.host);
     w.changed = true;
 }
@@ -278,7 +303,8 @@ fn sweep(w: &MobyWorld, ctx: &Ctx, id: usize, from: V3, to: V3, vel: &mut V3) ->
         return (Sweep::None, to, [0.0; 3], None, to);
     }
     let n = crate::hero::physics::unit(h.normal);
-    if dot([0.0, 0.0, 1.0], n) < FLOOR {
+    // Against the frames' up at its (new) place (`0x37ecc0`).
+    if dot(crate::gravity::up(ctx.hero, to), n) < FLOOR {
         // `0x2ef2a8`: reflected; then the normal part a quarter.
         let r = sub(*vel, scale(n, 2.0 * dot(*vel, n)));
         let along = scale(n, dot(r, n));
@@ -293,10 +319,13 @@ pub fn update_bomb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     match w.mobys[id].state {
         0 | 1 => {
             w.mobys[id].state = 1;
+            // The move, the moving frame's ride of the place and the velocity (`0x380e08` / `0x380ec0`), the tracker's
+            // turn (`0x37f618`) and the fall along the frames' up (`0x37ec68`), all at the new place.
             let from = w.mobys[id].pos;
-            let mut vel = w.mobys[id].pv_v(0);
-            let to = add(from, vel);
-            vel[2] -= GRAVITY;
+            let to = crate::gravity::ride(w, add(from, w.mobys[id].pv_v(0)));
+            let vel = crate::gravity::ride_dir(w, w.mobys[id].pv_v(0));
+            let vel = crate::gravity::turn(w, ctx.hero, w.mobys[id].pv_i(0x34), vel, Some(to));
+            let mut vel = sub(vel, scale(crate::gravity::up(ctx.hero, to), GRAVITY));
             let (s, at, n, touched, point) = sweep(w, ctx, id, from, to, &mut vel);
             let m = &mut w.mobys[id];
             m.set_pv_v(0, vel);
@@ -318,7 +347,7 @@ pub fn update_bomb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if let Some(t) = touched {
                 let kind = w.mobys.get(t).and_then(|x| w.class(x.o_class)).map_or(0, |c| c.kind);
                 if kind == 5 || kind == 9 || w.mobys.get(t).is_some_and(|x| x.mode & mode::LINE != 0) {
-                    let up = [0.0, 0.0, 1.0];
+                    let up = crate::gravity::up(ctx.hero, w.mobys[t].pos);
                     let start = match aim::health(w, t) {
                         Some((_, h)) => add(w.mobys[id].pos, scale(up, h)),
                         None => w.mobys[id].pos,
@@ -340,6 +369,7 @@ pub fn update_bomb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             crate::shadows::request(w, ctx, 0.2, id);
             let p = w.mobys[id].pos;
             if p.iter().any(|&c| !(2.0..=1021.0).contains(&c)) {
+                crate::gravity::untrack(w, w.mobys[id].pv_i(0x34));
                 w.delete(id);
                 return;
             }
@@ -348,6 +378,7 @@ pub fn update_bomb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         2 => {
             ctx.host.play_sound(&w.mobys[id], 0, 0);
+            crate::gravity::untrack(w, w.mobys[id].pv_i(0x34));
             let (at, n, hand) = (w.mobys[id].pos, w.mobys[id].pv_v(0x20), w.mobys[id].pv_link(0x30));
             if w.mobys[id].o_class == MINI_BOMB { mini_blast(w, ctx, at, n, hand) } else { blast(w, ctx, at, n, hand) }
             w.delete(id);
@@ -399,6 +430,8 @@ fn turn(v: V3, k: V3, a: f32) -> V3 {
 
 /// `0x3f0310`; each moby the blast hits takes Acid (`0x3f9f70(m, 0x2a, the hand)`, crate::moby::weapon_mods).
 pub fn update_blast(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    // On the level's moving frame (`0x380e08`).
+    w.mobys[id].pos = crate::gravity::ride(w, w.mobys[id].pos);
     if w.mobys[id].state == 0 {
         let m = &mut w.mobys[id];
         m.state = 1;
@@ -490,6 +523,8 @@ fn nuke_damage(row: usize) -> f32 {
 ///
 /// Not ported: the trail slot it takes (`0x32b1b8`).
 pub fn update_mini_blast(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    // On the level's moving frame (`0x380e08`).
+    w.mobys[id].pos = crate::gravity::ride(w, w.mobys[id].pos);
     if w.mobys[id].state == 0 {
         let m = &mut w.mobys[id];
         m.state = 1;

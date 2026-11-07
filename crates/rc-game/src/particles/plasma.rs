@@ -4,9 +4,9 @@
 //! random roll, frame `*def[0x6e]`, `lo..hi` ticks, size `size`·630000, at `at` jittered ±0.015 on each axis, rising
 //! 0.01..0.015 a tick along the up, its alpha 0x50..200 (`+0x30`), a grey of 0x60..0x80 (`+0x34`). Each tick
 //! (`0x342988`): by `t` its life's share left, its alpha the start's · `t` and its colour from black toward its grey by
-//! `t / 2`; its roll on a step; it grows 0.004..0.012 · 210000; it moves, its velocity ×0.99; its life out: gone.
-//!
-//! Not ported: the gravity frames' bends (`0x380e08` / `0x380ec0`).
+//! `t / 2`; its roll on a step; it grows 0.004..0.012 · 210000; it moves, its velocity ×0.99; both ride the level's
+//! moving frame (`0x380e08` / `0x380ec0`, crate::gravity::ride / ride_dir); its life out: gone. The up is the frames'
+//! (`0x37ecc0`, crate::gravity::up: the caller's).
 
 use super::{rec, Particles};
 use crate::rng::Rng;
@@ -43,7 +43,7 @@ pub fn puff(sys: &mut Particles, rng: &mut Rng, size: f32, at: [f32; 3], up: [f3
 }
 
 /// `0x342988` (module docs).
-pub fn update(sys: &mut Particles, i: usize, rng: &mut Rng) {
+pub fn update(sys: &mut Particles, i: usize, rng: &mut Rng, mobys: &crate::moby::MobyWorld) {
     let grow = rng.randf(f32::from_bits(0x3b83_126f), f32::from_bits(0x3c44_9ba6));
     let r = &mut sys.pool.recs[i];
     let t = rec::i16(r, 0xa) as f32 / rec::u32(r, 0x38) as i32 as f32;
@@ -53,7 +53,8 @@ pub fn update(sys: &mut Particles, i: usize, rng: &mut Rng) {
     rec::set_ff(r, 0xc, rec::ff(r, 0xc) + grow * 210_000.0);
     let (p, v) = (rec::v3(r, 0x10), rec::v3(r, 0x20));
     rec::set_v3(r, 0x10, [p[0] + v[0], p[1] + v[1], p[2] + v[2]]);
-    rec::set_v3(r, 0x20, v.map(|x| x * f32::from_bits(0x3f7d_70a4)));
+    rec::set_v3(r, 0x20, crate::gravity::ride_dir(mobys, v.map(|x| x * f32::from_bits(0x3f7d_70a4))));
+    rec::set_v3(r, 0x10, crate::gravity::ride(mobys, rec::v3(r, 0x10)));
     rec::set_u32(r, 4, colour | alpha << 24);
     let mut n = rec::i16(r, 0xa) as i32;
     let out = crate::moby::countdown(&mut n);

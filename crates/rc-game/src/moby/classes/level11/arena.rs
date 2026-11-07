@@ -35,8 +35,8 @@
 //!   the guide marker (`0x443c48`, `0x2d70a0(5)`), the platform's sparks and lights (`0x448a40`, `0x4486a0`,
 //!   `0x4488e0`, the pvars `+0x90..+0xbc`), the ring's flashes (`+0xd0..+0xdc`), the falling drops of a wave's flag
 //!   `+0x18` (`0x448bd0` → `0x461850`);
-//! * the gravity's cylinder mode (`0x1a8ff0` / `0x1a8ff4` set above 480 in state 9: kept as
-//!   [`super::Globals::arena_gravity`], crate::gravity has no cylinder mode) and what it resets (`0x448d88`), the
+//! * what the gravity's cylinder mode (`0x1a8ff0` / `0x1a8ff4` set above 480 in state 9, [`set_gravity`]) resets
+//!   (`0x448d88`), the
 //!   launch's strength `0x1a7cd8` (80 / 5, [`super::Globals::arena_launch`]), the fall word `0x18a010` = 1 in the band
 //!   460..463, Ratchet's pickup radius `0x18c2c4` (300 / 200 after a challenge; crate::moby::classes::bolt's is
 //!   constant), the Zapper's word `0x18b6f4` kept off in challenges 7 / 8, the no-△ byte `0x18c0d7` in 7;
@@ -912,7 +912,7 @@ fn to_overview(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if let Some(mid) = middle(w, id, ctx) { put_hero(w, ctx, mid, MIDDLE_ANGLES, 0x6f); }
     checkpoint(ctx);
     menu_camera(ctx);
-    w.level11.arena_gravity = [false; 2];
+    set_gravity(w, ctx, false);
 }
 
 /// The challenge's end: the Spiderbot Glove's bot blown up (`0x3f9048(1, −1)`; the upgraded glove's `0x460f68` not
@@ -1338,9 +1338,16 @@ fn fight(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// The height above which state 9 turns the gravity's cylinder mode on.
 const GRAVITY_TOP: f32 = 480.0;
 
+/// `0x1a8ff0` / `0x1a8ff4` together: the gravity's frames and its cylinder mode (crate::gravity), also kept as
+/// [`super::Globals::arena_gravity`] for the fighters' and the crowd's reads.
+fn set_gravity(w: &mut MobyWorld, ctx: &mut Ctx, on: bool) {
+    w.level11.arena_gravity = [on; 2];
+    (ctx.hero.gravity.on, ctx.hero.gravity.cylinder) = (on, on);
+}
+
 /// State 9: a wave of the ring (module docs). Its first phase: the platform and the lamp rise (to 421.266); Ratchet
 /// on the lamp (after 300 ticks, or in state 7) launched (states 7 → 0x81); the wave's 0x0dcf / 0x0df4 / 0x0d98 sent
-/// (four each) from the spawners; above 480 at rest the gravity's cylinder mode (not ported) and the ring shrinks
+/// (four each) from the spawners; above 480 at rest the gravity's cylinder mode ([`set_gravity`]) and the ring shrinks
 /// ([`ring_step`]); in, the wave's fighters placed round the middle (phase 1). Phase 1: the wave over, the next if it
 /// is a ring's too (its fighters placed, its 0x0b3a sent), else Ratchet back down (0x6f, phase 2, the ring grows back).
 /// Phase 2: after 180 ticks the walkway word off, Ratchet's launch down (0x81, phase 3). Phase 3: the platform down;
@@ -1374,7 +1381,7 @@ fn ring_fight(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 send_wave(w, id, ctx, [(1, DCF, 4), (2, DF4, 4), (0, D98, 4), (3, DF7, 0), (4, DF9, 0), (5, D37, 0)]);
                 // Above 480 and slow: Ratchet's `+0x180` (`0x189fa0`) is read here as his vertical speed (not traced).
                 if !w.level11.arena_gravity[1] && GRAVITY_TOP < ctx.hero.pos[2] && ctx.hero.vel[2] < 1.0 / 30.0 {
-                    w.level11.arena_gravity = [true; 2];
+                    set_gravity(w, ctx, true);
                 }
                 if w.level11.arena_gravity[1] && w.mobys[id].pv_s(pv::RING_MODE) == 3 {
                     w.mobys[id].state_ticks = 0;
@@ -1425,7 +1432,7 @@ fn ring_fight(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 }
             }
             3 => {
-                w.level11.arena_gravity = [false; 2];
+                set_gravity(w, ctx, false);
                 ring_step(w, id, ctx);
                 let z = platform_z(w, id);
                 if PLATFORM_LOW < z { set_platform_z(w, id, z - PLATFORM_STEP); }
@@ -1466,7 +1473,7 @@ pub fn update_master(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         0 => {
             reset(w, id);
             put_crates_away(w, id, ctx);
-            w.level11.arena_gravity = [false; 2];
+            set_gravity(w, ctx, false);
             hide_door(w, id);
             ctx.game.arena_menu = None;
         }

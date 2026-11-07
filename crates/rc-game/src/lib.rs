@@ -38,6 +38,7 @@ pub mod ps2v;
 pub mod quat;
 pub mod quick_select;
 pub mod rng;
+pub mod rumble;
 pub mod save;
 pub mod scene;
 pub mod scene_camera;

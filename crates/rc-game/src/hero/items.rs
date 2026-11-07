@@ -360,6 +360,8 @@ pub struct ItemBlock {
     /// `0x18aa18`: the moby a weapon aims at (its lock) and its aim height, set by the weapon's update each tick it
     /// holds one and read once by the posture (crate::hero::posture, `0x2abc18`).
     pub aim_target: Option<(usize, f32)>,
+    /// `0x18b270`: the Lock On mod's lock (crate::moby::lock_on), kept while L2 and R2 are held.
+    pub lock: Option<usize>,
     /// A sequence for Ratchet `(blend, seq)` the use stance asks for (`0x2d2508`; the engine plays it after the pass).
     pub hero_anim: Option<(f32, u8)>,
     /// The first-person weapon ([`first_person_weapon`]).
@@ -513,6 +515,8 @@ impl ItemBlock {
 /// lock `0x18c0d5` — his items hidden (`0x2d3208`: the hand, head and feet; the wrench in flight stays), and the
 /// first-person weapon (`0x2d54f8`, [`first_person_weapon`]).
 pub fn item_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
+    // `0x2cb2e0` (the transitions' head): the Lock On mod's lock (crate::moby::lock_on).
+    crate::moby::lock_on::update(world, ctx);
     // What a body's way back left for the world (crate::hero::body::after).
     crate::hero::body::after(world, ctx);
     // `0x2a6dd0`'s head: the hand item's glow queue emptied (crate::fx::HeroGlow).

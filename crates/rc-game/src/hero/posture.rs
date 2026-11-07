@@ -548,8 +548,9 @@ impl Hero {
             return;
         }
         // Aiming: the spine turns to the target's aim point (yaw within 59°) and the chest to its pitch (−25°..35°)
-        // from 0.5 ahead and 0.55 up; while invincible past 27 ticks 17° and level.
-        if let Some((id, up)) = aim {
+        // from 0.5 ahead and 0.55 up; while invincible past 27 ticks 17° and level. Not with the Lock On mod's lock
+        // held (`0x18b270`, crate::moby::lock_on): the look below then.
+        if let Some((id, up)) = aim.filter(|_| self.items.lock.is_none()) {
             if let Some(t) = env.targets.iter().find(|t| t.id == id) {
                 let p = [t.pos[0], t.pos[1], t.pos[2] + up];
                 let from = self.local_point(0.5, 0.0, 0.55);

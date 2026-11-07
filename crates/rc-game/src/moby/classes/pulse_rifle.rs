@@ -76,10 +76,15 @@
 //! Its glow in the hand (`0x2a7ed8`'s case 0x17): two green glows at its joints 2 and 3 (crate::hero::items,
 //! crate::fx::HeroGlow).
 //!
-//! The weapon mod: Shock on the moby a shot hits (`0x4126b8(m, 0x17, the hand)`, crate::moby::weapon_mods).
+//! The weapon mod: Shock on the moby a shot hits (`0x4126b8(m, 0x17, the hand)`, crate::moby::weapon_mods). In
+//! the ready state the Lock On mod's lock is the aim (crate::moby::lock_on::mirror). A shot starts the pad's rumble
+//! (`0x2d6d60(0x2947c0)`, its handle `+0x24`), stopped at the ready state's end (crate::rumble::weapon_stop).
 //!
-//! Not ported: the pad rumble (`0x2d6d60` / `0x2d6f38`), the lock cheat (`0x18b270`), the moving frames (`$gp−0x14e4`: their aim straight at a lock or the scope's target, the shot's mode 2,
-//! and the frame's carry `0x380e58` / bends `0x380e08`), the LOD ranges the zoom widens (`0x36a1c0`, `0x1aa100`: the
+//! The level's moving frame (crate::gravity): the shot takes its start's move on it (`0x380e58`) and, ended, rides it
+//! (`0x380e08`).
+//!
+//! Not ported: the moving frames' aims (`$gp−0x14e4`: their aim straight at a lock or the scope's target, the shot's
+//! mode 2), the LOD ranges the zoom widens (`0x36a1c0`, `0x1aa100`: the
 //! engine's LOD is its own), `0x18ccd0` (set to 0xffff while zooming; no reader on Aranos), the impact's upgraded branch
 //! (`0x3a9668` → `0x320538` and a sphere of the row's `+0x64`: the upgraded rows swap the hand for the Vaporizer's,
 //! crate::moby::classes::vaporizer, whose own shot never comes here).
@@ -92,7 +97,8 @@ use crate::first_person::Tune;
 use crate::hero::items::{row, ItemRow, PULSE};
 use crate::hero::physics::{add, add_rot, cross, dot, len, scale, set_len, sub, unit, V3};
 use crate::moby::hits::HitTemplate;
-use crate::moby::{aim, countdown, Ctx, MobyWorld};
+use crate::moby::{aim, countdown, lock_on, Ctx, MobyWorld};
+use crate::rumble;
 use crate::point_lights::PointLight;
 
 /// The hand's class (item 0x17's row `+0x04`) and the shot's (`+0x50`).
@@ -336,6 +342,8 @@ fn ready(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, fp: bool) {
         ctx.hero.items.look_wait = 0x28;
         true
     };
+    // The Lock On mod's lock as the aim (crate::moby::lock_on).
+    lock_on::mirror(w, ctx);
     let begin = w.mobys[id].pv_f(8);
     if fp {
         let held = ctx.hero.items.held;
@@ -386,7 +394,10 @@ fn ready(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, fp: bool) {
     if it.no_use == 0 && it.pressed & it.trigger != 0 && ok {
         if ctx.hero.items.take_ammo(ctx.game, 1) {
             ctx.hero.items.use_start(ctx.hero.group);
+            // The pad's rumble (`0x2d6d60(0x2947c0)`, crate::rumble), its handle `+0x24`.
+            let h = ctx.game.rumble.start(&rumble::pattern::PULSE_RIFLE);
             let m = &mut w.mobys[id];
+            m.set_pv_i(0x24, h);
             m.set_pv_s(2, 2);
             m.state = 2;
             ctx.host.set_anim(&w.mobys[id], 2, 0, 0);
@@ -394,6 +405,8 @@ fn ready(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, fp: bool) {
             ctx.host.play_sound(&w.mobys[id], 1, 0);
         }
     }
+    rumble::weapon_stop(w, id, ctx, 0x24, true);
+    lock_on::mirror(w, ctx);
 }
 
 /// State 2's shot (module docs).
@@ -498,6 +511,8 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, pos: V3, dir: V3, slot: i32, mode
     let mut b = w.pulse.next_beam;
     if 3 < b { b = 0; }
     w.pulse.next_beam = (b + 1) % 3;
+    // `0x380e58(vel, dir, pos)`: plus its start's move on the level's moving frame (crate::gravity::ride_carry).
+    let dir = crate::gravity::ride_carry(w, dir, pos);
     {
         let m = &mut w.mobys[id];
         m.update_dist = 0xff;
@@ -552,6 +567,8 @@ pub fn update_shot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         return;
     }
     if w.mobys[id].state == 2 {
+        // Ended: on the level's moving frame (`0x380e08`).
+        w.mobys[id].pos = crate::gravity::ride(w, w.mobys[id].pos);
         tail(w, id, ctx);
         return;
     }

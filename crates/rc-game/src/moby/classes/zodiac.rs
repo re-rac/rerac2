@@ -55,7 +55,9 @@
 //!
 //! Its glow in the hand (`0x2a7ed8`'s case 0x2b): crate::hero::items.
 //!
-//! Not ported: the pad rumble (`0x2d6d60(0x29fba0)`), the word `0x25c5cc` set to 0.1 while drawn (no reader found);
+//! A charge starts the pad's rumble (`0x2d6d60(0x29fba0)`: the big motor's 40-frame ramp, crate::rumble).
+//!
+//! Not ported: the word `0x25c5cc` set to 0.1 while drawn (no reader found);
 //! the flakes' velocity the ash computes (4/60 a tick across the view) is left unused by the original (it passes the
 //! zero vector `0x1a8f20`), as here.
 
@@ -237,6 +239,9 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     ctx.host.play_sound(&w.mobys[id], 4, 0);
                 } else {
                     ctx.hero.items.use_start(ctx.hero.group);
+                    // The pad's rumble (`0x2d6d60(0x29fba0)`, crate::rumble): its handle `+0x18`, never stopped.
+                    let h = ctx.game.rumble.start(&crate::rumble::pattern::ZODIAC);
+                    w.mobys[id].set_pv_i(0x18, h);
                     w.mobys[id].state = 2;
                     w.mobys[id].set_pv_i(pv::HITS, HIT_TICKS);
                 }

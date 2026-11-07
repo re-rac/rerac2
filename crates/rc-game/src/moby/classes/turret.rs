@@ -107,9 +107,8 @@
 //! plasma hits (`0x4126b8(m, 0x40, the hand)`; crate::moby::weapon_mods).
 //!
 //! Not ported (the upgraded glove): the free mobys' check of the shot's make (`0x1b1d40` below 0x11: none), the
-//! search's class list (`$gp−0x90`: {0, 0x1367}, of no class of type 5). The gravity frames and moving frames (`0x37f538` /
-//! `0x37f618` / `0x37f5f8`, `0x380e08` / `0x380e58`, the down `0x37ecc0` of the frames: the port's crate::gravity
-//! stands in for the up); the level's moving frame (`0x1adb0c`, the tables `0x238730` / `0x2388c0` by the turret's
+//! search's class list (`$gp−0x90`: {0, 0x1367}, of no class of type 5). (The turret's flight keeps a tracker, `+0x4f`,
+//! rides the level's moving frame and falls along the frames' up: crate::gravity.) The level's moving frame (`0x1adb0c`, the tables `0x238730` / `0x2388c0` by the turret's
 //! index: what it lands on carries it with its turn; null on the ported levels), the water's ripple (`0x37d5a0`, with
 //! the ripple module: G-REN-009) and splash moby (`0x39f938`: class 0x307, in no level), the water's patch and plane
 //! heights for the bubbles (`0x31d7a0`: the bubble's own height here, as the port's water does); the shots' line through the gravity frames (`0x380e58`). The original keeps the table's
@@ -198,6 +197,8 @@ mod pv {
     pub const NODE: usize = 0x48;
     pub const NEW_LOOK: usize = 0x4c;
     pub const SLOT: usize = 0x4e;
+    /// Its tracker (crate::gravity::track; a byte, −1 none).
+    pub const TRACKER: usize = 0x4f;
     pub const AIMED: usize = 0x50;
     pub const SHARE: usize = 0x54;
     pub const STEP: usize = 0x58;
@@ -405,7 +406,7 @@ fn make(w: &mut MobyWorld, ctx: &mut Ctx, pos: V3, vel: V3, up: bool) -> Option<
         return None;
     }
     let id = w.create(class);
-    let rows = align_up(crate::hero::physics::euler_rows(ctx.hero.rot), ctx.hero.gravity.up_at(pos));
+    let rows = align_up(crate::hero::physics::euler_rows(ctx.hero.rot), crate::gravity::up(ctx.hero, pos));
     let m = &mut w.mobys[id];
     m.update = Some(update);
     m.mode = (m.mode & !mode::NO_UPDATE) | mode::KEEP_ROWS;
@@ -433,6 +434,9 @@ fn make(w: &mut MobyWorld, ctx: &mut Ctx, pos: V3, vel: V3, up: bool) -> Option<
     m.set_pv_i(pv::NODE, 0);
     m.set_pv_b(pv::SLOT, 0xff);
     m.set_pv_i(pv::UNDER, 0);
+    // `0x37f538(turret, 0, 1, 1, 1)`: its tracker.
+    let k = crate::gravity::track(w, ctx.hero, id, None, [1.0; 3]);
+    w.mobys[id].set_pv_b(pv::TRACKER, k as i8 as u8);
     w.rebuild(id, &*ctx.host);
     w.changed = true;
     Some(id)
@@ -455,7 +459,7 @@ enum Swept {
 fn sweep(w: &MobyWorld, ctx: &Ctx, id: usize, from: V3, to: V3, vel: &mut V3) -> (Swept, V3, Option<usize>, i32) {
     let none = (Swept::None, to, None, -1);
     let Some(c) = ctx.coll else { return none };
-    let up = ctx.hero.gravity.up_at(w.mobys[id].pos);
+    let up = crate::gravity::up(ctx.hero, w.mobys[id].pos);
     let (radius, lift) = if is_up(w, id) { (UP_RADIUS, UP_LIFT) } else { (RADIUS, LIFT) };
     let centre = add(to, set_len(w.mobys[id].rows[2], lift));
     let hit = crate::collision::coll_sphere_m(c, ctx.scene, centre, radius, QueryFlags(0), Some(id)).map(|h| (h.pushed_centre.unwrap_or(h.point), h))
@@ -621,15 +625,20 @@ fn set_seq(w: &MobyWorld, id: usize, ctx: &mut Ctx, seq: u8, frame: u8) {
 /// State 1 (module docs): the flight and the landing.
 fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let from = w.mobys[id].pos;
-    let up = ctx.hero.gravity.up_at(from);
+    let up = crate::gravity::up(ctx.hero, from);
     {
         let m = &mut w.mobys[id];
         m.rows = align_up(m.rows, up);
         m.pos = add(m.pos, m.pv_v(pv::VEL));
     }
     let to = w.mobys[id].pos;
-    // `0x37ec68(11/3600, pos, vel)`: the fall along the up at the new place.
-    let mut vel = sub(w.mobys[id].pv_v(pv::VEL), scale(ctx.hero.gravity.up_at(to), FALL / 3600.0));
+    // `0x37f618(+0x4f, vel, 0)`: the tracker's turn at the new place; `0x37ec68(11/3600, pos, vel)`: the fall along the
+    // frames' up there; then the place rides the level's moving frame (`0x380e08`).
+    let k = w.mobys[id].pv_b(pv::TRACKER) as i8 as i32;
+    let vel = crate::gravity::turn(w, ctx.hero, k, w.mobys[id].pv_v(pv::VEL), None);
+    let mut vel = sub(vel, scale(crate::gravity::up(ctx.hero, to), FALL / 3600.0));
+    let to = crate::gravity::ride(w, to);
+    w.mobys[id].pos = to;
     let (s, at, moby, surface) = sweep(w, ctx, id, from, to, &mut vel);
     {
         let m = &mut w.mobys[id];
@@ -641,6 +650,8 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         w.mobys[id].set_pv_v(pv::VEL, scale(vel, f32::from_bits(0x3f8c_cccd)));
         return;
     }
+    // `0x37f5f8(+0x4f)`: the tracker given back.
+    crate::gravity::untrack(w, w.mobys[id].pv_b(pv::TRACKER) as i8 as i32);
     {
         let under_at = moby.and_then(|t| w.mobys.get(t)).map(|x| x.pos);
         let m = &mut w.mobys[id];
@@ -678,10 +689,13 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 }
 
 /// States 3 and 4: the moby under it gone (−2 / −3), no collision and **1** (it falls again).
-fn under_gone(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
+fn under_gone(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let Some(u) = w.mobys[id].pv_link(pv::UNDER) else { return };
     if !gone(w, u) { return; }
+    // A new tracker (`0x37f538(turret, 0, 1, 1, 1)`).
+    let k = crate::gravity::track(w, ctx.hero, id, None, [1.0; 3]);
     let m = &mut w.mobys[id];
+    m.set_pv_b(pv::TRACKER, k as i8 as u8);
     m.has_collision = false;
     m.state = 1;
     m.set_pv_i(pv::UNDER, 0);
@@ -761,7 +775,8 @@ fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let owner = w.mobys[id].parent;
         if let Some(s) = spawn_plasma(w, ctx, muzzle, vel, Some(t)) { w.mobys[s].parent = owner; }
     } else {
-        spawn_shot(w, id, muzzle, vel);
+        // `0x380e58(vel, vel, muzzle)`: plus the muzzle's move on the level's moving frame.
+        spawn_shot(w, id, muzzle, crate::gravity::ride_carry(w, vel, muzzle));
         ctx.host.play_sound(&w.mobys[id], 0, 0);
     }
     let m = &mut w.mobys[id];
@@ -895,7 +910,7 @@ fn step_shots(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// one (`0x7f7f7f7f`) to 0.7 of it turning the other way; both falling 0.002 a tick.
 fn sparks(ctx: &mut Ctx, at: V3, n: i32) {
     let cam = ctx.host.camera_pos();
-    let up = ctx.hero.gravity.up_at(at);
+    let up = crate::gravity::up(ctx.hero, at);
     let c = sub(cam, at);
     let across = sub(c, scale(up, dot(up, c)));
     let Some(sys) = ctx.parts.as_deref_mut() else { return };
@@ -1003,6 +1018,8 @@ mod plasma {
     pub const SCROLL: usize = 0x64;
     pub const MAX: usize = 0x68;
     pub const PUFF: usize = 0x6c;
+    /// (s16) Its tracker (crate::gravity::track).
+    pub const TRACKER: usize = 0x6e;
     pub const ACCEL: usize = 0x70;
     pub const DAMAGE: usize = 0x74;
     pub const LO: usize = 0x78;
@@ -1023,7 +1040,6 @@ const PLASMA_RGB: u32 = 0x10_3080;
 fn spawn_plasma(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, dir: V3, target: Option<usize>) -> Option<usize> {
     if w.class(PLASMA).is_none() { return None; }
     let id = w.create(PLASMA);
-    let _ = ctx;
     let m = &mut w.mobys[id];
     m.pvars.resize(crate::moby::PVAR_BYTES, 0);
     m.pos = at;
@@ -1048,6 +1064,9 @@ fn spawn_plasma(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, dir: V3, target: Optio
     m.set_pv_s(plasma::TICKS, 0x10e);
     m.set_pv_f(plasma::SPIN_A, 0.0);
     m.set_pv_b(plasma::FIXED, target.is_none() as u8);
+    // `0x37f538(shot, 0, 1, 1, 1)`: its tracker.
+    let k = crate::gravity::track(w, ctx.hero, id, None, [1.0; 3]);
+    w.mobys[id].set_pv_s(plasma::TRACKER, k as i16);
     Some(id)
 }
 
@@ -1090,16 +1109,21 @@ pub fn update_plasma(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].pvars.resize(crate::moby::PVAR_BYTES, 0);
     match w.mobys[id].state {
         2 => {
+            crate::gravity::untrack(w, w.mobys[id].pv_s(plasma::TRACKER) as i32);
             w.delete(id);
             return;
         }
         0 => {
             let roll = (ctx.game.rng.rand() & 1) as i16;
+            // The place and the velocity on the level's moving frame (`0x380e08` / `0x380ec0`).
+            let (p, v) = (crate::gravity::ride(w, w.mobys[id].pos), crate::gravity::ride_dir(w, w.mobys[id].pv_v(plasma::VEL)));
             let m = &mut w.mobys[id];
             m.state = 1;
             m.set_pv_f(plasma::SCROLL, 0.0);
             m.set_pv_s(plasma::PUFF, roll);
             m.rows = plasma_rows(m.pv_v(plasma::VEL));
+            m.pos = p;
+            m.set_pv_v(plasma::VEL, v);
             let c = add(scale(m.rows[0], -0.3), m.pos);
             let step = set_len(c, 0.01);
             m.set_pv_v(plasma::TRAIL, c);
@@ -1153,7 +1177,8 @@ pub fn update_plasma(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.mode |= 0x41;
         }
     }
-    let tail = { let m = &w.mobys[id]; add(scale(m.rows[0], -0.3), m.pos) };
+    // The tail on the level's moving frame (`0x380e08`).
+    let tail = crate::gravity::ride(w, { let m = &w.mobys[id]; add(scale(m.rows[0], -0.3), m.pos) });
     {
         let m = &mut w.mobys[id];
         m.rows[1][1] *= 0.5;
@@ -1216,7 +1241,7 @@ pub fn update_plasma(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let due = countdown(&mut every) || w.mobys[id].pv_b(plasma::EVERY) == 0;
     if due {
         let m = &w.mobys[id];
-        let (at, up) = (add(scale(m.rows[0], -0.3), m.pos), ctx.hero.gravity.up_at(m.pos));
+        let (at, up) = (add(scale(m.rows[0], -0.3), m.pos), crate::gravity::up(ctx.hero, m.pos));
         let k = m.pv_s(plasma::PUFF);
         let (lo, hi) = (m.pv_b(plasma::LO) as i32, m.pv_b(plasma::HI) as i32);
         if let Some(sys) = ctx.parts.as_deref_mut() { crate::particles::plasma::puff(sys, &mut ctx.game.rng, moved * 0.5, at, up, PLASMA_ALPHA[(k % 2).unsigned_abs() as usize], lo, hi); }
@@ -1230,18 +1255,33 @@ pub fn update_plasma(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_f(plasma::SPIN_B, add_rot(m.pv_f(plasma::SPIN_B), sa));
         m.set_pv_f(plasma::SPIN_A, crate::hero::physics::sub_rot(m.pv_f(plasma::SPIN_A), sb));
     }
-    // Its trail's four points shift every second tick, the newest its tail.
-    let m = &mut w.mobys[id];
-    let mut n = m.pv_b(plasma::SHIFT) as i32;
-    if countdown(&mut n) {
+    // Its trail's four points shift every second tick, the newest its tail; on the level's moving frame every tick,
+    // each riding it (`0x380e08`).
+    if crate::gravity::moving_frame(w).is_some() {
         for k in (1..4).rev() {
-            let p = m.pv_v(plasma::TRAIL + 0x10 * (k - 1));
-            m.set_pv_v(plasma::TRAIL + 0x10 * k, p);
+            let p = crate::gravity::ride(w, w.mobys[id].pv_v(plasma::TRAIL + 0x10 * (k - 1)));
+            w.mobys[id].set_pv_v(plasma::TRAIL + 0x10 * k, p);
         }
-        m.set_pv_v(plasma::TRAIL, tail);
-        n = 2;
+        w.mobys[id].set_pv_v(plasma::TRAIL, tail);
+    } else {
+        let m = &mut w.mobys[id];
+        let mut n = m.pv_b(plasma::SHIFT) as i32;
+        if countdown(&mut n) {
+            for k in (1..4).rev() {
+                let p = m.pv_v(plasma::TRAIL + 0x10 * (k - 1));
+                m.set_pv_v(plasma::TRAIL + 0x10 * k, p);
+            }
+            m.set_pv_v(plasma::TRAIL, tail);
+            n = 2;
+        }
+        m.set_pv_b(plasma::SHIFT, n as u8);
     }
-    m.set_pv_b(plasma::SHIFT, n as u8);
+    // Then the place and the velocity ride the moving frame (`0x380e08` / `0x380ec0`) and the tracker turns the
+    // velocity (`0x37f618(+0x6e, vel, 0)`).
+    let (p, v) = (crate::gravity::ride(w, w.mobys[id].pos), crate::gravity::ride_dir(w, w.mobys[id].pv_v(plasma::VEL)));
+    w.mobys[id].pos = p;
+    let v = crate::gravity::turn(w, ctx.hero, w.mobys[id].pv_s(plasma::TRACKER) as i32, v, None);
+    w.mobys[id].set_pv_v(plasma::VEL, v);
     w.register_draw(id);
 }
 

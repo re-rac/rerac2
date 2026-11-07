@@ -47,13 +47,18 @@
 //! Its glow in the hand (`0x2a7ed8`'s case 0x1b, upgraded rows only, crate::hero::items): its word pulses
 //! `0xff20205f` .. `0xffdfdfdf`.
 //!
-//! Not ported: the pad rumble (`0x2d6d60(0x29fc88)` / `0x2d6f38`), the lock cheat (`0x18b270`), the help text a
+//! The aim takes the Lock On mod's lock first (`0x325f90`, crate::moby::aim::search_lock) and mirrors it as the tick's
+//! aim (crate::moby::lock_on); a volley starts the pad's rumble (`0x2d6d60(0x29fc88)`, `+0x24`), stopped after the
+//! shot's test (crate::rumble::weapon_stop).
+//!
+//! Not ported: the help text a
 //! single-rocket shot counts toward (`0x18cd00`, `0x2f5270(0x9f7, 0x4e)`: every shot here is a volley, which ends the
 //! count), the write-only flag `0x1b2cd8`, the gravity frames.
 
 use crate::hero::items::{row, MINIROCKET};
 use crate::hero::physics::{add, add_rot, scale, sub, V3};
-use crate::moby::{countdown, Ctx, MobyWorld};
+use crate::moby::{countdown, lock_on, Ctx, MobyWorld};
+use crate::rumble;
 use crate::point_lights::PointLight;
 use super::minirocket::{self, LockPv};
 
@@ -150,6 +155,8 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_i(hv::SIZE, -1);
         m.set_pv_i(hv::LEFT, -1);
     }
+    // The Lock On mod's lock as the aim (crate::moby::lock_on).
+    lock_on::mirror(w, ctx);
     if ctx.hero.state == 1 { ctx.hero.request_state(0x1d, true); }
     let muzzle = in_hand(w, id, MUZZLE);
     let look = ctx.hero.state == 0x1d && ctx.hero.view_lock != 0;
@@ -212,10 +219,14 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             ctx.host.set_anim(&w.mobys[id], 2, 0, 2);
             let g = ctx.hero.group;
             ctx.hero.items.use_start(g);
+            // The pad's rumble (`0x2d6d60(0x29fc88)`, crate::rumble).
+            let h = ctx.game.rumble.start(&rumble::pattern::MEGAROCKET);
+            w.mobys[id].set_pv_i(hv::RUMBLE, h);
         }
         let rate = row(ctx.game, MINIROCKET).map_or(1.0, |r| r.rate);
         w.mobys[id].set_pv_f(hv::COOL, 1.0 / rate);
     }
+    rumble::weapon_stop(w, id, ctx, hv::RUMBLE, true);
     if 0 <= w.mobys[id].pv_i(hv::LEFT) && count_i(w, id, hv::WAIT) { next_rocket(w, id, ctx); }
     light(w, id, ctx, muzzle);
 }

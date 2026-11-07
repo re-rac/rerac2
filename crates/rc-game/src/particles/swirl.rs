@@ -8,7 +8,7 @@
 //!
 //! **Each tick** ([`update`], `0x33daf8`): it turns; over its first 6 ticks it grows from its end size halfway to its
 //! full size while its alpha halves, then on to the full size as the alpha runs out with the life; it moves its
-//! velocity (`0x380e08`, the gravity frames' bend, not ported). With a moby to follow whose place is at most 2 ahead
+//! velocity and rides the level's moving frame (`0x380e08`, crate::gravity::ride). With a moby to follow whose place is at most 2 ahead
 //! of it in x and in y (the differences as they are, not their sizes): it steps 0.2 across (gravity × the way to the
 //! moby) and its velocity turns to the moby — kept its speed while more than 0.5 off in x or y, else 0.03 — and rises
 //! 0.02. Its life out: gone.
@@ -65,7 +65,7 @@ pub fn update(sys: &mut Particles, i: usize, mobys: &crate::moby::MobyWorld) {
     let c = rec::u32(r, 4);
     rec::set_u32(r, 4, (alpha as i32 as u32) << 24 | c & 0xff_ffff);
     let mut v = rec::v3(r, 0x2c);
-    let mut p = add(rec::pos(r), v);
+    let mut p = crate::gravity::ride(mobys, add(rec::pos(r), v));
     let follow = rec::u32(r, 0x38).checked_sub(1).and_then(|m| mobys.mobys.get(m as usize));
     if let Some(m) = follow {
         let d = sub(m.pos, p);

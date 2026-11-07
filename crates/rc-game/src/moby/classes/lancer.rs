@@ -26,12 +26,17 @@
 //! The Heavy Lancer (row 0x3c, hand class 0x0c05, both hands: stance 2, Ratchet's sequence 0x33) runs this update
 //! (`0x3e5dc8`) with its row's speed, rate and damage (crate::upgrades).
 //!
-//! Not ported: the pad rumble (`0x2d6d60`), the stats (`0x18c8dc..`), the first-person aim (`0x18b320`).
+//! The search takes the Lock On mod's lock first (`0x325f90`, crate::moby::aim::search_lock). A shot starts the
+//! pad's rumble (crate::rumble: the Lancer's short one each shot; the Heavy Lancer's held one, `+0x3c`, stopped when
+//! ○ lets go, the ammo is out or the use ends).
+//!
+//! Not ported: the stats (`0x18c8dc..`), the first-person aim (`0x18b320`).
 
 use crate::hero::items::{row, LANCER};
 use crate::hero::physics::{add, len, scale, sub, V3};
 use crate::moby::hits::HitTemplate;
 use crate::moby::{aim, countdown, Ctx, MobyWorld};
+use crate::rumble;
 use crate::point_lights::PointLight;
 
 /// The Heavy Lancer's hand class (rows 0x3c / 0x4f / 0x50, crate::upgrades): its update `0x3e5dc8` is this one's.
@@ -101,7 +106,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].state == 1 && w.mobys[id].pv_s(6) == 0 {
         let (sp, cp) = hero_rot[1].sin_cos();
         let (sy, cy) = hero_rot[2].sin_cos();
-        let found = aim::search(w, ctx, CONE, chest, [cy * cp, sy * cp, sp], true);
+        let found = aim::search_lock(w, ctx, CONE, chest, [cy * cp, sy * cp, sp], true);
         let last = w.mobys[id].pv_link(0x30);
         match found {
             None => {
@@ -162,6 +167,11 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 }
                 w.mobys[id].set_pv_f(0xc, 1.0 / r.rate);
             }
+            // The Heavy Lancer's held rumble: stopped as the other weapons' (crate::rumble::weapon_stop), its handle
+            // dropped once the pattern's channel (`handle − 1`, `0x2d6d40`) has run out.
+            rumble::weapon_stop(w, id, ctx, 0x3c, true);
+            let h = w.mobys[id].pv_i(0x3c);
+            if 0 < h && !ctx.game.rumble.running(h - 1) { w.mobys[id].set_pv_i(0x3c, -1); }
             let it = &ctx.hero.items;
             let keep = (fire_held && it.has_ammo(ctx.game)) || (it.use_ticks < 10 && it.using);
             if !keep {
@@ -237,6 +247,14 @@ fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, muzzle: V3, damage: f32, sp
     }
     w.mobys[id].set_pv_i(0x28, 10);
     ctx.host.play_sound(&w.mobys[id], 0, 0);
+    // The pad's rumble (crate::rumble): the Lancer's (class 0x5d2) every shot (`0x2d6d60(0x294940)`, no handle kept),
+    // the Heavy Lancer's held one (`0x2d6d60(0x2949c0)`) when its handle `+0x3c` has none.
+    if w.mobys[id].o_class == 0x5d2 {
+        ctx.game.rumble.start(&rumble::pattern::LANCER);
+    } else if w.mobys[id].pv_i(0x3c) < 0 {
+        let h = ctx.game.rumble.start(&rumble::pattern::HEAVY_LANCER);
+        w.mobys[id].set_pv_i(0x3c, h);
+    }
     let target = w.mobys[id].pv_link(0);
     crate::moby::classes::shot::spawn(w, ctx, RANGE, muzzle, id, target);
     // `0x2e14b0(0.5, muzzle)`: the mobys at the muzzle, each hit along muzzle → it.

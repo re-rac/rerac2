@@ -43,15 +43,20 @@
 //! Its glow in the hand (`0x2a7ed8`'s case 0x1d, crate::hero::items): its word pulses `0xff00ffff` .. `0xff104080` and
 //! it sheds a glow sprite at (0.06, −0.509, 0).
 //!
-//! Not ported: the gravity frames' trackers and bends (`0x37f538` / `0x37f618` / `0x37f5f8`, `0x380e08`), the lock
-//! cheat (`0x18b270`, `0x32b4d0`), the GS test register the draw sets
+//! The gravity frames (crate::gravity): each point keeps a tracker (`+0x38`, `0x37f538(hand, point, 1, 1, 1)` at its
+//! shot) that turns its velocity each step (`0x37f618`) and is given back when it sticks, when its record is shot again
+//! and when the gun is put away (`0x37f5f8`); the points but the newest and the pools' first flames ride the level's
+//! moving frame (`0x380e08`).
+//!
+//! Not ported: the stream's
+//! aim at the Lock On mod's lock (`0x32b4d0`; the lock is mirrored as the tick's aim, crate::moby::lock_on), the GS test register the draw sets
 //! (`0x37c948`), the 125 records past the pools no code reads (`$gp+0x23f8`). Its upgrade (rows 0x3f on) is the Meteor Gun,
 //! crate::moby::classes::meteor.
 
 use crate::hero::items::{row, ItemRow, LAVA};
 use crate::hero::physics::{add, cross, dist2, scale, set_len, spring, sub, unit, V3};
 use crate::moby::hits::HitTemplate;
-use crate::moby::{countdown, Ctx, MobyWorld};
+use crate::moby::{countdown, lock_on, Ctx, MobyWorld};
 
 /// The hand's class (item 0x1d's row `+0x04`).
 pub const HAND_CLASS: i16 = 0x5c9;
@@ -65,14 +70,20 @@ const NO_KNOCK_LIMIT: f32 = 5627.925;
 /// `0x1b13f8`: the drops' ALPHA, in turn.
 const DROP_ALPHA: [u8; 2] = [0x48, 0x44];
 
-/// One point of the stream (`+0x00` place, `+0x10` velocity, `+0x20` the face's push, `+0x30` ticks, `+0x34` stuck).
-#[derive(Clone, Copy, Debug, Default)]
+/// One point of the stream (`+0x00` place, `+0x10` velocity, `+0x20` the face's push, `+0x30` ticks, `+0x34` stuck,
+/// `+0x38` its tracker, crate::gravity::track, −1 none).
+#[derive(Clone, Copy, Debug)]
 pub struct Point {
     pub pos: V3,
     pub vel: V3,
     pub push: V3,
     pub life: i32,
     pub stuck: bool,
+    pub tracker: i32,
+}
+
+impl Default for Point {
+    fn default() -> Self { Point { pos: [0.0; 3], vel: [0.0; 3], push: [0.0; 3], life: 0, stuck: false, tracker: -1 } }
 }
 
 /// One flame of a pool (`+0x20 + 0x10·k` its place, `+0x60 + 0x90·k` its quad's corners, `+0x4e0` / `+0x4f0` /
@@ -161,6 +172,12 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     w.lava.ready();
     if ctx.hero.items.ready == 3 {
+        // Put away: every point's tracker given back (`0x37f5f8`).
+        for k in 0..POINTS {
+            let t = w.lava.points[k].tracker;
+            if 0 <= t { crate::gravity::untrack(w, t); }
+            w.lava.points[k].tracker = -1;
+        }
         stop_sound(w, id, ctx);
         return;
     }
@@ -191,6 +208,8 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_i(0x60, 0);
     }
     if ctx.hero.state == 1 { ctx.hero.request_state(0x1d, true); }
+    // The Lock On mod's lock as the aim (crate::moby::lock_on).
+    lock_on::mirror(w, ctx);
     let muzzle = ctx.host.joint(&w.mobys[id], 0).unwrap_or(w.mobys[id].pos);
     let flow = w.mobys[id].pv_f(0x50);
     let mut dir = scale(w.mobys[id].rows[1], -1.0);
@@ -205,7 +224,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let left = ctx.hero_moby.and_then(|h| w.mobys.get(h)).map_or(ctx.hero.rows[1], |h| h.rows[1]);
         dir = crate::gravity::rotate(dir, unit(left), f32::from_bits(0xbdc9_0fdb));
     }
-    if flow != 0.0 { emit(w, id, muzzle, dir); }
+    if flow != 0.0 { emit(w, ctx, id, muzzle, dir); }
     {
         let m = &mut w.mobys[id];
         for (o, step) in [(0x58usize, 0.1f32), (0x5c, 0.025)] {
@@ -251,9 +270,14 @@ fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, muzzle: V3) {
 }
 
 /// `0x41c0b8(hand, at, vel, 40)`: the next point shot from `at`.
-fn emit(w: &mut MobyWorld, id: usize, at: V3, vel: V3) {
+fn emit(w: &mut MobyWorld, ctx: &Ctx, id: usize, at: V3, vel: V3) {
     let head = w.mobys[id].pv_i(0x3c).clamp(0, POINTS as i32 - 1);
-    w.lava.points[head as usize] = Point { pos: at, vel, push: [0.0; 3], life: 0x28, stuck: false };
+    // The record's old tracker given back (`0x37f5f8`), a new one for the hand at the point (`0x37f538(hand, point, 1,
+    // 1, 1)`).
+    let old = w.lava.points[head as usize].tracker;
+    if 0 <= old { crate::gravity::untrack(w, old); }
+    let tracker = crate::gravity::track(w, ctx.hero, id, Some(at), [1.0; 3]);
+    w.lava.points[head as usize] = Point { pos: at, vel, push: [0.0; 3], life: 0x28, stuck: false, tracker };
     let m = &mut w.mobys[id];
     m.set_pv_i(0x48, head);
     let next = head + 1;
@@ -274,9 +298,12 @@ fn step_points(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let (count, mut k) = (w.mobys[id].pv_i(0x44), w.mobys[id].pv_i(0x48));
     let flow = w.mobys[id].pv_f(0x50);
     let damage = cur_row(ctx.game).map_or(0.0, |r| r.damage);
-    for _ in 0..count.max(0) {
+    for i in 0..count.max(0) {
         let ki = k.clamp(0, POINTS as i32 - 1) as usize;
         let mut p = w.lava.points[ki];
+        // But the newest, on the level's moving frame (`0x380e08`); the tracker's turn at it (`0x37f618`).
+        if i != 0 { p.pos = crate::gravity::ride(w, p.pos); }
+        if 0 <= p.tracker { p.vel = crate::gravity::turn(w, ctx.hero, p.tracker, p.vel, Some(p.pos)); }
         if !p.stuck {
             let next = add(p.pos, p.vel);
             match ctx.coll.and_then(|c| crate::collision::coll_line_m(c, ctx.scene, p.pos, next, crate::collision::QueryFlags(0x10), Some(id))) {
@@ -287,6 +314,8 @@ fn step_points(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     p.vel = [0.0; 3];
                     p.stuck = true;
                     p.push = push;
+                    crate::gravity::untrack(w, p.tracker);
+                    p.tracker = -1;
                     let g = &mut ctx.game.rng;
                     let quarter = f32::from_bits(0x3f49_0fdb);
                     let e = [g.randf(-quarter, quarter), g.randf(-quarter, quarter), g.randf(-quarter, quarter)];
@@ -380,7 +409,10 @@ fn start_pool(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, push: V3) {
 
 /// `0x41cfe8` (module docs).
 fn step_pools(w: &mut MobyWorld) {
-    for p in w.lava.pools.iter_mut().filter(|p| p.live) {
+    // The flames on the level's moving frame (`0x380e08`).
+    let ridden: Vec<[V3; 2]> = w.lava.pools.iter().map(|p| p.flames.map(|f| crate::gravity::ride(w, f.pos))).collect();
+    for (p, r) in w.lava.pools.iter_mut().zip(ridden).filter(|(p, _)| p.live) {
+        for (f, q) in p.flames.iter_mut().zip(r) { f.pos = q; }
         for f in p.flames.iter_mut() {
             let s = f.scroll + f.speed;
             f.scroll = if s <= -8.0 { s + 8.0 } else { s };

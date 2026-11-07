@@ -6,7 +6,7 @@
 //! (`+0x2c`), twice its size (`+0x38`, unread), a roll step 0..3 (`+0x36`), half its life (`+0x34`) and its sway's
 //! phase (`+0x3c`, `0x31bb00`).
 //!
-//! **Each tick** ([`update`], `0x340e38`): (`0x380e08`, the gravity frames' bend, not ported) its velocity × 0.9 and
+//! **Each tick** ([`update`], `0x340e38`): it rides the level's moving frame (`0x380e08`, crate::gravity::ride); its velocity × 0.9 and
 //! falling its fall; it moves; within 1.05 of Ratchet's feet while he moves (`0x189f90`, his speed) it is pushed away
 //! from them by `0.2·speed + 0.15·randf(0.1, 2)/60` and rolls `step · speed / 2`; every tenth frame (`0x1b1948 % 10`) its
 //! sway's phase on 1 and `0.0075·sin` of it along the view matrix's first row (`0x1b8c00`) added to its velocity; its
@@ -49,12 +49,13 @@ pub fn wool(sys: &mut Particles, rng: &mut Rng, at: [f32; 3], vel: [f32; 3], lif
 
 /// `0x340e38` (module docs). `hero`: Ratchet's feet (`0x189ea0`) and his speed (`0x189f90`); `frame`: `0x1b1948`;
 /// `view_x`: the view matrix's first row.
-pub fn update(sys: &mut Particles, i: usize, rng: &mut Rng, hero: ([f32; 3], f32), frame: i32, view_x: [f32; 3]) {
+pub fn update(sys: &mut Particles, i: usize, rng: &mut Rng, hero: ([f32; 3], f32), mobys: &crate::moby::MobyWorld, view_x: [f32; 3]) {
+    let frame = mobys.frame;
     let r = &mut sys.pool.recs[i];
     let mut v = rec::v3(r, 0x20);
     for c in v.iter_mut() { *c *= 0.9; }
     v[2] -= rec::ff(r, 0x2c);
-    let mut p = add(rec::v3(r, 0x10), v);
+    let mut p = add(crate::gravity::ride(mobys, rec::v3(r, 0x10)), v);
     let (feet, speed) = hero;
     if dist(p, feet) < 1.05 && speed != 0.0 {
         let k = rng.randf(0.1, 2.0);

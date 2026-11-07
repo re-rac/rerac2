@@ -57,16 +57,20 @@
 //! ships by their groups: [`activate_group`] (`0x37c4f0`, with the leaders' callbacks), [`put_away_all`]
 //! (`0x37c480`), [`scatter_group`] / [`goal_group`], [`activate_one`].
 //!
-//! Not ported: the exhaust trails (`0x3ca6c0` / `0x3cbc40` through `0x349c48`); the no-fly volumes' check
-//! (`0x3782c8`: none on Wupash) and the formations' set-up and break-up (`0x376d20`, `0x376e58`: none form on
-//! Wupash; state 3 itself is); the moby groups (`+0x21`: the leaders' groups are their classes here); the view test
+//! The no-fly volumes' check (`0x3782c8`, [`no_fly`]: none on Wupash, four on the missions' levels).
+//!
+//! Not ported: the exhaust trails (`0x3ca6c0` / `0x3cbc40` through `0x349c48`); the formations' set-up and break-up
+//! (`0x376d20`, `0x376e58`: none form on Wupash; state 3 itself is); the push out of the no-fly volumes in a group's
+//! scatter (`0x37e150`); the moby groups (`+0x21`: the leaders' groups are their classes here); the view test
 //! `0x302b78` is the game's 4:3 frustum by its tangents, not its planes `0x1bd900..`.
 
 use crate::hero::physics::{add, atan2, dist, len, len2, rot_dist, scale, set_len, sub, sub_rot, V3};
 use crate::moby::{mode, Ctx, MobyWorld};
 
 pub mod escort;
+pub mod gate;
 pub mod mission;
+pub mod platinum;
 
 /// The fighter's class.
 pub const FIGHTER: i16 = 0x0957;
@@ -121,6 +125,9 @@ pub const PLACE_AT: usize = 0x170;
 pub const PLACE_FACES: usize = 0x180;
 pub const REFILL: usize = 0x190;
 pub const SHIP_DAMAGE: usize = 0x194;
+/// `lib +0x90`: the no-fly volumes' count (the missions' start: 4; Wupash's none), the volumes `lib +0x9c..` being the
+/// mission moby's disc pvars 1..4 (sphere indices: [`no_fly`]).
+pub const NO_FLY: usize = 0x198;
 
 /// The level's mission moby (the library's globals: [`MISSIONS`]).
 pub fn lib(w: &MobyWorld) -> Option<usize> { w.mobys.iter().position(|m| MISSIONS.contains(&m.o_class) && m.state < 0x80) }
@@ -420,6 +427,25 @@ fn ahead_goal(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
     set_ai_i(w, id, a::TIMER, 300);
 }
 
+/// `0x3782c8` (L05 `0x37e3a8`, L10 `0x380150`, L15 `0x384c80`; `func_002EE6E0`): the no-fly volumes (the count
+/// [`NO_FLY`]; none on Wupash). Not in state 0xb; 0xd back to 1; inside one of the volumes (`0x2acca8`, the sphere
+/// test: [`crate::level::LevelData::in_sphere`]) its attack ends (`0x376950`'s count, `+0x118`), 0xd, the goal 8
+/// ahead (`0x378498`, [`ahead_goal`]).
+fn no_fly(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
+    let Some(l) = lib(w) else { return };
+    let n = w.mobys[l].pv_i(NO_FLY).clamp(0, 4) as usize;
+    if n == 0 { return; }
+    let state = ai_i(w, id, a::STATE);
+    if state == 0xb { return; }
+    if state == 0xd { set_ai_i(w, id, a::STATE, 1); }
+    let pos = w.mobys[id].pos;
+    if (0..n).any(|k| ctx.level.in_sphere(w.mobys[l].pv_i(4 + 4 * k), pos)) {
+        set_ai_i(w, id, a::ATTACKING, 0);
+        set_ai_i(w, id, a::STATE, 0xd);
+        ahead_goal(w, id, ctx);
+    }
+}
+
 /// `0x3786e8`: at the goal (within 1; 8 in state 2), or the goal's timer out.
 pub(crate) fn arrived(w: &mut MobyWorld, id: usize) -> bool {
     let state = ai_i(w, id, a::STATE);
@@ -615,7 +641,7 @@ pub(crate) fn think(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             bounce_sparks(w, id, ctx);
         }
     }
-    // `0x3782c8`, the no-fly volumes (`0x221890`): none on Wupash (nothing sets the count), not ported.
+    no_fly(w, id, ctx);
     let vel = ai_v(w, id, a::VEL);
     // `0x377a58`: the push.
     let pos = w.mobys[id].pos;

@@ -4,7 +4,7 @@
 //! each walks in to the middle's polygon (state 3, after its delay) and fights. Maktar's (crate::moby::classes::
 //! fighters) are the model: Joba's are their level's own copies, each with a mode for the ring (its word
 //! "placed", set by the start's third argument): its moves are the gravity frames' (crate::moby::frames, `0x3415a0` /
-//! `0x3415e8`; the cylinder mode `0x1a8ff4` itself is not ported, [`super::Globals::arena_gravity`]), its yaws in its
+//! `0x3415e8`; the cylinder mode `0x1a8ff4`: crate::gravity, read here as [`super::Globals::arena_gravity`]), its yaws in its
 //! own frame (`0x338e18`, [`ring_yaw`]), it keeps within 15 of the middle ([`ring_keep`]) and in the master's
 //! cylinder `+0x1c4` (`0x447be8`, else its health 0 and the spin out); until the cylinder mode is on it waits. Out of
 //! the ring it is spun away from the middle ([`spin_out`]).

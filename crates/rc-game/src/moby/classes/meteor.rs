@@ -45,16 +45,19 @@
 //! `0xff104080` slower and a sprite at (−0.07, −0.67, 0), 99750, pull 0.15, its alpha 0x30 uncapped.
 //!
 //! Not ported: the hand's draw `0x3ebc50` (two glows at `0x1b2b20`, a word nothing writes: the world's origin); the
-//! lock cheat (`0x18b270` → `0x18aa18`, `0x32b4d0`); the first-person target search (`0x2ae668`); the targets of class
+//! throw's aim at the Lock On mod's lock (`0x32b4d0`: the lock is only mirrored as the tick's aim `0x18aa18`,
+//! crate::moby::lock_on); the first-person target search (`0x2ae668`); the targets of class
 //! 0xa8d / 0xa8e (`0x37e328`'s health-block height); the throw's jitter `0x3dd3a0` works out and drops (its three draws
 //! are made); the pools `0x3dd7a0` clears in the trail slot's memory and the ten records `0x3dd720` ages (nothing writes
-//! them); the gravity frames' trackers and bends (`0x37f538` / `0x37f618` / `0x37f5f8`, `0x380e08`). The moby a
+//! them). The gravity frames (crate::gravity): a meteor keeps a tracker (`+0x78`, `0x37f538(m, 0, 1, 1, 1)`) that turns
+//! its velocity before each step (`0x37f618`), its place and its trail's points ride the level's moving frame
+//! (`0x380e08`), and the tracker is given back when it goes (`0x37f5f8`). The moby a
 //! meteor strikes takes Acid (`0x3f9f70(m, 0x3f, the hand)`, crate::moby::weapon_mods).
 
 use crate::hero::items::{row, LAVA};
-use crate::hero::physics::{add, add_rot, atan2, cross, dist, dist2, euler_rows, rot_dist, scale, set_len, sub, unit, V3};
+use crate::hero::physics::{add, add_rot, cross, dist2, euler_rows, scale, set_len, sub, unit, V3};
 use crate::moby::hits::HitTemplate;
-use crate::moby::{countdown, mode, Ctx, MobyWorld};
+use crate::moby::{countdown, lock_on, mode, Ctx, MobyWorld};
 
 /// The hand's class (rows 0x3f / 0x5f / 0x60 `+0x04`) and the meteor's.
 pub const HAND_CLASS: i16 = 0x0c59;
@@ -88,6 +91,8 @@ mod pv {
     pub const FADE: usize = 0x6c;
     pub const SLOT: usize = 0x70;
     pub const HAND: usize = 0x74;
+    /// Its tracker (crate::gravity::track).
+    pub const TRACKER: usize = 0x78;
     pub const MET_MOBY: usize = 0x7c;
 }
 
@@ -115,6 +120,8 @@ pub fn update_hand(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if let Some(a) = ctx.host.anim(&w.mobys[id]) {
         if a.seq_a == a.seq_b && a.flags & 2 != 0 { ctx.host.set_anim(&w.mobys[id], 1, 0, 2); }
     }
+    // The Lock On mod's lock as the aim (crate::moby::lock_on).
+    lock_on::mirror(w, ctx);
     if w.mobys[id].state == 0 {
         let class = w.mobys[id].o_class;
         let mut pool = std::mem::take(&mut w.chopper);
@@ -185,32 +192,16 @@ fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, slot: i32, at: V3, _dir:
     m.set_pv_v(pv::VEL, vel);
     m.set_pv_i(pv::FADE, 0x60);
     m.set_pv_i(pv::LIFE, LIFE);
+    let k = crate::gravity::track(w, ctx.hero, id, None, [1.0; 3]);
+    w.mobys[id].set_pv_i(pv::TRACKER, k);
     w.rebuild(id, &*ctx.host);
     w.changed = true;
     Some(id)
 }
 
-/// `0x2ae900(range, yaw, yaw cone, pitch cone, .., class type 5, no line)` (crate::hero::Hero::target_search's score,
-/// third-person): of the target list, the moby of class type 5 with health left, within `range` and both cones of
-/// Ratchet's yaw, with the lowest `d + d·(yaw off + pitch off)` (a crate's + 0.8·range).
+/// `0x2ae900(range, Ratchet's yaw, yaw cone, pitch cone, .., class type 5, no line)` (crate::moby::aim::hero_search).
 fn search(w: &MobyWorld, ctx: &Ctx, range: f32, yaw_cone: f32, pitch_cone: f32) -> Option<usize> {
-    let h = &*ctx.hero;
-    let eye = if h.state == 0x14 { [h.pos[0], h.pos[1], h.ground_z] } else { h.pos };
-    let mut best = 1e8f32;
-    let mut out = None;
-    for t in w.targets(ctx.host.camera_pos()) {
-        if t.kind != 5 || crate::moby::aim::health(w, t.id).is_none_or(|(hp, _)| hp == 0.0) { continue; }
-        let d = dist(eye, t.pos);
-        let a_yaw = rot_dist(atan2(t.pos[0] - eye[0], t.pos[1] - eye[1]), h.rot[2]);
-        let a_pitch = rot_dist(atan2(dist2(eye, t.pos), t.pos[2] - eye[2]), 0.0);
-        let skip = range < d || (0.0 < yaw_cone && yaw_cone < a_yaw) || (0.0 < pitch_cone && pitch_cone < a_pitch);
-        let mut score = d + (a_yaw + a_pitch) * d;
-        if t.crate_like || t.kind == 0x16 { score += range * 0.8; }
-        if skip || best <= score { continue; }
-        best = score;
-        out = Some(t.id);
-    }
-    out
+    crate::moby::aim::hero_search(w, ctx, range, ctx.hero.rot[2], yaw_cone, pitch_cone, false)
 }
 
 /// `0x3dd610(meteor, vel)`: the throw (module docs).
@@ -253,6 +244,14 @@ fn sparks(ctx: &mut Ctx, at: V3, normal: V3, n: usize) {
 /// `0x3dc568` (module docs).
 pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].pvars.resize(crate::moby::PVAR_BYTES, 0);
+    if w.mobys[id].state != 0 {
+        // Its place and its trail's points on the level's moving frame (`0x380e08`).
+        w.mobys[id].pos = crate::gravity::ride(w, w.mobys[id].pos);
+        for k in 0..4 {
+            let p = crate::gravity::ride(w, w.mobys[id].pv_v(pv::POINTS + 0x10 * k));
+            w.mobys[id].set_pv_v(pv::POINTS + 0x10 * k, p);
+        }
+    }
     if w.mobys[id].state == 0 {
         let m = &mut w.mobys[id];
         let p = m.pos;
@@ -273,6 +272,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if usize::try_from(slot).is_ok_and(|s| w.chopper.holds(class, s)) {
         w.register_draw(id);
     } else {
+        crate::gravity::untrack(w, w.mobys[id].pv_i(pv::TRACKER));
         w.delete(id);
     }
 }
@@ -280,11 +280,12 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// State 1 of `0x3dc568`; false when the meteor is gone.
 fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     let prev = w.mobys[id].pos;
-    let vel = w.mobys[id].pv_v(pv::VEL);
+    // `0x37f618(+0x78, vel, 0)`: the tracker's turn at its place.
+    let vel = crate::gravity::turn(w, ctx.hero, w.mobys[id].pv_i(pv::TRACKER), w.mobys[id].pv_v(pv::VEL), None);
     let pos = add(prev, vel);
     w.mobys[id].pos = pos;
     // `0x37ec68(11/3600, pos, vel)`: the fall along the up at the new place.
-    let vel = sub(vel, scale(ctx.hero.gravity.up_at(pos), GRAVITY * 0.000_277_777_78));
+    let vel = sub(vel, scale(crate::gravity::up(ctx.hero, pos), GRAVITY * 0.000_277_777_78));
     w.mobys[id].set_pv_v(pv::VEL, vel);
     close_in(w, id, 0.2);
     {
@@ -312,6 +313,7 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     let gone = countdown(&mut life);
     w.mobys[id].set_pv_i(pv::LIFE, life);
     if gone {
+        crate::gravity::untrack(w, w.mobys[id].pv_i(pv::TRACKER));
         w.delete(id);
         return false;
     }
@@ -397,6 +399,7 @@ fn burn(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     let gone = countdown(&mut life);
     w.mobys[id].set_pv_i(pv::LIFE, life);
     if gone {
+        crate::gravity::untrack(w, w.mobys[id].pv_i(pv::TRACKER));
         w.delete(id);
         return false;
     }

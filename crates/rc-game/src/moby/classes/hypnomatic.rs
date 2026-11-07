@@ -16,8 +16,8 @@
 //! search's angle 5° (and a target is dropped once on the way in); else from 0.75 up Ratchet's moby, its start the
 //! hand's joint 1, both 15°. The lock's rest runs down; a target gone, of no health, not drawn, or with the arm raised
 //! at a wall (`0x18c30c`) is dropped (else it is the hero's aim target `0x18aa18`). With the lock's rest out, no
-//! landing lag and the arm not raised, the search along the camera's forward (flat in 0x1d): the aim target while it
-//! has health; else the first of the aim search's list (`0x3257a0`: angle, cone, 35, 45°, 35°; twenty) that is a
+//! landing lag and the arm not raised, the search along the camera's forward (flat in 0x1d): the Lock On mod's lock
+//! (`0x18b270`, crate::moby::lock_on) while it lives with health; else the first of the aim search's list (`0x3257a0`: angle, cone, 35, 45°, 35°; twenty) that is a
 //! gunner of endless lives with health, within its own reach (`+0x3e4`, 0: any); else what the line 35 ahead (flags
 //! 0, Ratchet's moby left out) meets, the same test. The same candidate 5 ticks running is the target (the rest 5,
 //! its aim height); none, no target. In 0x1d the reticle (sprite 0x26, `0x600fff0f`) at the screen's centre; a target
@@ -44,7 +44,7 @@
 
 use super::level18::capturable::{GUNNER, PVARS};
 use crate::hero::physics::{add, dist, dist2, scale, set_len, sub, V3};
-use crate::moby::{ai, aim, countdown, Ctx, MobyWorld};
+use crate::moby::{ai, aim, countdown, lock_on, Ctx, MobyWorld};
 
 /// The item and its hand's class.
 pub const ITEM: i32 = 0x37;
@@ -241,9 +241,8 @@ fn loop_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// `0x3ba2a0` (module docs): the creature the beam would take.
 #[allow(clippy::too_many_arguments)]
 fn search(w: &MobyWorld, id: usize, ctx: &Ctx, origin: V3, dir: V3, angle: f32, cone: f32, reach: f32) -> Option<usize> {
-    if let Some((t, _)) = ctx.hero.items.aim_target {
-        if w.mobys.get(t).is_some_and(|m| !gone(m.state)) && aim::health(w, t).is_some_and(|(h, _)| 0.0 < h) { return Some(t); }
-    }
+    // The Lock On mod's lock (`0x18b270`) while it lives (crate::moby::lock_on::live).
+    if let Some(t) = lock_on::live(w, ctx) { return Some(t); }
     let c = aim::Cone { yaw: angle, pitch: cone, range: reach, near_pitch: std::f32::consts::FRAC_PI_4, near_yaw: f32::from_bits(0x3f1c_61aa) };
     let list = aim::search_list(w, ctx, c, origin, dir, false, 20);
     if let Some(&k) = list.iter().find(|&&k| capturable(w, k, true, |m| dist2(origin, m.pos))) { return Some(k); }

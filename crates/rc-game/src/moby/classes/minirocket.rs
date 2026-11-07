@@ -13,7 +13,7 @@
 //! * **The look** (0x1d with Ratchet hidden: the view lock, crate::first_person): entering it drops the lock (the
 //!   count 5); the crosshair (`0x2db498(1.25, 0, 90°, hand, …, FX 0x27, −1, 4)`: red `0x600000ff` while the cooldown
 //!   runs with ammo left, else green `0x600fff0f`); the search 4° by 4° (and near). Outside it, 18° by 17°.
-//! * **The aim** (`0x325f90`, crate::moby::aim::search, crates too): 75 far, from 0.75 up Ratchet's up row along his
+//! * **The aim** (`0x325f90`, crate::moby::aim::search_lock: the Lock On mod's lock first, crates too): 75 far, from 0.75 up Ratchet's up row along his
 //!   forward row (`0x18a580`; the arm raised at a wall (`0x18c30c`) outside the look: the gun's −row 1). Without a
 //!   lock, the same pick 5 ticks running becomes it (the hold 5, the aim height its health block's `+0x10`, else 0.1).
 //!   With one — live (not state −2 / −3, health left when it has a block), drawn, the arm not raised — picked again
@@ -92,8 +92,14 @@
 //! The weapon mod (`0x3f9f70(moby, 0x45 upgraded / 0x1b, owner)`, crate::moby::weapon_mods): Acid on the moby a rocket
 //! struck and on every moby in its blast.
 //!
-//! Not ported: the pad rumble (`0x2d6d60(0x294840)` / `0x2d6f38`), the lock cheat (`0x18b270`), the gravity frames and moving frames (the way flattened to the
-//! frame at the make, `0x380e08`, `0x37f538` / `0x37f618` / `0x37f5f8`), the projectile list `0x1b1f30` the rocket
+//! The Lock On mod's lock is also the tick's aim (crate::moby::lock_on::mirror); a rocket starts the pad's rumble
+//! (`0x2d6d60(0x294840)`, `+0x2c`), stopped after the shot's test (crate::rumble::weapon_stop).
+//!
+//! The gravity frames (crate::gravity): the rocket keeps a tracker (`+0x50`, `0x37f538(rocket, 0, 1, 1, 1)`) that turns
+//! its way when it does not home (`0x37f618`), rides the level's moving frame after its move (`0x380e08`) and gives the
+//! tracker back when it goes (`0x37f5f8`).
+//!
+//! Not ported: the way flattened to the frame at the make, the projectile list `0x1b1f30` the rocket
 //! joins (`0x3216e0` / `0x321760`: no reader ported), the frame (1) of the standing use's sequence (the use stance's
 //! request carries none: frame 0). The upgraded rows (row 0x45 on, the hand 0x1004) are the Megarocket Cannon,
 //! crate::moby::classes::megarocket, firing these rockets.
@@ -116,7 +122,8 @@ impl From<CollOutput> for Hit {
 use crate::hero::items::{row, ItemRow, MINIROCKET};
 use crate::hero::physics::{add, add_rot, cross, dist, dot, len, scale, set_len, sub, unit, V3};
 use crate::moby::hits::HitTemplate;
-use crate::moby::{aim, countdown, Ctx, MobyWorld};
+use crate::moby::{aim, countdown, lock_on, Ctx, MobyWorld};
+use crate::rumble;
 use crate::point_lights::PointLight;
 
 /// The hand's class (item 0x1b's row `+0x04`) and the rocket's (`0x3ace00`).
@@ -159,6 +166,8 @@ mod pv {
     pub const R28: usize = 0x28;
     pub const SLOT: usize = 0x2c;
     pub const DIR: usize = 0x30;
+    /// Its tracker (crate::gravity::track).
+    pub const TRACKER: usize = 0x50;
     pub const OFFSET: usize = 0x40;
 }
 
@@ -247,6 +256,8 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     smoke(w, id, ctx);
     cooldown(w, id);
+    // The Lock On mod's lock as the aim (crate::moby::lock_on).
+    lock_on::mirror(w, ctx);
     if ctx.hero.state == 1 { ctx.hero.request_state(0x1d, true); }
     if let Some(a) = ctx.host.anim(&w.mobys[id]) {
         if a.seq_a == a.seq_b && a.flags & 2 != 0 { ctx.host.set_anim(&w.mobys[id], 1, 0, 2); }
@@ -286,6 +297,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
     }
+    rumble::weapon_stop(w, id, ctx, hv::RUMBLE, true);
     light(w, id, ctx);
 }
 
@@ -294,7 +306,7 @@ pub(super) fn aim(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, yaw: f32, pitch: 
     let h = &*ctx.hero;
     let from = add(h.pos, scale(h.rows[2], 0.75));
     let cone = aim::Cone { yaw, pitch, range: 75.0, near_pitch: yaw, near_yaw: yaw };
-    let found = aim::search(w, ctx, cone, from, way, true);
+    let found = aim::search_lock(w, ctx, cone, from, way, true);
     let aimh = |w: &MobyWorld, t: usize| aim::health(w, t).map_or(0.1, |(_, a)| a);
     match w.mobys[id].pv_link(o.lock) {
         None => {
@@ -352,6 +364,9 @@ fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, r: &ItemRow) {
         ctx.hero.items.use_start(g);
     }
     ctx.host.set_anim(&w.mobys[id], 2, 0, 0);
+    // The pad's rumble (`0x2d6d60(0x294840)`, crate::rumble).
+    let h = ctx.game.rumble.start(&rumble::pattern::MINIROCKET);
+    w.mobys[id].set_pv_i(hv::RUMBLE, h);
     w.mobys[id].set_pv_f(hv::COOL, 1.0 / r.rate);
 }
 
@@ -560,6 +575,8 @@ pub(super) fn spawn_with(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, muzzle: 
     }
     let e = exhaust_point(&w.mobys[id]);
     w.rockets.points[n as usize][0] = e;
+    let k = crate::gravity::track(w, ctx.hero, id, None, [1.0; 3]);
+    w.mobys[id].set_pv_i(pv::TRACKER, k);
     w.rebuild(id, &*ctx.host);
     w.mobys[id].scale *= 2.5;
     Some(id)
@@ -574,8 +591,11 @@ fn rows_from(r0: V3, up: V3) -> [V3; 3] {
     [r0, r1, cross_ba(r1, r0)]
 }
 
-/// Gone (`0x311688`).
-fn gone(w: &mut MobyWorld, id: usize) { w.delete(id); }
+/// Gone: its tracker given back (`0x37f5f8`), deleted (`0x311688`).
+fn gone(w: &mut MobyWorld, id: usize) {
+    crate::gravity::untrack(w, w.mobys[id].pv_i(pv::TRACKER));
+    w.delete(id);
+}
 
 /// `0x3ad308` (module docs).
 pub fn update_rocket(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
@@ -624,14 +644,18 @@ pub fn update_rocket(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
     } else {
+        // `0x37f618(+0x50, way, 0)`: the way turned by the tracker.
+        let d = crate::gravity::turn(w, ctx.hero, w.mobys[id].pv_i(pv::TRACKER), w.mobys[id].pv_v(pv::DIR), None);
         let m = &mut w.mobys[id];
-        m.rows = rows_from(m.pv_v(pv::DIR), up);
+        m.set_pv_v(pv::DIR, d);
+        m.rows = rows_from(d, up);
     }
     if target.is_some() { w.mobys[id].set_pv_v(pv::POINT, point); }
     {
         let m = &mut w.mobys[id];
         m.pos = add(m.pos, scale(m.rows[0], speed));
     }
+    w.mobys[id].pos = crate::gravity::ride(w, w.mobys[id].pos);
     if target.is_some_and(|t| w.mobys[t].o_class == 0xcea) {
         if dot(sub(point, w.mobys[id].pos), w.mobys[id].rows[0]) < 0.0 {
             w.mobys[id].set_pv_i(pv::TARGET, 0);

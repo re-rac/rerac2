@@ -44,6 +44,8 @@ pub struct PartAux<'a> {
     pub coll: Option<&'a Collision>,
     /// The rain's (crate::particles::rain).
     pub rain: super::rain::RainAux<'a>,
+    /// Ratchet's gravity frames (crate::gravity::Frames: the up the Lava Gun's drops read).
+    pub frames: crate::gravity::Frames,
 }
 
 /// `0x3378b0(size, top, pos, vel)`: a bubble (type 0x22) at `pos` moving `vel` a tick, its size 5250 growing to

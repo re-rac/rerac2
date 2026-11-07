@@ -5,9 +5,8 @@
 //! `*def[0x13]`, both colours `0x784040xx` (blue 0x40 + 6·`randi(6)`), its head `at`, its tail two moves behind
 //! (`at − 2·vel`), its widths 0.09 and ×0.5 (`+0x1c`, `+0x2c`), its fade 6 a tick (`+0x3c`). Each tick
 //! ([`update`], `0x3353d8`): both ends move by the velocity; the first colour's word goes down by the fade (truncated)
-//! in its top byte and both colours take it; below 0 (the alpha run out) it is gone.
-//!
-//! Not ported: the gravity frames' bends (`0x380e08`).
+//! in its top byte and both colours take it; below 0 (the alpha run out) it is gone. After the move both ends ride the
+//! level's moving frame (`0x380e08`, crate::gravity::ride).
 
 use super::{rec, Particles};
 use crate::rng::Rng;
@@ -37,12 +36,14 @@ pub fn line(sys: &mut Particles, rng: &mut Rng, at: [f32; 3], vel: [f32; 3]) -> 
 }
 
 /// `0x3353d8` (module docs).
-pub fn update(sys: &mut Particles, i: usize) {
+pub fn update(sys: &mut Particles, i: usize, mobys: &crate::moby::MobyWorld) {
     let r = &mut sys.pool.recs[i];
     let v = rec::v3(r, 0x30);
     let (a, b) = (rec::v3(r, 0x10), rec::v3(r, 0x20));
     rec::set_v3(r, 0x10, std::array::from_fn(|k| a[k] + v[k]));
     rec::set_v3(r, 0x20, std::array::from_fn(|k| b[k] + v[k]));
+    rec::set_v3(r, 0x10, crate::gravity::ride(mobys, rec::v3(r, 0x10)));
+    rec::set_v3(r, 0x20, crate::gravity::ride(mobys, rec::v3(r, 0x20)));
     let fade = rec::ff(r, 0x3c) as i32;
     let c = (rec::u32(r, 4) as i32).wrapping_sub(fade.wrapping_mul(0x100_0000));
     rec::set_u32(r, 4, c as u32);

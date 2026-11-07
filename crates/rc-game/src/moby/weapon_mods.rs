@@ -46,7 +46,7 @@
 //! Users (every L00 caller of `0x3f9f70` / `0x4126b8`): crate::moby::classes::{blitz, blitz_mega, bouncer, chopper,
 //! gravity_bomb (with the Mini-Nuke's blast), hoverbomb, lava_gun, meteor, minirocket, plasma_coil, plasma_storm,
 //! spiderbot, spiderbot_plus} (Acid) and {pulse_rifle, seeker, shot, synthenoid, synthenoid_bomb, turret, vaporizer}
-//! (Shock). The third mod, Lock On (slot 2), is not an effect on a hit: these do not serve it.
+//! (Shock). The third mod, Lock On (slot 2), is not an effect on a hit: it is crate::moby::lock_on.
 //!
 //! Not ported: the Heavy Lancer's shot 0x0c89 (`0x420358`: Shock as item 0x3c; its class is not ported). The weapons'
 //! statistics counters (`0x18c8dc..`) are no part of these functions.

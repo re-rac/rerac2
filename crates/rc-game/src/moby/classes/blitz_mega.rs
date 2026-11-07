@@ -32,9 +32,12 @@
 //! 0.1 in front of the camera (FX 0xb, additive, 0.03 across, `0x808080` at 255 of its share) and the screen's additive
 //! fill (`0x808080` at 255 of it).
 //!
+//! A shot starts the pad's rumble (`0x2d6d60(0x2960e0)`, `+0x50`), stopped after the shot's test
+//! (crate::rumble::weapon_stop). Its hits take Acid as the Blitz Gun's, as item 0x44 ([`MEGA_ITEM`],
+//! crate::moby::weapon_mods).
+//!
 //! Not ported: the muzzle's six glows (`0x33ff78`, particles of type 0x5c: the port's particles have no such type);
-//! the pad rumble (`0x2d6d60` / `0x2d6f38`); the gravity frames' bends. Its hits take Acid as the Blitz Gun's, as item
-//! 0x44 ([`MEGA_ITEM`], crate::moby::weapon_mods).
+//! the gravity frames' bends.
 
 /// The upgraded row's id (the weapon mods' item, `0x3f9f70(m, 0x44, hand)`).
 pub const MEGA_ITEM: i32 = 0x44;
@@ -45,6 +48,7 @@ use crate::hero::items::{row, BLITZ};
 use crate::hero::physics::{add, add_rot, len, scale, set_len, sub, unit, V3};
 use crate::moby::hits::HitTemplate;
 use crate::moby::{countdown, Ctx, MobyWorld};
+use crate::rumble;
 
 /// The hand's class (rows 0x44 / 0x5b / 0x5c `+0x04`).
 pub const HAND_CLASS: i16 = 0x0af1;
@@ -152,10 +156,14 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.set_pv_f(0x2c, 1.0 / GLARE as f32);
             m.set_pv_i(0x44, RING + 2);
             m.set_pv_f(0x48, 1.0 / RING as f32);
+            // The pad's rumble (`0x2d6d60(0x2960e0)`, crate::rumble).
+            let h = ctx.game.rumble.start(&rumble::pattern::BLITZ_MEGA);
+            w.mobys[id].set_pv_i(0x50, h);
         } else if it.pressed & it.trigger != 0 {
             ctx.host.play_sound(&w.mobys[id], 5, 0);
         }
     }
+    rumble::weapon_stop(w, id, ctx, 0x50, true);
     // What the draw reads of the hero and the gravity this tick.
     {
         let fwd = way(w, id, ctx);

@@ -4,8 +4,11 @@
 //! Its aim point (the position raised by its health block's `+0x10`) is within `range` (and 0.1 away); its yaw and
 //! pitch off `dir` are within limits that narrow with the distance (from `near_yaw` / `near_pitch` at Ratchet to
 //! `yaw` / `pitch` at the range, `0x31bc68`'s ease 1 − (1 − t)³); the score `3·yaw off + 0.2·pitch off·distance +
-//! 0.1·distance` (a crate's × 0.8·range) is the lowest, and the line to it (flags 0x12) is clear. A target held by
-//! `0x18b270` wins outright (not ported: nothing sets it on Aranos).
+//! 0.1·distance` (a crate's × 0.8·range) is the lowest, and the line to it (flags 0x12) is clear. Through the wrapper
+//! `0x325f90` ([`search_lock`]) the Lock On mod's lock (`0x18b270`, crate::moby::lock_on) wins outright.
+//!
+//! The hero's target search `0x2ae900` with class type 5 ([`hero_search`]: the Lock On mod's, the Meteor Pad's) is here
+//! too.
 //!
 //! Not ported: the walls-and-ceilings branch (`$gp − 0x6000`, the gravity boots' planes) and the see-through classes a
 //! blocked line may still pass (`0x381350`, the list at `0x2318d0`).
@@ -46,6 +49,43 @@ pub fn aim_point(w: &MobyWorld, m: usize) -> V3 {
 
 /// `0x3257a0(cone, from, dir, ..)`: the moby picked, if any.
 pub fn search(w: &MobyWorld, ctx: &Ctx, cone: Cone, from: V3, dir: V3, crates: bool) -> Option<usize> { scan(w, ctx, cone, from, dir, crates, &[], &EXCLUDED, None) }
+
+/// `0x325f90(cone, from, dir, ..)`: the Lock On mod's lock while it is alive with health left
+/// (crate::moby::lock_on::live), else [`search`].
+pub fn search_lock(w: &MobyWorld, ctx: &Ctx, cone: Cone, from: V3, dir: V3, crates: bool) -> Option<usize> {
+    super::lock_on::live(w, ctx).or_else(|| search(w, ctx, cone, from, dir, crates))
+}
+
+/// `0x2ae900(range, yaw, yaw cone, pitch cone, .., class type 5, line)` (crate::hero::Hero::target_search's score,
+/// third person): of the target list, the moby of class type 5 with health left, within `range` and both cones
+/// (≤ 0: none) of `yaw` from Ratchet, with the lowest `d + d·(yaw off + pitch off)` (a crate's or a type 0x16's
+/// + 0.8·range); with `line`, one a line from Ratchet's centre (`0x189f00`, a unit over his feet) to its place plus
+/// its up row meets the world (flags 2) is left out.
+pub fn hero_search(w: &MobyWorld, ctx: &Ctx, range: f32, yaw: f32, yaw_cone: f32, pitch_cone: f32, line: bool) -> Option<usize> {
+    use crate::hero::physics::{add, dist, dist2};
+    let h = &*ctx.hero;
+    let eye = if h.state == 0x14 { [h.pos[0], h.pos[1], h.ground_z] } else { h.pos };
+    let mut best = 1e8f32;
+    let mut out = None;
+    for t in w.targets(ctx.host.camera_pos()) {
+        if t.kind != 5 || health(w, t.id).is_none_or(|(hp, _)| hp == 0.0) { continue; }
+        let d = dist(eye, t.pos);
+        let a_yaw = rot_dist(atan2(t.pos[0] - eye[0], t.pos[1] - eye[1]), yaw);
+        let a_pitch = rot_dist(atan2(dist2(eye, t.pos), t.pos[2] - eye[2]), 0.0);
+        let skip = range < d || (0.0 < yaw_cone && yaw_cone < a_yaw) || (0.0 < pitch_cone && pitch_cone < a_pitch);
+        let mut score = d + (a_yaw + a_pitch) * d;
+        if t.crate_like || t.kind == 0x16 { score += range * 0.8; }
+        if skip || best <= score { continue; }
+        if line {
+            let centre = add(h.pos, [0.0, 0.0, 1.0]);
+            let blocked = ctx.coll.is_some_and(|c| crate::collision::coll_line_m(c, ctx.scene, centre, add(t.pos, t.up), crate::collision::QueryFlags(2), None).is_some());
+            if blocked { continue; }
+        }
+        best = score;
+        out = Some(t.id);
+    }
+    out
+}
 
 /// `0x3257a0` with a list (`&count, list, max`) and no excluded classes (its `param_13` null): every candidate that
 /// beat the best so far, in the target list's order (at most `max`), the best then swapped to the front.

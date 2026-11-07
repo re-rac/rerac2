@@ -31,7 +31,7 @@
 //! ([`CamTweaks::turn_toward`]).
 //!
 //! **Not ported**: D+0x250 in Giant Clank's branch of `0x4239d0` (crate::hero::giant), the focus
-//! mobys `0x1b8e84` / `0x18b270` (nothing sets them on Aranos), the stick auto-centre (`$gp+0x2540` is 0 on the disc),
+//! mobys `0x1b8e84` / `0x18b270` (the Lock On mod's lock, crate::moby::lock_on: the turn to it at `0x4240c4`), the stick auto-centre (`$gp+0x2540` is 0 on the disc),
 //! the knock-down view (state 0x74, mode 11), the magnetic walkway's branch of
 //! `0x4227b8` (the gravity frames' is ported: crate::gravity) and the settle after the walkway and the frames (D+0x14e:
 //! 15 ticks of re-blending once `0x18a168` / `0x1a8ff0` go off; not the water's); the other camera classes (first

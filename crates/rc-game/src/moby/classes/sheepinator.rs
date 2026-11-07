@@ -40,8 +40,8 @@
 //! its distance across Ratchet's up; else 8 along the aim to what the line (flags 0x14, Ratchet left out) meets, the
 //! sheep let through (their collision off for the walk, `+0x98`; at most 6 steps and 128 sheep); its point spacing the
 //! reach / 12. Its eleven points after the muzzle each follow the last: the way they lay blended toward the aim (the
-//! gun's −row 1, from the seventh on bent 0.2 toward the target) by `0.9 − 0.5·i/12`, a spacing long (`0x380e08`, the
-//! gravity frames' bend, not ported); round each a ring of 20 points 0.05..1.234 out (across the way and Ratchet's down
+//! gun's −row 1, from the seventh on bent 0.2 toward the target) by `0.9 − 0.5·i/12`, a spacing long (each first riding the
+//! level's moving frame, `0x380e08`, crate::gravity::ride); round each a ring of 20 points 0.05..1.234 out (across the way and Ratchet's down
 //! `0x18a0e0`), and two side points `±` a wave 0.01..0.5 out, turned 22.9° a point. Then sparks at the side ends
 //! (twinkles at random, `0x33a6a0`: red `0x7f10107f` and `0x7f104fff` with white), at random a swirl at the muzzle
 //! (type 0x4e, crate::particles::swirl: along the beam turned up to 15° each way, its life the reach · 6 (× 3 on a
@@ -68,7 +68,7 @@
 //! has its literal); its transform `0x409cf0`, the black sheep (crate::moby::classes::black_sheep).
 //!
 //! Not ported: the weapon's use statistics (`0x18c420..0x18c428`), the gravity frames' branches (the targeting's
-//! `0x1a8ff0` / `0x18a168` / `0x1a8ff4` walls-and-ceilings test, `0x380e08`), `0x37c948(0x47, 0x5360b)` after the
+//! `0x1a8ff0` / `0x18a168` / `0x1a8ff4` walls-and-ceilings test), `0x37c948(0x47, 0x5360b)` after the
 //! strips (a GS register reset).
 
 use crate::hero::items::row_at;
@@ -552,6 +552,8 @@ pub fn beam(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     };
     let target_pos = target.map(|t| w.mobys[t].pos);
     let down = ctx.hero.gravity.down;
+    // Each point after the muzzle on the level's moving frame before it follows (`0x380e08`).
+    let ridden: Vec<V3> = w.sheep.beam.points.iter().map(|&p| crate::gravity::ride(w, p)).collect();
     let b = &mut w.sheep.beam;
     b.down = down;
     b.gun_row1 = rows[1];
@@ -560,6 +562,7 @@ pub fn beam(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     b.side[0][0] = muzzle;
     b.side[1][0] = muzzle;
     for i in 1..POINTS {
+        b.points[i] = ridden[i];
         let d = sub(b.points[i], b.points[i - 1]);
         let f = i as f32 * TWELFTH;
         if let (true, Some(tp)) = (6 < i, target_pos) {

@@ -14,7 +14,7 @@
 //! `0x2db498(1.3, 0, 90, …, FX 0x21, −1, 4)`: its mode from the −1, so FX 0x21 draws as a sprite, mode 2; red
 //! `0x600000ff` while the cooldown runs with shells left, else green `0x600fff0f`). Outside the twin `0x18c354` is set to 0x28, in it
 //! counted down (the first shot from the look stance waits it out). There is no aim of its own (`0x18aa18` is only
-//! the lock cheat's, `0x18b270`).
+//! the Lock On mod's lock, `0x18b270`).
 //!
 //! **1** (the items not kept away, the cooldown out, in the hand 0x17 ticks, the look wait out): ○ held (`0x18b050`)
 //! and a shell taken: when Ratchet already plays the use sequence, moves (group ≠ 0) or raises the arm at a wall
@@ -57,8 +57,12 @@
 //! The weapon mod: Acid on every moby the point-blank sphere and the pellets hit (`0x3f9f70(m, 0x1a, hand)`, the
 //! upgraded one's 0x44; crate::moby::weapon_mods).
 //!
-//! Not ported: the pad rumble (`0x2d6d60` / `0x2d6f38`), the lock cheat
-//! (`0x18b270`), the gravity frames' bends of the tracer (`0x380e08`), the glare quad the screen flash draws 0.1 in
+//! The Lock On mod's lock is the tick's aim (crate::moby::lock_on::mirror); a shot starts the pad's rumble
+//! (`0x2d6d60(0x2948c0)`, `+0x4c`), stopped after the shot's test (crate::rumble::weapon_stop).
+//!
+//! Each tick a tracer's place and tail ride the level's moving frame (`0x380e08`, crate::gravity::ride).
+//!
+//! Not ported: the glare quad the screen flash draws 0.1 in
 //! front of the camera toward the muzzle (FX 0xb under ALPHA 0x49, `Cd·As + Cd`: the engine's effect pass has no such
 //! blend). The muzzle burst's carry in the air (`auStack_d0`, only set on the ground: the stack's leftovers) is 0. The
 //! upgraded Blitz (rows 0x44, 0x5b, 0x5c: the hand 0x0af1 and its tracer 0x0d9c) is crate::moby::classes::blitz_mega;
@@ -68,7 +72,8 @@ use crate::collision::QueryFlags;
 use crate::hero::items::{row, ItemRow, BLITZ};
 use crate::hero::physics::{add, add_rot, atan2, cross, dist, scale, set_len, sub, unit, V3};
 use crate::moby::hits::HitTemplate;
-use crate::moby::{countdown, Ctx, MobyWorld};
+use crate::moby::{countdown, lock_on, Ctx, MobyWorld};
+use crate::rumble;
 
 /// The hand's class (item 0x1a's row `+0x04`) and the tracer's; the upgraded Blitz's tracer (`0x3fdee0`).
 pub const HAND_CLASS: i16 = 0x5d1;
@@ -144,6 +149,8 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if let Some(a) = ctx.host.anim(&w.mobys[id]) {
         if a.seq_a == a.seq_b && a.flags & 2 != 0 { ctx.host.set_anim(&w.mobys[id], 1, 0, 2); }
     }
+    // The Lock On mod's lock as the aim (crate::moby::lock_on).
+    lock_on::mirror(w, ctx);
     let hero_state = ctx.hero.state;
     if hero_state == 1 { ctx.hero.request_state(0x1d, true); }
     cooldown(w, id);
@@ -178,10 +185,14 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.set_pv_f(0x2c, b);
             m.set_pv_i(0x40, SCREEN_FLASH);
             m.set_pv_f(0x44, 1.0 / SCREEN_FLASH as f32);
+            // The pad's rumble (`0x2d6d60(0x2948c0)`, crate::rumble).
+            let h = ctx.game.rumble.start(&rumble::pattern::BLITZ);
+            w.mobys[id].set_pv_i(0x4c, h);
         } else if it.pressed & it.trigger != 0 {
             ctx.host.play_sound(&w.mobys[id], 4, 0);
         }
     }
+    rumble::weapon_stop(w, id, ctx, 0x4c, true);
     // The delay out: the flashes count down, the draw while they run.
     if w.mobys[id].pv_s(6) == 0 {
         count_s(w, id, 0xa);
@@ -458,6 +469,10 @@ fn look_of(o_class: i16) -> &'static TracerLook { if o_class == MEGA_TRACER { &M
 /// `0x3fd6c8` (module docs); the upgraded Blitz's `0x3fe010`, the same with its [`MEGA_LOOK`].
 pub fn update_tracer(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].pvars.resize(crate::moby::PVAR_BYTES, 0);
+    // Its place and its tail (`+0x50`) on the level's moving frame (`0x380e08`, crate::gravity::ride).
+    w.mobys[id].pos = crate::gravity::ride(w, w.mobys[id].pos);
+    let tail = crate::gravity::ride(w, w.mobys[id].pv_v(0x50));
+    w.mobys[id].set_pv_v(0x50, tail);
     if w.mobys[id].state == 0 {
         {
             let m = &mut w.mobys[id];

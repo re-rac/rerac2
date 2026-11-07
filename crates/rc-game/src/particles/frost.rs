@@ -6,9 +6,8 @@
 //! moving `vel` (the shot's) a tick; `+0x38` twice its size (unread), its roll's step `rand_range(0, 3)` (`+0x34`),
 //! its fade from half its life (`+0x30`), its fall `randf(9, 11)` a second² (`gp−0x48bc`, + 2; × 1/3600). Each tick
 //! (`0x340748`): its velocity × 0.9 (`gp−0x48b8`) and its fall taken off; it moves; under half its life its alpha
-//! `life / half · 64` (truncated), grey `0x808080`; its roll on a step; its life out: gone.
-//!
-//! Not ported: the gravity frames' bends (`0x380e08`).
+//! `life / half · 64` (truncated), grey `0x808080`; its roll on a step; its life out: gone. (It does not ride the
+//! level's moving frame: `0x340748` has no `0x380e08`.)
 
 use super::{rec, Particles};
 use crate::rng::Rng;

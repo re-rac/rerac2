@@ -57,8 +57,8 @@ pub struct Globals {
     /// `$gp+0x1764`: the frame the light shafts' draw was last asked for (props::update_0e49).
     pub shafts_frame: i32,
     /// Joba's arena (arena): the ring's polygon (the path `0x1ff580[master +0x1c8]` the original rescales), the gravity
-    /// flags `0x1a8ff0` / `0x1a8ff4` its master sets in the ring's waves (the cylinder mode: crate::gravity has none,
-    /// so only the crowd reads them), the launch's strength `0x1a7cd8` (nothing here reads it).
+    /// flags `0x1a8ff0` / `0x1a8ff4` its master sets in the ring's waves (arena::set_gravity also sets them in
+    /// crate::gravity, Ratchet's; the fighters and the crowd read this copy), the launch's strength `0x1a7cd8` (nothing here reads it).
     pub arena_ring: Vec<[f32; 4]>,
     pub arena_gravity: [bool; 2],
     pub arena_launch: f32,

@@ -50,7 +50,8 @@
 //! drop's ring or splash under a point: the weather, the Thermanator's cold shot).
 //!
 //! Any other type kills itself on its first update. The gravity direction (`0x18a0e0`) is (0, 0, −1): normal gravity.
-//! Not ported: the gravity-boots bend of the positions (`0x380e08`, `+0x1c` = 2).
+//! The records whose place's w (`+0x1c`) is set ride the level's moving frame from their second tick ([`ride_frame`],
+//! `0x380e08`: crate::gravity::ride).
 
 pub mod arc;
 pub mod ash;
@@ -90,6 +91,14 @@ use crate::rng::Rng;
 pub const GRAVITY: [f32; 3] = [0.0, 0.0, -1.0];
 /// The update a type-0x55 record carries at `+0x3c`.
 const SPRITE_UPDATE: u32 = 0x33f120;
+
+/// The record on the level's moving frame by its place's w (`+0x1c`): 2 rides it this tick (`0x380e08`,
+/// crate::gravity::ride); any other non-zero (its first tick) becomes 2; 0 never rides.
+pub(crate) fn ride_frame(r: &mut crate::particles::Record, mobys: &crate::moby::MobyWorld) {
+    let w = rec::ff(r, 0x1c);
+    if w == 2.0 { rec::set_v3(r, 0x10, crate::gravity::ride(mobys, rec::v3(r, 0x10))); }
+    if w != 0.0 { rec::set_ff(r, 0x1c, 2.0); }
+}
 
 /// `0x2eeae0(rec + 0xa)`: the life down one; true when it was or reaches 0.
 fn dec_life(r: &mut crate::particles::Record) -> bool {
@@ -161,7 +170,7 @@ pub fn sprite(sys: &mut Particles, rng: &mut Rng, size0: f32, size1: f32, fall: 
 
 /// `0x33f120`: the life down (out: killed); the alpha steps, the position moves, the velocity's z falls, the angle
 /// turns and the size grows.
-pub fn update_sprite(sys: &mut Particles, i: usize) {
+pub fn update_sprite(sys: &mut Particles, i: usize, mobys: &crate::moby::MobyWorld) {
     let r = &mut sys.pool.recs[i];
     if dec_life(r) {
         sys.kill_part(i);
@@ -173,7 +182,7 @@ pub fn update_sprite(sys: &mut Particles, i: usize) {
     let (p, v) = (rec::v3(r, 0x10), rec::v3(r, 0x20));
     rec::set_v3(r, 0x10, [p[0] + v[0], p[1] + v[1], p[2] + v[2]]);
     rec::set_ff(r, 0x28, rec::ff(r, 0x28) - rec::ff(r, 0x2c));
-    if rec::ff(r, 0x1c) != 0.0 { rec::set_ff(r, 0x1c, 2.0); }
+    ride_frame(r, mobys);
     r[8] = r[8].wrapping_add(r[0x35]);
     rec::set_ff(r, 0xc, rec::ff(r, 0xc) + rec::ff(r, 0x30));
 }
@@ -212,7 +221,7 @@ pub fn spark(sys: &mut Particles, rng: &mut Rng, size: f32, grow: f32, drag: f32
 
 /// `0x3399c8`: the life down (out: killed); alpha = start · life / start life; the position moves; the velocity
 /// gains the fall along the gravity and is scaled by the drag; the angle turns, the size grows.
-pub fn update_spark(sys: &mut Particles, i: usize) {
+pub fn update_spark(sys: &mut Particles, i: usize, mobys: &crate::moby::MobyWorld) {
     let r = &mut sys.pool.recs[i];
     if dec_life(r) {
         sys.kill_part(i);
@@ -222,7 +231,7 @@ pub fn update_spark(sys: &mut Particles, i: usize) {
     rec::set_u32(r, 4, a << 24 | (r[0x33] as u32) << 16 | (r[0x32] as u32) << 8 | r[0x31] as u32);
     let (p, v) = (rec::v3(r, 0x10), rec::v3(r, 0x20));
     rec::set_v3(r, 0x10, [p[0] + v[0], p[1] + v[1], p[2] + v[2]]);
-    if rec::ff(r, 0x1c) != 0.0 { rec::set_ff(r, 0x1c, 2.0); }
+    ride_frame(r, mobys);
     let (fall, drag) = (rec::ff(r, 0x2c), rec::ff(r, 0x38));
     rec::set_v3(r, 0x20, std::array::from_fn(|k| (v[k] + GRAVITY[k] * fall) * drag));
     r[8] = r[8].wrapping_add(r[0x30]);
@@ -544,10 +553,14 @@ pub fn orb_attach(sys: &mut Particles, i: usize, moby: usize, at: [f32; 3]) {
 }
 
 /// `0x33bc70`: kind 1 does nothing (its cluster moves and kills it); kind 2 follows its moby at the kept offset; kinds
-/// 0 and 2 lose their alpha step a tick and die with no alpha left.
+/// 0 and 2 lose their alpha step a tick and die with no alpha left. Those left with `+0x23` set ride the level's
+/// moving frame (`0x380e08`, crate::gravity::ride).
 pub fn update_orb(sys: &mut Particles, i: usize, mobys: &crate::moby::MobyWorld) {
     let r = &mut sys.pool.recs[i];
-    if r[0x22] == 1 { return; }
+    if r[0x22] == 1 {
+        if r[0x23] != 0 { rec::set_v3(r, 0x10, crate::gravity::ride(mobys, rec::v3(r, 0x10))); }
+        return;
+    }
     if r[0x22] == 2 {
         if let Some(m) = rec::u32(r, 0x24).checked_sub(1).and_then(|k| mobys.mobys.get(k as usize)) {
             let o = rec::v3(r, 0x30);
@@ -560,6 +573,7 @@ pub fn update_orb(sys: &mut Particles, i: usize, mobys: &crate::moby::MobyWorld)
         sys.kill_part(i);
     } else {
         rec::set_u32(r, 4, c & 0xff_ffff | (a as u32) << 24);
+        if r[0x23] != 0 { rec::set_v3(r, 0x10, crate::gravity::ride(mobys, rec::v3(r, 0x10))); }
     }
 }
 
@@ -748,7 +762,7 @@ pub const TWINKLE: u8 = 0x35;
 /// `0x33a6a0(size, end, fall, pos, life, rgba, rot, spin, vel, w)`: a twinkle (type 0x35) 0.05 above `pos`, its
 /// frame `*def[0x35]`, additive, far 32, for `life` ticks: from `end`·210000 it swells to `size`·210000 and fades
 /// out ([`update_twinkle`]), turning `spin` a tick from `rot` (0: 0, 1: 0x20, else random), moving `vel` a tick
-/// that falls `fall` a tick; `+0x1c` = `w` (2: the gravity-boots bend, not ported).
+/// that falls `fall` a tick; `+0x1c` = `w` (non-zero: on the moving frame, [`ride_frame`]).
 #[allow(clippy::too_many_arguments)]
 pub fn twinkle(sys: &mut Particles, rng: &mut Rng, size: f32, end: f32, fall: f32, pos: [f32; 3], life: i16, rgba: u32, rot: u8, spin: i8, vel: [f32; 3], w: i32) -> Option<usize> {
     let i = sys.create_part(TWINKLE)?;
@@ -777,7 +791,7 @@ pub fn twinkle(sys: &mut Particles, rng: &mut Rng, size: f32, end: f32, fall: f3
 /// `0x33a848`: it turns; over its first 6 ticks it grows from its end size halfway to its full size while its alpha
 /// halves, then it grows on to the full size as the alpha runs out with the life; it moves, its velocity falling;
 /// killed outside [2, 1021]³ or when its life is out.
-pub fn update_twinkle(sys: &mut Particles, i: usize) {
+pub fn update_twinkle(sys: &mut Particles, i: usize, mobys: &crate::moby::MobyWorld) {
     let r = &mut sys.pool.recs[i];
     r[8] = r[8].wrapping_add(r[0x2a]);
     let (life0, life) = (rec::i16(r, 0x28) as i32, rec::i16(r, 0xa) as i32);
@@ -799,7 +813,7 @@ pub fn update_twinkle(sys: &mut Particles, i: usize) {
     let p = add(rec::pos(r), v);
     rec::set_v3(r, 0x10, p);
     rec::set_ff(r, 0x34, v[2] - rec::ff(r, 0x38));
-    if rec::ff(r, 0x1c) != 0.0 { rec::set_ff(r, 0x1c, 2.0); }
+    ride_frame(r, mobys);
     if p.iter().any(|&x| !(2.0..=1021.0).contains(&x)) || dec_life(r) { sys.kill_part(i); }
 }
 
@@ -1066,7 +1080,8 @@ pub fn ember(sys: &mut Particles, rng: &mut Rng, size: f32, pos: [f32; 3], vel: 
 /// `0x334a18`: the life down (out: killed); size and colour by the life left; the move, then the fall; with a trail on
 /// an odd frame (`frame`, `0x1b1948`) an ember behind it (its speed's 0.15..0.25 a random way added, × 0.75..0.95, 15..30
 /// ticks, its own size, colour, frame and ALPHA, no trail), else the velocity × 0.96.
-pub fn update_ember(sys: &mut Particles, i: usize, rng: &mut Rng, frame: i32) {
+pub fn update_ember(sys: &mut Particles, i: usize, rng: &mut Rng, mobys: &crate::moby::MobyWorld) {
+    let frame = mobys.frame;
     let r = &mut sys.pool.recs[i];
     if dec_life(r) {
         sys.kill_part(i);
@@ -1079,7 +1094,7 @@ pub fn update_ember(sys: &mut Particles, i: usize, rng: &mut Rng, frame: i32) {
     rec::set_v3(r, 0x10, p);
     let mut v = rec::v3(r, 0x20);
     v[2] -= rec::ff(r, 0x2c);
-    if rec::ff(r, 0x1c) != 0.0 { rec::set_ff(r, 0x1c, 2.0); }
+    ride_frame(r, mobys);
     if rec::i16(r, 0x3a) == 0 || frame & 1 == 0 {
         rec::set_v3(r, 0x20, scale(v, 0.96));
         return;
@@ -1151,36 +1166,36 @@ pub fn update_parts(sys: &mut Particles, mobys: &crate::moby::MobyWorld, cam: [f
         let r = &sys.pool.recs[i];
         if r[1] & 0x80 != 0 { continue; }
         match r[0] {
-            0x17 => crate::particles::type23::update(sys, i),
+            0x17 => crate::particles::type23::update(sys, i, mobys),
             arc::ARC => arc::update(sys, rng, i),
-            0x2c => update_spark(sys, i),
+            0x2c => update_spark(sys, i, mobys),
             DRIFT => crate::particles::type48::update48(sys, i),
-            0x55 if rec::u32(r, 0x3c) == SPRITE_UPDATE => update_sprite(sys, i),
+            0x55 if rec::u32(r, 0x3c) == SPRITE_UPDATE => update_sprite(sys, i, mobys),
             0x59 => update_glow(sys, i, mobys, cam),
             0x5a => update_streak(sys, i, rng),
             0x61 => update_burst(sys, i),
             0x3b => update_sparkle(sys, i, hero),
             0x3c => update_glint(sys, i, hero),
-            TWINKLE => update_twinkle(sys, i),
+            TWINKLE => update_twinkle(sys, i, mobys),
             STAGED => update_staged(sys, i, mobys.frame),
             ORB => update_orb(sys, i, mobys),
             EXHAUST => update_exhaust(sys, i, mobys),
             TRAIL => update_trail(sys, i),
             BILLOW => update_billow(sys, i, cam, rng),
-            EMBER => update_ember(sys, i, rng, mobys.frame),
+            EMBER => update_ember(sys, i, rng, mobys),
             cinder::CINDER => cinder::update(sys, i, rng, mobys.frame),
             dust::DUST => dust::update(sys, i),
             keyed::KEYED => keyed::update(sys, i),
             foot_dust::PUFF => foot_dust::update(sys, i),
             foot_dust::PRINT => foot_dust::update_print(sys, i),
-            lava::SPARK => lava::update_spark(sys, i, aux.coll),
-            lava::DROP => lava::update_drop(sys, i),
-            line::LINE => line::update(sys, i),
-            plasma::PUFF => plasma::update(sys, i, rng),
+            lava::SPARK => lava::update_spark(sys, i, aux.coll, mobys),
+            lava::DROP => lava::update_drop(sys, i, mobys, &aux.frames),
+            line::LINE => line::update(sys, i, mobys),
+            plasma::PUFF => plasma::update(sys, i, rng, mobys),
             frost::FROST => frost::update(sys, i),
-            meteor::STREAK => meteor::update_streak(sys, i),
-            meteor::EMBER => meteor::update_ember(sys, i),
-            meteor::SMOKE => meteor::update_smoke(sys, i),
+            meteor::STREAK => meteor::update_streak(sys, i, mobys),
+            meteor::EMBER => meteor::update_ember(sys, i, mobys),
+            meteor::SMOKE => meteor::update_smoke(sys, i, mobys),
             mote::MOTE => mote::update(sys, i),
             pulse::PULSE => pulse::update(sys, i),
             spot::SPOT => spot::update(sys, i),
@@ -1192,7 +1207,7 @@ pub fn update_parts(sys: &mut Particles, mobys: &crate::moby::MobyWorld, cam: [f
             ash::ASH => ash::update(sys, i, aux.coll, mobys.frame, mobys.view_x()),
             swirl::SWIRL => swirl::update(sys, i, mobys),
             smoke::SMOKE => smoke::update(sys, i),
-            wool::WOOL => wool::update(sys, i, rng, (hero, aux.hero_speed), mobys.frame, mobys.view_x()),
+            wool::WOOL => wool::update(sys, i, rng, (hero, aux.hero_speed), mobys, mobys.view_x()),
             FLARE => update_flare(sys, i),
             rain::DROP => rain::update_drop(sys, i, &aux.rain),
             rain::SPLASH => rain::update_splash(sys, i),

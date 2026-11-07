@@ -21,9 +21,11 @@
 //!
 //! Each moby its blast touches takes Shock (`0x4126b8(m, 0x3d, the drone)`, crate::moby::weapon_mods).
 //!
-//! Not ported: the gravity frames' bends (`0x380e08`, `0x380e58`), the
-//! moby set-up `0x313dc0`, the rolling state 2 (a bounce while falling sets 3 first, so its count never passes 1: the
-//! tinted slide of `+0x78` / `+0x2c` and the bounces' slow-downs of `0x3f56b0` are unreachable).
+//! Made, its velocity takes its start's move on the level's moving frame (`0x380e58`, crate::gravity::ride_carry).
+//!
+//! Not ported: the moby set-up `0x313dc0`, the rolling state 2 (a bounce while falling sets 3 first, so its count never
+//! passes 1: the tinted slide of `+0x78` / `+0x2c`, its ride of the moving frame `0x380e08` and the bounces' slow-downs
+//! of `0x3f56b0` with their `0x380e58` are unreachable or followed at once by the blast).
 
 use crate::hero::items::{row, SYNTHENOID};
 use crate::hero::physics::{add, atan2, len2, scale, set_len, sub, unit, V3};
@@ -59,6 +61,8 @@ pub fn throw(w: &mut MobyWorld, _ctx: &mut Ctx, drone: usize, from: V3, to: V3) 
     let d = sub(to, from);
     let mut vel = set_len([d[0], d[1], 0.0], speed);
     vel[2] = up;
+    // `0x380e58(vel, vel, from)`: plus its start's move on the level's moving frame (crate::gravity).
+    let vel = crate::gravity::ride_carry(w, vel, from);
     let id = w.create(CLASS);
     let m = &mut w.mobys[id];
     m.pvars.resize(crate::moby::PVAR_BYTES, 0);

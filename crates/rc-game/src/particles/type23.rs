@@ -20,13 +20,15 @@
 use super::{fast_dec_timer, rec, Particles};
 
 /// `PartType23Update` 0x282210.
-pub(crate) fn update(sys: &mut Particles, i: usize) {
+pub(crate) fn update(sys: &mut Particles, i: usize, mobys: &crate::moby::MobyWorld) {
     let (t10, t20) = (sys.time.ticks(10), sys.time.ticks(20));
     let speed = f32::from_bits(sys.time.speed);
     let r = &mut sys.pool.recs[i];
     r[8] = r[8].wrapping_add(r[0x28]);
     let (p, v) = (rec::v3(r, 0x10), rec::v3(r, 0x30));
     rec::set_v3(r, 0x10, [p[0] + v[0], p[1] + v[1], p[2] + v[2]]);
+    // Going Commando's (L00 `0x335dc4`): on the level's moving frame by its place's w.
+    super::ride_frame(r, mobys);
     rec::set_ff(r, 0xc, rec::ff(r, 0xc) * ((rec::ff(r, 0x2c) - 1.0) * speed + 1.0));
     let base = rec::u32(r, 0x20);
     let alpha = match rec::u32(r, 0x24) {

@@ -426,6 +426,9 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         // 0x1161: the upgraded missile, the same update (`0x3caae8`'s class with the upgrade; the port makes none).
         crate::ship::MISSILE_CLASS | 0x1161 => Some(crate::ship::update_missile),
         space::SHIELD_PICKUP | space::BOLT_PICKUP => Some(space::update_pickup),
+        // The space levels' gate race (5, 10, 15): its gates (`0x426508`) and platinum bolt (`0x42db38`).
+        space::gate::CLASS => Some(space::gate::update),
+        space::platinum::CLASS => Some(space::platinum::update),
         // 0x0ae0: a placed pickup (L25 `0x3da5f8`, 1 placed), the same update.
         pickup::CLASS | 0x0ae0 => Some(pickup::update),
         nanotech::CLASS => Some(nanotech::update),

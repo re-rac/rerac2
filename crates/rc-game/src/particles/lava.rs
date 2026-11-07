@@ -12,9 +12,8 @@
 //! `*def[0x6d]`, 5..50 ticks (unread), size `size`·525000, its alpha 0x40..0x80 (`+0x30`), its colour `0x103080`
 //! darkened by 0..0.5. Each tick (`0x3425e8`): its alpha down one (out: gone), its roll on a step, it moves and grows
 //! 1575, its velocity ×0.99 and, while its red is under 0x20 (smoke), 0.0015 up a tick, else 0.00075 down; its colour
-//! 10% darker.
-//!
-//! Not ported: the gravity frames' bends (`0x380e08`) and their up (`0x326448`, `0x37ecc0`: world up here).
+//! 10% darker; the rise and the fall along the frames' up (`0x37ecc0`, crate::gravity::Frames::up). Both ride the
+//! level's moving frame first each tick (`0x380e08`, crate::gravity::ride).
 
 use super::{rec, Particles};
 use crate::rng::Rng;
@@ -53,11 +52,12 @@ pub fn spark(sys: &mut Particles, rng: &mut Rng, size: f32, pos: [f32; 3], vel: 
 }
 
 /// `0x3362d0` (module docs). `coll`: the level's collision.
-pub fn update_spark(sys: &mut Particles, i: usize, coll: Option<&rc_formats::collision::Collision>) {
+pub fn update_spark(sys: &mut Particles, i: usize, coll: Option<&rc_formats::collision::Collision>, mobys: &crate::moby::MobyWorld) {
     let r = &mut sys.pool.recs[i];
     let (mut cr, mut cg, mut cb) = (rec::ff(r, 0x30), rec::ff(r, 0x34), rec::ff(r, 0x38));
     let flip = cr < 0.0 || cg < 0.0 || cb < 0.0;
     if flip { (cr, cg, cb) = (-cr, -cg, -cb); }
+    rec::set_v3(r, 0x10, crate::gravity::ride(mobys, rec::v3(r, 0x10)));
     rec::set_ff(r, 0xc, rec::ff(r, 0xc) - 100.0);
     let pos = rec::v3(r, 0x10);
     let vel = rec::v3(r, 0x20);
@@ -125,16 +125,19 @@ pub fn drop(sys: &mut Particles, rng: &mut Rng, size: f32, pos: [f32; 3], vel: [
 }
 
 /// `0x3425e8` (module docs).
-pub fn update_drop(sys: &mut Particles, i: usize) {
+pub fn update_drop(sys: &mut Particles, i: usize, mobys: &crate::moby::MobyWorld, frames: &crate::gravity::Frames) {
     let r = &mut sys.pool.recs[i];
+    rec::set_v3(r, 0x10, crate::gravity::ride(mobys, rec::v3(r, 0x10)));
     let a = (rec::u32(r, 0x30) as i32 - 1).max(0);
     rec::set_u32(r, 0x30, a as u32);
     r[8] = r[8].wrapping_add(1);
     let (p, v) = (rec::v3(r, 0x10), rec::v3(r, 0x20));
     rec::set_v3(r, 0x10, [p[0] + v[0], p[1] + v[1], p[2] + v[2]]);
     rec::set_ff(r, 0xc, rec::ff(r, 0xc) + 1575.0);
-    let mut v = v.map(|x| x * f32::from_bits(0x3f7d_70a4));
-    v[2] += if r[4] < 0x20 { f32::from_bits(0x3ac4_9ba6) } else { f32::from_bits(0xba44_9ba6) };
+    let v = v.map(|x| x * f32::from_bits(0x3f7d_70a4));
+    let up = frames.up(rec::v3(r, 0x10));
+    let k = if r[4] < 0x20 { f32::from_bits(0x3ac4_9ba6) } else { f32::from_bits(0xba44_9ba6) };
+    let v: [f32; 3] = std::array::from_fn(|j| v[j] + up[j] * k);
     rec::set_v3(r, 0x20, v);
     let c = crate::hud::lerp_rgba(f32::from_bits(0x3dcc_cccd), rec::u32(r, 4) & 0xff_ffff, 0);
     rec::set_u32(r, 4, c | (a as u32) << 24);

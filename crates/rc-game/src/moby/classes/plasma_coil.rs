@@ -12,7 +12,7 @@
 //! drawn anew; the balls' table cleared (`0x3cd028`). **1**, each tick: Ratchet in the look stance 1 goes to its twin
 //! 0x1d; in 0x1d the look wait (`0x18c354`) counts down and the screen-centre crosshair shows (`0x2db498`, FX 0x26: red
 //! `0x600000ff` while the cooldown runs with ammo left, else green `0x600fff0f`), else the wait is 0x28. The aim
-//! (`0x3260c0`, crate::moby::aim::search, crates too): from 0.75 up Ratchet's up row along his way (`0x18a580`), 20 far,
+//! (`0x3260c0`, crate::moby::aim::search_lock: the Lock On mod's lock first, crates too): from 0.75 up Ratchet's up row along his way (`0x18a580`), 20 far,
 //! 10° by 10° (45° by 45° near him); ready with ammo left, its pick shows the green reticle (FX 0x26, `0xff0fff0f`,
 //! `|0.9 − d·0.0067·0.65|` large at the camera's distance d) on its aim point. The cooldown runs down; out, the items
 //! not kept away, ○ held, the wait out, fewer than 4 balls out and in the hand past 0x16 ticks: one ammo — taken, the
@@ -73,8 +73,12 @@
 //! The weapon mod: Acid on the moby the ball strikes and on an arc's target (`0x3f9f70(m, 0x1c, the hand)`,
 //! crate::moby::weapon_mods, which also draws its Shock arcs with this file's strip and sparks).
 //!
-//! Not ported: the gravity frames' trackers and bends (`0x37f538` / `0x37f618` / `0x37f5f8`, `0x380e08`), the lock
-//! cheat (`0x18b270`, `0x32b4d0`), the loop sound's random pitch
+//! The gravity frames (crate::gravity): the ball rides the level's moving frame at the tick's start (`0x380e08`), keeps a
+//! tracker (`+0x44`, `0x37f538(ball, 0, 1, 1, 1)`) that turns its velocity before each step (`0x37f618`) and gives it
+//! back when it goes (`0x37f5f8`).
+//!
+//! Not ported: the aim at
+//! the Lock On mod's lock (`0x18b270`, mirrored as the tick's aim by crate::moby::lock_on; its `0x32b4d0` path), the loop sound's random pitch
 //! (`0x360a10`; its random draw is kept), the GS test register the draws set (`0x37c948`), the ball point's spring
 //! (`0x31ec88`: the update resets it every tick, so the draw always snaps), the words `$gp+0x1694` / `$gp+0x1698` the
 //! shot writes and nothing reads, the strips' fixed alpha (ALPHA 0x68) as the vertex alpha of an additive quad (the
@@ -86,7 +90,7 @@
 use crate::hero::items::{row, ItemRow, PLASMA_COIL};
 use crate::hero::physics::{add, add_rot, atan2, cross, dist, dist2, scale, set_len, sub, sub_rot, unit, V3};
 use crate::moby::hits::HitTemplate;
-use crate::moby::{aim, countdown, mode, Ctx, MobyWorld};
+use crate::moby::{aim, countdown, lock_on, mode, Ctx, MobyWorld};
 use rc_formats::moby_anim::JointModifier;
 
 /// The hand's class (item 0x1c's row `+0x04`) and the ball's.
@@ -307,6 +311,8 @@ fn start(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// The hand's state 1 (module docs).
 fn tick(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, speed: f32) {
+    // The Lock On mod's lock as the aim (crate::moby::lock_on).
+    lock_on::mirror(w, ctx);
     if ctx.hero.state == 1 { ctx.hero.request_state(0x1d, true); }
     let mut ok = true;
     if ctx.hero.state == 0x1d {
@@ -316,14 +322,14 @@ fn tick(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, speed: f32) {
     } else {
         ctx.hero.items.look_wait = 0x28;
     }
-    // The aim (the lock cheat's `0x18aa18` path is not ported).
+    // The aim (the aim's `0x18aa18` path, the Lock On mod's lock, is not ported: no pick then).
     let pick = if ctx.hero.items.aim_target.is_some() {
         None
     } else {
         let h = &*ctx.hero;
         let from = add(h.pos, scale(h.rows[2], 0.75));
         let cone = aim::Cone { yaw: f32::from_bits(0x3e32_b8c4), pitch: f32::from_bits(0x3e32_b8c4), range: 20.0, near_pitch: f32::from_bits(0x3f49_0fdc), near_yaw: f32::from_bits(0x3f49_0fdc) };
-        aim::search(w, ctx, cone, from, h.rows[0], true)
+        aim::search_lock(w, ctx, cone, from, h.rows[0], true)
     };
     if w.mobys[id].pv_f(0) == 0.0 && ctx.hero.items.has_ammo(ctx.game) {
         if let Some(t) = pick {
@@ -449,6 +455,8 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, slot: usize, at: V3,
         m.set_pv_i(0x38, 0);
         m.set_pv_i(0x40, hand_class as i32);
     }
+    let k = crate::gravity::track(w, ctx.hero, id, None, [1.0; 3]);
+    w.mobys[id].set_pv_i(0x44, k);
     w.coil.count += 1;
     if let Some(b) = w.coil.balls.get_mut(index) { *b = Some(id); }
     if !w.coil.ready {
@@ -582,12 +590,14 @@ fn gone(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let index = w.mobys[id].pv_i(0x14);
     if let Some(b) = usize::try_from(index).ok().and_then(|i| w.coil.balls.get_mut(i)) { *b = None; }
     for r in w.coil.rays.iter_mut().filter(|r| r.owner == Some(id)) { r.owner = None; }
+    crate::gravity::untrack(w, w.mobys[id].pv_i(0x44));
     w.delete(id);
 }
 
 /// `0x3cbb78` (module docs).
 pub fn update_ball(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].pvars.resize(crate::moby::PVAR_BYTES, 0);
+    w.mobys[id].pos = crate::gravity::ride(w, w.mobys[id].pos);
     if w.mobys[id].state == 0 {
         let m = &mut w.mobys[id];
         m.state = 1;
@@ -597,7 +607,9 @@ pub fn update_ball(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     match w.mobys[id].state {
         1 => {
             let start = w.mobys[id].pos;
-            let vel = w.mobys[id].pv_v(0);
+            // `0x37f618(+0x44, vel, 0)`: the tracker's turn at its place.
+            let vel = crate::gravity::turn(w, ctx.hero, w.mobys[id].pv_i(0x44), w.mobys[id].pv_v(0), None);
+            w.mobys[id].set_pv_v(0, vel);
             let pos = add(start, vel);
             w.mobys[id].pos = pos;
             // `0x360a10`: the loop sound's pitch moved by −200..200 (not ported; the draw kept).
@@ -699,6 +711,7 @@ pub fn update_ball(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     } else {
         stop_sound(w, id, ctx);
         for r in w.coil.rays.iter_mut().filter(|r| r.owner == Some(id)) { r.owner = None; }
+        crate::gravity::untrack(w, w.mobys[id].pv_i(0x44));
         w.delete(id);
     }
 }

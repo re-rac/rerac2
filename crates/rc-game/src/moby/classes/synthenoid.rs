@@ -80,8 +80,10 @@
 //! The weapon mod: Shock on a moby a shot hits with its collision on (`0x4126b8(m, 0x3d upgraded / 0x1f, the drone)`,
 //! crate::moby::weapon_mods).
 //!
-//! Not ported: the gravity frames' bends (`0x380e08`, `0x380e58`) and the moving frames (`$gp−0x14e4`), the
-//! lock cheat (`0x18b270`), the unreachable branch of state 1 (its
+//! The level's moving frame (`$gp−0x14e4`, crate::gravity): the drones ride it (`0x380e08`, instead of Ratchet's
+//! platform), a shot takes its start's move on it (`0x380e58`) and rides it after each step (`0x380e08`).
+//!
+//! Not ported: the unreachable branch of state 1 (its
 //! leaving's ticks past 20 there: a random sequence-1 blend and speed).
 
 use crate::collision::QueryFlags;
@@ -365,9 +367,13 @@ fn leaving_twinkle(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// The tail past state 0 (module docs): the platform's ride, the shadow, the exhaust.
 fn tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    // On the level's moving frame (`$gp−0x14e4`) it rides that instead (`0x380e08`).
+    let framed = crate::gravity::moving_frame(w).is_some();
     {
         let m = &mut w.mobys[id];
-        if ctx.hero.state == 0x27 {
+        if framed {
+            // (ridden below)
+        } else if ctx.hero.state == 0x27 {
             m.pos = add(m.pos, ctx.hero.eff);
         } else {
             let to = add(m.pos, ctx.hero.carry);
@@ -376,6 +382,7 @@ fn tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.pos = add(p, scale(sub(to, p), 0.625));
         }
     }
+    w.mobys[id].pos = crate::gravity::ride(w, w.mobys[id].pos);
     // The upgraded drone's shadow whatever the gravity frames (`0x3d5e70`).
     if !ctx.hero.gravity.on || w.mobys[id].o_class == PLUS_DRONE { crate::shadows::request(w, ctx, 0.3, id); }
     // `0x3ed4f8`: while drawn, three exhaust puffs at joint 0 sinking 1..2 a second in its frame.
@@ -528,7 +535,7 @@ fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let wide = 90.0 * DEG;
     let cone = aim::Cone { yaw: wide, pitch: wide, range: 20.0, near_pitch: wide, near_yaw: wide };
     let dir = ctx.host.camera_rows()[0];
-    let found = aim::search(w, ctx, cone, muzzle, dir, false).filter(|&t| {
+    let found = aim::search_lock(w, ctx, cone, muzzle, dir, false).filter(|&t| {
         let x = &w.mobys[t];
         (!matches!(x.o_class, 0xee1 | 0xec0 | 0xed4) || x.pv_b(0x3b1) != 0xff) && x.o_class != 0xef4
     });
@@ -616,6 +623,8 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, from: V3, drone: usize, target: O
         }
     };
     let class_scale = w.class(SHOT).map_or(1.0, |c| c.scale);
+    // `0x380e58(vel, vel, from)`: plus its start's move on the level's moving frame.
+    let vel = crate::gravity::ride_carry(w, vel, pos);
     {
         let m = &mut w.mobys[id];
         m.pos = pos;
@@ -700,9 +709,14 @@ pub fn update_shot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// State 0 of the shot (module docs).
 fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, start: V3) {
     let damage = cur_row(ctx.game).map_or(0.0, |r| r.damage);
-    let to = {
+    {
         let m = &mut w.mobys[id];
         m.pos = add(m.pos, m.pv_v(0x20));
+    }
+    // The step on the level's moving frame (`0x380e08`).
+    w.mobys[id].pos = crate::gravity::ride(w, w.mobys[id].pos);
+    let to = {
+        let m = &mut w.mobys[id];
         for (k, off) in [0x44usize, 0x48, 0x4c].into_iter().enumerate() { m.rot[k] = add_rot(m.rot[k], m.pv_f(off)); }
         wobble(m);
         m.pos

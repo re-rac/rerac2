@@ -50,11 +50,14 @@
 //! The weapon mod: Acid on each moby a shot or a shell hits (`0x3f9f70(m, 0x4e, the bot's hand)`, crate::moby::weapon_mods).
 //!
 //! Not ported: the explosion mobys these make (`0x416c40`: the class 0x139d at the shell's blast; `0x405858`'s class
-//! 0x139f at a shot's hit, and its two sparks `0x33fbb8`): the port has neither class nor that particle; the gravity
-//! frames' bends (`0x37f538` / `0x37f618`, `0x380e08` / `0x380ec0`). The
+//! 0x139f at a shot's hit, and its two sparks `0x33fbb8`): the port has neither class nor that particle; the
 //! aim search's class list (`0x1b0c8c`: 0, 0x0e79) is not passed (neither is of class type 5). With ✕ and □ both held
 //! the original aims a shot at a target with a point it did not set this tick (its stack's leftovers): the port
 //! takes the target's aim point.
+//!
+//! The gravity frames (crate::gravity): the shot and the shell keep trackers (`+0x1c` / `+0x30`, `0x37f538(m, 0, 1,
+//! 1, 1)`) that turn their velocity after each step (`0x37f618`), ride the level's moving frame (`0x380e08`; the shell's
+//! velocity `0x380ec0`) and give the tracker back when they go (`0x37f5f8`).
 
 use super::spiderbot::{PLUS, PLUS_BOT};
 use crate::collision::QueryFlags;
@@ -373,6 +376,9 @@ fn make_shot(w: &mut MobyWorld, ctx: &mut Ctx, bot: usize, at: V3, vel: V3) {
     let f = unit(vel);
     let l = unit(cr(f, up));
     m.rows = [f, l, cr(l, f)];
+    // `0x37f538(shot, 0, 1, 1, 1)`: its tracker (`+0x1c`).
+    let k = crate::gravity::track(w, ctx.hero, id, None, [1.0; 3]);
+    w.mobys[id].set_pv_i(0x1c, k);
 }
 
 /// `0x405248` (module docs).
@@ -383,6 +389,10 @@ pub fn update_shot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let m = &mut w.mobys[id];
             let from = m.pos;
             m.pos = add(m.pos, m.pv_v(0));
+            // The step on the level's moving frame (`0x380e08`), the tracker's turn there (`0x37f618(+0x1c, vel, 0)`).
+            w.mobys[id].pos = crate::gravity::ride(w, w.mobys[id].pos);
+            let v = crate::gravity::turn(w, ctx.hero, w.mobys[id].pv_i(0x1c), w.mobys[id].pv_v(0), None);
+            w.mobys[id].set_pv_v(0, v);
             shot_hit(w, id, ctx, from);
             let m = &mut w.mobys[id];
             let mut t = m.pv_i(0x10);
@@ -390,6 +400,7 @@ pub fn update_shot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.set_pv_i(0x10, t);
         }
         2 => {
+            crate::gravity::untrack(w, w.mobys[id].pv_i(0x1c));
             w.delete(id);
             return;
         }
@@ -445,12 +456,15 @@ pub fn draw_shot(w: &mut MobyWorld, id: usize, g: &mut crate::rng::Rng, cam: V3,
 }
 
 /// `0x405f70(bot, at, twin, vel)`: the shell 0x0eab at `at` moving `vel`, its twin `twin − at` from it.
-fn make_lob(w: &mut MobyWorld, _ctx: &mut Ctx, bot: usize, at: V3, twin: V3, vel: V3) {
+fn make_lob(w: &mut MobyWorld, ctx: &mut Ctx, bot: usize, at: V3, twin: V3, vel: V3) {
     let Some(id) = spawn(w, LOB, update_lob, at) else { return };
     let m = &mut w.mobys[id];
     m.set_pv_v(0, vel);
     m.set_pv_v(0x20, sub(twin, at));
     m.set_pv_i(0x34, bot as i32);
+    // `0x37f538(shell, 0, 1, 1, 1)`: its tracker (`+0x30`).
+    let k = crate::gravity::track(w, ctx.hero, id, None, [1.0; 3]);
+    w.mobys[id].set_pv_i(0x30, k);
 }
 
 /// Outside the world's 2..1021 box.
@@ -470,8 +484,13 @@ pub fn update_lob(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         1 => {
             let m = &mut w.mobys[id];
             from = m.pos;
-            let mut vel = m.pv_v(0);
-            m.pos = add(m.pos, vel);
+            m.pos = add(m.pos, m.pv_v(0));
+            // The step and the velocity on the level's moving frame (`0x380e08` / `0x380ec0`), the tracker's turn
+            // (`0x37f618(+0x30, vel, 0)`).
+            w.mobys[id].pos = crate::gravity::ride(w, w.mobys[id].pos);
+            let vel = crate::gravity::ride_dir(w, w.mobys[id].pv_v(0));
+            let mut vel = crate::gravity::turn(w, ctx.hero, w.mobys[id].pv_i(0x30), vel, None);
+            let m = &mut w.mobys[id];
             vel[2] -= LOB_GRAVITY;
             m.set_pv_v(0, vel);
             // `0x4062c8`.
@@ -520,6 +539,7 @@ fn lob_gone(w: &mut MobyWorld, id: usize) {
     let s = w.mobys[id].pv_i(0x18);
     if 0 <= s { w.point_lights.free(s as usize); }
     w.mobys[id].set_pv_i(0x18, -1);
+    crate::gravity::untrack(w, w.mobys[id].pv_i(0x30));
     w.delete(id);
 }
 

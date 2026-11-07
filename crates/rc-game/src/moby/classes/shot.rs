@@ -20,8 +20,12 @@
 //! The weapon mod: Shock on a moby the shot hits with its collision on (`0x4126b8(m, 0x1e, the hand)`,
 //! crate::moby::weapon_mods).
 //!
-//! Not ported: the impact's `+0x98` test (a moby without its collision takes the moby impact here), the gravity boots' bend
-//! (`0x37f538` / `0x37f618`), the first-person aim (`0x380ef8`).
+//! The gravity frames (crate::gravity): the shot keeps a tracker (`+0x34`, `0x37f538(shot, 0, 1, 1, 1)`) that turns its
+//! velocity before each step (`0x37f618`), its place rides the level's moving frame after the step and its trail's points
+//! before the trail's push (`0x380e08`), and the tracker is given back when it goes (`0x37f5f8`).
+//!
+//! Not ported: the impact's `+0x98` test (a moby without its collision takes the moby impact here), the first-person
+//! aim (`0x380ef8`).
 
 use crate::hero::items::{row, LANCER};
 use crate::hero::physics::{add, len, scale, sub, V3};
@@ -90,7 +94,15 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, range: f32, at: V3, owner: usize,
     m.set_pv_v(0x44, s);
     m.rot = rot;
     m.set_pv_v(4, phases);
+    let k = crate::gravity::track(w, ctx.hero, id, None, [1.0; 3]);
+    w.mobys[id].set_pv_i(0x34, k);
     w.rebuild(id, &*ctx.host);
+}
+
+/// Gone: its tracker given back (`0x37f5f8`), deleted.
+fn gone(w: &mut MobyWorld, id: usize) {
+    crate::gravity::untrack(w, w.mobys[id].pv_i(0x34));
+    w.delete(id);
 }
 
 /// `0x3e4d10`: the rows from the Euler angles, each scaled by 0.35 + 0.15·sin of its phase; the phases step 0.5.
@@ -124,8 +136,11 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     match w.mobys[id].state {
         0 => {
-            let vel = w.mobys[id].pv_v(0x20);
-            let to = add(from, vel);
+            // `0x37f618(+0x34, vel, 0)`: the tracker's turn at its place; the step rides the level's moving frame
+            // (`0x380e08`).
+            let vel = crate::gravity::turn(w, ctx.hero, w.mobys[id].pv_i(0x34), w.mobys[id].pv_v(0x20), None);
+            w.mobys[id].set_pv_v(0x20, vel);
+            let to = crate::gravity::ride(w, add(from, vel));
             {
                 let m = &mut w.mobys[id];
                 m.pos = to;
@@ -171,7 +186,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let done = countdown(&mut n);
             w.mobys[id].set_pv_i(0x38, n);
             if done {
-                w.delete(id);
+                gone(w, id);
                 return;
             }
             w.register_draw(id);
@@ -179,7 +194,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => {}
     }
     let p = w.mobys[id].pos;
-    if p.iter().any(|&c| !(2.0..=1021.0).contains(&c)) { w.delete(id); }
+    if p.iter().any(|&c| !(2.0..=1021.0).contains(&c)) { gone(w, id); }
 }
 
 /// State 1: hidden, the lock dropped, 6 ticks left.
@@ -344,7 +359,14 @@ pub fn ribbon_quads(pts: &[[f32; 4]], n: usize, inner: u32, outer: u32, cam: V3,
 /// `0x3e4050` (the draw callback, registered by the spawn, so the first point is the muzzle): in flight its position
 /// pushed onto the trail ([`trail_step`]), the phase (`$gp+0x1574`) down 0.1 (wrapping at −7), then the ribbons over
 /// the first 20 points and, with more, over all of them.
-pub fn draw_trail(m: &mut crate::moby::Moby, cam: V3, phase: &mut f32, out: &mut Vec<crate::fx::FxQuad>) {
+pub fn draw_trail(w: &mut MobyWorld, id: usize, cam: V3, phase: &mut f32, out: &mut Vec<crate::fx::FxQuad>) {
+    // Its points on the level's moving frame (`0x380e08`), then the push.
+    let n = w.mobys[id].pv_i(0x10).clamp(0, TRAIL_POINTS as i32) as usize;
+    for k in 0..n {
+        let p = crate::gravity::ride(w, w.mobys[id].pv_v(TRAIL + 0x10 * k));
+        w.mobys[id].set_pv_v(TRAIL + 0x10 * k, p);
+    }
+    let m = &mut w.mobys[id];
     trail_step(m);
     *phase -= 0.1;
     if *phase <= -7.0 { *phase += 7.0; }

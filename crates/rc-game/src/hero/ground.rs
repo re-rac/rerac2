@@ -181,7 +181,8 @@ impl Hero {
                 if self.land_lag != 0 { return None; }
                 let from_look = (self.prev_state == 1 || self.prev_state == 0x1d) && self.timer < 5;
                 if self.surf.boots == 1 {
-                    if Self::cross_within(env, 7) { return Some(0x6e); }
+                    // `0x2cbe4c`: not in the gravity's cylinder mode (crate::gravity).
+                    if !self.gravity.cylinder && Self::cross_within(env, 7) { return Some(0x6e); }
                 } else if !from_look {
                     let n = if self.glide_lag != 0 { 1 } else { 7 };
                     if self.try_jump(anim, env, n, false) { return None; }

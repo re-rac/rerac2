@@ -47,6 +47,7 @@ pub mod frames;
 pub mod hits;
 pub mod joint_aim;
 pub mod knock;
+pub mod lock_on;
 pub mod platform;
 pub mod shards;
 pub mod slide;
@@ -682,6 +683,8 @@ pub struct MobyWorld {
     pub level07: classes::level07::boss::Globals,
     /// Level 7's convoy's globals (classes::level07::train::Globals).
     pub convoy: classes::level07::train::Globals,
+    /// The gravity frames' trackers (`0x2319e0`, crate::gravity::track).
+    pub trackers: crate::gravity::Trackers,
     /// Level 11's globals (classes::level11::Globals).
     pub level11: classes::level11::Globals,
     /// Level 12's globals (classes::level12::Globals).
