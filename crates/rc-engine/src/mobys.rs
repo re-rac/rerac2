@@ -239,6 +239,7 @@ fn rows_f(r: [[f32; 4]; 4]) -> ([V3; 3], V3) {
 impl MobyHost for Host<'_> {
     fn camera_pos(&self) -> V3 { self.camera }
     fn camera_rows(&self) -> [V3; 3] { self.camera_rows }
+    fn clock(&self) -> [u8; 8] { if crate::determinism::deterministic() { [0; 8] } else { crate::clock::clock_now() } }
 
     /// `0x313420` for a created moby (the placed ones advance in crate::moby_anim).
     /// `0x313420` (`MobyAnimAdvance`): the keys step; a tick that did not land a blend then plays the first trigger

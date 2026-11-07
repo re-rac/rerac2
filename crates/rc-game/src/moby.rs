@@ -481,6 +481,9 @@ pub trait MobyHost {
     fn camera_pos(&self) -> V3 { [0.0; 3] }
     /// The camera's matrix (`0x1b8f70`): rows forward, left, up.
     fn camera_rows(&self) -> [V3; 3] { [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]] }
+    /// The console's clock (`0x1256d8`, `sceCdReadClock` then `0x131a98` to local time): BCD — status, seconds,
+    /// minutes, hours, 0, day, month, year. All 0 without one.
+    fn clock(&self) -> [u8; 8] { [0; 8] }
     /// `+0x48`: the playback speed.
     fn set_anim_speed(&mut self, _m: &Moby, _speed: f32) {}
     /// `0x311880`: the moby's place in its sequence in the frames' time units (`+0x44` the blend between two keys of one

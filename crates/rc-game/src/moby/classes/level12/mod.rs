@@ -1,6 +1,11 @@
 //! Level 0x0c's own classes (level 12; L12 addresses, the engine functions they call named by their L12 addresses with
 //! the L00 ones the port knows them by where they differ). Each class's update is registered in [`update_for`] and
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
+//!
+//! Not ported yet: the launcher system — the critters 0x0bb8 (`0x3e0d78`, 10 placed: set-up `0x3e1890`, tail
+//! `0x3e1b88`, the walkers 0x0fb4 given them `0x3e2f00`; launched by `0x3e1c30` from a cuboid's group, then along their
+//! cuboid waypoints on the framework, counted dead toward the help texts 0xa2d..0xa30 and skill point 0x0a) and their
+//! carrier 0x0fa5 (`0x41a510`, 1 placed: three paths, its child's pad `0x41ba60` / `0x41bb00`, its exhaust `0x41a188`).
 
 use crate::hero::physics::V3;
 use crate::moby::MobyWorld;
@@ -11,12 +16,15 @@ pub mod fence;
 pub mod field;
 pub mod grid;
 pub mod head;
+pub mod hints;
 pub mod lifts;
 pub mod mine;
+pub mod misc;
 pub mod props;
 pub mod robot;
 pub mod shot;
 pub mod towers;
+pub mod trader;
 pub mod tractor;
 pub mod trooper;
 pub mod walker;
@@ -57,6 +65,11 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         grid::CLASS => Some(grid::update_0f9f),
         robot::CLASS => Some(robot::update_1169),
         towers::CLASS => Some(towers::update_12b1),
+        hints::CLASS => Some(hints::update),
+        trader::CLASS => Some(trader::update),
+        0x0f1f => Some(misc::update_0f1f),
+        0x0e6a => Some(misc::update_0e6a),
+        0x1109 => Some(misc::update_1109),
         // `0x38b400`: `jr ra`, as level 4's U293 classes.
         _ => None,
     }

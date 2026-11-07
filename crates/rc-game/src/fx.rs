@@ -383,6 +383,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::blitz::TRACER | crate::moby::classes::blitz::MEGA_TRACER => crate::moby::classes::blitz::draw_tracer(w, id, cam, out),
         crate::moby::classes::blitz_mega::HAND_CLASS => crate::moby::classes::blitz_mega::draw(w, id, &mut game.rng, cam, out),
         crate::moby::classes::beam::CLASS => crate::moby::classes::beam::draw(w, id, cam, out),
+        crate::moby::classes::ray::CLASS => crate::moby::classes::ray::draw(w, id, cam, host.camera_rows(), out),
         crate::moby::classes::pulse_rifle::SHOT => crate::moby::classes::pulse_rifle::draw(w, id, hero_state, cam, out),
         crate::moby::classes::minirocket::ROCKET => crate::moby::classes::minirocket::draw(w, id, &mut game.rng, cam, out),
         crate::moby::classes::megarocket::HAND_CLASS => {

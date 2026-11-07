@@ -62,6 +62,11 @@ pub struct Gravity {
     /// them back to 0; the port runs it only while this is set (crate::hero::frame), so the world path of a level
     /// without frames is unchanged.
     pub tilted: bool,
+    /// `0x18a110` / `0x18a11c`: the magnetic walkways' normal and its word beside it, as Boldan's cuboids 0x0f55 set
+    /// them (crate::moby::classes::level13::walkway: the normal away from a cuboid's first row, the word 10); their
+    /// reader, frame mode 1, is not ported.
+    pub walkway_normal: V3,
+    pub walkway_k: f32,
 }
 
 impl Default for Gravity {
@@ -77,6 +82,8 @@ impl Default for Gravity {
             moby_rows: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
             push_step: 0.0,
             tilted: false,
+            walkway_normal: [0.0; 3],
+            walkway_k: 0.0,
         }
     }
 }

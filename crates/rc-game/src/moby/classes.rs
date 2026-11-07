@@ -46,6 +46,7 @@ pub mod flyer;
 pub mod debris;
 pub mod enemies;
 pub mod explosion;
+pub mod ferry;
 pub mod fighters;
 pub mod flash;
 pub mod flock;
@@ -58,6 +59,7 @@ pub mod lancer;
 pub mod lava_gun;
 pub mod meteor;
 pub mod pulse_rifle;
+pub mod ray;
 pub mod seeker;
 pub mod leaper;
 pub mod oozla;
@@ -76,6 +78,7 @@ pub mod smash;
 pub mod spawn_point;
 pub mod spiderbot;
 pub mod spiderbot_plus;
+pub mod swimmer;
 pub mod swingshot;
 pub mod synthenoid;
 pub mod teleport;
@@ -158,6 +161,8 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         // The strand curtains (L06 `0x401b40` / `0x3e7268`; placed on levels 6, 13 and 17).
         strands::BARRIER => Some(strands::update_barrier),
         strands::FIELD => Some(strands::update_field),
+        swimmer::CLASS => Some(swimmer::update),
+        ray::CLASS => Some(ray::update),
         0x5d2 => Some(lancer::update),
         // The Heavy Lancer's hand (`0x3e5dc8` calls the Lancer's `0x3a8060`; crate::upgrades).
         lancer::HEAVY_CLASS => Some(lancer::update),
@@ -482,6 +487,8 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         bounce_pad::PLANET_PAD => Some(bounce_pad::update_09b9),
         // The barrier (L13 `0x420d98`, L16 `0x41a6e0`).
         barrier::CLASS => Some(barrier::update_112e),
+        // The ferry (L06 `0x3e5460`, L09 `0x3a0038`, L11 `0x3b7340`, L13 `0x3ac360`, L18 `0x3c00f8`).
+        ferry::CLASS => Some(ferry::update),
         // The levels' own (their modules' lists).
         _ => race::update_for(o_class).or_else(|| level04::update_for(o_class)).or_else(|| level06::update_for(o_class)).or_else(|| level07::update_for(o_class)).or_else(|| level08::update_for(o_class)).or_else(|| level09::update_for(o_class)).or_else(|| level10::update_for(o_class)).or_else(|| level11::update_for(o_class)).or_else(|| level13::update_for(o_class)).or_else(|| level14::update_for(o_class)).or_else(|| level16::update_for(o_class)).or_else(|| level12::update_for(o_class)).or_else(|| level17::update_for(o_class)).or_else(|| level18::update_for(o_class)).or_else(|| level19::update_for(o_class)).or_else(|| level20::update_for(o_class)).or_else(|| level21::update_for(o_class)).or_else(|| level22::update_for(o_class)).or_else(|| level26::update_for(o_class)).or_else(|| level05::update_for(o_class)).or_else(|| level15::update_for(o_class)).or_else(|| level23::update_for(o_class)),
     }

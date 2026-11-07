@@ -26,6 +26,9 @@
 //!   * **2** (off): its off timer out with its timer byte 0: on for 200..250, its hiss (class sound 0, flags 4) unless
 //!     it plays, 1, its group's timers 1.
 //!   * Its hit let go (`+0xa8` −1) each tick.
+//! * **0x0eb1** ([`update_0eb1`], `0x451ad0`, 1 placed; the decomp's `func_L06_004504C8`): in state 0, with its cuboid
+//!   `+0x00` (−1 none) holding Ratchet (`0x3622d0`) in the challenge mode (`0x334778` = L00 `0x2f51a0`: `0x1a7a12`),
+//!   the flag 0x18 (`0x1395d0`, the flags `0x1395b8 +`) set and 1.
 
 use crate::hero::physics::add_rot;
 use crate::moby::{Ctx, MobyWorld};
@@ -473,4 +476,14 @@ pub fn update_1240(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         2 => if at(w, a) != Some(2) { w.mobys[id].state = 1 },
         _ => {}
     }
+}
+
+/// 0x0eb1 (`0x451ad0`, module docs).
+pub fn update_0eb1(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let m = &w.mobys[id];
+    if m.state != 0 { return; }
+    let c = m.pv_i(0);
+    if c == -1 || !ctx.level.in_cuboid(c, ctx.hero.pos) || !ctx.game.challenge { return; }
+    crate::moby::talk::set_flag(ctx, 0x18);
+    w.mobys[id].set_state(1, -1);
 }
