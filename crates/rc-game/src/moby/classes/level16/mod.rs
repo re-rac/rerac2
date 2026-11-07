@@ -3,6 +3,7 @@
 //! after its own.
 
 pub mod bolts;
+pub mod boss;
 pub mod breakables;
 pub mod copter;
 pub mod drawbridge;
@@ -24,6 +25,8 @@ pub fn draw(w: &mut crate::moby::MobyWorld, _host: &dyn crate::moby::MobyHost, g
         drone::SHOT => drone::draw_0f7a(w, id, &mut game.rng, cam, out),
         laser::CLASS => laser::draw(w, id, cam, out),
         gate::CLASS => gate::draw(w, id, &mut game.rng, out),
+        boss::CLASS => boss::draw_beam(w, id, cam, out),
+        boss::BOMB => boss::draw_ring(w, id, cam, out),
         _ => return false,
     }
     true
@@ -54,6 +57,10 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         triggers::OPENER => Some(triggers::update_1107),
         triggers::WAKER => Some(triggers::update_1154),
         triggers::FLOOR => Some(triggers::update_1145),
+        boss::CLASS => Some(boss::update_0f79),
+        boss::ARM => Some(boss::update_07e8),
+        boss::MISSILE => Some(boss::update_0f4e),
+        boss::BOMB => Some(boss::update_12be),
         _ => None,
     }
 }

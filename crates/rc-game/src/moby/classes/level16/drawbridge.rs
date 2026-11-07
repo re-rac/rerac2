@@ -58,7 +58,7 @@ pub fn update_125d(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
 /// place): its pitch (`+0xf4`) the angle (0x125d's own the angle's negative), its rows rebuilt (`0x2e8a68` = L00
 /// `0x2ef6b8`), its place moved so the pivot keeps its place in its frame (`0x31e8e0` = L00 `0x326248`: into the
 /// old frame, back out through the new).
-fn swing(w: &mut MobyWorld, id: usize, angle: f32) {
+pub fn swing(w: &mut MobyWorld, id: usize, angle: f32) {
     let m = &w.mobys[id];
     let pivot = add(through(PIVOT, &m.rows), m.pos);
     let Some(list) = usize::try_from(m.group).ok().and_then(|g| w.groups.get(g)).cloned() else { return };
