@@ -54,6 +54,7 @@ pub mod lava;
 pub mod line;
 pub mod meteor;
 pub mod mote;
+pub mod pulse;
 pub mod plasma;
 mod pool;
 pub mod rain;
@@ -1165,6 +1166,7 @@ pub fn update_parts(sys: &mut Particles, mobys: &crate::moby::MobyWorld, cam: [f
             meteor::EMBER => meteor::update_ember(sys, i),
             meteor::SMOKE => meteor::update_smoke(sys, i),
             mote::MOTE => mote::update(sys, i),
+            pulse::PULSE => pulse::update(sys, i),
             vapour::VAPOUR => vapour::update(sys, i, rng, aux.coll),
             ash::ASH => ash::update(sys, i, aux.coll, mobys.frame, mobys.view_x()),
             swirl::SWIRL => swirl::update(sys, i, mobys),

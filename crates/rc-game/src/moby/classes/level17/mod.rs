@@ -30,6 +30,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         props::LAMP => Some(props::update_10ec),
         hatchling::HATCHLING => Some(hatchling::update_0b88),
         hatchling::POD | hatchling::POD_OPEN => Some(hatchling::update_0920),
+        hatchling::POD_B => Some(hatchling::update_0929),
         floaters::BUOY => Some(floaters::update_08af),
         floaters::TIPPER => Some(floaters::update_0937),
         gate::CLASS => Some(gate::update_1305),
@@ -50,6 +51,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         misc::SWITCH => Some(misc::update_1326),
         misc::MUSIC => Some(misc::update_1272),
         misc::SCENE_FX => Some(misc::update_0f27),
+        misc::GLOW => Some(misc::update_09ad),
+        misc::WIND => Some(misc::update_09ae),
         _ => None,
     }
 }

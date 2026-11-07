@@ -43,12 +43,28 @@
 //!   `0x7fffffff`, a random roll), each 16 ticks with its tail (`+0x24` 2, `+0x2a` 0x7f, `+0x2b` 16) — the second only
 //!   when the first was made.
 //!
+//! * **0x09ad** ([`update_09ad`], `0x3cdc30`, 12 placed; the decomp's `func_L17_003CC6A8`): a glow. Its pvars: `+0x00`
+//!   .. `+0x0c` the colour's red, green, blue and alpha (a word each), `+0x10` its size (×210000). Updated from 0xff;
+//!   every 600 ticks (`$gp+0x1478` 10 s, its tick count `+0x96`) a pulse at its place for as long (crate::particles::
+//!   pulse, `0x342180`); none made (the pool full), it tries again the next tick.
+//! * **0x09ae** ([`update_09ae`], `0x3cddd8`, 4 placed; the decomp's `func_L17_003CC850`): a wind that pushes Ratchet
+//!   along its yaw. Its pvars: `+0x00` / `+0x04` its zone's length (along its y) and width (along its x), `+0x08` its
+//!   strength (7 each tick, `$gp+0x147c`), `+0x0c` the push now. Its zone test (`0x3cdd20(a, b, m, p)`): `p` into its
+//!   rows (`0x2f07c0` / `0x2f01a0`), |x| < b and |y| < a.
+//!   * **0**: 0.05 lower, hidden (mode | 0x41); 1.
+//!   * **2**: Ratchet below it (his z under its z), its yaw within 90° of the way to him (`0x2f0370` / `0x2f0e30`) and
+//!     off the ground (`0x18a160`, his ticks on it, 0): 3, the push 0, and at once:
+//!   * **3**: Ratchet on the ground: 1. Else the push eased (`0x31fe00`, crate::hero::physics::approach) toward
+//!     strength/60 by strength/900 a tick while he is within its long zone (60 by 2.5), else toward 0 by
+//!     strength/1800; Ratchet's push (`0x189f20`) gains it along its yaw.
+//!   * **Every tick but in 3**: Ratchet at or above its height and in its zone: 2; else (not in 3) 1.
+//!
 //! Not ported: 0x1326's markers (its path's points of w equal to `+0x04` set to 0 in its moves to 2; the port's paths
 //! are the level's, read-only, and nothing here reads them); 0x1272's level words (`0x1b27cc` 2 and `$gp+0x3878`
 //! 55 while Ratchet is in `+0x00`, `0x1b27cc` 0 out of it; on its state 1's first tick `0x13963d` 1 and `0x1b2868`
 //! 75), which nothing in the port reads; 0x1256's debug prints (`0x2a5e70`).
 
-use crate::hero::physics::{add_rot, set_len};
+use crate::hero::physics::{add_rot, approach, atan2, rot_dist, set_len, sub};
 use crate::moby::{Ctx, MobyWorld};
 
 pub const MARKER_A: i16 = 0x0877;
@@ -59,6 +75,8 @@ pub const BARRIER: i16 = 0x1256;
 pub const SWITCH: i16 = 0x1326;
 pub const MUSIC: i16 = 0x1272;
 pub const SCENE_FX: i16 = 0x0f27;
+pub const GLOW: i16 = 0x09ad;
+pub const WIND: i16 = 0x09ae;
 
 /// 6° in radians.
 const SIX_DEG: f32 = f32::from_bits(0x3dd6_7752);
@@ -272,5 +290,74 @@ pub fn update_0f27(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if (scene == 4 && (301..=359).contains(&tick)) || (scene == 5 && 531 <= tick) { sparks(w, a, ctx); }
         }
         _ => {}
+    }
+}
+
+/// 0x09ad (module docs).
+pub fn update_09ad(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let m = &mut w.mobys[id];
+    if m.state == 0 {
+        m.update_dist = 0xff;
+        m.state = 1;
+        m.state_ticks = 1;
+    }
+    m.state_ticks = m.state_ticks.wrapping_sub(1);
+    if m.state_ticks != 0 { return; }
+    let rgba = (m.pv_i(0xc) as u32) << 24 | (m.pv_i(8) as u32) << 16 | (m.pv_i(4) as u32) << 8 | m.pv_i(0) as u32;
+    let (size, pos) = (m.pv_f(0x10) * 210_000.0, m.pos);
+    let life = (10.0f32 * 60.0) as i16;
+    let made = ctx.parts.as_deref_mut().and_then(|p| crate::particles::pulse::spawn(p, &mut ctx.game.rng, size, id, pos, rgba, life));
+    w.mobys[id].state_ticks = if made.is_some() { life } else { 1 };
+}
+
+/// `0x3cdd20(a, b, m, p)`: `p` in the zone `|x| < b`, `|y| < a` of moby `m`'s rows.
+fn in_zone(m: &crate::moby::Moby, a: f32, b: f32, p: crate::hero::physics::V3) -> bool {
+    let l = crate::gravity::to_local(sub(p, m.pos), &m.rows);
+    l[0].abs() < b && l[1].abs() < a
+}
+
+/// 0x09ae (module docs).
+pub fn update_09ae(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let m = &mut w.mobys[id];
+    if m.pvars.len() < 0x10 { m.pvars.resize(0x10, 0); }
+    m.set_pv_f(8, 7.0);
+    let hero = ctx.hero.pos;
+    let off_ground = ctx.hero.grounded_ticks == 0;
+    let push = |m: &mut crate::moby::Moby, ctx: &mut Ctx| {
+        if ctx.hero.grounded_ticks != 0 {
+            m.state = 1;
+            return;
+        }
+        let k = m.pv_f(8);
+        let mut v = m.pv_f(0xc);
+        if in_zone(m, 60.0, 2.5, ctx.hero.pos) { approach(k / 60.0, k * 0.001_111_111_3, &mut v); } else { approach(0.0, k * 0.000_555_555_6, &mut v); }
+        m.set_pv_f(0xc, v);
+        let yaw = m.rot[2];
+        ctx.hero.push[0] += yaw.cos() * v;
+        ctx.hero.push[1] += yaw.sin() * v;
+    };
+    match m.state {
+        0 => {
+            m.state = 1;
+            m.mode |= 0x41;
+            m.pos[2] -= 0.05;
+        }
+        2 => {
+            let to = atan2(hero[0] - m.pos[0], hero[1] - m.pos[1]);
+            if hero[2] < m.pos[2] && rot_dist(m.rot[2], to) < std::f32::consts::FRAC_PI_2 && !off_ground {
+                m.state = 3;
+                m.set_pv_f(0xc, 0.0);
+                push(m, ctx);
+            }
+        }
+        3 => push(m, ctx),
+        _ => {}
+    }
+    if m.state == 3 { return; }
+    let m = &mut w.mobys[id];
+    if m.pos[2] <= ctx.hero.pos[2] && in_zone(m, m.pv_f(0), m.pv_f(4), ctx.hero.pos) {
+        m.state = 2;
+    } else {
+        m.state = 1;
     }
 }

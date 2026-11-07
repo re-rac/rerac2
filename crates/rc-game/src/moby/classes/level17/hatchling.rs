@@ -72,9 +72,8 @@
 //!
 //! Not ported: the global gate `0x1ca140`, the floor mobys it rides (`0x324050` / `0x324020` / `0x3257b8`, as the
 //! skitter's), `+0x310` (→ `$gp+0x1c78`, read by nothing here), what
-//! draws it in (state 9: the moby `0x1afb5c`; it goes at once, as the skitter's), and a 0x0929 pod's debris
-//! (`0x3292e8` = L03 `0x327c38`, five of class 0x0931) when it hatches; 0x0929's own update (`0x3c87e8`) is not
-//! here, and the words of it read ([`pod_ready`]: `+0x98`, `+0x9c`, `+0xa0`) are taken as it leaves them.
+//! draws it in (state 9: the moby `0x1afb5c`; it goes at once, as the skitter's). The pod 0x0929's own update:
+//! [`update_0929`].
 
 use crate::hero::physics::{add, add_rot, approach, approach_angle, atan2, dist2, set_len, sub, V3};
 use crate::moby::classes::props::{seq, set_seq, wrapped};
@@ -84,7 +83,7 @@ pub const HATCHLING: i16 = 0x0b88;
 pub const POD: i16 = 0x0920;
 pub const POD_OPEN: i16 = 0x0921;
 /// The other pod (not ported here: `0x3c87e8`).
-const POD_B: i16 = 0x0929;
+pub const POD_B: i16 = 0x0929;
 
 const FLASH: usize = 0x50;
 const WANDER: usize = 0x110;
@@ -199,7 +198,8 @@ pub(super) fn pod_ready(w: &MobyWorld, ctx: &Ctx, p: usize) -> bool {
 }
 
 /// `0x3c7080`: the pod opens — a 0x0920 in state 0 to 1 (sequence 1 at once); a 0x0929 in state 0 hatches
-/// (`0x3c8738`: its sound 0, without collision, hidden, state 1; its debris not ported).
+/// (`0x3c8738`: its debris (`0x3292e8`, crate::moby::classes::level08::crystal::emit: four of 0x0931..0x0934 at six
+/// points of it), its sound 0, without collision, hidden, state 1).
 pub(super) fn pod_open(w: &mut MobyWorld, ctx: &mut Ctx, p: usize) {
     match (w.mobys[p].o_class, w.mobys[p].state) {
         (POD, 0) => {
@@ -207,6 +207,7 @@ pub(super) fn pod_open(w: &mut MobyWorld, ctx: &mut Ctx, p: usize) {
             ctx.host.set_anim(&w.mobys[p], 1, 0, 0);
         }
         (POD_B, 0) => {
+            crate::moby::classes::level08::crystal::emit(w, p, ctx, 0x931, 0, 0x931, 4, 6, false, [0.0; 3]);
             ctx.host.play_sound(&w.mobys[p], 0, 0);
             let m = &mut w.mobys[p];
             m.mode |= 0x41;
@@ -691,6 +692,72 @@ pub fn update_0920(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             return w.delete(id);
         },
         _ => {}
+    }
+    let m = &mut w.mobys[id];
+    let mv = sub(m.pos, old);
+    platform::write(m, 0x50, mv, rot, rot);
+}
+
+/// 0x0929 (`0x3c87e8`, 13 placed; the decomp's `func_L17_003C7260`): a pod that settles and bursts. Nothing while
+/// `+0xac` is 1.
+/// * **In state 0, with `+0x90` set** (≠ −1): the ground under it (`0x31e048(0.5, p, 0)`; the moby it met, `0x1c0018`,
+///   into `+0x9c` as a link). Above it the pod falls (`+0x98` its speed, 3/3600 more a tick, `$gp+0x1350`), else it
+///   rests on it (`+0x98` 0). Ratchet inside it (`0x3c8668`: his offset in its rows within ±2 across, `$gp+0x1320`,
+///   and his feet within 2 of its height) takes a hit of 2 (flags 0x10001) along (−1, −1, −2) through its rows
+///   (`$gp+0x1340`; `0x31e380` / `0x31e5a0`).
+/// * **Once the level has run 31 ticks** (`0x1b2748`): with `+0xa4` clear and `+0xa8` at 51 or more, Ratchet within
+///   15 and still in state 0, it hatches: debris (as [`pod_open`]), its sound 0, state 1, without collision (the moby's `+0x98`),
+///   hidden (mode | 0x41); nothing more this tick. Else `+0xa4` set clears both; clear, `+0xa8` counts up.
+/// * **Each tick** its move into its platform block `+0x50` (`0x324660`).
+pub fn update_0929(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    if w.mobys[id].pvars.len() < 0xb0 { w.mobys[id].pvars.resize(0xb0, 0); }
+    if w.mobys[id].pv_i(0xac) == 1 { return; }
+    let (old, rot) = (w.mobys[id].pos, w.mobys[id].rot);
+    if w.mobys[id].state == 0 && w.mobys[id].pv_i(0x90) != -1 {
+        let p = w.mobys[id].pos;
+        let (a, b) = ([p[0], p[1], p[2] + 0.5], [p[0], p[1], 0.01]);
+        let hit = ctx.coll.and_then(|c| crate::collision::coll_line_m(c, ctx.scene, a, b, crate::collision::QueryFlags(2), None));
+        let ground = hit.as_ref().map_or(0.0, |o| o.point[2]);
+        let m = &mut w.mobys[id];
+        ai::set_link(m, 0x9c, hit.and_then(|o| o.moby));
+        if ground < m.pos[2] {
+            let v = m.pv_f(0x98) + 3.0 * 0.000_277_777_78;
+            m.set_pv_f(0x98, v);
+            m.pos[2] -= v;
+        } else {
+            m.set_pv_f(0x98, 0.0);
+            m.pos[2] = ground;
+        }
+        let r = m.rows;
+        let d = sub(ctx.hero.pos, m.pos);
+        let inside = [0, 1].iter().all(|&k| (d[0] * r[k][0] + d[1] * r[k][1] + d[2] * r[k][2]).abs() <= 2.0) && (ctx.hero.pos[2] - m.pos[2]).abs() < 2.0;
+        if inside {
+            if let Some(h) = ctx.hero_moby {
+                let v = [-1.0f32, -1.0, -2.0];
+                let dir: V3 = std::array::from_fn(|k| v[0] * r[0][k] + v[1] * r[1][k] + v[2] * r[2][k]);
+                let t = crate::moby::hits::HitTemplate::new(2.0, Some(id), 0x10001, [dir[0], dir[1], dir[2], 0.0]);
+                w.deliver_hit_any(h, &t, [0.0, 0.0, 0.0, 1.0]);
+            }
+        }
+    }
+    if 30 < ctx.game.frame {
+        let m = &w.mobys[id];
+        if m.pv_i(0xa4) == 0 && 51 <= m.pv_i(0xa8) && dist2(m.pos, ctx.hero.pos) < 15.0 * 15.0 && m.state == 0 {
+            crate::moby::classes::level08::crystal::emit(w, id, ctx, 0x931, 0, 0x931, 4, 6, false, [0.0; 3]);
+            ctx.host.play_sound(&w.mobys[id], 0, 0);
+            let m = &mut w.mobys[id];
+            m.state = 1;
+            m.has_collision = false;
+            m.mode |= 0x41;
+            return;
+        }
+        let m = &mut w.mobys[id];
+        if m.pv_i(0xa4) != 0 {
+            m.set_pv_i(0xa4, 0);
+            m.set_pv_i(0xa8, 0);
+        } else {
+            m.set_pv_i(0xa8, m.pv_i(0xa8) + 1);
+        }
     }
     let m = &mut w.mobys[id];
     let mv = sub(m.pos, old);
