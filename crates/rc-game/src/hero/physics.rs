@@ -642,11 +642,15 @@ impl Hero {
         self.on_moby = false;
         if self.water.under != 0 { self.water.under += 1; }
         let up = self.cap_radius * if self.group == 2 { 2.9 } else { 2.2 };
-        // `0x2b48b0(.., 1)`: with the frames on, along the last tick's down `0x18a0e0`.
+        // `0x2b48b0(.., 1)`: with the sphere on, along the last tick's down `0x18a0e0`; else along his moby's up row
+        // (frame mode 1; in mode 0 the port keeps world z, the upright row).
         let framed = self.gravity.mode != 0;
-        let (mut a, b) = if framed {
+        let (mut a, b) = if framed && self.gravity.on {
             let d = self.gravity.down;
             (add(self.pos, set_len(d, -up)), add(self.pos, set_len(d, 48.0)))
+        } else if framed {
+            let u = self.gravity.moby_rows[2];
+            (add(self.pos, set_len(u, up)), add(self.pos, set_len(u, -48.0)))
         } else {
             (add(self.pos, [0.0, 0.0, up]), add(self.pos, [0.0, 0.0, -48.0]))
         };
@@ -691,8 +695,8 @@ impl Hero {
                 self.ground_class = o.moby.and_then(|m| env.classes.get(m).copied()).unwrap_or(-1);
                 self.on_moby = o.moby.is_some();
                 self.ground_point = o.point;
-                // With the frames on the ground's height is its distance from the centre (`0x326820`).
-                self.ground_z = if framed { self.gravity.height(o.point) } else { o.point[2] };
+                // With the sphere on (`0x1a8ff0`) the ground's height is its distance from the centre (`0x326820`).
+                self.ground_z = if self.gravity.on { self.gravity.height(o.point) } else { o.point[2] };
                 self.height = dist(self.pos, self.ground_point);
                 self.ground_normal = unit(o.normal);
                 self.slope = if framed { self.frame_slope(o.normal) } else { slope_of(o.normal) };
@@ -710,8 +714,12 @@ impl Hero {
         } else {
             self.grounded_ticks = 0;
         }
-        // `0x18a0e0`: the gravity, toward the frame's centre in mode 2.
-        self.gravity.down = if framed { self.gravity.down_at(self.pos) } else { [0.0, 0.0, -1.0] };
+        // `0x18a0e0`: the gravity — toward the frame's centre in mode 2, the walkways' down in mode 1.
+        self.gravity.down = match self.gravity.mode {
+            0 => [0.0, 0.0, -1.0],
+            1 => self.walkway_down(),
+            _ => self.gravity.down_at(self.pos),
+        };
         self.foot_probe(env);
     }
 

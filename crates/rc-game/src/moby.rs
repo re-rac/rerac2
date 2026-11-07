@@ -692,6 +692,8 @@ pub struct MobyWorld {
     pub snivelak: classes::level16::boss::Globals,
     /// `0x1a9048`: the flock members shot on this level (classes::flock; read by 0x12ca, classes::flock::update_12ca).
     pub flock_kills: i32,
+    /// Hrugis's cloud glints' points (L10 `0x26ce20`, 1056 of them; classes::level10::glints).
+    pub glints10: Vec<V3>,
     /// Level 14's electric strands (classes::level14::fence::Globals).
     pub fence14: classes::level14::fence::Globals,
     /// The sinking pits' samples and grids (classes::level14::pit::Globals).

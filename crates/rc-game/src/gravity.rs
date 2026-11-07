@@ -22,16 +22,25 @@
 //! their world-z work along his local up instead; his ground probe looks along the last tick's down, and the
 //! post-move (`0x2c3330` → `0x2b9488` → `0x2b92c8` / `0x2b9008`) springs his up toward −down.
 //!
+//! **Frame mode 1** (the magnetic walkways): `0x2d37a0` gives mode 1 on a walkway's surface with the Gravity Boots
+//! (`0x18a168`, crate::hero::surface), in the states 0x3b / 0x6d / 0x6e (0x6e not on mud), while `0x18a038`
+//! ([`Gravity::walkway_hold`]) counts, or standing (state 0, under 4 air ticks) on the magnetic flag `0x18b2b7` with
+//! the boots; mud (`0x18b2ba`) makes it 0. In mode 1 the down (`0x2b4a08`'s end) is the walkways' normal `0x18a110`
+//! while its word `0x18a11c` counts down to 0 a tick ([`Gravity::walkway_normal`] / [`Gravity::walkway_k`]), else
+//! the ground's normal turned over; the gravity pull and the flat part of a vector go along the ground's normal
+//! (`0x2d3860`, `0x2d3d00`), his up springs to the ground's normal (`0x2b92c8`; softly, 0.001, in the air while
+//! `0x18a038` counts) about a point 0.8 up him in the air, and the ground probe runs along his moby's up row
+//! (`0x2b48b0`): crate::hero::frame.
+//!
 //! Ported: the flag, the sphere's centres, [`Gravity::height`] (`0x326820`), [`Gravity::up_at`] (`0x326448` /
-//! L02 `0x3864f0` without the magnetic walkway), Ratchet's mode 2 and down, the hero helpers' frame branches, his
+//! L02 `0x3864f0` without the magnetic walkway), Ratchet's modes 1 and 2 and their down, the hero helpers' frame branches, his
 //! camera's up (`0x2d9760`) and its frame branches (`0x421dc8`, `0x4227b8`, `0x4239d0`), the shadow probes'
 //! frame branch (`0x31da58`, `0x2a97d8`).
 //!
 //! The level settings' sphere ([`Gravity::from_settings`]) is set at Ratchet's spawns (the Jamming Array has one).
 //!
-//! Not ported: the cylinder mode (`0x1a8ff4`, `0x1a9000`, `0x3263d0`; no consumer yet), Ratchet's frame mode 1 (the
-//! magnetic walkways with the Gravity Boots `0x18a168`, the states 0x3b / 0x6d / 0x6e and `0x18a038`: their own smoothed normal `0x18a110` / `0x18a11c`), the
-//! other readers (listed in docs/plan/gaps.md G-LVL-003).
+//! Not ported: the cylinder mode (`0x1a8ff4`, `0x1a9000`, `0x3263d0`; no consumer yet; it would force mode 1), the
+//! camera's walkway branch (`0x4227b8`, G-CAM-003), the other readers (listed in docs/plan/gaps.md G-LVL-003).
 
 use crate::hero::physics::{dist, dot, len, scale, sub, unit, V3};
 
@@ -46,7 +55,7 @@ pub struct Gravity {
     pub inward: bool,
     /// `0x1b1a90` (L02 `0x1b3210`): the centre the heights are measured from.
     pub height_centre: V3,
-    /// `0x18c0e3`: Ratchet's frame mode this tick (0 world, 2 the sphere; 1 the walkways, not ported).
+    /// `0x18c0e3`: Ratchet's frame mode this tick (0 world, 1 the walkways, 2 the sphere; crate::hero::frame).
     pub mode: u8,
     /// `0x18a0e0`: Ratchet's gravity direction (unit; (0, 0, −1) in mode 0), set at the end of his ground probe.
     pub down: V3,
@@ -62,11 +71,15 @@ pub struct Gravity {
     /// them back to 0; the port runs it only while this is set (crate::hero::frame), so the world path of a level
     /// without frames is unchanged.
     pub tilted: bool,
-    /// `0x18a110` / `0x18a11c`: the magnetic walkways' normal and its word beside it, as Boldan's cuboids 0x0f55 set
-    /// them (crate::moby::classes::level13::walkway: the normal away from a cuboid's first row, the word 10); their
-    /// reader, frame mode 1, is not ported.
+    /// `0x18a110` / `0x18a11c`: the magnetic walkways' down and its word beside it (the quad's w), as Boldan's cuboids
+    /// 0x0f55 (crate::moby::classes::level13::walkway: against a cuboid's first row, the word 10) and Snivelak's
+    /// 0x0c32 (crate::moby::classes::level16::walkway: toward a cuboid's centre, the word 2) set them. Frame mode 1's
+    /// ground probe takes the down from it while the word is above 0, counting it down a tick.
     pub walkway_normal: V3,
     pub walkway_k: f32,
+    /// `0x18a038` (s16): frame mode 1 forced while it counts (the post-move's timers count it down; Snivelak's 0x0c32
+    /// sets 5).
+    pub walkway_hold: i16,
 }
 
 impl Default for Gravity {
@@ -84,6 +97,7 @@ impl Default for Gravity {
             tilted: false,
             walkway_normal: [0.0; 3],
             walkway_k: 0.0,
+            walkway_hold: 0,
         }
     }
 }
@@ -102,7 +116,7 @@ impl Gravity {
         g
     }
 
-    /// `0x2d37a0`'s sphere part: mode 2 while the sphere is on (the walkways' mode 1 is not ported).
+    /// `0x2d37a0`'s sphere part: mode 2 while the sphere is on (the walkways' mode 1: crate::hero::Hero::frame_mode).
     pub fn frame_mode(&self) -> u8 { if self.on { 2 } else { 0 } }
 
     /// `0x326820(p)` (L02 `0x32ad88`): the height in the frames — the distance from the centre `0x1b1a90`.

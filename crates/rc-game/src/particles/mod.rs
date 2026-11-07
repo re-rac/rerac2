@@ -41,6 +41,7 @@
 //! | 0x6a, 0x6b, 0x6c | [`meteor`] (`0x341890`, `0x341bc8`, `0x342028`) | (`0x341a18`, `0x341dc0`, `0x342230`) | the Meteor Gun's burst streaks and embers, its burning's smoke |
 //! | 0x45 | [`arc`] (L08 `0x34b3b8`) | `0x34b4e0` (L00 `0x33cb10`) | the beams' sparks (crate::fx::beams): moving, turning at random, fading over the life |
 //! | 0x60 | [`frost`] (`0x340608`) | (`0x340748`) | the Thermanator's cold shot's trail: slowing, falling, fading over the last half |
+//! | 0x67 | [`spot`] (L04 `0x364f80`) | (L04 `0x365030`) | spots: a sprite shown two ticks (the tie waves' glows, Hrugis's cloud glints) |
 //!
 //! Any other type kills itself on its first update. The gravity direction (`0x18a0e0`) is (0, 0, −1): normal gravity.
 //! Not ported: the gravity-boots bend of the positions (`0x380e08`, `+0x1c` = 2).
@@ -62,6 +63,7 @@ pub mod plasma;
 mod pool;
 pub mod rain;
 pub mod smoke;
+pub mod spot;
 pub mod swirl;
 pub mod type23;
 pub mod type48;
@@ -1171,6 +1173,7 @@ pub fn update_parts(sys: &mut Particles, mobys: &crate::moby::MobyWorld, cam: [f
             meteor::SMOKE => meteor::update_smoke(sys, i),
             mote::MOTE => mote::update(sys, i),
             pulse::PULSE => pulse::update(sys, i),
+            spot::SPOT => spot::update(sys, i),
             spray::SPRAY => spray::update(sys, i, rng),
             vapour::VAPOUR => vapour::update(sys, i, rng, aux.coll),
             ash::ASH => ash::update(sys, i, aux.coll, mobys.frame, mobys.view_x()),

@@ -1,8 +1,8 @@
 //! Boldan's walkway cuboids **0x0f55** (`0x41d270`, one placed; the decomp's `func_L13_0041BDA8`): up to eight cuboids
 //! (pvars `+0x00..+0x1c`, −1 none). **0**: updated at any distance; 1. **Each tick**: for each cuboid holding Ratchet
 //! (`0x32b7c0` = L00 `0x321858`), his walkways' normal `0x18a110` the cuboid's first row made −1 long (`0x2f9800` = L00
-//! `0x2ef138`) and the word `0x18a11c` 10 (crate::gravity::Gravity::walkway_normal / walkway_k; frame mode 1, their
-//! reader, is not ported).
+//! `0x2ef138`) and the word `0x18a11c` 10 (crate::gravity::Gravity::walkway_normal / walkway_k; their reader is frame
+//! mode 1's ground probe, crate::hero::frame's `walkway_down`).
 
 use crate::hero::physics::set_len;
 use crate::moby::{Ctx, MobyWorld};

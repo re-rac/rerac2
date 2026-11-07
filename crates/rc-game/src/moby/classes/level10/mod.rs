@@ -2,11 +2,13 @@
 //! with the port's). Each class's update is registered in [`update_for`]; crate::moby::classes::update_for asks it
 //! after its own.
 //!
-//! Ported here: 0x0cbe ([`tethered`]), 0x11c9 ([`sky`]), the carrier 0x0f85 ([`carrier`]); the escort 0x0f82
+//! Ported here: 0x0cbe ([`tethered`]), 0x11c9 ([`sky`]), the carrier 0x0f85 ([`carrier`]), the cloud glints 0x11b9
+//! ([`glints`]); the escort 0x0f82
 //! (`0x417600`) is the shared crate::moby::classes::space::escort, the mission 0x1155 the shared
 //! crate::moby::classes::space::mission.
 
 pub mod carrier;
+pub mod glints;
 pub mod ships;
 pub mod sky;
 pub mod tethered;
@@ -16,6 +18,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
         sky::RING => Some(sky::update_11c8),
         sky::LIGHT => Some(sky::update_11c9),
+        glints::CLASS => Some(glints::update),
         tethered::CLASS => Some(tethered::update),
         // 0xf93 is Gorn's too (the same code, L15 `0x421538`).
         ships::FIGHTER | ships::WINGMAN => Some(super::space::update_fighter),

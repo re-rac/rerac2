@@ -16,6 +16,7 @@ pub mod rocks;
 pub mod topple;
 pub mod triggers;
 pub mod turret;
+pub mod walkway;
 
 /// This level's draw callbacks (crate::fx): true when the moby's class is one of them.
 #[allow(clippy::too_many_arguments)]
@@ -61,6 +62,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         boss::ARM => Some(boss::update_07e8),
         boss::MISSILE => Some(boss::update_0f4e),
         boss::BOMB => Some(boss::update_12be),
+        walkway::CLASS => Some(walkway::update),
         _ => None,
     }
 }

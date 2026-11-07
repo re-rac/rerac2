@@ -8,8 +8,12 @@
 //! local z, and turns it back. The ones that read his moby's angles (`+0xf0`) turn through
 //! [`crate::gravity::Gravity::moby_rows`] instead.
 //!
-//! Not ported: mode 1 (the magnetic walkways, crate::gravity), the jump attack's frame fall cap (`0x2ba8e0`: −1.1667
-//! instead of −0.6167 with the frames on), `0x18a038`'s soft spring of the up (0.001 in the air).
+//! Mode 1 (the magnetic walkways, crate::gravity): [`Hero::frame_mode`] (`0x2d37a0`), the down [`Hero::walkway_down`]
+//! (`0x2b4a08`'s end), the pull and the flat part along the ground's normal, the up's spring to the ground's normal
+//! (softly while `0x18a038` counts in the air) about a point 0.8 up him in the air.
+//!
+//! Not ported: the jump attack's frame fall cap (`0x2ba8e0`: −1.1667 instead of −0.6167 with the frames on), the
+//! cylinder mode's branches (`0x1a8ff4`: mode 1 forced, its down `0x3263d0`).
 
 use super::physics::*;
 use super::Hero;
@@ -17,6 +21,33 @@ use crate::collision::{coll_sphere_hero_groups, coll_sphere_m, QueryFlags};
 use crate::gravity::{rotate, to_local, to_world};
 
 impl Hero {
+    /// `0x2d37a0`: the frame mode at the tick's start — the walkway flag `0x18a168` (crate::hero::surface's `boots`),
+    /// 2 with the sphere on (the cylinder `0x1a8ff4` off); 1 in the states 0x3b, 0x6d, 0x6e (not on mud `0x18b2ba`),
+    /// while `0x18a038` counts, or idle (0) under 4 air ticks on the magnetic flag `0x18b2b7` with the Gravity Boots
+    /// `0x1a7b13`; 1 on mud is 0.
+    pub fn frame_mode(&self, env: &Env) -> u8 {
+        let mut m = self.surf.boots;
+        if self.gravity.on { m = 2; }
+        let s = self.state;
+        if s == 0x3b || (s == 0x6e && !self.surf.mud) || s == 0x6d || self.gravity.walkway_hold != 0
+            || (self.surf.magnet && env.boots && s == 0 && self.air_ticks < 4)
+        {
+            m = 1;
+        }
+        if m == 1 && self.surf.mud { 0 } else { m }
+    }
+
+    /// `0x2b4a08`'s end in mode 1: the walkways' down `0x18a110` while its word `0x18a11c` is above 0 (`0x31eb18`: one
+    /// down toward 0), else the ground's normal `0x18a0c0` turned over.
+    pub(super) fn walkway_down(&mut self) -> V3 {
+        let g = &mut self.gravity;
+        if g.walkway_k != 0.0 {
+            approach(0.0, 1.0, &mut g.walkway_k);
+            return g.walkway_normal;
+        }
+        scale(self.ground_normal, -1.0)
+    }
+
     /// `0x2d3ea0(v)`: v's local z (mode 0: v.z).
     pub fn local_z(&self, v: V3) -> f32 {
         if self.gravity.mode == 0 { v[2] } else { to_local(v, &self.rows)[2] }
@@ -51,10 +82,11 @@ impl Hero {
     /// in crate::hero::physics takes his rows as upright).
     pub fn up_point(&self, h: f32) -> V3 { add(self.pos, scale(self.rows[2], h)) }
 
-    /// `0x2d3d00(out, v)`: v without its part along the gravity (mode 2: `0x18a0e0`; mode 0: z = 0).
+    /// `0x2d3d00(out, v)`: v without its part along the gravity (mode 2: `0x18a0e0`; mode 1: the ground's normal
+    /// `0x18a0c0` made unit; mode 0: z = 0).
     pub fn flat(&self, v: V3) -> V3 {
         if self.gravity.mode == 0 { return [v[0], v[1], 0.0]; }
-        let d = self.gravity.down;
+        let d = if self.gravity.mode == 1 { set_len(self.ground_normal, 1.0) } else { self.gravity.down };
         sub(v, scale(d, dot(d, v)))
     }
 
@@ -65,10 +97,11 @@ impl Hero {
         len2(l).atan2(l[2])
     }
 
-    /// `0x2d3860(g, out, src)` in mode 2: `out` keeps its local xy, takes `src`'s local z and gains `g` along the gravity
-    /// `0x18a0e0` (the climb 0x3a on the ground: `g` into the ground normal `0x18a0c0` instead).
+    /// `0x2d3860(g, out, src)` in a frame: `out` keeps its local xy, takes `src`'s local z and gains `g` along the
+    /// gravity `0x18a0e0` (mode 1, and the climb 0x3a on the ground in mode 2: `g` into the ground normal `0x18a0c0`).
     pub(super) fn frame_gravity(&mut self, src: V3, g: f32) {
-        let pull = if self.state == 0x3a && self.air_ticks == 0 { set_len(self.ground_normal, -g) } else { set_len(self.gravity.down, g) };
+        let into = self.gravity.mode == 1 || (self.state == 0x3a && self.air_ticks == 0);
+        let pull = if into { set_len(self.ground_normal, -g) } else { set_len(self.gravity.down, g) };
         let up = self.with_flat_len(src, 0.0);
         let v = self.with_local_z(self.vel, 0.0);
         self.vel = add(add(v, up), pull);
@@ -111,19 +144,23 @@ impl Hero {
         atan2(u[0], u[1])
     }
 
-    /// `0x2b92c8` (mode 2) with `0x2b9008(0.035, 0.3, 0, −down)`: the angle between his up row and −down springs from 0
-    /// (velocity `0x189ec4`) and his rows turn by the step about their cross product (`0x2eef88(up, row)` = row × up;
-    /// about z when its z is 0.99 or more: the original's yaw / tilt decomposition degenerates there); the angles
-    /// (`0x320000`) go to `0x189eb0`.
+    /// `0x2b92c8` with `0x2b9008(k, d, 0, up)`: the up is −down in mode 2, else (mode 1, or `0x18a038` counting) the
+    /// ground's normal `0x18a0c0`; `k` / `d` 0.035 / 0.3, both 0.001 in the air (`0x18a16e`) while `0x18a038` counts.
+    /// The angle between his up row and the up springs from 0 (velocity `0x189ec4`) and his rows turn by the step about
+    /// their cross product (`0x2eef88(up, row)` = row × up; about z when its z is 0.99 or more: the original's yaw / tilt
+    /// decomposition degenerates there); the angles (`0x320000`) go to `0x189eb0`. In mode 1 in the air he turns about
+    /// the point 0.8 up his rows (his place moved by the old up row · 0.8 less the new one's).
     pub(super) fn frame_align(&mut self) {
-        let up = scale(self.gravity.down, -1.0);
+        let mode = self.gravity.mode;
+        let up = if mode == 2 { scale(self.gravity.down, -1.0) } else { self.ground_normal };
+        let (k, d) = if self.air_ticks != 0 && self.gravity.walkway_hold != 0 { (0.001, 0.001) } else { (0.035, 0.3) };
         let m = self.rows;
         let c = dot(up, m[2]);
         let s = (1.0 - c * c).max(0.0).sqrt();
         let angle = atan2(c, s);
         let axis = cross(m[2], up);
         let (mut step, mut v) = (0.0, self.rot_vel[1]);
-        turn_spring(angle, 0.035, 0.3, 0.0, &mut step, &mut v, 0);
+        turn_spring(angle, k, d, 0.0, &mut step, &mut v, 0);
         self.rot_vel[1] = v;
         let n = if axis[2] < 0.99 {
             if !crate::gravity::has_len(axis) { return; }
@@ -133,6 +170,9 @@ impl Hero {
         };
         let out = m.map(|row| rotate(row, n, step));
         self.rot = crate::moby::attach::angles_of(&out);
+        if mode == 1 && self.air_ticks != 0 {
+            self.pos = add(sub(self.pos, scale(out[2], 0.8)), scale(m[2], 0.8));
+        }
     }
 
     /// `0x2b9488`'s mode-0 branch, after a frame: outside the states 0x24 / 0x25 / 0x74 / 0x30 / 0x2c / 0x2b and the

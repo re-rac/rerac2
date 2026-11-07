@@ -15,12 +15,14 @@
 //!   along it × `[0xc]`), 2 out from the moby (the clock + the distance), 3 a hash of its place (the clock + the
 //!   period × the fraction of x + y + z), 4 a beam turning about the moby (`f` by the angle off it: 80°..85° in,
 //!   85°..95° full, 95°..115° out), else 0; its colour `[0x31]` → `[0x30]` by `f` (`0x310cf0`), with flag 1 the
-//!   tie's colour (`0x393b78` = L00 `0x3701d0`, crate::moby::MobyWorld::tie_colours).
-//!
-//! Not ported: the glows (flag 2: a particle of type 0x67, `0x364f80`, at the tie's offset pulled toward the camera,
-//! faded by its facing's cone): the particle type is not in crate::particles.
+//!   tie's colour (`0x393b78` = L00 `0x3701d0`, crate::moby::MobyWorld::tie_colours); with flag 2 its glow: the
+//!   angle between the facing through the tie's rows (`0x30ff80`) and the way to the camera (`acos` as
+//!   `π/2 − asin`) fades it — none from `[0x1a]` on, eased in between `[0x1a]` and `[0x19]`, full within `[0x19]` —
+//!   and with alpha and fade left a spot (crate::particles::spot, type 0x67, `0x364f80`) at the offset through the
+//!   tie's rows, `[0x1e]` · the tie's scale (its first row's length) toward the camera, of size `[0x18]` · the scale
+//!   · 210000, in the colour with its alpha · the fade.
 
-use crate::hero::physics::{dist, dot, len, sub, V3};
+use crate::hero::physics::{add, dist, dot, len, set_len, sub, V3};
 use crate::moby::{Ctx, MobyWorld};
 
 fn group(w: &MobyWorld, id: usize) -> Option<Vec<usize>> {
@@ -87,6 +89,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let (kind, t, flags) = (m.pv_i(8), m.pv_f(0xe0), m.pv_i(4));
     let (ca, cb) = (m.pv_i(0xc0) as u32, m.pv_i(0xc4) as u32);
     let (pos, rows, way) = (m.pos, m.rows, m.pv_v(0x90));
+    let (face, off, cone_in, cone_out, size, pull) = (m.pv_v(0xa0), m.pv_v(0xb0), m.pv_f(0x64), m.pv_f(0x68), m.pv_f(0x60), m.pv_f(0x78));
     let mut out = Vec::new();
     for tie in ties {
         let Some(mat) = w.ties.get(tie) else { break };
@@ -112,6 +115,23 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         };
         let c = crate::hud::lerp_rgba(f, cb, ca);
         if flags & 1 != 0 { out.push((tie, [c as u8 & 0xfc, (c >> 8) as u8 & 0xfc, (c >> 16) as u8 & 0xfc])); }
+        if flags & 2 != 0 {
+            let r: [V3; 3] = std::array::from_fn(|k| [mat[k][0], mat[k][1], mat[k][2]]);
+            let through = |v: V3| -> V3 { std::array::from_fn(|k| v[0] * r[0][k] + v[1] * r[1][k] + v[2] * r[2][k]) };
+            let to_cam = unit(sub(cam, p));
+            let ang = std::f32::consts::FRAC_PI_2 - dot(through(face), to_cam).clamp(-1.0, 1.0).asin();
+            let fade = if cone_out <= ang { 0.0 } else if cone_in < ang { smooth((ang - cone_out) / (cone_in - cone_out)) } else { 1.0 };
+            let mut a = c >> 24;
+            if a == 0 || fade == 0.0 { continue; }
+            if fade != 1.0 { a = (a as f32 * fade) as i32 as u32; }
+            let rgba = c & 0xff_ffff | a << 24;
+            let scale = len(r[0]);
+            let spot = add(through(off), p);
+            let spot = add(spot, set_len(sub(cam, spot), pull * scale));
+            if let Some(sys) = ctx.parts.as_deref_mut() {
+                crate::particles::spot::spot(sys, &mut ctx.game.rng, spot, rgba, size * scale * 210_000.0);
+            }
+        }
     }
     w.tie_colours.extend(out);
 }

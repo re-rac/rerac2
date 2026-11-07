@@ -545,7 +545,7 @@ impl Hero {
         // `0x18be50` and `0x2d37a0`: the tick's start and the frame mode (crate::gravity); the moby's rows as the last
         // write-back left them.
         self.gravity.tick_start = self.pos;
-        self.gravity.mode = self.gravity.frame_mode();
+        self.gravity.mode = self.frame_mode(env);
         if self.gravity.mode != 0 { self.gravity.moby_rows = euler_rows(self.rot); }
         if !self.state_physics(env, anim) { return false; }
         self.yaw_hist[self.yaw_hist_idx] = self.rot[2];
@@ -565,9 +565,9 @@ impl Hero {
     /// The start of `0x2c3330`: the state, group and sequence timers. Its ~35 countdown timers belong to states not
     /// ported yet.
     fn post_move(&mut self) {
-        // `0x2b9488`: in a frame his up springs toward −down; its mode-0 branch (the pitch and roll easing back to 0)
-        // runs only after a frame (crate::gravity::Gravity::tilted).
-        if !self.no_update && self.gravity.mode != 0 {
+        // `0x2b9488`: in a frame (or while `0x18a038` counts) his up springs toward the frame's up; its mode-0 branch
+        // (the pitch and roll easing back to 0) runs only after a frame (crate::gravity::Gravity::tilted).
+        if !self.no_update && (self.gravity.mode != 0 || self.gravity.walkway_hold != 0) {
             self.frame_align();
             self.gravity.tilted = true;
         } else if !self.no_update && self.gravity.tilted {
@@ -580,6 +580,8 @@ impl Hero {
         if self.land_lag != 0 { self.land_lag -= 1; }
         if self.jump.landed != 0 { self.jump.landed = self.jump.landed.saturating_add(1); }
         if 0 < self.ledge.cooldown { self.ledge.cooldown -= 1; }
+        // `0x18a038`: the walkways' hold of frame mode 1 (`0x2eeae0`).
+        if 0 < self.gravity.walkway_hold { self.gravity.walkway_hold -= 1; }
         if 0 < self.damage.invincible { self.damage.invincible -= 1; }
         if 0 < self.wall.timer { self.wall.timer -= 1; }
         if 0 < self.wall.regrab { self.wall.regrab -= 1; }
