@@ -25,8 +25,7 @@
 //!
 //! Not ported: its look (the screen's fill `0x1a8ab0..0x1a8ac8`, its point light `+0x2c` `0x302fd0`, the charge's
 //! sparks `0x33ad38`, the roll's particles and trail `0x3585b8` / `0x3364e0` / `0x34b2e8`, the blast `0x3f8348` at a
-//! hit; their random draws with them); the opponent's special (its AI, crate::moby::classes::level22::boss, is not
-//! ported: only Giant Clank's is held); L23's copy (its update differs: L23's Giant Clank makes none).
+//! hit; their random draws with them); L23's copy (its update differs: L23's Giant Clank makes none).
 
 use super::planet::{down_at, surface};
 use crate::hero::physics::{add, cross, dist, dot, scale, set_len, sub, unit, V3};
@@ -61,24 +60,30 @@ pub fn make(w: &mut MobyWorld, ctx: &Ctx, owner: usize, at: V3) -> usize {
 }
 
 /// `0x3ba568(Giant Clank, at, 1)` (module docs).
-pub fn hold(w: &mut MobyWorld, ctx: &mut Ctx, owner: usize, at: V3) {
-    if ctx.hero.giant.special.is_none() {
+pub fn hold(w: &mut MobyWorld, ctx: &mut Ctx, owner: usize, at: V3) { hold_by(w, ctx, owner, at, true) }
+
+fn word(w: &MobyWorld, ctx: &Ctx, hero: bool) -> Option<usize> { if hero { ctx.hero.giant.special } else { w.level22.boss_special } }
+fn set_word(w: &mut MobyWorld, ctx: &mut Ctx, hero: bool, v: Option<usize>) { if hero { ctx.hero.giant.special = v } else { w.level22.boss_special = v } }
+
+/// `0x3ba568(owner, at, hero)` (module docs): Giant Clank's (`hero`, his word and aim) or the opponent's (its word
+/// `$gp+0x9cc`; aimed nowhere: its way `+0x50` to Ratchet's place 2.2 above the surface).
+pub fn hold_by(w: &mut MobyWorld, ctx: &mut Ctx, owner: usize, at: V3, hero: bool) {
+    if word(w, ctx, hero).is_none() {
         let id = make(w, ctx, owner, at);
-        ctx.hero.giant.special = Some(id);
-        w.level22.special_sound[0] = ctx.host.play_level_sound_after(None, 0x14, 0);
+        set_word(w, ctx, hero, Some(id));
+        w.level22.special_sound[!hero as usize] = ctx.host.play_level_sound_after(None, 0x14, 0);
         if ctx.hero.gravity.on {
             let (opos, orows) = (w.mobys[owner].pos, w.mobys[owner].rows);
-            match w.level22.boss {
-                None => w.mobys[id].set_pv_i(0x48, 0),
-                Some(b) => {
+            match (w.level22.boss, ctx.hero_moby) {
+                (Some(b), Some(_)) => {
                     let (bp, brows) = (w.mobys[b].pos, w.mobys[b].rows);
-                    let aim = add(bp, scale(brows[2], 4.0));
+                    let aim = if hero { add(bp, scale(brows[2], 4.0)) } else { surface(ctx, w.level22.radius, ctx.hero.pos, f32::from_bits(0x400c_cccd)) };
                     let to = set_len(sub(aim, opos), 1.0);
                     let m = &mut w.mobys[id];
                     m.set_pv_v(0x50, to);
                     let facing = set_len(orows[0], 1.0);
                     let d = dist(bp, ctx.hero.pos);
-                    if dot(to, facing) < 0.75 || 55.0 < d {
+                    if !hero || dot(to, facing) < 0.75 || 55.0 < d {
                         m.set_pv_i(0x44, 0);
                     } else {
                         m.set_pv_i(0x44, b as i32 + 1);
@@ -86,31 +91,37 @@ pub fn hold(w: &mut MobyWorld, ctx: &mut Ctx, owner: usize, at: V3) {
                     }
                     m.set_pv_i(0x48, 0);
                 }
+                _ => w.mobys[id].set_pv_i(0x48, 0),
             }
         }
-        w.mobys[id].set_pv_s(0x40, 1);
+        w.mobys[id].set_pv_s(0x40, hero as i16);
     }
-    let Some(id) = ctx.hero.giant.special else { return };
+    let Some(id) = word(w, ctx, hero) else { return };
     let m = &mut w.mobys[id];
     m.pos = at;
     m.set_pv_s(0x2e, 1);
 }
 
 /// `0x3ba798(Giant Clank)` (module docs).
-pub fn end(w: &mut MobyWorld, ctx: &mut Ctx) {
-    let s = &mut w.level22.special_sound[0];
+pub fn end(w: &mut MobyWorld, ctx: &mut Ctx) { end_by(w, ctx, true) }
+
+/// `0x3ba798(owner)`: the opponent's (any owner but Giant Clank) or his.
+pub fn end_for(w: &mut MobyWorld, ctx: &mut Ctx, owner: usize) { end_by(w, ctx, ctx.hero_moby == Some(owner)) }
+
+fn end_by(w: &mut MobyWorld, ctx: &mut Ctx, hero: bool) {
+    let s = &mut w.level22.special_sound[!hero as usize];
     if *s != -1 {
         ctx.host.stop_sound(*s);
         *s = -1;
     }
-    let Some(id) = ctx.hero.giant.special else { return };
+    let Some(id) = word(w, ctx, hero) else { return };
     if !w.mobys.get(id).is_some_and(|m| m.o_class == CLASS) {
-        ctx.hero.giant.special = None;
+        set_word(w, ctx, hero, None);
         return;
     }
     if w.mobys[id].state != 0 { return; }
     w.delete(id);
-    ctx.hero.giant.special = None;
+    set_word(w, ctx, hero, None);
 }
 
 /// The end of its roll: its owner's sound stopped, deleted, the word cleared.

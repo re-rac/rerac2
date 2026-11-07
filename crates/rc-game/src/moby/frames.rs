@@ -326,6 +326,19 @@ fn ground(w: &mut MobyWorld, id: usize, ctx: &Ctx, goal: V3, from: V3, kind: Kin
 /// returns the flags (`+0x94`; 8 without the block).
 pub fn move_to(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3) -> i32 { mover(w, id, ctx, goal, Kind::Sphere) }
 
+/// L22 `0x331418(m, v)` (the decomp's `func_L22_003300E8`, its L23 copy shared): the body's move alone (L02 `0x3340d8`)
+/// by the velocity `v` (`+0xa0`), in its frame as it is; the block's flags (8 without it). The orbit drones'
+/// (crate::moby::classes::level22::drone).
+pub fn move_by(w: &mut MobyWorld, id: usize, ctx: &Ctx, v: V3) -> i32 {
+    let m = &mut w.mobys[id];
+    if m.pv_i(0x18) == 0 { return 8; }
+    let o = ai::mv(m);
+    m.set_pv_v(o + 0xa0, v);
+    let (from, inv) = (m.pos, m.rows);
+    body(w, id, ctx, from, &inv, Kind::Sphere);
+    w.mobys[id].pv_i(o + 0x94)
+}
+
 /// L13 `0x40ab60(m, goal)`: the troopers' wall walk (module docs); returns the flags (8 without the block).
 pub fn move_on_walls(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3) -> i32 { mover(w, id, ctx, goal, Kind::Walls) }
 

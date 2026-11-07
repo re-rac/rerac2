@@ -60,7 +60,7 @@ const REACH: f32 = 12.0;
 /// `$gp+0x2c8` / `0x1af2b8`: the push.
 const PUSH: f32 = f32::from_bits(0x406c_cccd);
 const ROW: usize = 50;
-/// `$gp+0x370` (copied from `0x1af580`, its count `0x1b2a54` = 5): the opponent's paths left out.
+/// The set-up's paths left out (`0x3a4ad0`'s own list; the same as the skip table's start).
 const SKIPPED: [usize; 5] = [10, 27, 28, 31, 15];
 /// The at-rest turn (rad a tick) and the taken one's unit (rad an arc minute).
 const SPIN: f32 = 0.018_907_737;
@@ -222,14 +222,14 @@ pub fn take(w: &mut MobyWorld, boss: usize, ctx: &mut Ctx, kind: usize, hero: bo
 }
 
 /// `0x3a4980(out, 1, h)`: one of the opponent's 32 paths (`0x320f00(32)`) with none of its points within 45 of
-/// Giant Clank and not left out ([`SKIPPED`]), a point of it but its last (`0x320f00(n − 1)`), put `h` above the
+/// Giant Clank and not in the skip table (crate::moby::classes::level22::planet::passable), a point of it but its last (`0x320f00(n − 1)`), put `h` above the
 /// surface. The port's: at most 1000 draws (the game draws until one passes).
 pub fn pick_point(w: &MobyWorld, ctx: &mut Ctx, boss: usize, h: f32) -> V3 {
     let hero = ctx.hero.pos;
     for _ in 0..1000 {
         let i = ctx.game.rng.randi(32) as usize;
         let path = path_of(ctx, w.mobys[boss].pv_i(0x2a0 + 4 * i));
-        if path.iter().any(|p| dist(hero, [p[0], p[1], p[2]]) < 45.0) || SKIPPED.contains(&i) { continue; }
+        if path.iter().any(|p| dist(hero, [p[0], p[1], p[2]]) < 45.0) || !super::planet::passable(w, i) { continue; }
         let k = ctx.game.rng.randi(path.len() as i32 - 1).max(0) as usize;
         let Some(p) = path.get(k) else { continue };
         return surface(ctx, w.level22.radius, [p[0], p[1], p[2]], h);
@@ -243,6 +243,18 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, boss: usize, pos: V3, staggered: 
     let kind = match ctx.game.rng.randi(n) { 0 => 1, 1 => 2, _ => 0 };
     let Some(k) = w.level22.pickups.slots[kind].iter().position(|s| s.is_none()) else { return };
     let id = create(w, kind, pos, staggered);
+    let pk = &mut w.level22.pickups;
+    pk.slots[kind][k] = Some(id);
+    pk.total += 1;
+    pk.counts[kind] += 1;
+}
+
+/// `0x3a50a0(pos, kind)` → `0x3a4df8(boss, pos, kind, 0)`: a pickup of `kind` at `pos` in the row's first free slot
+/// (none free: none made). The drones 0x0edd drop Giant Clank a health pickup at his feet this way
+/// (crate::moby::classes::level22::drone).
+pub fn drop_at(w: &mut MobyWorld, pos: V3, kind: usize) {
+    let Some(k) = w.level22.pickups.slots[kind].iter().position(|s| s.is_none()) else { return };
+    let id = create(w, kind, pos, false);
     let pk = &mut w.level22.pickups;
     pk.slots[kind][k] = Some(id);
     pk.total += 1;

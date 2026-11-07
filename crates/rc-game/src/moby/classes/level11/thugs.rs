@@ -45,11 +45,12 @@
 //! there. The tail (`0x427268`): the flash, the timers `+0x260` / `+0x26` down, its ticks, the aim record sprung
 //! (crate::moby::joint_aim, list 4, 0.03 / 0.3) and the head aim (3.5); a height change under 0.005 undone.
 //!
-//! Not ported here: the turret 0x0c20 and the hover 0x0d07 it rides (their own updates, crate::moby::classes::level11's
-//! list); the thug only writes the words they share (the turret's state byte, sequence, playback speed,
-//! angles and height; the hover's `+0x27c` rider link, crate::moby::ai::link, and `+0x2c8`). The turret's shots 0x0dd9
-//! ([`shot`], `0x451d60`) are made only when the level has the class. The hit's source is the frame's hit record's
-//! (the original reads its health block's `+0x38`); the debug prints (`0x2bdc70`) are left out.
+//! The turret 0x0c20 and the hover 0x0d07 it rides have their own updates (crate::moby::classes::level11::turret,
+//! hovers); the thug only writes the words they share (the turret's state byte, sequence, playback speed, angles and
+//! height; the hover's `+0x27c` rider link, crate::moby::ai::link, and `+0x2c8`). Its cousin 0x0cf6 (gunners) runs
+//! copies of its helpers, which it shares from here. The turret's shots 0x0dd9 ([`shot`], `0x451d60`; the turret's
+//! own too) are made only when the level has the class. The hit's source is the frame's hit record's (the original
+//! reads its health block's `+0x38`); the debug prints (`0x2bdc70`) are left out.
 
 use crate::hero::physics::{add, add_rot, approach, atan2, dist2, ease, euler_rows, rot_dist, set_len, spring, sub, sub_rot, turn_ease, V3};
 use crate::moby::{ai, countdown, Ctx, MobyWorld};
@@ -70,9 +71,6 @@ const FLASH: usize = 0x50;
 const WANDER: usize = 0x110;
 const MV: usize = 0x140;
 const PATH_NEAR: usize = 0x250;
-const PATH_FAR: usize = 0x254;
-const RANGE_NEAR: usize = 0x258;
-const RANGE_FAR: usize = 0x25c;
 const T260: usize = 0x260;
 const RANGE: usize = 0x264;
 const ALARMED: usize = 0x266;
@@ -137,60 +135,60 @@ const TURRET_L: [u32; 4] = [0x3b7e_dcbb, 0x3dee_eef0, 0x3afe_2e99, 0x3bbe_a2f4];
 const DEG: f32 = 0.017_453_294;
 const HALF_PI: f32 = 1.570_796_5;
 
-fn limits(w: &mut MobyWorld, id: usize, l: [u32; 4]) {
+pub(super) fn limits(w: &mut MobyWorld, id: usize, l: [u32; 4]) {
     let [a, b, c, d] = l.map(f32::from_bits);
     ai::senses(&mut w.mobys[id], a, b, c, d);
 }
 
 /// `0x33d580`: the first tick since the last sub-state change.
-fn first_sub(w: &mut MobyWorld, id: usize) -> bool {
+pub(super) fn first_sub(w: &mut MobyWorld, id: usize) -> bool {
     let m = &mut w.mobys[id];
     if m.once & 2 != 0 { return false; }
     m.once |= 2;
     true
 }
 
-fn anim(w: &MobyWorld, id: usize, ctx: &mut Ctx, s: u8, frame: u8, blend: u8) { set_seq(w, id, ctx, s, frame, blend); }
+pub(super) fn anim(w: &MobyWorld, id: usize, ctx: &mut Ctx, s: u8, frame: u8, blend: u8) { set_seq(w, id, ctx, s, frame, blend); }
 /// [`anim`] with its blend drawn from `lo..=hi` only when the sequence is to change.
-fn anim_r(w: &MobyWorld, id: usize, ctx: &mut Ctx, s: u8, frame: u8, lo: i32, hi: i32) {
+pub(super) fn anim_r(w: &MobyWorld, id: usize, ctx: &mut Ctx, s: u8, frame: u8, lo: i32, hi: i32) {
     if seq(w, id, ctx) != s {
         let b = ctx.game.rng.rand_range(lo, hi);
         ctx.host.set_anim(&w.mobys[id], s, frame, b.clamp(0, 255) as u8);
     }
 }
-fn st(w: &mut MobyWorld, id: usize, state: u8, sub: i32) { w.mobys[id].set_state(state, sub); }
-fn speed(w: &MobyWorld, id: usize, ctx: &mut Ctx, s: f32) { ctx.host.set_anim_speed(&w.mobys[id], s); }
+pub(super) fn st(w: &mut MobyWorld, id: usize, state: u8, sub: i32) { w.mobys[id].set_state(state, sub); }
+pub(super) fn speed(w: &MobyWorld, id: usize, ctx: &mut Ctx, s: f32) { ctx.host.set_anim_speed(&w.mobys[id], s); }
 
-fn yaw_to(w: &MobyWorld, id: usize, p: V3) -> f32 { let q = w.mobys[id].pos; atan2(p[0] - q[0], p[1] - q[1]) }
+pub(super) fn yaw_to(w: &MobyWorld, id: usize, p: V3) -> f32 { let q = w.mobys[id].pos; atan2(p[0] - q[0], p[1] - q[1]) }
 /// Across to Ratchet (`0x3013f0` with `0x189ea0`).
-fn hdist(w: &MobyWorld, id: usize, ctx: &Ctx) -> f32 { dist2(w.mobys[id].pos, ctx.hero.pos) }
-fn faces_hero(w: &MobyWorld, id: usize, ctx: &Ctx, within: f32) -> bool { rot_dist(w.mobys[id].rot[2], yaw_to(w, id, ctx.hero.pos)) < within }
-fn in_range(w: &MobyWorld, id: usize) -> bool { (1..=2).contains(&w.mobys[id].pv_s(RANGE)) }
+pub(super) fn hdist(w: &MobyWorld, id: usize, ctx: &Ctx) -> f32 { dist2(w.mobys[id].pos, ctx.hero.pos) }
+pub(super) fn faces_hero(w: &MobyWorld, id: usize, ctx: &Ctx, within: f32) -> bool { rot_dist(w.mobys[id].rot[2], yaw_to(w, id, ctx.hero.pos)) < within }
+pub(super) fn in_range(w: &MobyWorld, id: usize) -> bool { (1..=2).contains(&w.mobys[id].pv_s(RANGE)) }
 
 /// `0x33f8e0(yaw, m, pos)`: the frame's move in place, facing `p`.
-fn face(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, p: V3) {
+pub(super) fn face(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, p: V3) {
     let y = yaw_to(w, id, p);
     let pos = w.mobys[id].pos;
     ai::move_step(w, id, ctx, y, pos);
 }
 /// `0x33f6c0(m, goal)`: the move toward `goal`.
-fn go(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3) {
+pub(super) fn go(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3) {
     let y = yaw_to(w, id, goal);
     ai::move_step(w, id, ctx, y, goal);
 }
 /// `0x32e5d0(0.001, 0.01, 0.1, m, Ratchet's moby, +0x27c)`: the facing springs toward Ratchet.
-fn turn_hero(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
+pub(super) fn turn_hero(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
     let y = yaw_to(w, id, ctx.hero.pos);
     ai::turn_to(&mut w.mobys[id], y, 0.001, 0.01, 0.1, TURN_V);
 }
 
 /// The level path `i`'s points.
-fn path(ctx: &Ctx, i: i32) -> Option<Vec<V3>> {
+pub(super) fn path(ctx: &Ctx, i: i32) -> Option<Vec<V3>> {
     usize::try_from(i).ok().and_then(|p| ctx.level.paths.get(p)).filter(|p| !p.is_empty()).map(|p| p.iter().map(|q| [q[0], q[1], q[2]]).collect())
 }
 
 /// `0x340aa8(m, path, last, first)`: a walk along the path from point `first` to `last` (−1: its last point).
-fn path_start(w: &mut MobyWorld, id: usize, ctx: &Ctx, i: i32, last: i32, first: i32) {
+pub(super) fn path_start(w: &mut MobyWorld, id: usize, ctx: &Ctx, i: i32, last: i32, first: i32) {
     let Some(p) = path(ctx, i) else { return };
     let m = &mut w.mobys[id];
     let o = ai::mv(m);
@@ -200,7 +198,7 @@ fn path_start(w: &mut MobyWorld, id: usize, ctx: &Ctx, i: i32, last: i32, first:
 }
 
 /// The walk along path `off` from its nearer end to the other.
-fn from_nearer_end(w: &mut MobyWorld, id: usize, ctx: &Ctx, off: usize) {
+pub(super) fn from_nearer_end(w: &mut MobyWorld, id: usize, ctx: &Ctx, off: usize) {
     let i = w.mobys[id].pv_i(off);
     let Some(p) = path(ctx, i) else { return };
     let pos = w.mobys[id].pos;
@@ -208,12 +206,12 @@ fn from_nearer_end(w: &mut MobyWorld, id: usize, ctx: &Ctx, off: usize) {
     if dist2(pos, p[p.len() - 1]) < dist2(pos, p[0]) { path_start(w, id, ctx, i, 0, last) } else { path_start(w, id, ctx, i, last, 0) }
 }
 
-fn follow(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, off: usize) -> bool {
+pub(super) fn follow(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, off: usize) -> bool {
     let p = w.mobys[id].pv_i(off);
     ai::follow_path(w, id, ctx, p)
 }
 
-fn index(w: &MobyWorld, id: usize, off: usize) -> Option<usize> { usize::try_from(w.mobys[id].pv_i(off)).ok().filter(|&i| i < w.mobys.len()) }
+pub(super) fn index(w: &MobyWorld, id: usize, off: usize) -> Option<usize> { usize::try_from(w.mobys[id].pv_i(off)).ok().filter(|&i| i < w.mobys.len()) }
 fn turret(w: &MobyWorld, id: usize) -> Option<usize> { index(w, id, TURRET) }
 /// The turret is not in its states 5 / 6 (taken).
 fn turret_free(w: &MobyWorld, t: usize) -> bool { 1 < w.mobys[t].state.wrapping_sub(5) }
@@ -239,21 +237,25 @@ fn leave_turret(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// `0x33c970(near, far, m, &who, near path, far path, 0)`: Ratchet (the moby kept at `who`) in the near range (2; in
 /// the near path's polygon when it has one) or the far one (1), outside play neither.
-fn range_test(w: &mut MobyWorld, id: usize, ctx: &Ctx) -> i16 {
+pub(super) fn range_test(w: &mut MobyWorld, id: usize, ctx: &Ctx) -> i16 { range_at(w, id, ctx, WHO, PATH_NEAR) }
+
+/// [`range_test`] on the words its caller keeps them in: who it found at `who`, the near and far paths at `at` /
+/// `at + 4` and their ranges at `at + 8` / `at + 0xc` (the hover 0x0d07's `+0x278`, `+0x260..`).
+pub(super) fn range_at(w: &mut MobyWorld, id: usize, ctx: &Ctx, who: usize, at: usize) -> i16 {
     let m = &mut w.mobys[id];
-    ai::set_link(m, WHO, ctx.hero_moby);
+    ai::set_link(m, who, ctx.hero_moby);
     if ctx.game.scenes.mode != crate::scene::PLAY { return 0; }
     let hero = ctx.hero.pos;
     let d = dist2(m.pos, hero);
-    let (np, fp) = (m.pv_i(PATH_NEAR), m.pv_i(PATH_FAR));
-    if if np == -1 { d < m.pv_f(RANGE_NEAR) } else { ctx.level.in_polygon(np, hero) } { return 2; }
-    if if fp == -1 { d < m.pv_f(RANGE_FAR) } else { ctx.level.in_polygon(fp, hero) } { return 1; }
+    let (np, fp) = (m.pv_i(at), m.pv_i(at + 4));
+    if if np == -1 { d < m.pv_f(at + 8) } else { ctx.level.in_polygon(np, hero) } { return 2; }
+    if if fp == -1 { d < m.pv_f(at + 0xc) } else { ctx.level.in_polygon(fp, hero) } { return 1; }
     0
 }
 
 /// A part: its update distance, draw distance, light and ambient its owner's, drawn, rebuilt; at its owner's `joint`
 /// (`0x3374c0`, crate::moby::classes::enemies::place_part).
-fn make_part(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, class: i16, joint: usize, solid: bool) -> Option<usize> {
+pub(super) fn make_part(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, class: i16, joint: usize, solid: bool) -> Option<usize> {
     w.class(class)?;
     let (ud, dd, light, amb) = { let m = &w.mobys[id]; (m.update_dist, m.draw_dist, m.light, m.ambient) };
     let p = w.create(class);
@@ -270,7 +272,7 @@ fn make_part(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, class: i16, joint: usi
 }
 
 /// The seat target 0x0911 0.75 above it (its update distance, not drawn).
-fn make_seat(w: &mut MobyWorld, id: usize, ctx: &Ctx) -> Option<usize> {
+pub(super) fn make_seat(w: &mut MobyWorld, id: usize, ctx: &Ctx) -> Option<usize> {
     w.class(SEAT_CLASS)?;
     let (ud, pos) = (w.mobys[id].update_dist, w.mobys[id].pos);
     let s = w.create(SEAT_CLASS);
@@ -281,10 +283,10 @@ fn make_seat(w: &mut MobyWorld, id: usize, ctx: &Ctx) -> Option<usize> {
     Some(s)
 }
 
-fn part(w: &MobyWorld, id: usize, off: usize) -> Option<usize> { ai::link(&w.mobys[id], off).filter(|&p| w.mobys.get(p).is_some_and(|m| m.state < 0x80)) }
+pub(super) fn part(w: &MobyWorld, id: usize, off: usize) -> Option<usize> { ai::link(&w.mobys[id], off).filter(|&p| w.mobys.get(p).is_some_and(|m| m.state < 0x80)) }
 
 /// The part at `off` deleted (`0x323a00`), with a smoke burst at it first (`0x333678(0.5, 3, m, part, −1)`).
-fn drop_part(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, off: usize, smoke: bool) {
+pub(super) fn drop_part(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, off: usize, smoke: bool) {
     if let Some(p) = part(w, id, off) {
         if smoke {
             let at = w.mobys[p].pos;
@@ -296,14 +298,14 @@ fn drop_part(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, off: usize, smoke: boo
 }
 
 /// Its bolts (`0x32d0e8(m, 0, 3)`).
-fn bolts(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) { crate::moby::bolts::drop(w, id, 0, 3, ctx); }
+pub(super) fn bolts(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) { crate::moby::bolts::drop(w, id, 0, 3, ctx); }
 
-fn members(w: &MobyWorld, id: usize) -> Vec<usize> {
+pub(super) fn members(w: &MobyWorld, id: usize) -> Vec<usize> {
     usize::try_from(w.mobys[id].group).ok().and_then(|g| w.groups.get(g)).cloned().unwrap_or_default()
 }
-fn alive(w: &MobyWorld, i: usize) -> bool { w.mobys.get(i).is_some_and(|m| m.state < 0x80) }
+pub(super) fn alive(w: &MobyWorld, i: usize) -> bool { w.mobys.get(i).is_some_and(|m| m.state < 0x80) }
 /// Its group has two live members or more (`0x32ecd0(group, −1)`).
-fn group_pair(w: &MobyWorld, id: usize) -> bool { let g = w.mobys[id].group as i32; 0 <= g && 1 < group_alive(w, g) }
+pub(super) fn group_pair(w: &MobyWorld, id: usize) -> bool { let g = w.mobys[id].group as i32; 0 <= g && 1 < group_alive(w, g) }
 
 /// The charge (`+0x294`) given to the first of its group without it (`thugs_only`: of its class).
 fn hand_charge(w: &mut MobyWorld, id: usize, thugs_only: bool) {
@@ -314,7 +316,7 @@ fn hand_charge(w: &mut MobyWorld, id: usize, thugs_only: bool) {
 
 /// `0x427310`: its group's live thugs and 0x0cf6 alarmed (`+0x266`) and their alarms counted (`+0x560`); a thug's
 /// turret kills (`+0x584`) counted too when it is dead.
-fn alarm(w: &mut MobyWorld, id: usize) {
+pub(super) fn alarm(w: &mut MobyWorld, id: usize) {
     let dead = w.mobys[id].pv_f(HEALTH) <= 0.0;
     for i in members(w, id) {
         let m = &mut w.mobys[i];
@@ -331,7 +333,7 @@ fn chat_one(w: &MobyWorld, id: usize) -> Option<usize> {
 }
 
 /// The weapon 0x09ac on its joint 3 (no collision); false when it cannot be made.
-fn arm(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
+pub(super) fn arm(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     let Some(g) = make_part(w, id, ctx, WEAPON_CLASS, 3, false) else { return false };
     ai::set_link(&mut w.mobys[id], WEAPON, Some(g));
     true
@@ -518,7 +520,7 @@ fn senses(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
 /// nearer, `yaw` eased to (0.4°, 0.2, 12°) and the speed down by `speed`/1200 — stopped and within 5° of `yaw`, done.
 /// The step along its facing on walkable ground (`0x32e668(0.75, 0.75, 0.4, 30°)`); 30 steps that fail, done.
 #[allow(clippy::too_many_arguments)]
-fn net_walk(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, yaw: f32, speed: f32, near: f32, off: f32, goal: V3) -> bool {
+pub(super) fn net_walk(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, yaw: f32, speed: f32, near: f32, off: f32, goal: V3) -> bool {
     let mut done = false;
     let m = &w.mobys[id];
     let pos = m.pos;
@@ -773,7 +775,7 @@ fn states_and_tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, z0: f32) {
 }
 
 /// The movement block's walk flag (`+0x178` bit 0x10) off.
-fn clear_walk_flag(w: &mut MobyWorld, id: usize) {
+pub(super) fn clear_walk_flag(w: &mut MobyWorld, id: usize) {
     let m = &mut w.mobys[id];
     m.set_pv_i(MV + 0x38, m.pv_i(MV + 0x38) & !0x10);
 }
@@ -931,7 +933,7 @@ fn seat_on_turret(w: &mut MobyWorld, id: usize, t: usize) {
 /// `+0x10` the owner, `+0x14` the damage, `+0x18` a random angle, `+0x1c` its spin 12..36°, `+0x20` 0.15, `+0x24` 0),
 /// update and draw distance 0xff, drawn, the owner's light, alpha 0x80, mode | 0x341, scale 0.005..0.00625; and two
 /// twinkles at it for 4 ticks (`0x801060e0` 0.3·s → s, white 0.04·s → 0.4·s; s 2..4). None without the class.
-fn shot(w: &mut MobyWorld, ctx: &mut Ctx, damage: f32, owner: usize, dir: V3, at: V3) {
+pub(super) fn shot(w: &mut MobyWorld, ctx: &mut Ctx, damage: f32, owner: usize, dir: V3, at: V3) {
     if w.class(SHOT_CLASS).is_none() { return; }
     let (light, amb) = (w.mobys[owner].light, w.mobys[owner].ambient);
     let s = w.create(SHOT_CLASS);
@@ -1508,7 +1510,7 @@ fn chat(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 }
 
 /// `0x427268` (module docs).
-fn tail(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
+pub(super) fn tail(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
     let m = &mut w.mobys[id];
     ai::flash(m, FLASH);
     for off in [T260, HEALTH + 6] {

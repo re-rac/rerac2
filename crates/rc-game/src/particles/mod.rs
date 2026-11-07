@@ -410,7 +410,7 @@ pub const EXHAUST: u8 = 0x4a;
 
 /// The exhaust puffs' descriptors (L25 `$gp+0xba8`, `+0xbb8`, `+0xbc8` the fighter's, `+0xc10`, `+0xc20`, `+0xc30` the
 /// gunship's; read live): the colour at the start and at the end, the size's range and least (in thousandths), the life.
-pub const EXHAUST_DESCS: [(u32, u32, i16, i16, i32); 15] = [
+pub const EXHAUST_DESCS: [(u32, u32, i16, i16, i32); 18] = [
     (0xcf00_00ff, 0x0000_00cf, -20, 60, 10),
     (0x6000_ffff, 0x0000_0080, -20, 60, 12),
     (0xefff_7f4f, 0x00ff_0000, -40, 40, 8),
@@ -429,9 +429,15 @@ pub const EXHAUST_DESCS: [(u32, u32, i16, i16, i32); 15] = [
     (0x88ff_8020, 0x00cf_6000, -400, 600, 15),
     (0x66ff_ff00, 0x0080_0000, -300, 550, 16),
     (0x6000_0000, 0x0000_0000, 300, 500, 25),
+    // Joba's grenade carriers 0x0e86 (L11 `0x1b23d0`, `0x1b23c0`, `$gp+0x33c0`; crate::moby::classes::level11::carrier).
+    (0xefff_7f4f, 0x00ff_0000, -20, 75, 12),
+    (0x6000_ffff, 0x0000_0080, -10, 150, 20),
+    (0xcf00_00ff, 0x0000_00cf, -10, 100, 18),
 ];
 /// The Zodiac's first descriptor in [`EXHAUST_DESCS`].
 pub const ZODIAC_DESC: usize = 11;
+/// Joba's carriers' first descriptor in [`EXHAUST_DESCS`].
+pub const CARRIER_DESC: usize = 15;
 
 /// `0x349c48(moby, pos, vel, desc, 1)` (L00 `0x33d400`, the same code on every level): an exhaust puff (type 0x4a) at
 /// `pos`, riding `moby` (its place kept in the moby's frame, `+0x30`), moving `vel` a tick in that frame; the descriptor

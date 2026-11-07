@@ -7,6 +7,7 @@ pub mod boss;
 pub mod debris;
 pub mod giant;
 pub mod director;
+pub mod drone;
 pub mod pickups;
 pub mod planet;
 pub mod props;
@@ -29,13 +30,35 @@ pub struct Globals {
     pub special_sound: [i32; 2],
     /// `0x1b2a14..0x1b2a20`: the damages the opponent keeps from its pvars `+0x330..` ([`shot`], [`special`]).
     pub damage: [f32; 4],
-    /// `$gp+0x2a8`: the ticks fought (the opponent's health is cut after long fights).
-    pub fight_ticks: i32,
+    /// `$gp+0x2a0`: the scene trigger 0x0f6e the opponent waits for; `$gp+0x2a4`: the wait over ([`boss`]).
+    pub trigger: Option<usize>,
+    pub started: bool,
+    /// `$gp+0x2c4`: the intro's ticks (0 out of it).
+    pub intro: i32,
+    /// `0x1b2a30`: the hit-landed timer (its double punch's, [`boss`]); `0x1b2a10`: a timer counted down;
+    /// `0x1b2a08`: the fight's phase; `$gp+0x354`: the phase changed this tick; `0x1b2a2c`: the dropped 0x0f8f's height.
+    pub immune: i32,
+    pub timer: i32,
+    pub phase: i32,
+    pub flag: bool,
+    pub hat: f32,
+    /// `$gp+0x370` (its count `0x1b2a54`): the skip table; `$gp+0x384`: the scan's entry; the slots' link bits at
+    /// their starts and ends (the paths' end points' w) ([`planet`]).
+    pub skip: [i32; 5],
+    pub skip_n: i32,
+    pub scan_at: i32,
+    pub links: [[u32; 2]; 32],
+    /// `0x1b2a0c`: the drones come back so far in phase 2 (at most 16, [`drone`]; the timer between them `0x1b2a10`).
+    pub drones_back: i32,
 }
 
 impl Default for Globals {
     fn default() -> Self {
-        Globals { boss: None, most: 0, radius: 0.0, boss_counts: [0; 4], pickups: Default::default(), boss_special: None, special_sound: [-1; 2], damage: [0.0; 4], fight_ticks: 0 }
+        Globals {
+            boss: None, most: 0, radius: 0.0, boss_counts: [0; 4], pickups: Default::default(), boss_special: None, special_sound: [-1; 2], damage: [0.0; 4],
+            trigger: None, started: false, intro: 0, immune: 0, timer: 0, phase: 0, flag: false, hat: 0.0, skip: planet::SKIP, skip_n: 5, scan_at: 0, links: [[0; 2]; 32],
+            drones_back: 0,
+        }
     }
 }
 
@@ -49,6 +72,9 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         giant::BODY => Some(giant::update_027d),
         director::CLASS => Some(director::update_133a),
         boss::CLASS => Some(boss::update_0e0b),
+        boss::SHADOW => Some(boss::update_0d55),
+        drone::CLASS => Some(drone::update),
+        drone::SHOT => Some(drone::update_0f5d),
         pickups::HEALTH | pickups::GUN | pickups::SPECIAL => Some(pickups::update),
         shot::CLASS => Some(shot::update),
         special::CLASS => Some(special::update),

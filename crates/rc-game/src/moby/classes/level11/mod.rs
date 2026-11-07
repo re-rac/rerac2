@@ -9,28 +9,31 @@
 //! * [`props`]: the small objects (the Hacker's gate, the help texts, the sparks, ...).
 //! * [`sellers`]: the talking NPCs 0x0e95 (item 8's seller) and 0x0b7c (the Charge Boots).
 //! * [`thugs`]: the thug 0x0cf5 (the riders' family: chats, patrols, turrets and hovers it rides) and its squads'
-//!   triggers 0x0b6d.
+//!   triggers 0x0b6d; [`gunners`]: its cousin the gun thug 0x0cf6 and its bolts 0x0d1b; [`hovers`]: the hovers 0x0d07
+//!   they ride; [`turret`]: the turret 0x0c20 Ratchet and the thugs man; [`carrier`]: the grenade carriers 0x0e86 and
+//!   their grenades 0x0a77.
 //! * [`arena`]: Joba's arena: its master 0x0d8a, spawners 0x0c7f and crowd 0x126e.
 //! * [`fighters`]: the arena's fighters 0x0d37 / 0x0dcf / 0x0df4 / 0x0df7 (and the shared pieces); [`brutes`]: 0x0d98
 //!   / 0x0df9; [`bosses`]: 0x0d4a with its links 0x0d4b, bombs 0x0e20 and the links' bolts 0x0e2d, and 0x0b3a.
 //!
-//! Not ported (2026-11-06):
-//! * The level's other enemies 0x0cf6 (`0x427728`, 9) and the hovers 0x0d07 (`0x430848`, 10) the thugs ride, with the
-//!   carrier 0x0e86 (`0x462db0`, 3; it makes a 0x0cf6) (the wave floor wakes them, movers::update_0b6b; their deaths
-//!   make skill point 0x12, props::update_12c7).
-//! * The turret 0x0c20 (`0x4134b0`, 4): Ratchet mounted on it (its own camera and shots, `0x489c70..0x48a068`).
+//! The squads (0x0cf5, 0x0cf6, 0x0d07) are woken by the wave floor (movers::update_0b6b) and their triggers; their
+//! deaths make skill point 0x12 (props::update_12c7).
 
 pub mod arena;
 pub mod beams;
 pub mod bosses;
 pub mod brutes;
+pub mod carrier;
 pub mod critters;
 pub mod fighters;
+pub mod gunners;
+pub mod hovers;
 pub mod movers;
 pub mod props;
 pub mod sellers;
 pub mod stalks;
 pub mod thugs;
+pub mod turret;
 
 use crate::hero::physics::V3;
 use crate::moby::{Ctx, MobyWorld};
@@ -59,6 +62,9 @@ pub struct Globals {
     pub arena_ring: Vec<[f32; 4]>,
     pub arena_gravity: [bool; 2],
     pub arena_launch: f32,
+    /// `$gp+0x185c`: the event chosen (an index of `0x2b6e40`'s records; the grenade carriers read its flags,
+    /// carrier::update). No writer in the port: 0.
+    pub event: i32,
 }
 
 /// The level's mission `mission` done (`0x19b2e8 + level·16`, bit 7).
@@ -93,6 +99,12 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         sellers::BOOTS => Some(sellers::update_0b7c),
         thugs::CLASS => Some(thugs::update),
         thugs::TRIGGER => Some(thugs::update_trigger),
+        gunners::CLASS => Some(gunners::update),
+        gunners::SHOT => Some(gunners::update_0d1b),
+        hovers::CLASS => Some(hovers::update),
+        turret::CLASS => Some(turret::update),
+        carrier::CLASS => Some(carrier::update),
+        carrier::GRENADE => Some(carrier::update_0a77),
         arena::CROWD => Some(arena::update_crowd),
         arena::MASTER => Some(arena::update_master),
         arena::SPAWNER => Some(arena::update_spawner),

@@ -15,6 +15,8 @@
 //! **Sites** (the point, its byte, where): the port awards
 //! * 0x01 (`0x1a7a69`): Maktar's arena boss 0x09f8 beaten with nothing but the wrench (L02 `0x3d4d6c`,
 //!   crate::moby::classes::bosses);
+//! * 0x08 (`0x1a7a70`): Dobbo's orbit's opponent 0x0e0b beaten with no hit but Giant Clank's (L22 `0x39f874`,
+//!   crate::moby::classes::level22::boss);
 //! * 0x0d (`0x1a7a75`): Oozla's path riders 0x061c knocked off four times (L01 `0x3a7260`, crate::moby::classes::oozla);
 //! * 0x0e (`0x1a7a76`): Maktar's resort down to 10 breakables (0x12cf, L02 `0x38b5e8`, crate::moby::classes::maktar);
 //! * 0x0f (`0x1a7a77`): Oozla's store's breakables all broken (0x12dc, L01 `0x379e6c`, crate::moby::classes::smash);
@@ -64,6 +66,9 @@ pub mod point {
     pub const SHEEP: usize = 0x16;
     /// Ten Endako enemies killed while Ratchet works the remote crane (state 0x31).
     pub const CRANE: usize = 0x1c;
+    /// Dobbo's orbit's opponent 0x0e0b beaten with no hit but Giant Clank's (L22 `0x39f874`,
+    /// crate::moby::classes::level22::boss).
+    pub const GIANT_ORBIT: usize = 0x08;
 }
 
 impl GameState {

@@ -298,7 +298,11 @@ fn alarm(w: &mut MobyWorld, id: usize) {
 /// `0x452900(at, n)` (also L11 `0x4273f8`, crate::moby::classes::level11::thugs): `n` pairs of twinkles 0.3 toward the camera from `at` (which jitters ±0.15 a pair), thrown
 /// 0.05..3 a second across (the camera's way turned ±60°) and 1..5 up, 0.5..2 in size: pink `0x7f207f7f` and a smaller
 /// white `0x7f7f7f7f`, 60 ticks, spinning opposite ways.
-pub(crate) fn sparks(ctx: &mut Ctx, mut at: V3, n: i32) {
+pub(crate) fn sparks(ctx: &mut Ctx, at: V3, n: i32) { sparks_in(ctx, at, n, 0x7f20_7f7f) }
+
+/// [`sparks`] with the first twinkle of each pair in `rgba` (L11's copies: `0x436788` in `0x8020ff20`, the hover's
+/// `0x433b88` in `0x80ca00cb`).
+pub(crate) fn sparks_in(ctx: &mut Ctx, mut at: V3, n: i32, rgba: u32) {
     let cam = ctx.host.camera_pos();
     let mut d = crate::hero::physics::sub(cam, at);
     let off = set_len(d, 0.3);
@@ -317,7 +321,7 @@ pub(crate) fn sparks(ctx: &mut Ctx, mut at: V3, n: i32) {
         v[2] = rng.randf(1.0, 5.0) * 0.016_666_668;
         let p = add(at, off);
         for k in 0..3 { at[k] += rng.randf_signed(0.0, 0.15); }
-        if let Some(i) = crate::particles::twinkle(sys, rng, f * 0.1, f, 0.002, p, 0x3c, 0x7f20_7f7f, 0, spin, v, 0) { sys.pool.recs[i][9] = 0x74; }
+        if let Some(i) = crate::particles::twinkle(sys, rng, f * 0.1, f, 0.002, p, 0x3c, rgba, 0, spin, v, 0) { sys.pool.recs[i][9] = 0x74; }
         if let Some(i) = crate::particles::twinkle(sys, rng, f * 0.07, f * 0.7, 0.002, p, 0x3c, 0x7f7f_7f7f, 1, -spin, v, 0) { sys.pool.recs[i][9] = 0x74; }
     }
 }
