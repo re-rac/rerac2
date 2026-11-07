@@ -48,3 +48,10 @@ pub fn slide(w: &mut MobyWorld, id: usize, ctx: &Ctx, up: f32, r: f32, ground: f
     w.mobys[id].pos = pos;
     flags_out
 }
+
+/// L04 `0x33cb08(m, &vel, r, flags, up, ground)` (L04 `0x33dd28` = L06 `0x35ca60` = L17 `0x31d450`; the decomp's
+/// `func_L04_0033CB08`): [`slide`] with its radius in 1/1024ths.
+#[allow(clippy::too_many_arguments)]
+pub fn slide_r(w: &mut MobyWorld, id: usize, ctx: &Ctx, vel: &mut V3, r: i32, flags: u32, up: f32, ground: f32) -> u32 {
+    slide(w, id, ctx, up, r as f32 * f32::from_bits(0x3a80_0000), ground, vel, flags)
+}
