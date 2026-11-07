@@ -7,6 +7,7 @@ pub mod emitter;
 pub mod exhibits;
 pub mod flung;
 pub mod toys;
+pub mod zone;
 
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
@@ -17,6 +18,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         emitter::CLASS => Some(emitter::update_1317),
         flung::CLASS => Some(flung::update_0c46),
         commentary::CLASS => Some(commentary::update_130e),
+        zone::CLASS => Some(zone::update_12e7),
         // 0x0b84 (`0x3da5d8`, L00 `0x4450c0`): only a debug print (`0x2a48f0`), so crate::moby::classes::props::update_empty.
         _ => None,
     }

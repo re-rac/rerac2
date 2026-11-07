@@ -1203,7 +1203,7 @@ pub fn update_dynamo_platform(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// a tick (wrapped to ±π) and the ambient pulses between (0x20, 0xc0, 0) and (0, 0x80, 0) by `(sin + 0.5) / 2`, one
 /// tick in twenty (`0x3117a0`) 0.3 of the way to (0xff, 0xff, 0x80); the alpha (`+0x23`) goes 3 a tick up to 0x40 on, down
 /// to 0 off. So a platform spawned at 0x80 fades out at the start and shows only while it is out.
-fn hologram(m: &mut crate::moby::Moby, phase: usize, on: bool, rng: &mut crate::rng::Rng) {
+pub(crate) fn hologram(m: &mut crate::moby::Moby, phase: usize, on: bool, rng: &mut crate::rng::Rng) {
     if m.alpha == 0 && !on { return; }
     let mut p = m.pv_f(phase) + 0.145_444_1;
     if PI <= p { p = p - PI - PI; } else if p < -PI { p = p + PI + PI; }

@@ -5,8 +5,11 @@
 pub mod biter;
 pub mod boss;
 pub mod director;
+pub mod effects;
 pub mod fighter;
 pub mod misc;
+pub mod movers;
+pub mod prize;
 pub mod props;
 pub mod shooter;
 pub mod strafer;
@@ -42,6 +45,14 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         misc::BOX => Some(misc::update_0f88),
         misc::PAD => Some(misc::update_1209),
         misc::BRIDGE => Some(misc::update_11e8),
+        misc::SLAB_QUIET => Some(misc::update_1236),
+        movers::TURNTABLE => Some(movers::update_1170),
+        movers::BOBBER => Some(movers::update_1306),
+        movers::GATE => Some(movers::update_1243),
+        movers::RISER => Some(movers::update_1283),
+        prize::CLASS => Some(prize::update_12d3),
+        effects::SCENE_FX => Some(effects::update_0f2a),
+        effects::RISING => Some(effects::update_0548),
         // `0x449298`: L19's floating platform `0x4168b8`, the same code.
         0x1257 => Some(super::level19::floe::update_0f4b),
         _ => None,

@@ -308,7 +308,7 @@ pub fn update_0ae5(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 }
 
 /// `0x3dfde0`: Ratchet on it, or the line from him 3 down (flags 0x10) meeting it first.
-fn over(id: usize, ctx: &Ctx) -> bool {
+pub(crate) fn over(id: usize, ctx: &Ctx) -> bool {
     if hero_on(ctx, id) { return true; }
     let a = ctx.hero.pos;
     let b = [a[0], a[1], a[2] - 3.0];

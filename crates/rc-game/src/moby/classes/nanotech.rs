@@ -181,7 +181,7 @@ fn rotate(v: V3, angle: f32, axis: V3) -> V3 {
 }
 
 /// `0x31bc68(a, b, c, d, t)`: the cubic from `b` (t = 0) to `c` (t = 1).
-fn cubic(a: f32, b: f32, c: f32, d: f32, t: f32) -> f32 {
+pub(crate) fn cubic(a: f32, b: f32, c: f32, d: f32, t: f32) -> f32 {
     let f = (d - c) - (a - b);
     f * t * t * t + ((a - b) - f) * t * t + (c - a) * t + b
 }

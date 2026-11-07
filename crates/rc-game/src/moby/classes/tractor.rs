@@ -34,8 +34,9 @@ use crate::moby::{carry_hero, mode, Ctx, MobyWorld};
 /// The boxes' classes (Maktar's 0x0e2a too), and the other things it picks (Maktar's bomb 0x09c8,
 /// crate::moby::classes::maktar; its critter 0x09bc, crate::moby::classes::maktar_pads; level 12's 0x0fc4..0x0fc8,
 /// crate::moby::classes::level12::tractor; Yeedil's 0x0f88, crate::moby::classes::level20::misc; level 12's robot 0x1169,
-/// crate::moby::classes::level12::robot, its range at `+0x178` as the critter's).
-const BOXES: [i16; 12] = [0x0acb, 0x0acc, 0x0e2a, crate::moby::classes::maktar::BOMB, crate::moby::classes::maktar_pads::CRITTER, 0x0fc4, 0x0fc5, 0x0fc6, 0x0fc7, 0x0fc8, 0x0f88, crate::moby::classes::level12::robot::CLASS];
+/// crate::moby::classes::level12::robot, its range at `+0x178` as the critter's; Yeedil's prize 0x12d3,
+/// crate::moby::classes::level20::prize).
+const BOXES: [i16; 13] = [0x0acb, 0x0acc, 0x0e2a, crate::moby::classes::maktar::BOMB, crate::moby::classes::maktar_pads::CRITTER, 0x0fc4, 0x0fc5, 0x0fc6, 0x0fc7, 0x0fc8, 0x0f88, crate::moby::classes::level12::robot::CLASS, crate::moby::classes::level20::prize::CLASS];
 /// The beam's pvar holding its target + 1 (the port's `0x18a3e0`).
 const TARGET: usize = 0x60;
 

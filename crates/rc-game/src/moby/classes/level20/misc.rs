@@ -7,6 +7,8 @@
 //!   **2**: on its first tick still and its class sound 0 (`0x3766c0` = L00 `0x3605f0`); it eases to `+0x00` short of
 //!   its start (`0x333eb8` = L00 `0x31ed78`, crate::camera::approach). **3**: hooked (`0x33fb18` = L00 `0x32a838`), 4.
 //!   **4**: the same back to its start.
+//! * **0x1236** ([`update_1236`], `0x4483b8`, 2 placed; the decomp's `func_US2_L20_004483B8`): 0x11ef's code without
+//!   its two sounds (the same pvars and states).
 //! * **0x1246** ([`update_1246`], `0x4488f8`, 3 placed; the decomp's `func_L20_004473B0`): a lift. Its pvars: `+0x20`
 //!   its platform block (crate::moby::platform, flags | 1), `+0x60` its place at the start, `+0x70` how high, `+0x74`
 //!   the trip's ticks, `+0x78` / `+0x7c` / `+0x80` the waits at the top, before the trip down, at the bottom, `+0x84`
@@ -66,15 +68,15 @@ use crate::moby::blast::{self, Explosion};
 use crate::moby::{bolts, shards, Ctx, MobyWorld};
 
 /// The level's mission `mission` done (`0x19b2e8 + level·0x10`, bit 7).
-fn mission_done(ctx: &Ctx, mission: u8) -> bool {
+pub(super) fn mission_done(ctx: &Ctx, mission: u8) -> bool {
     let g = &ctx.game;
     mission != 0xff && g.missions.get(g.level.max(0) as usize * 0x10 + mission as usize).is_some_and(|b| b & 0x80 != 0)
 }
 
-fn idx(w: &MobyWorld, k: i32) -> Option<usize> { usize::try_from(k).ok().filter(|&k| k < w.mobys.len()) }
+pub(super) fn idx(w: &MobyWorld, k: i32) -> Option<usize> { usize::try_from(k).ok().filter(|&k| k < w.mobys.len()) }
 
 /// Its move into its platform block at `b` and Ratchet carried.
-fn ride(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, b: usize, old: [f32; 3], old_rot: [f32; 3]) {
+pub(super) fn ride(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, b: usize, old: [f32; 3], old_rot: [f32; 3]) {
     let m = &mut w.mobys[id];
     let (pos, rot) = (m.pos, m.rot);
     crate::moby::platform::write(m, b, sub(pos, old), old_rot, rot);
@@ -83,9 +85,15 @@ fn ride(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, b: usize, old: [f32; 3], ol
 }
 
 pub const SLAB: i16 = 0x11ef;
+pub const SLAB_QUIET: i16 = 0x1236;
 
 /// 0x11ef (module docs).
-pub fn update_11ef(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+pub fn update_11ef(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) { slide(w, id, ctx, true) }
+
+/// 0x1236 (module docs): 0x11ef without its sounds.
+pub fn update_1236(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) { slide(w, id, ctx, false) }
+
+fn slide(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, sound: bool) {
     let state = w.mobys[id].state;
     match state {
         0 => {
@@ -99,7 +107,7 @@ pub fn update_11ef(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         2 | 4 => {
             if w.mobys[id].first() {
                 if state == 2 { w.mobys[id].set_pv_f(0x14, 0.0); }
-                ctx.host.play_sound(&w.mobys[id], 0, 0);
+                if sound { ctx.host.play_sound(&w.mobys[id], 0, 0); }
                 if state == 4 { w.mobys[id].set_pv_f(0x14, 0.0); }
             }
             let m = &mut w.mobys[id];
