@@ -11,6 +11,7 @@ pub mod gunship;
 pub mod hover_pad;
 pub mod lamp;
 pub mod leader;
+pub mod mission;
 pub mod patrol;
 pub mod props;
 pub mod scroll;
@@ -67,6 +68,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         bolt::CLASS => Some(bolt::update_05de),
         gunship::CLASS => Some(gunship::update_0cbc),
         director::CLASS => Some(director::update_0c2b),
+        mission::CLASS => Some(mission::update_0d9d),
         towers::MANAGER => Some(towers::update_0d12),
         towers::TOWER => Some(towers::update_0cea),
         towers::NODE => Some(towers::update_0d09),

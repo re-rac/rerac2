@@ -350,6 +350,8 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         c if crate::water::lid::CLASSES.contains(&c) => Some(crate::water::lid::update),
         c if crate::water::grid::CLASSES.contains(&c) => Some(crate::water::grid::update),
         c if crate::water::mesh::CLASSES.contains(&c) => crate::water::mesh::update_for(c),
+        c if crate::water::ripple::CLASSES.contains(&c) => crate::water::ripple::update_for(c),
+        crate::fx::fountain::CLASS | crate::fx::fountain::CLOCK => crate::fx::fountain::update_for(o_class),
         0x0a92 | 0x0a93 => Some(oozla::update_float),
         0x09a2 => Some(leaper::update),
         0x0b2b => Some(spitter::update),

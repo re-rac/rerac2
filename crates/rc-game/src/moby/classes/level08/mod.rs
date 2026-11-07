@@ -9,6 +9,7 @@ pub mod breather;
 pub mod burrower;
 pub mod counter;
 pub mod crystal;
+pub mod geyser;
 pub mod glider;
 pub mod hovership;
 pub mod lift;
@@ -48,6 +49,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         crystal::CARRIER => Some(crystal::update_0e78),
         // The chips: the same code as Level 12's (`0x3d49b8` = L12 `0x400850`).
         crystal::CHIP | crystal::CHIP_B => Some(super::level12::debris::update_0d66),
+        c if geyser::CLASSES.contains(&c) => Some(geyser::update),
         // The liquid lid 0x11fe is crate::water::lid.
         _ => None,
     }

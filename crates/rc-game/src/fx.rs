@@ -68,6 +68,8 @@
 //! | `0x42fce0` (L08; L09 `0x423498`, L19 `0x4223e8`; first list) | the liquid lids 0x11fe / 0x12af / 0x12b4 | the frame's lids' layers and sheens ([`crate::water::lid::draw`]) |
 //! | `0x3e94a0` → `0x3a35e8` (L04; L06 `0x3c1100`, L08 `0x3d1440` → `0x38e260`, L18, L20; first list, the second under water) | the liquid grid's mover of record 0 | every drawn patch's water and sheen ([`crate::water::grid::draw`]) |
 //! | `0x421db8` / `0x38abf0` (L12; first list) | Todano's mesh water 0x1113 / 0x1350 | its mesh's two layers ([`crate::water::mesh::draw`]) |
+//! | `0x4080c0` (first list) / `0x409040` (L04) | Barlow's ripple water 0x0b37 / 0x0b54 | its two strips twice ([`crate::water::ripple::draw`]) |
+//! | `0x3c5430` (L04; L19 `0x39d640`) | the quad fountain 0x02f8 | its quads, drops and cap ([`fountain::draw`]) |
 //! | `0x384b38` (L21, first list) | the museum's pool 0x1198 | its grid's refraction and reflection layers (crate::moby::classes::level21::ripples::draw) |
 //! | `0x390d60` (L14; L19 `0x383a18`; the world's list `0x2e77e0`, here the first) | the sinking pit 0x135f | its 7 × 7 waving cells (crate::moby::classes::level14::pit::draw) |
 //! | `0x432150` (L14) | the energy field 0x1164 | its halo, rings, core and rays (crate::moby::classes::level14::energy::draw) |
@@ -98,6 +100,7 @@ use crate::moby::MobyWorld;
 
 pub mod spin;
 pub mod beams;
+pub mod fountain;
 pub mod trails;
 
 /// One quad (`0x2eb998`): FX texture, additive (0x48) or normal (0x44), corners in GS strip order, ST, RGBA.
@@ -418,6 +421,8 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         c if first && crate::water::lid::CLASSES.contains(&c) => crate::water::lid::draw(w, id, game.frame, cam, out),
         c if crate::water::grid::CLASSES.contains(&c) => crate::water::grid::draw(w, view, cam, out),
         c if crate::water::mesh::CLASSES.contains(&c) => crate::water::mesh::draw(w, id, out),
+        c if crate::water::ripple::CLASSES.contains(&c) => crate::water::ripple::draw(w, id, game.frame, out),
+        fountain::CLASS => fountain::draw(w, id, &mut game.rng, cam, out),
         crate::vendor::CLASS => crate::moby::classes::vendor::draw(w, id, game, host.camera_rows(), out),
         // 0x0d5c is in the flocks' class switches but runs Damosel's traffic (L18 `0x3fcb78`, its only level): the flocks'
         // draw (`0x38ee50`) is a callback their leader's update registers, which no 0x0d5c runs, and its groups hold no

@@ -10,6 +10,8 @@
 //!   (`0x1a63f0`, a half-word against the whole word).
 //! * **A moby shown and solid or hidden and passed through** ([`solid`]): mode bits 0x41 off and 0x1000 on with its
 //!   class's collision (`+0x98` = class `+0x10`), or the other way with none.
+//! * **A moby's or a group's update, draw and collision switched** ([`set_parts`], [`set_group_parts`]; L08, L09,
+//!   L19): each flag on, off or left (−1).
 //! * **A group's members** ([`members`]): the list `0x1fa8a0[group]`, nothing for a group whose low byte is 0xff or
 //!   past the level's count.
 //! * **The census** ([`Census`], L09 `0x3e46f8`, L19 `0x42bbf8`): 40 mobys a frame of the whole table (`0x1b1e1c` ..
@@ -73,6 +75,28 @@ pub fn gone(w: &MobyWorld, i: usize) -> bool { w.mobys.get(i).is_none_or(|m| m.s
 
 /// The moby index a pvar names (−1 or past the table: none).
 pub fn link(w: &MobyWorld, v: i32) -> Option<usize> { usize::try_from(v).ok().filter(|&i| i < w.mobys.len()) }
+
+/// `0x329cf8(i, update, draw, solid)` → `0x329c58` (the decomp's `func_L08_00328B80` / `func_L08_00328AE0`: L09
+/// `0x318ce0` / `0x318c40`, L19 `0x31a4a0` / `0x31a400`): moby `i` (−1 or gone: nothing) with each flag that is not
+/// −1 applied: its update on (mode &= ~2) or off (|= 2), drawn (`+0x31` = 1, mode &= ~1) or not (0, mode |= 1),
+/// solid (`+0x98` = its class's `+0x10`) or not.
+pub fn set_parts(w: &mut MobyWorld, i: i32, update: i32, draw: i32, solid: i32) {
+    let Some(i) = link(w, i).filter(|&i| !gone(w, i)) else { return };
+    let coll = w.class(w.mobys[i].o_class).is_some_and(|c| c.has_collision);
+    let m = &mut w.mobys[i];
+    if update != -1 { if update != 0 { m.mode &= !2 } else { m.mode |= 2 } }
+    if draw != -1 {
+        if draw != 0 { m.drawn = 1; m.mode &= !1 } else { m.drawn = 0; m.mode |= 1 }
+    }
+    if solid != -1 { m.has_collision = solid != 0 && coll; }
+    w.changed = true;
+}
+
+/// `0x329d28(group, update, draw, solid)` (the decomp's `func_L08_00328BB0`: L09 `0x318d10`, L19 `0x31a4d0`):
+/// [`set_parts`] on every member of the group.
+pub fn set_group_parts(w: &mut MobyWorld, g: i32, update: i32, draw: i32, solid: i32) {
+    for i in members(w, g) { set_parts(w, i as i32, update, draw, solid); }
+}
 
 /// What the census makes of one moby.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

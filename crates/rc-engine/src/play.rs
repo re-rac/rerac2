@@ -559,6 +559,23 @@ fn tick(
             if mesh.is_none() { eprintln!("play: the veil's tables not found in level 26's overlay: no veil"); }
             mesh.map(std::sync::Arc::new)
         }).flatten();
+        // Barlow's ripple water (rc_game::water::ripple) and the quad fountains (rc_game::fx::fountain): their own
+        // tables in the level's overlay, on the levels whose class lists have them.
+        {
+            let level = crate::level_load::level_index() as i32;
+            let has = |c: i16| m.world.class(c).is_some();
+            let ripple = rc_game::water::ripple::CLASSES.iter().any(|&c| has(c));
+            let fountain = has(rc_game::fx::fountain::CLASS);
+            let code = (ripple || fountain).then(|| crate::level_code::LevelCode::load(&crate::level_load::extracted_root(), level as u32).ok()).flatten();
+            if ripple {
+                let t = code.as_ref().and_then(|c| c.with_own_reader(|read| rc_game::water::ripple::read_tables(level, read)));
+                if t.is_none() { eprintln!("play: the ripple water's tables not found in level {level}'s overlay"); }
+                m.world.water_ripple = t.map(std::sync::Arc::new);
+            }
+            let t = code.as_ref().filter(|_| fountain).and_then(|c| c.with_own_reader(|read| rc_game::fx::fountain::read_tables(level, read)));
+            if fountain && t.is_none() { eprintln!("play: the fountains' tables not found in level {level}'s overlay"); }
+            m.world.fountain = rc_game::fx::fountain::Fountains::new(t);
+        }
         // `0x3012a0`: Ratchet's parked ship from the level settings (rc_game::travel).
         {
             let host = crate::mobys::Host { lv: &lv.mobys, occl: occl.as_deref(), anim: anim.as_deref_mut(), created: &mut m.created, hero: None, hero_chains: &[], chains: Some(&m.chains), camera: p.camera.pos, camera_rows: p.camera.rows, sound: None };

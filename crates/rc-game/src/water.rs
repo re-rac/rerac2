@@ -7,6 +7,7 @@
 //! | The liquid lids: squares of layered, scrolling quads | 0x11fe (L08), 0x12af / 0x12b4 (L09), 0x12b4 (L19) | L08 `0x430568` / `0x42fce0` (the decomp's `func_L08_0042EF00` / `func_L08_0042E678`; L09 `0x423d20` / `0x423498`, L19 `0x422c70` / `0x4223e8`) | [`lid`] |
 //! | The liquid grid: 16 × 16 rippling patches the Thermanator freezes, with their own unit | 0x0960 (L04), 0x0fb2 / 0x0fce / 0x0fcf / 0x0fd6 / 0x0fe4 (L06), 0x0908 (L08), 0x0f59 (L18), 0x124d (L20) | L04 `0x3a2e68` / `0x3a3088` / `0x3a3390` / `0x3a33d0`, draw `0x3a35e8` (the decomp's `func_L04_003A0FC8` / `func_L04_003A15C0`, on levels 4, 6, 8, 18, 20) | [`grid`] |
 //! | Todano's mesh water: a mesh of the level's own waved in place, two layers of FX quads, and the water plane about Ratchet | 0x1113 / 0x1350 (L12) | L12 `0x421fe0` / `0x421db8` and `0x38ae28` / `0x38abf0` (the decomp's `func_L12_00420B78` / `func_L12_00389BC0`) | [`mesh`] |
+//! | Barlow's ripple water: two strips of the level's own about the moby, lifted by a ring wave, drawn twice with their UVs scrolled | 0x0b37 / 0x0b54 (L04) | L04 `0x4084c0` / `0x4080c0` and `0x409440` / `0x409040` (the decomp's `func_L04_00406C00` / `func_L04_00407B80`) | [`ripple`] |
 //!
 //! The heights: the ocean keeps its level and its waved height in crate::game::GameState::water_base /
 //! `water_z` (what Oozla's floating objects read, `0x3bc3b8`). Ratchet's liquid heights (`0x18a150` / `0x18a154`,
@@ -21,3 +22,4 @@ pub mod lid;
 pub mod mesh;
 pub mod ocean;
 pub mod plane;
+pub mod ripple;

@@ -7,12 +7,8 @@
 //! The hoverbike race (Ratchet's hoverbike 0x0bbc, the racers 0x0b2d, the boost jets 0x0474 / 0x0cef, shared with level
 //! 11): crate::moby::classes::race.
 //!
-//! Not ported yet (level 4's own list; docs/plan/gaps.md has the systems):
-//! * **0x02f8** (`0x3c4f80`), **0x0b37** (`0x4084c0`), **0x0b54** (`0x409440`): draw-callback effects (strips and
-//!   particle fountains from the level's `$gp` tables).
-//! * **0x0329** (`0x3c83c8`, also L17 / L19): a clock for 0x02f8 — it sets `0x1b2e70..0x1b2e84` (60, 1/60, the pool
-//!   index 0) and scrolls `$gp+0x518` by −0.0025 a tick (wrapped at −8); their only readers are 0x02f8's set-up
-//!   (`0x3c84a8`, `0x3c5c38`) and draw (`0x3c5430`), so it waits for 0x02f8.
+//! The quad fountain 0x02f8 (`0x3c4f80`, also L19) and its clock 0x0329 (`0x3c83c8`, also L17 / L19):
+//! crate::fx::fountain. The ripple water 0x0b37 (`0x4084c0`) and 0x0b54 (`0x409440`): crate::water::ripple.
 
 use crate::hero::physics::V3;
 use crate::moby::MobyWorld;

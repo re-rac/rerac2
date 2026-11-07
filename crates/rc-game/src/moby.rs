@@ -606,6 +606,10 @@ pub struct MobyWorld {
     pub liquid: crate::water::grid::Grid,
     /// Todano's mesh water's meshes as they wave (crate::water::mesh).
     pub water_mesh: crate::water::mesh::Meshes,
+    /// Barlow's ripple water's tables (crate::water::ripple), read by the engine at the level's start.
+    pub water_ripple: Option<std::sync::Arc<crate::water::ripple::Tables>>,
+    /// The quad fountains' tables, clock and pool (crate::fx::fountain; the engine sets the tables at the level's start).
+    pub fountain: crate::fx::fountain::Fountains,
     /// The Minirocket Tube's rockets' trail slots (classes::minirocket).
     pub rockets: classes::minirocket::Trails,
     /// The RYNO II's missiles' trail slots (classes::ryno).
