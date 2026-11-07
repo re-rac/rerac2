@@ -17,7 +17,8 @@
 //! **Health** (at (147, 10)): pills in groups of four (quarter sprites mirrored into a ring, `0x441560`): filled
 //! 0x1a / empty 0x19 up to 20 health (one row of five groups, 16.5 apart from (184, 29)), 0x1b / 0x18 above (rows of
 //! ten); the back 0x11 and outline 0x12 sprites sized by the pill count (`0x441238`); a raised limit blinks the new
-//! pills (180 ticks). Shown by `0x441d58(n)`.
+//! pills (180 ticks). Shown by `0x441d58(n)`. Under them, with a limit under 80, the XP bar (`+0xf4`,
+//! [`Health::set_xp`]): the XP into the health level reached against the level's span.
 //!
 //! **Weapon** (the panel's left half, `+0x0..+0x194`, [`WeaponPanel`]): the back and outline sprites 1 and 2 at (10,
 //! 10) (their frame = the ammo text's length − 3, 0..5), the item's icon (its row's `+0x2c`) 32 × 32 at (20, 15), the
@@ -34,9 +35,8 @@
 //! points over the row's), set while the held item with ammo has a record of the vendor (`−0x10`); its colour a
 //! fader (`+0x10f8`: `0x1eff` clear to 0.5, then to alpha 0x80, 1/15 a tick) run forward and back with the panel.
 //!
-//! Not ported: the low-ammo red pulse (the faders
-//! `0x70202080` / `0x70242335` under a tenth of the most), the quick select ring, the XP bar (`+0xf4`), the vendor and
-//! the other screens of the GUI object, PAL's sizes.
+//! Not ported: the low-ammo red pulse (the faders `0x70202080` / `0x70242335` under a tenth of the most), the quick
+//! select ring, the vendor and the other screens of the GUI object, PAL's sizes.
 
 use crate::gui::{self, Quad, Tex};
 use rc_formats::disc::boot::Glyph;
@@ -814,6 +814,10 @@ pub struct Health {
     pub back_size: Fader,
     pub outline_colour: Fader,
     pub outline_size: Fader,
+    /// `+0xf4`'s values (`0x441788`): the XP / 32 past the health level reached and the level's span (`0x2d61d0`);
+    /// drawn grey on Clank's body (`0x18c0d4`).
+    pub xp: [i32; 2],
+    pub body: bool,
 }
 
 impl Health {
@@ -835,7 +839,31 @@ impl Health {
             back_size: Fader::floats([(0.0, [0.0, 0.0]), (0.3, [1.0, 1.0]), (1.0, [1.0, 1.0])], 3),
             outline_colour,
             outline_size: Fader::floats([(0.0, [1.2, 1.2]), (0.3, [1.0, 1.0]), (1.0, [1.0, 1.0])], 3),
+            xp: [0, 0],
+            body: false,
         }
+    }
+
+    /// `0x441788`'s values: the XP total / 32 (`0x1a7a14 >> 5`) against the XP of the health level reached and of
+    /// the next (`0x18c350` / `0x18c34c`).
+    pub fn set_xp(&mut self, xp: i32, level: [i32; 2], body: bool) {
+        self.xp = [xp - level[0], level[1] - level[0]];
+        self.body = body;
+    }
+
+    /// `0x42d360` for `+0xf4` (`0x441788` places it): with a limit under 80, a bar 146 × 3 at the widget + (31, 39)
+    /// (`0x1aea90`; the y scale `0x1b2684` 1 on NTSC): the back 0x60442d00, then the fill `(min(xp, span) / span) ·
+    /// 146` wide shaded 0x8049c1ff → 0x80001eff (on Clank's body 0x60808080 both). Unsigned, as `0x42da50` compares:
+    /// a negative XP fills it.
+    fn xp_bar(&self, out: &mut Vec<Draw>) {
+        if 0x50 <= self.max { return; }
+        const W: f32 = 146.0;
+        let [x, y] = [self.pos[0] + 31.0, ((self.pos[1] + 39.0) + 0.5) as i32 as f32];
+        let [v, most] = self.xp;
+        let fill = if most as u32 as f32 == 0.0 { 0.0 } else { (v as u32).min(most as u32) as f32 / most as u32 as f32 * W };
+        out.push(Draw::Bar { pos: [x, y], size: [W, 3.0], colours: [0x6044_2d00; 2] });
+        let colours = if self.body { [0x6080_8080; 2] } else { [0x8049_c1ff, 0x8000_1eff] };
+        out.push(Draw::Bar { pos: [x, y], size: [((x + fill.min(W)) as i32) as f32 - x, 3.0], colours });
     }
 
     /// `0x441d58(n)`.
@@ -896,6 +924,7 @@ impl Health {
         let bc = self.back_colour.sample().1;
         out.push(Draw::Sprite { id: back, pos: self.pos, scale: self.back_size.sample().0, frame: sf, colour: bc });
         out.push(Draw::Sprite { id: outline, pos: self.pos, scale: self.outline_size.sample().0, frame: sf, colour: self.outline_colour.sample().1 });
+        self.xp_bar(out);
         // `0x31dc30(−1, 0x22222222, 10)`: the blink between white and dark every 10 ticks.
         let blink_colour = if (frame / 10) % 2 == 0 { 0xffff_ffff } else { 0x2222_2222 };
         let small = self.max < 0x15;

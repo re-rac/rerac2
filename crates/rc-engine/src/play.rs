@@ -1263,6 +1263,8 @@ fn tick(
     if weapon.is_some() {
         if let Some(r) = mobys.level.items.get(p.game.item_row(it.item)).filter(|r| r.mega) { p.hud.weapon.set_xp(p.game.weapon_xp(it.item), r.xp_max); }
     }
+    // `0x441788`: the health's XP bar (the body `0x18c0d4` greys it).
+    p.hud.health.set_xp(p.game.xp >> 5, p.game.level_xp, p.hero.mode == 1);
     // `0x30df80`: not while the NPC busy word is set (rc_game::moby::talk::busy).
     if !p.game.npc_busy { p.hud.tick(p.hero.hp, p.game.max_health, sb, sh, weapon); }
     // The boss bar's own update (`0x2f2458`): its ticks left counted down, gone at 0.
