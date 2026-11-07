@@ -2,23 +2,24 @@
 //! the L00 ones the port knows them by where they differ). Each class's update is registered in [`update_for`] and
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
 //!
-//! The talking NPCs 0x0c38, 0x0d3e and 0x0da8: [`talkers`]. The liquid grid 0x0960 (`0x3e9320`): crate::water::grid.
+//! The talking NPCs 0x0c38, 0x0d3e and 0x0da8: [`talkers`]. The hint manager 0x0c26: [`hints`]. The liquid grid 0x0960 (`0x3e9320`): crate::water::grid.
 //!
 //! The hoverbike race (Ratchet's hoverbike 0x0bbc, the racers 0x0b2d, the boost jets 0x0474 / 0x0cef, shared with level
 //! 11): crate::moby::classes::race.
 //!
 //! Not ported yet (level 4's own list; docs/plan/gaps.md has the systems):
-//! * **0x0c26** (`0x423a38`): the level's help-text controller (help texts 0x9b5..0x9de and 0xa3c on its cuboids,
-//!   over many of Ratchet's and the game's words not yet named).
 //! * **0x02f8** (`0x3c4f80`), **0x0b37** (`0x4084c0`), **0x0b54** (`0x409440`): draw-callback effects (strips and
 //!   particle fountains from the level's `$gp` tables).
-//! * **0x0329** (`0x3c83c8`): it only sets level words (`0x1b2e70..`, `$gp+0x518` scrolled) that nothing ported reads.
+//! * **0x0329** (`0x3c83c8`, also L17 / L19): a clock for 0x02f8 — it sets `0x1b2e70..0x1b2e84` (60, 1/60, the pool
+//!   index 0) and scrolls `$gp+0x518` by −0.0025 a tick (wrapped at −8); their only readers are 0x02f8's set-up
+//!   (`0x3c84a8`, `0x3c5c38`) and draw (`0x3c5430`), so it waits for 0x02f8.
 
 use crate::hero::physics::V3;
 use crate::moby::MobyWorld;
 
 pub mod ambush;
 pub mod beast;
+pub mod hints;
 pub mod launcher;
 pub mod misc;
 pub mod platforms;
@@ -61,6 +62,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         talkers::PLANET_GIVER => Some(talkers::update_0c38),
         talkers::SELLER => Some(talkers::update_0d3e),
         talkers::TALKER => Some(talkers::update_0da8),
+        hints::CLASS => Some(hints::update_0c26),
         _ => None,
     }
 }

@@ -51,8 +51,10 @@
 //! (crate::collision::coll_line_m / coll_sphere_m), `0x329b48` (L19 `0x31a2d8`, the class's live mobys), `0x36eb38` /
 //! `0x36ebe0` the class sounds, `0x31e320` / `0x31e688` = L00 `0x311320` / `0x311688` (create / delete).
 //!
-//! Not ported: the level's chunk gate (`0x32fb48`: the formation waits while its place is outside the chunk the
-//! level shows, `0x1ca080`; as crate::moby::classes::level08::burrower's); the reward flag `0x1a903c`; the
+//! The formation waits while its place is outside the chunk the level shows (`0x32fb48` = L00 `0x321a78`,
+//! crate::level::LevelData::in_variant), after its mission test.
+//!
+//! Not ported: the reward flag `0x1a903c`; the
 //! explosions' direction words (crate::moby::blast has none).
 
 use crate::collision::QueryFlags;
@@ -220,6 +222,7 @@ pub fn update_096a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let dead = ctx.game.uid_dead.get(m.uid.max(0) as usize).is_some_and(|&d| d != 0);
         if dead || ctx.game.uid_count(m.uid) != 0 { return w.delete(id); }
     }
+    if !ctx.level.in_variant(w.mobys[id].pos, ctx.game.variant) { return; }
     let m = &mut w.mobys[id];
     if ctx.game.scenes.mode == crate::scene::SCENE {
         m.drawn = 0;

@@ -9,9 +9,12 @@ pub mod director;
 pub mod flyer;
 pub mod gunship;
 pub mod hover_pad;
+pub mod lamp;
+pub mod leader;
 pub mod patrol;
 pub mod props;
 pub mod scroll;
+pub mod seller;
 pub mod talker;
 pub mod towers;
 pub mod trooper;
@@ -67,6 +70,9 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         towers::MANAGER => Some(towers::update_0d12),
         towers::TOWER => Some(towers::update_0cea),
         towers::NODE => Some(towers::update_0d09),
+        lamp::CLASS => Some(lamp::update_0292),
+        leader::CLASS => Some(leader::update_0e1a),
+        seller::CLASS => Some(seller::update_0e10),
         _ => None,
     }
 }

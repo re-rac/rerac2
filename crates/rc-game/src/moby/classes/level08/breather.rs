@@ -55,7 +55,9 @@
 //! `0x2ef2a8` (the bounce), `0x329db8` / `0x329ea0` = L00 `0x31c9d8` / `0x31cac0` (its group's members), the rest as
 //! crate::moby::classes::level08::burrower's.
 //!
-//! Not ported: the level's gate `0x1ca080` (as 0x0fff's), the head aims (`0x332d48` = L00 `0x324208` on the joint
+//! The update starts with the level's chunk gate `0x1ca080` (as 0x0fff's, crate::level::LevelData::off_chunk).
+//!
+//! Not ported: the head aims (`0x332d48` = L00 `0x324208` on the joint
 //! blocks `+0x260..`: the turns `+0x2c0..` toward its target while it runs in), the breath's sprite (`0x347620` = L03
 //! `0x33a558`, which the port has no particle for), the ground marks of its death (`0x3d92c0`, the copy of 0x0fff's unported
 //! marks), the
@@ -491,6 +493,7 @@ fn wake(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// 0x09c6 (module docs).
 pub fn update_09c6(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    if ctx.level.off_chunk(ctx.game.variant, w.mobys[id].pos[2]) { return; }
     if !head(w, id, ctx) { return; }
     match w.mobys[id].state {
         0 => {

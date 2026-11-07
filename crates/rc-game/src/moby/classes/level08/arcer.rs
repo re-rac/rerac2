@@ -50,10 +50,9 @@
 //! The engine functions with the port's: `0x330a10` (tabora_ai::find_target), `0x3300f8` / `0x32fa98`
 //! (tabora_ai::volume_reach / in_volumes), `0x329170` (tabora_ai::spring_angle), `0x3297f0` = L00 `0x31c618`
 //! (crate::moby::slide::slide), `0x32a160` = L00 `0x31ce20` (crate::moby::ai::ground_z), `0x2ea670` the line test,
-//! `0x2fada0` = L00 `0x2ef1d0` (at most so long), `0x3d4d80` the nearest-enemy tracker (below).
+//! `0x2fada0` = L00 `0x2ef1d0` (at most so long), `0x3d4d80` the camera's look target (crate::moby::classes::look_targets::offer).
 //!
-//! Not ported: the nearest-enemy tracker `0x3d4d80` (it feeds the target records of 0x0970, `0x3d4e48`, which the port
-//! does not have, nor their marker pool `0x2d70a0`); the path's length `0x351498` the set-up asks; the vehicle
+//! Not ported: the path's length `0x351498` the set-up asks; the vehicle
 //! heights (`0x1bff58` against Ratchet's vehicle `0x18a650`) in the floor and the aim; the shadow's two bytes
 //! `+0x6f` / `+0xbd`; the debug print of a wake mode 1 / 4 (stepped to 2 / 5).
 
@@ -947,6 +946,15 @@ pub fn update_1002(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => {}
     }
     tail(w, id);
+    // The camera's look target (`0x3d4d80`, crate::moby::classes::look_targets): the moby it guards while its group
+    // counts any, else itself.
+    let m = &w.mobys[id];
+    if (2..6).contains(&m.state) && m.drawn != 0 {
+        let anchor = m.pv_i(ANCHOR);
+        let guarded = if anchor != -1 && shared(w, id, GROUP_COUNT) != 0 { moby_at(w, anchor).filter(|a| !matches!(a.state, 0xfe | 0xfd)).map(|a| a.pos) } else { None };
+        let at = guarded.unwrap_or(m.pos);
+        crate::moby::classes::look_targets::offer(w, ctx.hero.pos, id, at);
+    }
     let p = w.mobys[id].pos;
     if p.iter().any(|&c| !(30.0..=993.0).contains(&c)) {
         leave_turn(w, id);

@@ -51,8 +51,10 @@
 //! L00 `0x2df8d8` (the sphere test), `0x2ea670` = L00 `0x2de878` (the line test), `0x32a160` = L00 `0x31ce20`
 //! (crate::moby::ai::ground_z), `0x329bb0` = L00 `0x31c970` (crate::moby::MobyWorld::poke_group).
 //!
-//! Not ported: the level's gate `0x1ca080` the update starts with (a state word, a mode and two heights: with a mode
-//! set, a burrower above or below the heights for the state is not updated; nothing the port has sets it), the
+//! The update starts with the level's chunk gate `0x1ca080` (crate::level::LevelData::off_chunk: nothing on another
+//! chunk's side of the level's planes).
+//!
+//! Not ported: the
 //! enemies' big-heads cheat on its joint block `+0x1e0` (`0x335a60`), the wake-up by the moby `+0x180` when there is
 //! none (the arena statistics `0x2b72f0`), the path's length (`0x351498`), the five ground marks of its death
 //! (`0x423a30` → `0x348d78` = L01 `0x330218`).
@@ -443,6 +445,7 @@ fn wake(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// 0x0fff (module docs).
 pub fn update_0fff(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    if ctx.level.off_chunk(ctx.game.variant, w.mobys[id].pos[2]) { return; }
     if ctx.hero.state == 0x6f {
         let m = &mut w.mobys[id];
         m.drawn = 0;

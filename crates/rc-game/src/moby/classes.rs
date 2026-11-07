@@ -64,6 +64,7 @@ pub mod seeker;
 pub mod leaper;
 pub mod oozla;
 pub mod light;
+pub mod look_targets;
 pub mod nanotech;
 pub mod pickup;
 pub mod platinum;
@@ -491,6 +492,8 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         barrier::CLASS => Some(barrier::update_112e),
         // The ferry (L06 `0x3e5460`, L09 `0x3a0038`, L11 `0x3b7340`, L13 `0x3ac360`, L18 `0x3c00f8`).
         ferry::CLASS => Some(ferry::update),
+        // The camera's look target on Tabora's hovership levels (L08 `0x3d4e48`, L19 `0x3c1660`, museum `0x3c09d0`).
+        look_targets::CLASS => Some(look_targets::update_0970),
         // The levels' own (their modules' lists).
         _ => race::update_for(o_class).or_else(|| level04::update_for(o_class)).or_else(|| level06::update_for(o_class)).or_else(|| level07::update_for(o_class)).or_else(|| level08::update_for(o_class)).or_else(|| level09::update_for(o_class)).or_else(|| level10::update_for(o_class)).or_else(|| level11::update_for(o_class)).or_else(|| level13::update_for(o_class)).or_else(|| level14::update_for(o_class)).or_else(|| level16::update_for(o_class)).or_else(|| level12::update_for(o_class)).or_else(|| level17::update_for(o_class)).or_else(|| level18::update_for(o_class)).or_else(|| level19::update_for(o_class)).or_else(|| level20::update_for(o_class)).or_else(|| level21::update_for(o_class)).or_else(|| level22::update_for(o_class)).or_else(|| level26::update_for(o_class)).or_else(|| level05::update_for(o_class)).or_else(|| level15::update_for(o_class)).or_else(|| level23::update_for(o_class)),
     }

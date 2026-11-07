@@ -674,6 +674,8 @@ pub struct MobyWorld {
     pub race: classes::race::Globals,
     /// Level 18's director's globals (classes::level18::director::Globals).
     pub level18: classes::level18::director::Globals,
+    /// The camera's look target records `0x1b3490` (Tabora's hovership levels; classes::look_targets).
+    pub look_targets: classes::look_targets::Targets,
     /// Level 19's globals (classes::level19::Globals).
     pub level19: classes::level19::Globals,
     /// Level 20's boss's globals (classes::level20::boss::Globals).
