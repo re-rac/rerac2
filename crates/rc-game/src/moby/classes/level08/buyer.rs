@@ -29,8 +29,12 @@
 //!
 //! In any state but 0 its idle and look (crate::moby::talk: looking in sequence 1, fidgeting in 2).
 //!
-//! Not ported: the level's NPC busy word `0x1b2728` set while its scenes play, the talk record, the debug print
-//! `0x2b72f0(0x1b1f60)`, the autosave after the sale (`0x319bc8(0, −1)`). The formations left are counted when they
+//! The talk record (crate::moby::talk::mark) is marked once Ratchet can talk in 1 and with the texts 0x12e8, 0x12f9 /
+//! 0x1322 (6) and 0x12e9; the level's NPC busy word (L08 `0x1b2728`, L19 `0x1b26a8`; crate::moby::talk::busy) is set
+//! while its scenes play (2, 5); the autosave after the sale (`0x319bc8(0, −1)`, crate::game::GameState::autosave) in
+//! 5.
+//!
+//! Not ported: the debug print `0x2b72f0(0x1b1f60)`. The formations left are counted when they
 //! are shown (the game keeps the count `$gp+0x2f68` from the set-up, the frame 5, the payment and Ratchet's crystal
 //! pickups; it only differs from a live count for the tick between a formation's break and its crystal's start).
 
@@ -110,7 +114,9 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             w.mobys[id].set_state(next, -1);
         }
         1 => {
-            if talk::can_talk(w, id, ctx, R, 10) && ctx.game.scenes.queue.push(0x59) {
+            if !talk::can_talk(w, id, ctx, R, 10) { return; }
+            talk::mark(w, id, ctx);
+            if ctx.game.scenes.queue.push(0x59) {
                 set_flag(ctx, MET);
                 ctx.game.scenes.start_queue(ctx.hero.hp);
                 w.mobys[id].set_state(2, -1);
@@ -120,7 +126,9 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             talk::hide_in_scene(w, id, ctx);
             let prop = link(w, id, PROP);
             if let Some(p) = prop { talk::hide_in_scene(w, p, ctx); }
+            talk::busy(ctx, true);
             if ctx.game.scenes.in_scene() { return; }
+            talk::busy(ctx, false);
             talk::show(w, id);
             if let Some(p) = prop { talk::show(w, p); }
             w.mobys[id].set_state(if short(ctx) { 3 } else { 4 }, -1);
@@ -132,6 +140,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         4 => {
             if short(ctx) { return w.mobys[id].set_state(3, -1); }
             if !talk::offer(w, id, ctx, R, 0x12e8, &[PRICE]) { return; }
+            talk::mark(w, id, ctx);
             if ctx.hero.items.pressed & crate::pad::button::TRIANGLE == 0 { return; }
             ctx.game.scenes.queue.push(0x5a);
             ctx.game.crystals = (crystals(ctx) - PRICE) as i16 as u16;
@@ -147,7 +156,9 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     w.mobys[id].set_pv_i(PROP, -1);
                 }
             }
+            talk::busy(ctx, true);
             if ctx.game.scenes.in_scene() { return; }
+            talk::busy(ctx, false);
             talk::show(w, id);
             let group = w.mobys[id].group;
             if group != -1 { w.poke_group(group as i32, 1); }
@@ -158,11 +169,14 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 w.mobys[id].set_pv_i(PROP, -1);
             }
             if let Some(t) = link(w, id, TOLD) { w.mobys[t].timer = 1; }
+            ctx.game.autosave(-1);
             w.mobys[id].set_state(if crystals(ctx) < 1 { 6 } else { 7 }, -1);
         }
         6 => {
             if 0 < crystals(ctx) { return w.mobys[id].set_state(7, -1); }
-            if left(w) == 0 { talk::offer(w, id, ctx, R, 0x1322, &[0]); } else { talk::offer(w, id, ctx, R, 0x12f9, &[]); }
+            if !talk::can_talk(w, id, ctx, R, 10) { return; }
+            if left(w) == 0 { talk::say(ctx, 0x1322, &[0]); } else { talk::say(ctx, 0x12f9, &[]); }
+            talk::mark(w, id, ctx);
         }
         7 => {
             let c = crystals(ctx);
@@ -170,6 +184,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let each = if ctx.game.challenge { 10 } else { 1 };
             let worth = c * each * 1000;
             if !talk::offer(w, id, ctx, R, 0x12e9, &[c, worth]) { return; }
+            talk::mark(w, id, ctx);
             if ctx.hero.items.pressed & crate::pad::button::TRIANGLE == 0 { return; }
             ctx.game.bolts = (ctx.game.bolts as i32 + worth) as u32;
             bolt_sound(w, id, ctx);

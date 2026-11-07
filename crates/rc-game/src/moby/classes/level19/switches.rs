@@ -88,9 +88,12 @@ const PLANET: i32 = 0x14;
 ///   0), it is shown, its mission done (`0x310c68` = L00 `0x3132a8`) and the checkpoint made at Ratchet (`0x357930` =
 ///   L00 `0x359b20`) when it has one; it goes.
 ///
+/// At the scenes' start its talk record is marked (`0x32d3f8` = L01 `0x3259b0`, crate::moby::talk::mark), the level's
+/// NPC busy word `0x1b26a8` is held through them (crate::moby::talk::busy), and the autosave follows at the end
+/// (`0x30af90` = L00 `0x30d658(0, −1)`, crate::game::GameState::autosave).
+///
 /// Not ported: its head `0x424ce8` (the objective marker on the class in the list `0x1bd6c0` with the option
-/// `0x1a7a48`), `0x32d3f8` (L01 `0x3246d0`) at the scenes' start, the level's flag `0x1b26a8` held through them, and
-/// the autosave at the end (`0x30af90` = L00 `0x30d658(0, −1)`).
+/// `0x1a7a48`).
 pub fn update_1267(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     const AT: usize = 0x120;
     match w.mobys[id].state {
@@ -108,16 +111,19 @@ pub fn update_1267(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if !g.scenes.queue.push(0x96) { return; }
             g.scenes.queue.push(0x14);
             g.scenes.queue.push(0x97);
-            g.scenes.start_queue(ctx.hero.hp);
+            crate::moby::talk::mark(w, id, ctx);
+            ctx.game.scenes.start_queue(ctx.hero.hp);
             w.mobys[id].set_state(2, -1);
         }
         2 => {
+            crate::moby::talk::busy(ctx, true);
             if ctx.game.scenes.mode == crate::scene::SCENE {
                 let m = &mut w.mobys[id];
                 m.drawn = 0;
                 m.mode |= 1;
             }
             if ctx.game.scenes.in_scene() { return; }
+            crate::moby::talk::busy(ctx, false);
             ctx.game.unlock_planet(PLANET);
             crate::travel::new_planet_banner(ctx.game, PLANET);
             if let Some((p, r)) = ctx.level.cuboid_place(w.mobys[id].pv_i(AT)) {
@@ -131,6 +137,7 @@ pub fn update_1267(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 ctx.game.mission_done(m.mission);
                 ctx.game.save_checkpoint(ctx.hero.pos, ctx.hero.rot);
             }
+            ctx.game.autosave(-1);
             w.delete(id);
         }
         _ => {}

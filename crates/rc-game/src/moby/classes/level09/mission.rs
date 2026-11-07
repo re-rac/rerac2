@@ -36,8 +36,8 @@
 //! * **6**: [`done`]; in `+0x00` → 1; out of `+0x0c` → 2; Ratchet in state 0x31 → 4 as from 3.
 //!
 //! Not ported: [`lift`]'s cuboid height (the cuboid `+0x64`'s `+0x68`[0x70] set to z 325.25 / 325: the level's
-//! cuboids are read-only here), the ship byte `0x152c26` = 1 before Ratchet is put (`0x365810`), the autosave
-//! `0x3098d0(0, −1)` with `[0xa3]` (as everywhere in the port).
+//! cuboids are read-only here), the ship byte `0x152c26` = 1 before Ratchet is put (`0x365810`). The autosave
+//! `0x3098d0(0, −1)` goes with `[0xa3]` (crate::game::GameState::autosave).
 
 use crate::moby::director::{gone, link, music_to, place_hero, place_hero_at, set_group_parts, set_parts};
 use crate::moby::{Ctx, MobyWorld};
@@ -208,7 +208,11 @@ pub fn update_0d9d(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     set_parts(w, pv(w, id, 0x4c), 0, 0, 0);
                 }
                 done(w, id, ctx);
-                if let Some(f) = ctx.game.flags.get_mut(ONCE).filter(|f| **f == 0) { *f = 1; }
+                if let Some(f) = ctx.game.flags.get_mut(ONCE).filter(|f| **f == 0) {
+                    *f = 1;
+                    // `0x3098d0(0, −1)`: the autosave (crate::game::GameState::autosave).
+                    ctx.game.autosave(-1);
+                }
             }
             if w.frame < 6 { return; }
             set_group_parts(w, pv(w, id, 0x30), 0, 0, -1);

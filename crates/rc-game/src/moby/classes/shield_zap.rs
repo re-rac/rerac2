@@ -23,7 +23,9 @@
 //! `0x7f7f7f` and FX 0xe 0.25 across in its colour scrolling): the first at alpha 0x80 / 0x40, the second at 0x10 / 0x10
 //! fading in over its first segment and out over its next-to-last.
 //!
-//! Not ported: the weapon mods' effects on a hit, the GS test register the draw sets (`0x37c948`), the loop sound
+//! The weapon mods: none (its hits call neither `0x3f9f70` nor `0x4126b8`; crate::moby::weapon_mods).
+//!
+//! Not ported: the GS test register the draw sets (`0x37c948`), the loop sound
 //! `+0x18` (never started: `0x415518` returns at once; only let go when the state is not 1, which it always is).
 
 use crate::hero::items::{row, SHIELD};

@@ -82,6 +82,10 @@ impl MobyInstance {
     /// cross-fade, unused).
     pub fn light_word(&self) -> u32 { self.light as u32 }
 
+    /// 0x74: R&C2's talk slot (−1 none): the loader lists the moby in the level's talk list at it (`0x309e90`,
+    /// rc-game `moby::talk::register`).
+    pub fn talk_slot(&self) -> i32 { self.unknown_74 }
+
     /// moby+0x3c..0x3e: the low three bytes of `b * 0x10000 + g * 0x100 + r` (s32 arithmetic, so
     /// channels above 255 would carry; none do on the disc).
     pub fn ambient_rgb(&self) -> [u8; 3] {

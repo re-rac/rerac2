@@ -82,8 +82,8 @@
 //! Not ported: the pad rumble (`0x2d6d60(0x296060)` / `0x2d6f38`; its stop's `0x2af848` only runs while the use is
 //! over, where it does nothing), the lock cheat (`0x18b270`), the missile's homing (its `+0x10` target is cleared by the
 //! make and set by nothing: the branch `0x40bafc..0x40bda0` never runs), the gravity frames and moving frames
-//! (`0x37f538` / `0x37f618` / `0x37f5f8`, `0x380e08`), the projectile list `0x1b1f30` (`0x3216e0` / `0x321760`), the
-//! weapon mods' effects on a hit; the 0x139c moby's own update and draw (`0x415850` / `0x4158d0`: its life of 60 ticks,
+//! (`0x37f538` / `0x37f618` / `0x37f5f8`, `0x380e08`), the projectile list `0x1b1f30` (`0x3216e0` / `0x321760`); the
+//! 0x139c moby's own update and draw (`0x415850` / `0x4158d0`: its life of 60 ticks,
 //! the heat shimmer and screen flash, as crate::moby::blast leaves the 0x13a0's) and its danger area (`0x1adb0c`, 0
 //! here); the normal and the ground under the blow-up (`0x31ce20`), which the explosion does not take.
 

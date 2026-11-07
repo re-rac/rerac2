@@ -57,10 +57,8 @@
 //!
 //! The update starts with the level's chunk gate `0x1ca080` (as 0x0fff's, crate::level::LevelData::off_chunk).
 //!
-//! Not ported: the head aims (`0x332d48` = L00 `0x324208` on the joint
-//! blocks `+0x260..`: the turns `+0x2c0..` toward its target while it runs in), the breath's sprite (`0x347620` = L03
-//! `0x33a558`, which the port has no particle for), the ground marks of its death (`0x3d92c0`, the copy of 0x0fff's unported
-//! marks), the
+//! Not ported: the head aims (`0x332d48` = L00 `0x324208` on the joint blocks `+0x260..`: the turns `+0x2c0..` toward
+//! its target while it runs in), the ground marks of its death (`0x3d92c0`, the copy of 0x0fff's unported marks), the
 //! path length (`0x351498`), the arena statistics wake-up (`0x2b72f0`), and the goal's pull into the path table's
 //! word before path 0 when it has no path (`0x351560(goal, $0x1fe7bc)`).
 
@@ -851,7 +849,8 @@ fn attack(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 }
 
 /// `0x3dabf0`: the breath: a sphere of 0.5 at joint 1 (its damage `+0x34`, flags 1), three lines 3 ahead of it along
-/// its facing (to its target's height, ±1.2; spread 0.1 and −0.2 across its second row, ±0.2 up), and two pairs of
+/// its facing (to its target's height, ±1.2; spread 0.1 and −0.2 across its second row, ±0.2 up; a marker at the
+/// first's end: frame 1, `0x00808080`, 0.5, 30 ticks), and two pairs of
 /// staged puffs (smoke 0x40101080 → 0x10101080, sizes 0.6 → 1.5; flame 0x801010ff, 0.05 → 0.07), half additive.
 fn breathe(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let damage = w.mobys[id].pv_b(0x34) as f32;
@@ -867,6 +866,9 @@ fn breathe(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         end[2] = (z - start[2]).clamp(-1.2, 1.2);
     }
     end = add(end, start);
+    // `0x347620(end, m, 1, 0x00808080, 0.5, 0x7f, 30, 0xff)`: a marker at the line's end (crate::particles::marker).
+    let look = crate::particles::marker::Look { rgba: 0x0080_8080, size: 0.5, near: 0x7f, life: 30, alpha: 0xff };
+    if let Some(sys) = ctx.parts.as_deref_mut() { crate::particles::marker::marker(sys, [end[0], end[1], end[2], 0.0], Some(id), 1, &look); }
     ai::attack_line(w, id, ctx, start, end, 1, damage, 1.0, 0);
     for k in [0.1, -0.2] {
         let step = set_len(rows[1], k);

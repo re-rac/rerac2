@@ -54,7 +54,10 @@
 //! Its glow word in the hand (`0x2a7ed8`'s case 0x1a, crate::hero::items) and Ratchet's swap face when it is drawn
 //! (`0x2b1380`, crate::hero::items::ItemBlock::swap_face).
 //!
-//! Not ported: the pad rumble (`0x2d6d60` / `0x2d6f38`), the weapon mods' effects on a hit (`0x3f9f70`), the lock cheat
+//! The weapon mod: Acid on every moby the point-blank sphere and the pellets hit (`0x3f9f70(m, 0x1a, hand)`, the
+//! upgraded one's 0x44; crate::moby::weapon_mods).
+//!
+//! Not ported: the pad rumble (`0x2d6d60` / `0x2d6f38`), the lock cheat
 //! (`0x18b270`), the gravity frames' bends of the tracer (`0x380e08`), the glare quad the screen flash draws 0.1 in
 //! front of the camera toward the muzzle (FX 0xb under ALPHA 0x49, `Cd·As + Cd`: the engine's effect pass has no such
 //! blend). The muzzle burst's carry in the air (`auStack_d0`, only set on the ground: the stack's leftovers) is 0. The
@@ -223,6 +226,8 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         for m in crate::collision::coll_sphere_mobys(sc, at, 1.5, QueryFlags(1), ctx.hero_moby) {
             if Some(m) == ctx.hero_moby { continue; }
             w.deliver_hit_any(m, &t, [0.0; 4]);
+            // `0x3f9f70(m, 0x1a, hand)` (crate::moby::weapon_mods).
+            crate::moby::weapon_mods::acid(w, ctx, m, crate::hero::items::BLITZ, Some(id));
         }
     }
     pellets(w, id, ctx, &mut t, fwd, r.damage);
@@ -290,6 +295,8 @@ pub(crate) fn pellet(w: &mut MobyWorld, ctx: &mut Ctx, t: &mut HitTemplate, star
         damage * 0.125
     };
     w.deliver_hit_any(m, t, [0.0; 4]);
+    // `0x3f9f70(m, 0x1a / 0x44, hand)` (crate::moby::weapon_mods).
+    crate::moby::weapon_mods::acid(w, ctx, m, if mega { super::blitz_mega::MEGA_ITEM } else { crate::hero::items::BLITZ }, t.source);
     Some(m)
 }
 

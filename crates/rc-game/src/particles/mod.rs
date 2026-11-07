@@ -42,19 +42,29 @@
 //! | 0x45 | [`arc`] (L08 `0x34b3b8`) | `0x34b4e0` (L00 `0x33cb10`) | the beams' sparks (crate::fx::beams): moving, turning at random, fading over the life |
 //! | 0x60 | [`frost`] (`0x340608`) | (`0x340748`) | the Thermanator's cold shot's trail: slowing, falling, fading over the last half |
 //! | 0x67 | [`spot`] (L04 `0x364f80`) | (L04 `0x365030`) | spots: a sprite shown two ticks (the tie waves' glows, Hrugis's cloud glints) |
+//! | 0x29 | [`marker`] (L03 `0x33a558`, L15 `0x351710`) | `0x338e00` | markers: a sprite held its life (Gorn's convoy's path, Endako's 0x0ef9, the breathers' breath) |
+//! | 0xd | [`break_dust`] (`0x334528`) | (`0x3346a8`) | the break's dust: puffs swelling, rising, turning, fading in and out (the crates) |
+//! | 0x49 | [`flake`] (L01 `0x332f80`) | (L01 `0x3330e8`) | the weather's snowflakes: drifting with the wind and the camera, gone under the height map |
+//!
+//! Spawners over the types above: [`hover_dust`] (the hovercraft's dust, type 2), crate::particles::rain::land (a
+//! drop's ring or splash under a point: the weather, the Thermanator's cold shot).
 //!
 //! Any other type kills itself on its first update. The gravity direction (`0x18a0e0`) is (0, 0, −1): normal gravity.
 //! Not ported: the gravity-boots bend of the positions (`0x380e08`, `+0x1c` = 2).
 
 pub mod arc;
 pub mod ash;
+pub mod break_dust;
 pub mod cinder;
 pub mod dust;
+pub mod flake;
 pub mod foot_dust;
 pub mod frost;
+pub mod hover_dust;
 pub mod keyed;
 pub mod lava;
 pub mod line;
+pub mod marker;
 pub mod meteor;
 pub mod mote;
 pub mod pulse;
@@ -1174,6 +1184,9 @@ pub fn update_parts(sys: &mut Particles, mobys: &crate::moby::MobyWorld, cam: [f
             mote::MOTE => mote::update(sys, i),
             pulse::PULSE => pulse::update(sys, i),
             spot::SPOT => spot::update(sys, i),
+            marker::MARKER => marker::update(sys, i),
+            break_dust::BREAK_DUST => break_dust::update(sys, i),
+            flake::FLAKE => flake::update(sys, i, &aux.rain),
             spray::SPRAY => spray::update(sys, i, rng),
             vapour::VAPOUR => vapour::update(sys, i, rng, aux.coll),
             ash::ASH => ash::update(sys, i, aux.coll, mobys.frame, mobys.view_x()),

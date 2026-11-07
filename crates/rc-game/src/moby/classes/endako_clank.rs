@@ -16,7 +16,9 @@
 //! The flags (`0x1395b8 + k`, crate::game::GameState::flags): `0x1395be` the scene 0x31 played, `0x1395bf` 0x32,
 //! `0x1395c0` the rescue over; `0x13965a` (the grind help's zone reached, crate::moby::classes::endako_b).
 //!
-//! Not ported: the ship byte (`0x369cc0`), the autosaves (`0x30ea10`), `0x373160` after the scene 0x32 is asked for
+//! The scenes 0x31's and 0x33's ends ask for the autosave (`0x30ea10(0, −1)`, crate::game::GameState::autosave).
+//!
+//! Not ported: the ship byte (`0x369cc0`), `0x373160` after the scene 0x32 is asked for
 //! (`$gp − 0x6024` = 1.2, `0x2e8888(6)` while `0x1b2460` < 1), the items' new marks `0x1a7b3a..0x1a7b3c`; the camera
 //! reset of the placings (`0x2bf080`'s last argument, `0x2dade0`), as crate::moby::classes::endako_b's `put_hero`.
 
@@ -240,6 +242,7 @@ fn start(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 fn end_31(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let (z, cam) = (w.mobys[id].pv_i(0x18), w.mobys[id].pv_i(0x1c));
     place_at_cuboid(ctx, z, cam);
+    ctx.game.autosave(-1);
     if let Some(h) = held(w, id) {
         show(w, h, false);
         w.mobys[h].state_ticks = 0;
@@ -279,4 +282,5 @@ fn end_33(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     ctx.host.music_request(pv(w, 9), -1);
     let (hp, hr) = (ctx.hero.pos, ctx.hero.rot);
     ctx.game.save_checkpoint(hp, hr);
+    ctx.game.autosave(-1);
 }

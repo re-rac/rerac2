@@ -12,7 +12,7 @@
 //! condition met), 2 done (both). **The list**: the entries not flagged 2 with a state, a done one left out when
 //! flagged 1, its text 0x31b9 ("Completed") when done; the widget's row is per level (`+0x30 + 4·level`).
 //!
-//! Not ported: the kinds 4..8 and 10 (the port keeps none of those records and flags: never met), the entries' own
+//! Not ported: the kinds 6..8 and 10 (never met), the entries' own
 //! functions (`+0x1c`: the result 0), the `+0x12 + result` list (`0x70000100`: nothing reads it on the ship's pages),
 //! the rows' text wrapping (`0x2eaf70`: one line each), the selection's glow (`0x2e9ae0`).
 
@@ -25,10 +25,12 @@ pub struct Flags<'a> {
     pub items: &'a [u8],
     pub visited: &'a [u8],
     pub scenes_seen: &'a [bool],
+    /// The talk records (`0x139a28`, crate::moby::talk::Record): the kinds 4 / 5.
+    pub talk: &'a [crate::moby::talk::Record],
 }
 
 impl<'a> Flags<'a> {
-    pub fn of(g: &'a GameState) -> Flags<'a> { Flags { planets: &g.planets, items: &g.items, visited: &g.visited, scenes_seen: &g.scenes_seen } }
+    pub fn of(g: &'a GameState) -> Flags<'a> { Flags { planets: &g.planets, items: &g.items, visited: &g.visited, scenes_seen: &g.scenes_seen, talk: &g.talk_records } }
 }
 
 /// `0x281560`: the levels' tables (0x1c pointers).
@@ -77,6 +79,7 @@ pub fn condition(g: &Flags, kind: i16, arg: i32) -> bool {
         0 => true,
         1 => byte(g.planets, arg),
         2 | 3 => byte(g.items, arg),
+        4 | 5 => usize::try_from(arg).ok().and_then(|i| g.talk.get(i)).is_some_and(|r| (kind - 3) as i32 <= r.word),
         9 => usize::try_from(arg).ok().and_then(|i| g.scenes_seen.get(i)).copied().unwrap_or(false),
         _ => false,
     }

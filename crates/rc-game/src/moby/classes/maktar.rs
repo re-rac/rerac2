@@ -705,7 +705,8 @@ fn to_frame(v: crate::hero::physics::V3, r: &[crate::hero::physics::V3; 3]) -> c
 /// stops its sound and makes the group solid (`0x3ec608`); then (8) runs: its speed eases (by 1/225) to the way / 15,
 /// the belt surfaces carry Ratchet (and write their platform blocks) by it along its second row (`0x3ec6a8`); Ratchet
 /// walking against it for 30 ticks turns the way; its pulse `[5]`, scroll `[6]` and fade `[7]` run and it draws
-/// ([`draw_0ab0`]). Not ported: `[1]`'s camera (`0x1395bb`, `0x311738`), the switch `$gp+0x1d20` that opens them all.
+/// ([`draw_0ab0`]). An end with `[1]` set marks the flag byte `0x1395bb` and asks for the autosave as it sets them off
+/// (`0x311738(0, −1)`, crate::game::GameState::autosave). Not ported: the switch `$gp+0x1d20` that opens them all.
 pub fn update_0ab0(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     use crate::hero::physics::{add, add_rot, approach, dot, ease, scale, sub};
     use crate::moby::attach::rows_of;
@@ -755,6 +756,10 @@ pub fn update_0ab0(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let t = m.state_ticks;
             m.state_ticks = t.wrapping_add(1);
             if t < 6 { return; }
+            if w.mobys[id].pv_i(4) != 0 {
+                if let Some(f) = ctx.game.flags.get_mut(3) { *f = 1; }
+                ctx.game.autosave(-1);
+            }
             let h = ctx.host.play_sound(&w.mobys[id], 0, 4);
             w.mobys[id].set_pv_i(0x2c, h);
             for &p in &pieces {

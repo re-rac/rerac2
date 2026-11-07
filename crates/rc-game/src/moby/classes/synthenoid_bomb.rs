@@ -19,7 +19,9 @@
 //!   1, 15, …, 5, 2, 4, 0, shake, 1, −1, 0, 0x810001)`), every moby within 6 hit for the row's `+0x64` (flags 0x810000,
 //!   kind `0x0cf3 << 16 | 0x0102`, `0x2e14b0`), deleted.
 //!
-//! Not ported: the gravity frames' bends (`0x380e08`, `0x380e58`), the weapon mods' effects on a hit (`0x4126b8`), the
+//! Each moby its blast touches takes Shock (`0x4126b8(m, 0x3d, the drone)`, crate::moby::weapon_mods).
+//!
+//! Not ported: the gravity frames' bends (`0x380e08`, `0x380e58`), the
 //! moby set-up `0x313dc0`, the rolling state 2 (a bounce while falling sets 3 first, so its count never passes 1: the
 //! tinted slide of `+0x78` / `+0x2c` and the bounces' slow-downs of `0x3f56b0` are unreachable).
 
@@ -177,6 +179,8 @@ fn explode(w: &mut MobyWorld, ctx: &mut Ctx, id: usize) {
     let mut t = HitTemplate::new(damage(ctx.game), Some(id), 0x81_0000, [0.0; 4]);
     t.kind = (CLASS as u16 as u32) << 16 | 1 << 8 | 2;
     let pos = w.mobys[id].pos;
-    w.sphere_hit(ctx.scene, pos, 6.0, 0x10, Some(id), Some(&t));
+    // `0x4126b8(m, 0x3d, the drone)` on each moby touched (crate::moby::weapon_mods).
+    let owner = w.mobys[id].parent;
+    for m in w.sphere_hit_list(ctx.scene, pos, 6.0, 0x10, Some(id), Some(&t)) { crate::moby::weapon_mods::shock(w, ctx, m, 0x3d, owner); }
     w.delete(id);
 }

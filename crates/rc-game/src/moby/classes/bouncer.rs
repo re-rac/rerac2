@@ -58,7 +58,10 @@
 //! crouched) runs the same update `0x3ff2e8`; its bomb and bomblets take the upgraded constants (the bracketed ones
 //! above) by the hand's class (the bomb's `+0x2c`, the bomblet's `+0x24`).
 //!
-//! Not ported: the pad rumble (`0x2d6d60` / `0x2d6f38`); the weapon mods' effects and statistics on a hit (`0x3f9f70`); the lock cheat
+//! The weapon mod (`0x3f9f70(m, 0x4c upgraded / 0x25, the hand)`, crate::moby::weapon_mods): Acid on every moby the
+//! bomb touched and on the moby a bomblet hit (not a crate).
+//!
+//! Not ported: the pad rumble (`0x2d6d60` / `0x2d6f38`); the lock cheat
 //! (`0x18b270`); the gravity frames and the moving frames (`0x326448`'s other gravities, `0x380e08`, `0x37f538` /
 //! `0x37f618` / `0x37f5f8`: the port's crate::gravity stands in for the up); the write-only word `0x1b2b64` (0x14 at the
 //! start and at an empty press); the blasts' heat shimmer (crate::moby::blast). The sweep's flag `+0x50` (a moby of
@@ -76,6 +79,8 @@ use crate::quat::{axis_angle, mul, Q};
 /// The hand's class (item 0x25's row `+0x04`), the upgraded hand's (rows 0x4c / 0x61 / 0x62), the bomb's and the bomblet's.
 pub const HAND_CLASS: i16 = 0x0e14;
 pub const UPGRADED_HAND: i16 = 0x0e9e;
+/// The upgraded hand's row (its item for the weapon mods, crate::moby::weapon_mods).
+const ITEM_UP: i32 = 0x4c;
 pub const BOMB: i16 = 0x0e64;
 pub const BOMBLET: i16 = 0x0ece;
 
@@ -423,7 +428,11 @@ pub fn update_bomb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let d = unit(s.vel);
             let mut t = HitTemplate::new(r.damage, Some(id), 0x83_0000, [d[0], d[1], d[2], NO_KNOCK_LIMIT]);
             t.kind = (BOMB as u16 as u32) << 16 | 0x0103;
-            if w.sphere_hit(ctx.scene, pos, BOMB_RADIUS[up] + 0.1, 1, ctx.hero_moby, Some(&t)) != 0 {
+            let hit = w.sphere_hit_list(ctx.scene, pos, BOMB_RADIUS[up] + 0.1, 1, ctx.hero_moby, Some(&t));
+            if !hit.is_empty() {
+                // `0x3f9f70(m, 0x4c / 0x25, hand)`: Acid on every moby it touched (crate::moby::weapon_mods).
+                let owner = w.mobys[id].parent;
+                for m in hit { crate::moby::weapon_mods::acid(w, ctx, m, if up != 0 { ITEM_UP } else { BOUNCER }, owner); }
                 burst(w, id, ctx);
                 return;
             }
@@ -570,6 +579,11 @@ pub fn update_bomblet(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                         // `0x31d378(m, tmpl)`.
                         w.deliver_hit_any(m, &t, [0.0; 4]);
                         blow = true;
+                        // `0x3f9f70(m, 0x4c / 0x25, hand)` on a moby that is not a crate (crate::moby::weapon_mods).
+                        if !crate_ {
+                            let owner = w.mobys[id].parent;
+                            crate::moby::weapon_mods::acid(w, ctx, m, if up != 0 { ITEM_UP } else { BOUNCER }, owner);
+                        }
                         break;
                     }
                 }

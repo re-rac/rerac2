@@ -38,8 +38,10 @@
 //! `0x360698`), started when its handle is not playing (`0x363938` = L00 `0x3602a8`); stopped `0x363980` = L00
 //! `0x3602f0`.
 //!
-//! Not ported: its talk record's moving word (`0x333080` = the decomp's `func_L06_0036F728`, in 2..6: G-CLS-008, as
-//! crate::moby::classes::ferry); the debug lines of its first route's paths (`$gp+0x1300` 0); with Ratchet on it in 5
+//! **First each tick**: its talk record's word set to whether it moves, its state in 2..6 (`0x333080(m, 0x3c7378(m))`
+//! = the decomp's `func_L06_0036F728`, crate::moby::talk::set_word, as crate::moby::classes::ferry).
+//!
+//! Not ported: the debug lines of its first route's paths (`$gp+0x1300` 0); with Ratchet on it in 5
 //! and 10 (`0x3c73a8`, crate::moby::classes::level17::floaters::hero_on) the hero words `0x18a032` / `0x18a034` (4
 //! each) and in 5 its camera path (`0x3c7400`: the path `+0x128` of 7 points rebuilt from the table `0x297070`
 //! through its frame, its index into `0x18c31e`), as crate::moby::classes::level17::lifts; the class sound table's
@@ -233,6 +235,8 @@ fn prompted(ctx: &mut Ctx, id: usize) -> Option<bool> {
 
 /// 0x0922's update (module docs).
 pub fn update_0922(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let moving = (2..=6).contains(&w.mobys[id].state) as i32;
+    crate::moby::talk::set_word(w, id, ctx, moving);
     {
         let m = &mut w.mobys[id];
         m.set_pv_i(BLOCK + 0x3c, m.pv_i(BLOCK + 0x3c) | 1);

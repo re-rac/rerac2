@@ -428,6 +428,14 @@ impl MobyHost for Host<'_> {
         usize::try_from(handle).ok().and_then(|i| s.system.slots.slots.get(i)).is_some_and(|x| x.state != rc_game::audio::voices::state::FREE)
     }
 
+    fn set_sound_volume(&mut self, handle: i32, vol: i32) {
+        if let Some(s) = self.sound.as_mut() { s.system.slots.set_volume(handle, vol); }
+    }
+
+    fn set_sound_bend(&mut self, handle: i32, pb: i32) {
+        if let Some(s) = self.sound.as_mut() { s.system.slots.set_bend(handle, pb); }
+    }
+
     /// `0x3082e0`'s sound part (rc_game::audio::chunk).
     fn switch_chunk_sound(&mut self, k: i32, track: i32) {
         let Some(s) = self.sound.as_mut() else { return };

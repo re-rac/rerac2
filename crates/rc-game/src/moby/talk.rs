@@ -7,8 +7,8 @@
 //!   free to talk.
 //! * **The offer** ([`offer`]): can talk (`n` = 10, as every caller passes) → the second message box with the text
 //!   formatted (L01 `0x325830`, L08 `0x33e1e0`, L17 `0x332e50`, L18 `0x34b138`; `func_L01_00324550(text, ...)`: the
-//!   string by id, `vsprintf` into a buffer, `0x2ed8b8` → L00 `0x30eff8`) and the talk record marked (L01 `0x3259b0`,
-//!   `func_L01_003246D0`: not ported, below).
+//!   string by id, `vsprintf` into a buffer, `0x2ed8b8` → L00 `0x30eff8`); most callers then mark the talk record
+//!   ([`mark`], below; not every offer does, so the callers mark it).
 //! * **The scene hide** ([`hide_in_scene`], [`show`]): while a talk scene the NPC asked for plays (the game in the scene
 //!   mode, `0x1a8f00` = 2) it is hidden (`+0x31` 0, mode | 1), and shown again when the scene is over (`0x371ba8`,
 //!   crate::scene::Scenes::in_scene).
@@ -35,14 +35,29 @@
 //!   `0x1b22e0`) hung on joint list 0 of the first scene actor of the NPC's class (`0x312f80`), at the scale.
 //!
 //! The consumers: L04 crate::moby::classes::level04::talkers (0x0c38, 0x0d3e, 0x0da8), L06
-//! crate::moby::classes::level06::host (0x0ccf), L08 level08::buyer, L09 level09::talker, L11 level11::sellers
-//! (0x0e95, 0x0b7c), L17 / L18 their sellers, Oozla's 0x0ace (crate::moby::classes::oozla::update_0ace).
+//! crate::moby::classes::level06::host (0x0ccf), L08 level08::buyer (also L19's), L09 level09::talker and seller,
+//! L11 level11::sellers (0x0e95, 0x0b7c), L12 level12::trader, L14 level14::seller, L17 / L18 their sellers, L18's
+//! director 0x0f01 (the busy word), L19's director (0x1254, 0x1313) and switches (0x1267), Oozla's 0x0ace
+//! (crate::moby::classes::oozla::update_0ace); the ferries set their records' words (crate::moby::classes::ferry,
+//! level17::shuttle).
 //!
-//! Not ported: the talk record (`0x3259b0` → `0x325980(0x3259d8(m))`, G-CLS-008: the moby's place in the level's
-//! talk list `0x1c5d20` from `0x28ead0[level]`, its record `0x139a34 + 0x10·i` set to 1; the missions' kinds 4 / 5 read
-//! it and are not ported either); the level's "NPC busy" word each sets while its scene plays (L04 `0x1b2228`, L06
-//! `0x1b2568`, L08 `0x1b2728`, L09 `0x1b2528`, L11 `0x1b3368`, L17 `0x1b2968`, L18 `0x1b24e8`; read by L00 `0x2fa968`,
-//! `0x30df80`, `0x30e200`, none ported); the autosave after a sale (`0x30d658(0, −1)`, as everywhere in the port).
+//! * **The talk records** (G-CLS-008, [`Record`]): the save's global chunk 15 (`0x139a28`, 0x72 records of 0x10:
+//!   x, y, yaw, word), [`FIRST`]`[level]..[level + 1]` each level's. The level load (`0x3012a0`) lists the placed
+//!   mobys whose record word 0x74 (the R&C2 record's `+0x84`) is not −1 at that place in the level's talk list (L00
+//!   `0x309e90(m, k)` = L01 `0x2ff868`; the list L00 `0x1c55a0` / L01 `0x1c5d20`, [`Mem::list`]) and the parked
+//!   ship 0x0d54 at 0 ([`register`]); the autosave copies each listed moby's x, y and yaw into its record (L00
+//!   `0x30a018`, [`copy_places`]). The NPCs mark theirs talked to ([`mark`], L01 `0x3259b0` → `0x325980(0x3259d8(m))`:
+//!   the word 0 → 1) and the ferries set its word to their stop ([`set_word`], L06 `0x370b60`, the decomp's
+//!   `func_L06_0036F728`). The missions' conditions 4 / 5 read the word (crate::travel::missions).
+//! * **The NPC busy word** (L00 `0x1b1b68`; L01 `0x1b22a8`, L04 `0x1b2228`, L06 `0x1b2568`, L08 `0x1b2728`, L09
+//!   `0x1b2528`, L11 `0x1b3368`, L12 `0x1b2b68`, L14 `0x1b2268`, L17 `0x1b2968`, L18 `0x1b24e8`, L19 `0x1b26a8`: one
+//!   word, at each level's place (as each level's `0x30df80` reads it);
+//!   crate::game::GameState::npc_busy): set every tick an NPC's talk scene plays ([`busy`]; also the platinum bolt's
+//!   and the swamp reward's shows, Oozla's transporter, Tabora's pickup 0x0e5b, and engine pieces not ported: L00
+//!   `0x3450d0`, `0x384f60`, `0x392410`, `0x392ce0`, `0x3b6cf8`, `0x3b7818`, `0x42aa28`). The HUD's update and draw
+//!   (`0x30df80`, `0x30e200`) do nothing while it is set (the engine's HUD); `0x2fa968` clears it each frame (the
+//!   engine's tick start) and skips its own tasks then (not ported).
+//! * **The autosave** after a sale or a talk: crate::game::GameState::autosave (`0x30d658(0, −1)`).
 
 use super::{countdown, joint_aim, Ctx, MobyWorld};
 use crate::hero::physics::{add, add_rot, atan2, dist, dist2, len, len2, rot_dist, sub, sub_rot, V3};
@@ -56,7 +71,69 @@ pub struct Mem {
     /// L21 `$gp−0x3b0` (`0x1aec40`): the museum's commentary kinds heard, a bit each (cleared by its set-up;
     /// crate::moby::classes::level21::commentary).
     pub museum_heard: i32,
+    /// The talk list (L00 `0x1c55a0`, L01 `0x1c5d20`): per talk record, the moby listed there this level ([`register`]).
+    pub list: Vec<Option<usize>>,
 }
+
+/// `0x28d850` (L00; L01 `0x28ead0`, the same in every level): each level's first talk record, the last the end.
+pub const FIRST: [usize; 20] = [0, 2, 6, 0xa, 0x19, 0x1c, 0x25, 0x29, 0x2d, 0x31, 0x35, 0x3a, 0x3e, 0x43, 0x4f, 0x56, 0x5d, 0x64, 0x6b, 0x72];
+/// The talk records (the save's chunk 15, `0x139a28`, 0x720 bytes).
+pub const RECORDS: usize = 0x72;
+/// The levels that have talk records (`0x13`: the lookups' `level < 0x13`).
+const LEVELS: usize = 0x13;
+
+/// A talk record (`0x139a28 + 0x10·i`): the listed moby's x, y and yaw at the last autosave, and its word (0 never
+/// talked to, 1 talked to, a ferry's stop).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Record {
+    pub x: f32,
+    pub y: f32,
+    pub yaw: f32,
+    pub word: i32,
+}
+
+fn level_of(g: &crate::game::GameState) -> Option<usize> { usize::try_from(g.level).ok().filter(|&l| l < LEVELS) }
+
+/// L00 `0x309e90(m, k)`: moby `id` listed at the level's talk slot `k` (no list past level 0x12).
+pub fn register(w: &mut MobyWorld, g: &crate::game::GameState, id: usize, k: i32) {
+    let Some(l) = level_of(g) else { return };
+    let Some(i) = usize::try_from(FIRST[l] as i32 + k).ok().filter(|&i| i < RECORDS) else { return };
+    if w.talk.list.len() < RECORDS { w.talk.list.resize(RECORDS, None); }
+    w.talk.list[i] = Some(id);
+}
+
+/// L01 `0x3259d8(m)`: `id`'s talk record among the level's: 0 past level 0x12, −1 when it is not listed.
+pub fn find(w: &MobyWorld, g: &crate::game::GameState, id: usize) -> i32 {
+    let Some(l) = level_of(g) else { return 0 };
+    (FIRST[l]..FIRST[l + 1]).find(|&i| w.talk.list.get(i).copied().flatten() == Some(id)).map_or(-1, |i| i as i32)
+}
+
+/// L01 `0x3259b0(m)` (`0x325980(0x3259d8(m))`): `id`'s talk record marked talked to (its word 0 → 1). Not listed:
+/// the game marks the word before the records (`0x139a24`, in no save chunk), which the port leaves out.
+pub fn mark(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
+    let i = find(w, ctx.game, id);
+    if let Some(r) = usize::try_from(i).ok().and_then(|i| ctx.game.talk_records.get_mut(i)) {
+        if r.word == 0 { r.word = 1; }
+    }
+}
+
+/// L06 `0x370b60(m, v)` (the decomp's `func_L06_0036F728`): `id`'s talk record's word set to `v` when it is listed.
+pub fn set_word(w: &MobyWorld, id: usize, ctx: &mut Ctx, v: i32) {
+    let i = find(w, ctx.game, id);
+    if let Some(r) = usize::try_from(i).ok().and_then(|i| ctx.game.talk_records.get_mut(i)) { r.word = v; }
+}
+
+/// L00 `0x30a018` (the autosave's start): each listed moby's x, y and yaw (`+0x10`, `+0x14`, `+0xf8`) into its record.
+pub fn copy_places(w: &MobyWorld, g: &mut crate::game::GameState) {
+    let Some(l) = level_of(g) else { return };
+    for i in FIRST[l]..FIRST[l + 1] {
+        let Some(m) = w.talk.list.get(i).copied().flatten().and_then(|id| w.mobys.get(id)) else { continue };
+        if let Some(r) = g.talk_records.get_mut(i) { (r.x, r.y, r.yaw) = (m.pos[0], m.pos[1], m.rot[2]); }
+    }
+}
+
+/// The NPC busy word (module docs) set (`on`) or cleared; the engine also clears it each tick (`0x2fa968`).
+pub fn busy(ctx: &mut Ctx, on: bool) { ctx.game.npc_busy = on; }
 
 /// A moby index in the pvars at `off` (as the level data gives them: −1 none).
 pub fn link(w: &MobyWorld, id: usize, off: usize) -> Option<usize> { usize::try_from(w.mobys[id].pv_i(off)).ok().filter(|&k| k < w.mobys.len()) }
@@ -91,7 +168,7 @@ pub fn say(ctx: &mut Ctx, text: i32, args: &[i32]) {
 }
 
 /// While Ratchet can talk to `id` ([`can_talk`] within `r`, from the tenth frame): the text in the second box
-/// ([`say`]) and the talk record marked (`0x3259b0`, not ported). True when he can.
+/// ([`say`]). True when he can (the caller marks the talk record, [`mark`], where the game does).
 pub fn offer(w: &MobyWorld, id: usize, ctx: &mut Ctx, r: f32, text: i32, args: &[i32]) -> bool {
     if !can_talk(w, id, ctx, r, 10) { return false; }
     say(ctx, text, args);

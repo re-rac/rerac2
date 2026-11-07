@@ -9,10 +9,11 @@
 //! * **0x0e5b** ([`update_0e5b`], `0x40ff80`; the decomp's v2.00 `func_US2_L08_0040FF80`): the item 0x15's pickup.
 //!   It is gone once item 13 is had. Otherwise it is raised 0.75, scaled 1.5 against its class, and spins 4.5° a
 //!   tick. With Ratchet in cuboid `+4` it starts scene 0x5b; when the scene is over it puts Ratchet at cuboid `+8`'s
-//!   place and angles, gives item 0x15 and message 0x122b, and goes.
+//!   place and angles, gives item 0x15 and message 0x122b, asks for the autosave (`0x319bc8(0, −1)` = L00 `0x30d658`,
+//!   crate::game::GameState::autosave), and goes.
 //!
 //! Not ported: 0x0e5b's sparkle (`0x40fce0` = L01 `0x3cff58`), its hiding during the scene, the flag
-//! `0x1b270a`, and the autosave (`0x319bc8` = L00 `0x30d658`).
+//! `0x1b270a`.
 
 use crate::moby::{platform, Ctx, MobyWorld};
 
@@ -66,10 +67,13 @@ pub fn update_0e5b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         2 => {
+            crate::moby::talk::busy(ctx, true);
             if ctx.game.scenes.in_scene() { return; }
+            crate::moby::talk::busy(ctx, false);
             if let Some((pos, rot)) = ctx.level.cuboid_place(w.mobys[id].pv_i(8)) { ctx.hero.teleport(pos, rot); }
             ctx.game.get_item(0x15);
             ctx.game.messages.push(crate::msgbox::Request::Text { text: 0x122b, ticks: None });
+            ctx.game.autosave(-1);
             w.delete(id);
         }
         _ => {}

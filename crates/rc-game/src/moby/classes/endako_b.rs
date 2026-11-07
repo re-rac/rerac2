@@ -132,7 +132,7 @@ fn delete_group(w: &mut MobyWorld, g: i32) {
 ///
 /// Not ported: the ship byte `0x152c26` (`0x369cc0`), the stats some hints read (`0x18c840` / `0x18c844`, `0x18c7c0`:
 /// G-HERO-005, read as none), the hint 0xa33 (slot 0x8a: its test `0x312640` reads the list `0x1b2918` the port does
-/// not have), the end's camera record reset (`0x43cf38([0x5c])`) and autosave (`0x30ea10`), the draw `0x3f27e0`
+/// not have), the end's camera record reset (`0x43cf38([0x5c])`), the draw `0x3f27e0`
 /// (registered while `$gp+0x1ef0` is set: nothing on the port sets it).
 pub fn update_0c25(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let pv = |w: &MobyWorld, o: usize| w.mobys[id].pv_i(o);
@@ -239,6 +239,8 @@ fn scene_end_0c25(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     ctx.hero.items.ask(held, SWINGSHOT);
     let g = w.mobys[id].pv_i(0x80);
     delete_group(w, g);
+    // `0x30ea10(0, −1)`: the autosave (crate::game::GameState::autosave).
+    ctx.game.autosave(-1);
 }
 
 /// 0x0982 / 0x0983 (`0x3cc4e8`, two placed each): a lift between its place and the height of the cuboid `[0x60]`
@@ -392,7 +394,7 @@ pub fn update_097a(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
 /// once the moby `[0x1c]` is gone it hooks `[0x00]` and `[0x04]`, marks the watch done (`0x139630` bit 0 on Endako,
 /// bit 1 on level 0xe) and goes to 4.
 ///
-/// Not ported: its marker drawn while `[0x10]` is set (`0x41af10` → `0x33a558`, which the port has no particle for).
+/// Last each tick, while `[0x10]` is set and it was drawn (`+0x31`), its marker ([`marker_0ef9`]).
 pub fn update_0ef9(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let pv = |w: &MobyWorld, o: usize| w.mobys[id].pv_i(o);
     if pv(w, 0x14) != 0 { w.mobys[id].has_collision = false; }
@@ -420,6 +422,18 @@ pub fn update_0ef9(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => false,
     };
     if watch && !alive(w, pv(w, 0x08)) && !alive(w, pv(w, 0x0c)) { w.mobys[id].set_state(2, -1); }
+    if pv(w, 0x10) != 0 && w.mobys[id].drawn != 0 { marker_0ef9(w, id, ctx); }
+}
+
+/// `0x41af10` (L14 `0x421e90`; the decomp's `func_L03_00419850`): a marker (crate::particles::marker, type 0x29) 2
+/// above it, its frame `[0x10] + 2`, `0x80202080`, size 0.333 (`$gp+0x2a54..`), near 0x20, for 2 ticks.
+fn marker_0ef9(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
+    use crate::particles::marker;
+    let m = &w.mobys[id];
+    let look = marker::Look { rgba: 0x8020_2080, size: f32::from_bits(0x3eaa_7efa), near: 0x20, life: 2, alpha: 0xff };
+    let frame = (m.pv_i(0x10) + 2).max(0) as usize;
+    let at = [m.pos[0], m.pos[1], m.pos[2] + 2.0, 0.0];
+    if let Some(sys) = ctx.parts.as_deref_mut() { marker::marker(sys, at, Some(id), frame, &look); }
 }
 
 /// 0x099d (`0x3cd7e0`, one placed): the Swingshot's pull target (crate::hero::swing, `0x2c4340`): drawn, it turns 6°

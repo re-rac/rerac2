@@ -15,9 +15,10 @@
 //!   `[4]` / `[8]` when it has both; at the end of its sequence 1 it goes back to 0 hidden; Ratchet's sequence back
 //!   to idle (30) at its end; then 60 ticks and it is found: the message, Ratchet let go where he is, the camera
 //!   behind him, deleted.
+//! * **Found** either way: the autosave (`0x303030(0, −1)` = L00 `0x30d658`, crate::game::GameState::autosave).
 //!
 //! Not ported: its four glow rings (`0x398e18`, `0x3311b0` by `[0x20..0x5c]`) and sparkles (`0x3992a0`), the count
-//! `$gp+0x520`, the autosave (`0x303030`), `0x2dd378(10)`, the flags `0x1b1fa8` / `0x18c0df` / `0x1b22a8` and the
+//! `$gp+0x520`, `0x2dd378(10)`, the flags `0x1b1fa8` / `0x18c0df` / `0x1b22a8` and the
 //! mirror bit `0x1a7a4d`.
 
 use crate::hero::physics::{add, add_rot, dist2, sub_rot, V3};
@@ -47,6 +48,7 @@ fn found(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         if ctx.game.platinum[i] == 0 { ctx.game.platinum_found += 1; }
         ctx.game.platinum[i] = 1;
     }
+    ctx.game.autosave(-1);
 }
 
 /// `0x398790`.
@@ -120,6 +122,8 @@ pub(super) fn show(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// State 2 (and `0x399088`, the camera).
 fn held(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    // The level's busy word (`0x1b22a8`, crate::moby::talk::busy): the HUD off through the show.
+    crate::moby::talk::busy(ctx, true);
     ctx.hero.request_state(0x6f, false);
     let (hp, hr) = (ctx.hero.pos, ctx.hero.rot);
     w.mobys[id].pos = hp;

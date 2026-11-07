@@ -31,7 +31,7 @@
 //!
 //! Not ported: the target held by `0x18b270` (nothing sets it on Aranos), the gravity frames and moving frames of
 //! the throw and the arc (`0x326448`'s other gravities, `0x37f538` / `0x37f618`, `0x380e08` / `0x380ec0`: nothing on
-//! Aranos; down is `(0, 0, −1)` here), the rumble, the statistics (`0x3f9f70`), the trail, the hit the ground line
+//! Aranos; down is `(0, 0, −1)` here), the rumble, the trail, the hit the ground line
 //! under a moby delivers (`0x3efda0`'s `0x2de878(.., 6, target)` passes the moby as its hit template).
 
 use crate::hero::items::{row, GRAVITY_BOMB};
@@ -397,7 +397,7 @@ fn turn(v: V3, k: V3, a: f32) -> V3 {
     std::array::from_fn(|i| v[i] * c + x[i] * s + k[i] * d * (1.0 - c))
 }
 
-/// `0x3f0310`.
+/// `0x3f0310`; each moby the blast hits takes Acid (`0x3f9f70(m, 0x2a, the hand)`, crate::moby::weapon_mods).
 pub fn update_blast(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].state == 0 {
         let m = &mut w.mobys[id];
@@ -433,6 +433,9 @@ pub fn update_blast(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     tm.kind = (x.o_class as u16 as u32) << 16 | 0x0305;
                     let p = x.pos;
                     w.deliver_hit_any(t, &tm, [p[0], p[1], p[2], 1.0]);
+                    // `0x3f9f70(t, 0x2a, the hand)` (crate::moby::weapon_mods).
+                    let owner = w.mobys[id].parent;
+                    crate::moby::weapon_mods::acid(w, ctx, t, GRAVITY_BOMB, owner);
                 }
             }
             let m = &mut w.mobys[id];
@@ -483,7 +486,9 @@ fn nuke_damage(row: usize) -> f32 {
 /// Its effect — the cloud's smoke records, the dome, the stem and the cap — is crate::moby::classes::mini_nuke: started
 /// after the smoke burst, ticked and drawn each tick; state 6 lasts until its records are all gone.
 ///
-/// Not ported: the trail slot it takes (`0x32b1b8`), the statistics (`0x3f9f70`).
+/// Each moby it hits takes Acid (`0x3f9f70(m, 0x47, the hand)`, crate::moby::weapon_mods).
+///
+/// Not ported: the trail slot it takes (`0x32b1b8`).
 pub fn update_mini_blast(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].state == 0 {
         let m = &mut w.mobys[id];
@@ -518,6 +523,9 @@ pub fn update_mini_blast(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     tm.kind = (x.o_class as u16 as u32) << 16 | 0x0305;
                     let p = x.pos;
                     w.deliver_hit_any(t, &tm, [p[0], p[1], p[2], 1.0]);
+                    // `0x3f9f70(t, 0x47, the hand)` (crate::moby::weapon_mods).
+                    let owner = w.mobys[id].parent;
+                    crate::moby::weapon_mods::acid(w, ctx, t, 0x47, owner);
                 }
             }
             let m = &mut w.mobys[id];

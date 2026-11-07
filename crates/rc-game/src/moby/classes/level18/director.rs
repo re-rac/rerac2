@@ -105,9 +105,9 @@ const WAVE_SHOWS: [&[usize]; 5] = [&[0, 1], &[2], &[3, 5, 6], &[4], &[7]];
 /// `0x3fbd90`: a member of a group put into play at a point out of view — 1324 bytes and the classes' own entries);
 /// the camera cuts (`0x3fb2c0` / `0x3fb360`, cuboids `+0x90..` and the bits `0x1395b8 + 0x94`: the scripted camera
 /// `0x335438` / `0x335370` / `0x3353c8` and its sound); the draw callback `0x3fc2c0` (eleven beams between two fixed
-/// lists of points); `0x384740` (`0x152c26` = 1) before each placing; the
-/// NPC-busy word `0x1b24e8` (crate::moby::talk); the tweak's gate `0x1cb9c0` (read as 0); the autosave after the
-/// scene (`0x327c10` = L00 `0x30d658(0, −1)`); the skill point's reward flag `0x1a903c`.
+/// lists of points); `0x384740` (`0x152c26` = 1) before each placing; the tweak's gate `0x1cb9c0` (read as 0); the
+/// skill point's reward flag `0x1a903c`. Its scene holds the NPC busy word `0x1b24e8` (crate::moby::talk::busy) and is
+/// followed by the checkpoint and the autosave (`0x327c10` = L00 `0x30d658(0, −1)`, crate::game::GameState::autosave).
 pub fn update_0f01(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let p = |w: &MobyWorld, o: usize| w.mobys[id].pv_i(o);
     let done = |w: &MobyWorld, ctx: &Ctx, o: usize| mission_is_done(ctx.game, w.mobys[id].pv_i(o));
@@ -207,12 +207,14 @@ fn scene(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
     } else if w.level18.scene_step == 2 {
         if ctx.game.scenes.in_scene() {
+            crate::moby::talk::busy(ctx, true);
             if ctx.game.scenes.mode == crate::scene::SCENE {
                 let m = &mut w.mobys[id];
                 m.drawn = 0;
                 m.mode |= 1;
             }
         } else {
+            crate::moby::talk::busy(ctx, false);
             // `0x2e4310(0)`: the body's idle.
             match ctx.hero.mode {
                 0 => ctx.hero.request_state(0, true),
@@ -228,6 +230,7 @@ fn scene(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 ctx.game.messages.push(crate::msgbox::Request::Text { text: GIFT_TEXT, ticks: None });
             }
             ctx.game.save_checkpoint(ctx.hero.pos, ctx.hero.rot);
+            ctx.game.autosave(-1);
         }
     }
 }

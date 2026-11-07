@@ -45,7 +45,7 @@
 //! Not ported: the lock cheat (`0x18b270`, `0x32b4d0`), the gravity frames' trackers and bends (`0x37f538` /
 //! `0x37f618` / `0x37f5f8`, `0x380e08`, the way flattened along the frame's up at the launch), the camera's flag the
 //! steering sets (`0x428588`: the current camera of class 4 or 0x51 marked), the bounce sound's volume (`0x3605f0`'s
-//! f12), the weapon mods' effects on a hit (`0x3f9f70`), the blast's screen flash (crate::moby::blast). The bomb's
+//! f12), the blast's screen flash (crate::moby::blast). The bomb's
 //! steering's lag and set-off rules read the item held, 0x19 or 0x46 (0x46 is a row, never an item: as the original).
 //!
 //! **The Tetrabomb Gun**, the upgrade (rows 0x46, 0x67, 0x68, crate::hero::items::UPGRADE_ROWS; L00 `0x266240`,
@@ -403,13 +403,17 @@ fn spawn_fused(w: &mut MobyWorld, ctx: &mut Ctx, speed: f32, damage: f32, height
 }
 
 /// `0x3aabc8(bomb, pvars, at, _)`: every moby within 6 of `at` but Ratchet (flags 1) takes the bomb's damage (flags
-/// 0x810000, along its way, kind `0x05d8 << 16 | 0x0203`).
+/// 0x810000, along its way, kind `0x05d8 << 16 | 0x0203`) and Acid (crate::moby::weapon_mods).
 fn hit(w: &mut MobyWorld, ctx: &Ctx, id: usize, at: V3) {
     let m = &w.mobys[id];
     let d = set_len(m.pv_v(0), 1.0);
     let mut t = HitTemplate::new(m.pv_f(0x18), Some(id), 0x81_0000, [d[0], d[1], d[2], NO_KNOCK_LIMIT]);
     t.kind = (BOMB as u16 as u32) << 16 | 0x0203;
-    w.sphere_hit(ctx.scene, at, 6.0, 1, ctx.hero_moby, Some(&t));
+    let owner = m.parent;
+    let hit = w.sphere_hit_list(ctx.scene, at, 6.0, 1, ctx.hero_moby, Some(&t));
+    // `0x3f9f70(m, 0x46 / 0x19, the bomb's owner)` by the item's row level (`0x2624f4`; crate::moby::weapon_mods).
+    let item = if ctx.game.upgrade_level(crate::hero::items::HOVERBOMB) != 0 { 0x46 } else { crate::hero::items::HOVERBOMB };
+    for m in hit { crate::moby::weapon_mods::acid(w, ctx, m, item, owner); }
 }
 
 /// The loop sound let go when still playing (`0x3602f0`).

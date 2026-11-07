@@ -89,8 +89,10 @@
 //!
 //! Its glow in the hand (`0x2a7ed8`'s case 0x1b): only on the upgraded rows (crate::hero::items).
 //!
-//! Not ported: the pad rumble (`0x2d6d60(0x294840)` / `0x2d6f38`), the lock cheat (`0x18b270`), the weapon mods'
-//! effects on a hit (`0x3f9f70(moby, 0x1b, owner)`), the gravity frames and moving frames (the way flattened to the
+//! The weapon mod (`0x3f9f70(moby, 0x45 upgraded / 0x1b, owner)`, crate::moby::weapon_mods): Acid on the moby a rocket
+//! struck and on every moby in its blast.
+//!
+//! Not ported: the pad rumble (`0x2d6d60(0x294840)` / `0x2d6f38`), the lock cheat (`0x18b270`), the gravity frames and moving frames (the way flattened to the
 //! frame at the make, `0x380e08`, `0x37f538` / `0x37f618` / `0x37f5f8`), the projectile list `0x1b1f30` the rocket
 //! joins (`0x3216e0` / `0x321760`: no reader ported), the frame (1) of the standing use's sequence (the use stance's
 //! request carries none: frame 0). The upgraded rows (row 0x45 on, the hand 0x1004) are the Megarocket Cannon,
@@ -685,10 +687,13 @@ pub fn update_rocket(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 }
             }
             Some(m) if Some(m) == ctx.hero_moby || Some(m) == w.mobys[id].pv_link(pv::OWNER) => {}
-            Some(_) => {
+            Some(m) => {
                 w.mobys[id].timer = 2;
                 w.mobys[id].pos = o.point;
                 exclude = Some(id);
+                // `0x3f9f70(m, 0x45 / 0x1b, owner)` (crate::moby::weapon_mods).
+                let owner = w.mobys[id].parent;
+                crate::moby::weapon_mods::acid(w, ctx, m, mod_item(ctx), owner);
             }
         }
     }
@@ -725,8 +730,14 @@ fn blast(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, r: &ItemRow, spared: Optio
     let Some(sc) = ctx.scene else { return };
     let ids = crate::collision::mobys::coll_sphere_mobys(sc, pos, radius, QueryFlags(0x10), Some(id));
     w.hits.last_target = ids.first().copied();
+    // `0x3f9f70(m, 0x45 / 0x1b, owner)` on each (crate::moby::weapon_mods), then the knock.
+    let (item, owner) = (mod_item(ctx), w.mobys[id].parent);
+    for &m in &ids { crate::moby::weapon_mods::acid(w, ctx, m, item, owner); }
     w.knock_hits(blast_damage(r), 1.0, 1.0, id, pos, &ids, spared, 0x81_0000, 3, 1);
 }
+
+/// The weapon mods' item (`0x3f9f70`'s): the upgraded row 0x45 when the item's row has a level (`0x2624f4`), else 0x1b.
+fn mod_item(ctx: &Ctx) -> i32 { if ctx.game.upgrade_level(MINIROCKET) != 0 { 0x45 } else { MINIROCKET } }
 
 /// `0x3adea0(rocket, from)` (module docs).
 fn sparks(w: &MobyWorld, id: usize, ctx: &mut Ctx, from: V3) {

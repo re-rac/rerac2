@@ -22,9 +22,13 @@
 //!   Ratchet (`0x356db8` = L00 `0x359b20`); else the autosave.
 //! * **9**: nothing.
 //!
-//! Not ported: the level's NPC busy word `0x1b25a8` while its scenes play, the save's log of its state
-//! (`0x357330` = L06 `0x39a2f0` on the list `0x21dde0`), the autosave (`0x3098d0` = L00 `0x30d658(0, −1)`), the
-//! debug prints (`0x2a82f0`).
+//! The talk record (crate::moby::talk::mark) is marked once the scene 0x5f is queued and with the texts 0x1323 /
+//! 0x1324; the level's NPC busy word `0x1b2528` (crate::moby::talk::busy) is set while its scenes play (2, 5, 8). In 8
+//! its new state is noted in the level's state log (`0x357330(m + 0x20, 1, m, 1, 0x21dd90)` = L06 `0x39b620`,
+//! crate::game::GameState::log_state: a death after the checkpoint keeps it in 9), and with no mission the autosave
+//! (`0x3098d0` = L00 `0x30d658(0, −1)`, crate::game::GameState::autosave) stands for the checkpoint.
+//!
+//! Not ported: the debug prints (`0x2a82f0`).
 
 use crate::moby::talk;
 use crate::moby::{Ctx, MobyWorld};
@@ -69,13 +73,16 @@ pub fn update_0e10(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         1 => {
             if ctx.level.in_cuboid(w.mobys[id].pv_i(ZONE), ctx.hero.pos) && ctx.game.scenes.queue.push(0x5f) {
+                talk::mark(w, id, ctx);
                 ctx.game.scenes.start_queue(ctx.hero.hp);
                 w.mobys[id].set_state(2, -1);
             }
         }
         2 => {
+            talk::busy(ctx, true);
             talk::hide_in_scene(w, id, ctx);
             if ctx.game.scenes.in_scene() { return; }
+            talk::busy(ctx, false);
             after_scene(w, id, ctx);
             w.mobys[id].set_state(3, -1);
         }
@@ -96,8 +103,10 @@ pub fn update_0e10(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         5 => {
             w.mobys[id].update_dist = 0x40;
+            talk::busy(ctx, true);
             talk::hide_in_scene(w, id, ctx);
             if ctx.game.scenes.in_scene() { return; }
+            talk::busy(ctx, false);
             after_scene(w, id, ctx);
             talk::set_flag(ctx, SOLD_SCENE);
             let s = by_bolts(ctx);
@@ -105,11 +114,12 @@ pub fn update_0e10(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         6 => {
             if PRICE < bolts { return w.mobys[id].set_state(7, -1); }
-            talk::offer(w, id, ctx, R, 0x1323, &[PRICE]);
+            if talk::offer(w, id, ctx, R, 0x1323, &[PRICE]) { talk::mark(w, id, ctx); }
         }
         7 => {
             if bolts < PRICE { return w.mobys[id].set_state(6, -1); }
             if !talk::offer(w, id, ctx, R, 0x1324, &[PRICE]) { return; }
+            talk::mark(w, id, ctx);
             if ctx.hero.items.pressed & crate::pad::button::TRIANGLE != 0 && ctx.game.scenes.queue.push(PLANET as _) {
                 ctx.game.bolts = (bolts - PRICE) as u32;
                 ctx.game.scenes.queue.push(0x61);
@@ -119,18 +129,24 @@ pub fn update_0e10(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         8 => {
+            talk::busy(ctx, true);
             talk::hide_in_scene(w, id, ctx);
             if ctx.game.scenes.in_scene() { return; }
+            talk::busy(ctx, false);
             talk::show(w, id);
             ctx.game.unlock_planet(PLANET);
             crate::travel::new_planet_banner(ctx.game, PLANET);
             w.mobys[id].set_state(9, -1);
+            let state = w.mobys[id].state;
+            ctx.game.log_state(&w.mobys[id], 1, 0x20, &[state]);
             let mission = w.mobys[id].mission;
             if mission != 0xff {
                 let done = ctx.game.missions.get(ctx.game.level.max(0) as usize * 0x10 + mission as usize).is_some_and(|&b| b & 0x80 != 0);
                 if !done { ctx.game.mission_done(mission); }
                 let (p, r) = (ctx.hero.pos, ctx.hero.rot);
                 ctx.game.save_checkpoint(p, r);
+            } else {
+                ctx.game.autosave(-1);
             }
         }
         _ => {}

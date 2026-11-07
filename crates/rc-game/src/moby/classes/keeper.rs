@@ -785,7 +785,7 @@ fn shot_head(m: &crate::moby::Moby) -> V3 { add(m.pos, scale(m.rows[0], -0.3)) }
 /// velocity; its sound 1; a small burst: crate::moby::blast, size 0.3, 20 puffs, 45 streaks, the flash). Out of its
 /// 270 ticks or the world it ends where it was. Else its velocity eases toward its goal, its looped sound 0 plays
 /// (`+0x7c`) and every third tick its trail's four points (`+0x20..+0x50`) step back, the head first. Its draw:
-/// [`draw_shot`]. Not ported: its trail's particles (type 0x16, `0x402b08` → `0x33c5a8`, every tick).
+/// [`draw_shot`]. Its trail's puffs: [`trail_puff`] each time its count `+0x77` runs out (then `+0x78` again).
 pub fn update_shot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &mut w.mobys[id];
     match m.state {
@@ -871,6 +871,8 @@ pub fn update_shot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     let c = m.pv_b(0x77);
     m.set_pv_b(0x77, if c == 0 { m.pv_b(0x78) } else { c - 1 });
+    if c == 0 { trail_puff(w, id, ctx); }
+    let m = &mut w.mobys[id];
     if m.pv_b(0x79) == 0 {
         for k in (1..4).rev() { let p = m.pv_v(0x20 + 0x10 * (k - 1)); m.set_pv_v(0x20 + 0x10 * k, p); }
         m.set_pv_v(0x20, head);
@@ -879,6 +881,18 @@ pub fn update_shot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_b(0x79, m.pv_b(0x79) - 1);
     }
     if m.state == 1 { w.register_draw(id); }
+}
+
+/// `0x402b08` (L03 `0x3e3128`, L15 `0x3f3e08`; the decomp's `func_L02_004013C0`): a smoke puff at the shot
+/// (crate::particles::smoke, `0x33c5a8` = L00 `0x335a90`): size `randf(0.3, 1)`·210000, still (`0x1a8f20`, zero),
+/// `0x60309030` → `0x00107090`, its life `+0x75..+0x76` (`0x31faa8`). The colours are 0x0b5a's for every class (the
+/// other pair, `0x60303030` / `0x00303030`, is picked by the class but only left on the stack).
+fn trail_puff(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
+    let m = &w.mobys[id];
+    let g = &mut ctx.game.rng;
+    let size = g.randf(0.3, 1.0) * 210_000.0;
+    let life = g.rand_range(m.pv_b(0x75) as i32, m.pv_b(0x76) as i32);
+    if let Some(sys) = ctx.parts.as_deref_mut() { crate::particles::smoke::smoke(sys, g, size, m.pos, [0.0; 3], 0x6030_9030, 0x0010_7090, life); }
 }
 
 /// `$gp+0x277c`: the shot's colour (rgb; `+0x2778` the other class's, 0x0b1b).

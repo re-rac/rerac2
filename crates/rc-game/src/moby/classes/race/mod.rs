@@ -27,6 +27,7 @@
 //! shut, 0x10000000 open from the start), the three bolt prizes and the racers' time (`+0x14`, in 1/180 s).
 
 pub mod bike;
+pub mod hud;
 pub mod jets;
 pub mod racers;
 
@@ -128,6 +129,45 @@ pub struct Globals {
     pub g1918: i32,
     /// `0x1b0928`: the racers' route time (the last racer's `+0x1b4`).
     pub route_time: f32,
+    /// The race's frame ([`Frame`]).
+    pub frame: Frame,
+    /// `$gp+0x18dc`: the ticks the lap's time shows (180 at a lap); `$gp+0x18e0`: that lap's ticks (`$gp+0x18d8`,
+    /// [`Globals::g1918`], as the lap ended).
+    pub lap_shown: i32,
+    pub lap_time: i32,
+    /// The lap box's sound played (the port's: once at 173).
+    pub lap_sound: bool,
+    /// `$gp+0x18fc`: the ticks the standings show the time skill point's text (300 when it is earned).
+    pub skill_shown: i32,
+    /// The race HUD's and the standings' own words (crate::moby::classes::race::hud).
+    pub hud: hud::Words,
+}
+
+/// The race's frame (L04 `0x1b31d0..0x1b3210`, L11 the same; the decomp's v1.01 `0x1b3190..`): the bike's place on
+/// its route (`0x1b31d0`) and three rows (`0x1b31e0`: along the route, `0x1b31f0` across, `0x1b3200` up). The start
+/// (`0x41ace8`) takes the bike's place and rows (its across row negated); every [`progress`] of the bike from its
+/// route's point 2 on turns it along the segment it is measured on ([`Frame::turn`]). The race HUD reads it
+/// (crate::moby::classes::race::hud).
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Frame {
+    pub origin: V3,
+    pub rows: [V3; 3],
+}
+
+impl Frame {
+    /// The macro `UPDATE_FRAME` of `0x410e00`: the place the projection; the along row `from − to` (flat on the route
+    /// itself), kept as it was when that is under 0.01 long or turns against it; across `up × along` (`0x282dd8`), both
+    /// made unit (`0x1290e0`). `saved` is the along row before the call's reset of the rows (`0x283360`).
+    fn turn(&mut self, saved: V3, projection: V3, from: V3, to: V3, flatten: bool) {
+        self.origin = projection;
+        let mut d = sub(from, to);
+        if flatten { d[2] = 0.0; }
+        let along = if len(d) < 0.01 { saved } else { d };
+        let mut along = crate::hero::physics::unit(along);
+        if dot(along, saved) <= 0.0 { along = crate::hero::physics::unit(saved); }
+        self.rows[0] = along;
+        self.rows[1] = crate::hero::physics::unit(crate::hero::physics::cross(self.rows[2], along));
+    }
 }
 
 /// The patched routes (module docs).
@@ -318,11 +358,18 @@ pub fn patch_routes(paths: &mut Paths, level: &crate::level::LevelData, bike: &m
 /// `0x410e00(moby, state, link, point, wrap, bike)` (the decomp's `ProjectLinkedRouteDistance`): how far along the
 /// route `pos` is from its nearest point `point` of branch `link` (−1 the route): the nearer of the two segments about
 /// it, the distance along that; on a branch, scaled into its stretch of the route (its joins' distances). The bike's
-/// call also turns the race's frame `0x1b31a0` along the segment (not ported: nothing ported reads it).
-pub fn progress(paths: &Paths, set: &RouteSet, pos: V3, link: i32, point: i32) -> f32 {
+/// call (`frame`: the moby is the bike 0x0bbc) also turns the race's [`Frame`] along that segment.
+pub fn progress(paths: &Paths, set: &RouteSet, pos: V3, link: i32, point: i32, frame: Option<&mut Frame>) -> f32 {
     let base = set.main;
     let nb = paths.count(base);
     if nb == 0 { return 0.0; }
+    // The bike's call (`update`, the moby's class 0x0bbc) from point 2 on: the rows reset, then turned below.
+    let mut frame = frame.filter(|_| 2 <= point);
+    let saved = frame.as_ref().map_or([0.0; 3], |f| f.rows[0]);
+    if let Some(f) = frame.as_mut() { f.rows = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]; }
+    let mut turn = |proj: V3, from: V3, to: V3, flat: bool| {
+        if let Some(f) = frame.as_mut() { f.turn(saved, proj, from, to, flat); }
+    };
     let bstep = paths.step(base);
     if link == -1 {
         let prev = (point + nb - 1) % nb;
@@ -330,8 +377,10 @@ pub fn progress(paths: &Paths, set: &RouteSet, pos: V3, link: i32, point: i32) -
         let p0 = on_segment(paths.point(base, prev), paths.point(base, point), pos);
         let p1 = on_segment(paths.point(base, point), paths.point(base, next), pos);
         return if len_sq(sub(p0, pos)) < len_sq(sub(p1, pos)) {
+            turn(p0, paths.point(base, point), paths.point(base, prev), true);
             prev as f32 * bstep + crate::hero::physics::dist(p0, paths.point(base, prev))
         } else {
+            turn(p1, paths.point(base, next), paths.point(base, point), true);
             point as f32 * bstep + crate::hero::physics::dist(p1, paths.point(base, point))
         };
     }
@@ -346,6 +395,7 @@ pub fn progress(paths: &Paths, set: &RouteSet, pos: V3, link: i32, point: i32) -
         let p0 = on_segment(j, paths.point(path, point), pos);
         let p1 = on_segment(paths.point(path, point), paths.point(path, next), pos);
         if len_sq(sub(p0, pos)) < len_sq(sub(p1, pos)) {
+            turn(p0, paths.point(path, point), j, false);
             return paths.w(path, 3) - crate::hero::physics::dist(p0, paths.point(path, point));
         }
         prev = 0;
@@ -355,6 +405,7 @@ pub fn progress(paths: &Paths, set: &RouteSet, pos: V3, link: i32, point: i32) -
         let p0 = on_segment(paths.point(path, point), paths.point(path, prev), pos);
         let p1 = on_segment(j, paths.point(path, point), pos);
         if len_sq(sub(p1, pos)) < len_sq(sub(p0, pos)) {
+            turn(p1, paths.point(path, point), j, false);
             return paths.w(path, 4) + crate::hero::physics::dist(p1, paths.point(path, point));
         }
         next = point;
@@ -363,8 +414,10 @@ pub fn progress(paths: &Paths, set: &RouteSet, pos: V3, link: i32, point: i32) -
     let p0 = on_segment(paths.point(path, prev), paths.point(path, point), pos);
     let p1 = on_segment(paths.point(path, point), paths.point(path, next), pos);
     let v = if len_sq(sub(p0, pos)) < len_sq(sub(p1, pos)) {
+        turn(p0, paths.point(path, point), paths.point(path, prev), false);
         prev as f32 * step + crate::hero::physics::dist(p0, paths.point(path, prev))
     } else {
+        turn(p1, paths.point(path, next), paths.point(path, point), false);
         point as f32 * step + crate::hero::physics::dist(p1, paths.point(path, point))
     };
     let v = v / (n as f32 * step);
@@ -374,7 +427,7 @@ pub fn progress(paths: &Paths, set: &RouteSet, pos: V3, link: i32, point: i32) -
 /// `0x411a28(moby, state, &link, &point, &out, wrap)` (`func_L04_00410518`): the nearest point of the route and its
 /// branches (all of them), then [`progress`]. A moby that was at the route's start and is now past its half is kept
 /// at point 0.
-pub fn find_progress(paths: &Paths, set: &RouteSet, pos: V3, link: &mut i32, point: &mut i32) -> f32 {
+pub fn find_progress(paths: &Paths, set: &RouteSet, pos: V3, link: &mut i32, point: &mut i32, frame: Option<&mut Frame>) -> f32 {
     let (old_point, old_link) = (*point, *link);
     *link = -1;
     *point = 0;
@@ -393,13 +446,13 @@ pub fn find_progress(paths: &Paths, set: &RouteSet, pos: V3, link: &mut i32, poi
     }
     let half = (paths.count(set.main) as f32 * 0.5) as i32;
     if old_link == -1 && old_point == 0 && *link == old_link && half < *point { *point = 0; }
-    progress(paths, set, pos, *link, *point)
+    progress(paths, set, pos, *link, *point, frame)
 }
 
 /// `0x411c98(moby, state, &link, &point, wrap, bike)` (`func_L04_00410788`): the nearest point found about the last
 /// one (ten points of the route about it and the ends of the branches that leave or join there; on a branch, its ten
 /// about it and, near its ends, the route or branch it joins), then [`progress`].
-pub fn track_progress(paths: &Paths, set: &RouteSet, pos: V3, link: &mut i32, point: &mut i32, wrap: bool) -> f32 {
+pub fn track_progress(paths: &Paths, set: &RouteSet, pos: V3, link: &mut i32, point: &mut i32, wrap: bool, frame: Option<&mut Frame>) -> f32 {
     let base = set.main;
     let nb = paths.count(base);
     let mut best = 9999.0;
@@ -477,7 +530,7 @@ pub fn track_progress(paths: &Paths, set: &RouteSet, pos: V3, link: &mut i32, po
             if d < best { best = d; *point = k; *link = old_link; }
         }
     }
-    progress(paths, set, pos, *link, *point)
+    progress(paths, set, pos, *link, *point, frame)
 }
 
 /// `0x412358(link, point, z)` (`func_L04_00410e48`): Joba's drops off the track — on the route at points 166..186

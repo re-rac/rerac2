@@ -922,7 +922,7 @@ fn end_bots(w: &mut MobyWorld) { super::super::spiderbot::end(w, true, -1); }
 /// `0x444008(m, n)`: challenge `n` won — the first win of the first challenge: line 1 and item 0x13; of the second:
 /// line 3 and item 0x33; else line 0x1e / 0x1f, the XP and the bolts (`+0x1e0`, the bolt counter shown); the tenth's
 /// first win also the challenge mode's unlock (`0x1a7a60`, `0x375010(1)`, the message 0x1233, `0x1a903c`: not
-/// ported); its win counted. Not ported: the autosave (`0x31f9d0(0, −1)`).
+/// ported); its win counted; the autosave (`0x31f9d0(0, −1)`, crate::game::GameState::autosave).
 fn reward(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, n: i32) {
     if n == 0 && wins(ctx.game, 0) == 0 {
         say(w, id, ctx, 1);
@@ -943,6 +943,7 @@ fn reward(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, n: i32) {
     if let Some(k) = win_flag(n) {
         if let Some(f) = ctx.game.flags.get_mut(k) { *f = f.saturating_add(1); }
     }
+    ctx.game.autosave(-1);
 }
 
 /// `0x443e18`: back to the resort — line 0x20, state 1, chunk 0 with the resort's music, Ratchet at the cuboid `+0x15c`

@@ -106,13 +106,18 @@ impl MobyWorld {
     /// `0x2e14b0(r, centre, flags, ignore, tmpl)`: the mobys a sphere touches (grid order), each delivered the hit;
     /// returns how many it touched.
     pub fn sphere_hit(&mut self, scene: Option<&MobyScene>, centre: V3, r: f32, flags: u32, ignore: Option<usize>, t: Option<&HitTemplate>) -> usize {
-        let Some(sc) = scene else { return 0 };
+        self.sphere_hit_list(scene, centre, r, flags, ignore, t).len()
+    }
+
+    /// [`Self::sphere_hit`] returning the mobys touched (the query's list `0x1c3280` the callers walk after it).
+    pub fn sphere_hit_list(&mut self, scene: Option<&MobyScene>, centre: V3, r: f32, flags: u32, ignore: Option<usize>, t: Option<&HitTemplate>) -> Vec<usize> {
+        let Some(sc) = scene else { return Vec::new() };
         let ids = coll_sphere_mobys(sc, centre, r, QueryFlags(flags), ignore);
         self.hits.last_target = ids.first().copied();
         if let Some(t) = t {
             for &id in &ids { self.deliver_hit(id, t, [0.0, 0.0, 0.0, 1.0]); }
         }
-        ids.len()
+        ids
     }
 
     /// `0x31def8(damage, out, up, source, centre, list, n, spared, flags, a, b)`: every moby of `list` but `spared`

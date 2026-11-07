@@ -10,11 +10,21 @@
 //! 2, the Gravity Boots 0x13, the Grind Boots 0x14, the Charge Boots 0x36) and their "ever had" copy `0x1a7b38`; the
 //! ammo `0x139688` (0xe0); the quick-select list `0x139948` (0x70); the hand item `0x1a7398`; the quick select's slots `0x1a73b8` (8 items); the scenes seen
 //! `0x139768` (0x100: scene `n` is bit `n & 31` of the word at byte `n & !3`, as the scene code indexes it); the save
-//! clock `0x1a7360` (8 bytes, BCD); the skill points `0x1a7a68` (chunk 8, 0x20); the cheats `0x1a7a48` (chunk 7); the weapons' rows `0x139568` (chunk 30),
-//! their experience `0x139868` (chunk 40) and the arena's kills `0x188610` (chunk 41, crate::upgrades); and others not
-//! typed yet.
+//! clock `0x1a7360` (8 bytes, BCD); the race best times `0x1a7368` (10 words); the skill points `0x1a7a68` (chunk 8, 0x20); the cheats `0x1a7a48` (chunk 7); the weapons' rows `0x139568` (chunk 30),
+//! their experience `0x139868` (chunk 40) and the arena's kills `0x188610` (chunk 41, crate::upgrades); the talk
+//! records `0x139a28` (chunk 15, 0x72 × 0x10: crate::moby::talk::Record); and others not typed yet.
 //! **Level chunks** (boot `0x2562e8`, 10 per level, at `addr + level·size`): visited `0x1a7bf0` (1), the map mask
 //! `0x18d278` (0x800), the missions `0x19b2e8` (0x10), the uid bits `0x19b4a8` (0x400), and six not typed yet.
+//!
+//! **The autosave** (`0x30d658(force 0, level)`, every level's copy of boot `0x29c1d0`; [`GameState::autosave`] asks,
+//! [`autosave`] runs it with the card): the talk records' places (`0x30a018`, crate::moby::talk::copy_places), the
+//! game into the save's chunks, then `memcard_Save` (crate::memcard::MemCard::memcard_save: nothing without a card or
+//! slot, and only while the card's auto-save is on, `0x13955c`, after a save or a load).
+//!
+//! **The state log** (L06 `0x39b620` = L09 `0x357330`, the decomp's `func_L06_0039A2F0`; [`GameState::log_state`]):
+//! a moby's byte or pvar word noted at the head of the level's checkpoint block (L06 `0x21dc50`, L09 `0x21dd90`: a
+//! count, then 0x40 entries of 0x10), copied with the checkpoint (`0x359b20`) and, after a death, written back into
+//! the respawned moby of the same uid (`0x359d58` → `0x358e50` → `0x358d98`, [`replay_log`]).
 
 use crate::game::GameState;
 use rc_formats::disc::save_game::{ChunkDesc, ChunkTables, SaveFile, Section, LEVEL_SLOTS};
@@ -177,6 +187,10 @@ mod at {
     pub const SKILL_POINTS: u32 = 0x1a7a68;
     /// The cheats, one byte each (chunk 7; crate::cheats).
     pub const CHEATS: u32 = 0x1a7a48;
+    /// The hoverbike races' best times, ten words (crate::moby::classes::race::bike).
+    pub const RACE_TIMES: u32 = 0x1a7368;
+    /// The talk records (chunk 15, 0x72 records of x, y, yaw, word; crate::moby::talk).
+    pub const TALK: u32 = 0x139a28;
     /// The weapons' rows (chunk 30, 0x50 bytes), their experience (chunk 40, 0x38 words) and the arena's kills (chunk
     /// 41, 0x4c bytes): crate::upgrades.
     pub const ITEM_ROWS: u32 = 0x139568;
@@ -235,7 +249,12 @@ impl GameState {
         if let Some(b) = s.bytes_mut(G, at::PLATINUM, self.platinum.len()) { b.copy_from_slice(&self.platinum); }
         if let Some(b) = s.bytes_mut(G, at::SKILL_POINTS, self.skill_points.len()) { b.copy_from_slice(&self.skill_points); }
         if let Some(b) = s.bytes_mut(G, at::CHEATS, self.cheats.len()) { b.copy_from_slice(&self.cheats); }
+        for (i, &t) in self.race_times.iter().enumerate() { s.set_i32(G, at::RACE_TIMES + 4 * i as u32, t); }
         if let Some(b) = s.bytes_mut(G, at::ITEM_ROWS, self.upgrades.rows.len()) { b.copy_from_slice(&self.upgrades.rows); }
+        for (i, r) in self.talk_records.iter().enumerate() {
+            let a = at::TALK + 0x10 * i as u32;
+            for (k, v) in [r.x.to_bits() as i32, r.y.to_bits() as i32, r.yaw.to_bits() as i32, r.word].into_iter().enumerate() { s.set_i32(G, a + 4 * k as u32, v); }
+        }
         for (i, &x) in self.upgrades.xp.iter().enumerate() { s.set_i32(G, at::WEAPON_XP + 4 * i as u32, x); }
         for (i, &n) in self.upgrades.arena_kills.iter().enumerate() { s.set_i32(G, at::ARENA_KILLS + 4 * i as u32, n); }
         for (n, &seen) in self.scenes_seen.iter().enumerate() {
@@ -306,7 +325,12 @@ impl GameState {
         if let Some(b) = s.bytes(G, at::PLATINUM, self.platinum.len()) { self.platinum.copy_from_slice(b); }
         if let Some(b) = s.bytes(G, at::SKILL_POINTS, self.skill_points.len()) { self.skill_points.copy_from_slice(b); }
         if let Some(b) = s.bytes(G, at::CHEATS, self.cheats.len()) { self.cheats.copy_from_slice(b); }
+        for (i, t) in self.race_times.iter_mut().enumerate() { *t = s.i32(G, at::RACE_TIMES + 4 * i as u32); }
         if let Some(b) = s.bytes(G, at::ITEM_ROWS, self.upgrades.rows.len()) { self.upgrades.rows.copy_from_slice(b); }
+        for (i, r) in self.talk_records.iter_mut().enumerate() {
+            let w = |k: u32| s.i32(G, at::TALK + 0x10 * i as u32 + 4 * k);
+            *r = crate::moby::talk::Record { x: f32::from_bits(w(0) as u32), y: f32::from_bits(w(1) as u32), yaw: f32::from_bits(w(2) as u32), word: w(3) };
+        }
         for (i, x) in self.upgrades.xp.iter_mut().enumerate() { *x = s.i32(G, at::WEAPON_XP + 4 * i as u32); }
         for (i, n) in self.upgrades.arena_kills.iter_mut().enumerate() { *n = s.i32(G, at::ARENA_KILLS + 4 * i as u32); }
         for n in 0..self.scenes_seen.len() {
@@ -324,6 +348,76 @@ impl GameState {
             self.uid_bits[..n].copy_from_slice(&b[..n]);
         }
     }
+}
+
+impl GameState {
+    /// `0x30d658(0, level)` from a moby's update: the autosave asked for (module docs), `level` −1 for the current
+    /// one; the engine runs it ([`autosave`]) once the tick's mobys are done. A second ask in the tick finds the card's
+    /// save already queued, so the first one stands.
+    pub fn autosave(&mut self, level: i32) {
+        if self.autosave_ask.is_none() { self.autosave_ask = Some((false, level)); }
+    }
+
+    /// `0x30d658(1, level)`: the save forced (the card's auto-save turned on with it; Aranos's arrival 0x1330 after a
+    /// new game, crate::moby::classes::props::update_1330); queued, the card's flag 0x200 is raised (the caller's
+    /// `0x1a7424 |= 0x200`, the engine's).
+    pub fn save_forced(&mut self, level: i32) {
+        if self.autosave_ask.is_none() { self.autosave_ask = Some((true, level)); }
+    }
+
+    /// L06 `0x39b620(value, size, m, tag, log)` (module docs): `bytes` (at most 4) of moby `m` at `off` — its record
+    /// (`tag` 1: the state byte `+0x20`) or its pvars (`tag` 2) — noted in the state log: an entry of the same place,
+    /// size, uid (`+0xb2`) and class (`+0xaa`) takes the new value, else one is added (the game does not bound the
+    /// count).
+    pub fn log_state(&mut self, m: &crate::moby::Moby, tag: i16, off: i32, bytes: &[u8]) {
+        let n = bytes.len().min(4);
+        let mut value = [0u8; 4];
+        value[..n].copy_from_slice(&bytes[..n]);
+        let mut tag_new = tag;
+        for e in self.state_log.iter_mut() {
+            if e.off != off || e.size != n as u16 || e.uid != m.uid || e.class != m.o_class { continue; }
+            tag_new = e.tag;
+            if e.tag != 0 {
+                e.value = value;
+                return;
+            }
+        }
+        self.state_log.push(LogEntry { off, value, size: n as u16, tag: tag_new, uid: m.uid, class: m.o_class });
+    }
+}
+
+/// A state log entry (0x10 bytes): the place (`+0`, from the moby or its pvars), the value (`+4`), its size (`+8`),
+/// the kind (`+0xa`: 1 the moby's record, 2 its pvars), the moby's uid (`+0xc`) and class (`+0xe`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LogEntry {
+    pub off: i32,
+    pub value: [u8; 4],
+    pub size: u16,
+    pub tag: i16,
+    pub uid: i16,
+    pub class: i16,
+}
+
+/// L00 `0x358d98(log)`: each entry written back into the first moby of its uid (`0x358d50`: the uid alone). The
+/// record's fields the port keeps by name: the state byte `+0x20` (the only one the callers note).
+pub fn replay_log(log: &[LogEntry], w: &mut crate::moby::MobyWorld) {
+    for e in log {
+        let Some(m) = w.mobys.iter_mut().find(|m| m.uid == e.uid) else { continue };
+        let n = e.size as usize;
+        if e.tag == 1 {
+            if e.off == 0x20 && n == 1 { m.state = e.value[0]; }
+        } else if let Some(b) = usize::try_from(e.off).ok().and_then(|o| m.pvars.get_mut(o..o + n)) {
+            b.copy_from_slice(&e.value[..n]);
+        }
+    }
+}
+
+/// The autosave (module docs, `0x30d658(force, level)`): the talk records' places from `w` (the level's mobys), the
+/// game stored into `save` and the card's incremental save asked for; true when it is queued.
+pub fn autosave(g: &mut GameState, w: Option<&crate::moby::MobyWorld>, card: &mut crate::memcard::MemCard, save: &mut SaveData, force: bool, level: i32, clock: [u8; 8]) -> bool {
+    if let Some(w) = w { crate::moby::talk::copy_places(w, g); }
+    g.store(save);
+    card.memcard_save(save, force, level, clock)
 }
 
 /// The save clock (`0x1a7360`, `sceCdCLOCK` BCD) in a save.

@@ -222,6 +222,9 @@ pub struct GameState {
     pub skill_points: [u8; crate::skill_points::LEN],
     /// `0x1a7a48`: the cheats, one byte each (crate::cheats).
     pub cheats: [u8; crate::cheats::LEN],
+    /// `0x1a7368` / `0x1a737c`: the hoverbike races' best times (ticks; 0 none), Barlow's five then Joba's
+    /// (crate::moby::classes::race::bike).
+    pub race_times: [i32; 10],
     /// `0x1a7b70`: the vendor's stock (crate::vendor: 32 slots, 0xff free, the item | 0x40 when owned as it went
     /// in); `0x1a7a12`: the challenge mode; `0x1a7a28`: the R&C1 save's weapons found (bits 0..4), for Barlow's
     /// Gadgetron vendor.
@@ -287,6 +290,17 @@ pub struct GameState {
     pub held_fade: Option<(u32, u32)>,
     /// The weapons' rows and experience (`0x139568`, `0x139868`) and the arena's kills (crate::upgrades).
     pub upgrades: crate::upgrades::Upgrades,
+    /// The talk records (`0x139a28`, the save's chunk 15; crate::moby::talk::Record), kept with the game.
+    pub talk_records: Vec<crate::moby::talk::Record>,
+    /// The level's NPC busy word (L00 `0x1b1b68`, crate::moby::talk::busy): the HUD's update and draw wait while set.
+    pub npc_busy: bool,
+    /// The card save asked for this tick (`0x30d658(force, level)`, [`GameState::autosave`] / `save_forced`): force,
+    /// and its level (−1 the current); the engine runs it with the card (crate::save::autosave).
+    pub autosave_ask: Option<(bool, i32)>,
+    /// The level's state log (L06 `0x21dc50`, L09 `0x21dd90`: the head of the checkpoint block; crate::save::LogEntry)
+    /// and the checkpoint's copy of it (the block's copy, L09 `0x21ea00`).
+    pub state_log: Vec<crate::save::LogEntry>,
+    pub checkpoint_log: Vec<crate::save::LogEntry>,
 }
 
 /// The flag bytes `0x1395b8..0x139685` ([`GameState::flags`]): the save's global chunk 5 (0xcd bytes).
@@ -305,9 +319,10 @@ impl Default for GameState {
             bolts: 0, raritanium: 0, max_health: 4, level: 0, occlusion: 0, crate_sound_frame: -100, pickup_sound_frame: -100, level_sounds: Vec::new(), bolt_bank: 0, xp_bank: 0, xp: 0, uid_bits: vec![0; 0x400],
             show_bolts: None, show_health: None, rng: Default::default(), recent_breaks: 0, last_break_frame: -1000, frame: 0,
             clank: false, thruster: false, boots: false, charge_boots: false, grind_boots: false, nanotech: [false; 10], level_xp: [0; 2], death_z: None, boss_bar: None, boss_icon: 0, orbit_ticks: 0, side_meter: Default::default(), shadow: Default::default(), water_base: 0.0, water_z: 0.0, water_scroll: [[0.0; 2]; 2], water_cam: [0.0; 3], missions: vec![0; 0x200], mission_area: 0, cam_tweaks: Default::default(), shakes: Default::default(), uid_pending: vec![0; 0x800], uid_dead: vec![0; 0x800], mission_table: vec![0; 0x100],
-            mission_xp: vec![0; 0x30], mission_bolts: vec![0; 0x30], checkpoint: None, checkpoint_bits: Vec::new(), checkpoint_chunk: 0, last_checkpoint: None, messages: Vec::new(), help_state: 0, help_req: None, help_counts: vec![0; 0x100], help_shift: 0, help_shift_ticks: 0, help_aux: vec![0; 0x100], help_last: vec![0; 0x100], help_levels: vec![0; 0x100], help_queue: Vec::new(), help_close: None, hint_flags: [0; 5], no_item_area: false, variant: 0, chunk_request: None, items: vec![0; 0x40], quick_select: vec![0; 28], planets: vec![0; 0x1c], travel: Default::default(), ring: [0; 8], ammo: vec![0; 0x50], held: 0, wrench_out: false, trail_phase: 0.0, view_far: 1024.0, sky: Default::default(), markers: Vec::new(), scenes_seen: vec![false; 0x100], scenes: Default::default(), cameras: Default::default(), ship_parts: Vec::new(), underwater: false, fog: Default::default(), fog_flash: Default::default(), area_ask: Vec::new(), area_hero: Vec::new(), next_level: None, next_level_save: false, bolt_help_done: false, space_bolts: 0, space_bolts_shown: 0, rider_hits: 0, store_left: 0, path_openings: Vec::new(), robot_blast_frame: 0, arc_jitter: (0, [[0.0; 3]; 16]), skill_points: [0; crate::skill_points::LEN], cheats: [0; crate::cheats::LEN], play_time: 0, visited: vec![0; 0x1c], puzzle: Default::default(), hacker: Default::default(),
+            mission_xp: vec![0; 0x30], mission_bolts: vec![0; 0x30], checkpoint: None, checkpoint_bits: Vec::new(), checkpoint_chunk: 0, last_checkpoint: None, messages: Vec::new(), help_state: 0, help_req: None, help_counts: vec![0; 0x100], help_shift: 0, help_shift_ticks: 0, help_aux: vec![0; 0x100], help_last: vec![0; 0x100], help_levels: vec![0; 0x100], help_queue: Vec::new(), help_close: None, hint_flags: [0; 5], no_item_area: false, variant: 0, chunk_request: None, items: vec![0; 0x40], quick_select: vec![0; 28], planets: vec![0; 0x1c], travel: Default::default(), ring: [0; 8], ammo: vec![0; 0x50], held: 0, wrench_out: false, trail_phase: 0.0, view_far: 1024.0, sky: Default::default(), markers: Vec::new(), scenes_seen: vec![false; 0x100], scenes: Default::default(), cameras: Default::default(), ship_parts: Vec::new(), underwater: false, fog: Default::default(), fog_flash: Default::default(), area_ask: Vec::new(), area_hero: Vec::new(), next_level: None, next_level_save: false, bolt_help_done: false, space_bolts: 0, space_bolts_shown: 0, rider_hits: 0, store_left: 0, path_openings: Vec::new(), robot_blast_frame: 0, arc_jitter: (0, [[0.0; 3]; 16]), skill_points: [0; crate::skill_points::LEN], cheats: [0; crate::cheats::LEN], race_times: [0; 10], play_time: 0, visited: vec![0; 0x1c], puzzle: Default::default(), hacker: Default::default(),
             stock: [0xff; crate::vendor::STOCK_SLOTS], challenge: false, rac1_weapons: 0, vendor_open: None, vendor_virtual: None, vendor_phase: [0.0; 3], vendor_beam: [0.0; 2], prompt: Default::default(),
             armor: 0, crystals: 0, moonstones: 0, armor_offer: 0, mods_available: [0; 0x38], mods_bought: [0; 0x38], platinum_spent: 0, platinum_found: 0, platinum: vec![0; 0x70], flags: vec![0; FLAGS_LEN], arena_menu: None, arena_hud: None, arena_wipe: None, arena_results: None, arena_on: false, arena_drop: -1, fade_black: 0.0, fade_white: 0.0, screen_callback: None, hud_slots: Default::default(), held_fade: None, upgrades: Default::default(),
+            talk_records: vec![Default::default(); crate::moby::talk::RECORDS], npc_busy: false, autosave_ask: None, state_log: Vec::new(), checkpoint_log: Vec::new(),
         }
     }
 }
@@ -382,7 +397,11 @@ impl GameState {
             platinum: old.platinum,
             skill_points: old.skill_points,
             cheats: old.cheats,
+            race_times: old.race_times,
             upgrades: old.upgrades,
+            // The save's flag bytes (chunk 5) and talk records (chunk 15) go with the game.
+            flags: old.flags,
+            talk_records: old.talk_records,
             ..Default::default()
         };
         // The level start (`0x2a3b88`): visited.
@@ -654,11 +673,16 @@ impl GameState {
         self.checkpoint = Some((pos, rot));
         self.checkpoint_bits = self.uid_bits.clone();
         self.checkpoint_chunk = self.variant;
+        // The block's head: the state log (`0x2eaed0(copy, log, 0x404)`).
+        self.checkpoint_log = self.state_log.clone();
     }
 
     /// The level restarted from the checkpoint (`0x2b31f0`'s request): the uid bits as it kept them, nothing pending.
     pub fn restart(&mut self) {
         if !self.checkpoint_bits.is_empty() { self.uid_bits = self.checkpoint_bits.clone(); }
+        // `0x359d58`: the checkpoint's block back (its state log replayed on the respawned mobys,
+        // crate::save::replay_log), or with none the block cleared.
+        self.state_log = if self.checkpoint.is_some() { self.checkpoint_log.clone() } else { Vec::new() };
         self.uid_pending.iter_mut().for_each(|p| *p = 0);
         if self.checkpoint.is_some() { self.switch_chunk(self.checkpoint_chunk); }
     }

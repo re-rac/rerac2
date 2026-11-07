@@ -57,8 +57,13 @@
 //! In any state but 0 its idle (looking in sequence 0, fidgeting in 1; the idle timer a word, `+0x11c`) and look
 //! (the pitch within ±10°).
 //!
-//! Not ported: the level's NPC busy word `0x1b2228` while their scenes play, the talk record (`0x3531a8`), the
-//! autosaves (`0x32df60(0, −1)`); 0x0c38's `$gp+0x18e4` = 1 after its first scene (`0x40b7f0`: read only by the
+//! The talk record (`0x3531a8`, crate::moby::talk::mark) is marked once Ratchet can talk before each first scene
+//! (0x0c38's 1 and 3, 0x0d3e's 1, 0x0da8's 1) and with 0x0d3e's texts 0x12f2 / 0x12f1; the level's NPC busy word
+//! `0x1b2228` (crate::moby::talk::busy) is set while their scenes play; the autosaves (`0x32df60(0, −1)`,
+//! crate::game::GameState::autosave): 0x0c38's at its end without a mission (with one, the checkpoint), 0x0d3e's
+//! after the sale.
+//!
+//! Not ported: 0x0c38's `$gp+0x18e4` = 1 after its first scene (`0x40b7f0`: read only by the
 //! hoverbike 0x0bbc, G-LVL-010); 0x0d3e's prop's `+0x38` taken from Ratchet's moby (`0x341a70`); 0x0da8's message
 //! of state 3: the game's mode 4 asked for (`0x34f440(4, 1, 10, 0, 0)`, the in-game dialog kind 10) with the text
 //! 0x31c3 and the button 0x312c (`0x312878` / `0x3127d8(0x40, 0)`), a dialog the port does not have.
@@ -108,23 +113,31 @@ fn states_0c38(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             w.mobys[id].set_state(if seen(ctx, 0x37) { 3 } else { 1 }, -1);
         }
         1 => {
-            if can_talk(w, id, ctx, 4.0, 10) && play(ctx, &[0x37]) { w.mobys[id].set_state(2, -1); }
+            if !can_talk(w, id, ctx, 4.0, 10) { return; }
+            talk::mark(w, id, ctx);
+            if play(ctx, &[0x37]) { w.mobys[id].set_state(2, -1); }
         }
         2 => {
+            talk::busy(ctx, true);
             talk::hide_in_scene(w, id, ctx);
             if ctx.game.scenes.in_scene() { return; }
+            talk::busy(ctx, false);
             talk::show(w, id);
             w.mobys[id].set_state(3, -1);
         }
         3 => {
-            if flag(ctx, GIVER_FLAG) && can_talk(w, id, ctx, 2.5, 10) && play(ctx, &[0x39, 5, 0x3a]) {
+            if !flag(ctx, GIVER_FLAG) || !can_talk(w, id, ctx, 2.5, 10) { return; }
+            talk::mark(w, id, ctx);
+            if play(ctx, &[0x39, 5, 0x3a]) {
                 talk::cut_in(ctx.game);
                 w.mobys[id].set_state(4, -1);
             }
         }
         4 => {
+            talk::busy(ctx, true);
             talk::hide_in_scene(w, id, ctx);
             if ctx.game.scenes.in_scene() { return; }
+            talk::busy(ctx, false);
             talk::show(w, id);
             ctx.game.unlock_planet(GIVER_PLANET);
             ctx.game.get_item(GIVER_ITEM);
@@ -134,6 +147,8 @@ fn states_0c38(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 ctx.game.mission_done(mission);
                 let (pos, rot) = (ctx.hero.pos, ctx.hero.rot);
                 ctx.game.save_checkpoint(pos, rot);
+            } else {
+                ctx.game.autosave(-1);
             }
             w.delete(id);
         }
@@ -226,6 +241,7 @@ fn states_0d3e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         1 => {
             let first_gone = link(w, id, FIRST_GONE).is_none_or(|o| matches!(w.mobys[o].state, 0xfe | 0xfd));
             if !can_talk(w, id, ctx, 4.0, 10) || !first_gone { return; }
+            talk::mark(w, id, ctx);
             set_flag(ctx, SELLER_FLAG);
             ctx.host.set_anim_speed(&w.mobys[id], 1.0);
             ctx.game.scenes.queue.push(0x3b);
@@ -233,8 +249,10 @@ fn states_0d3e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             w.mobys[id].set_state(2, -1);
         }
         2 => {
+            talk::busy(ctx, true);
             talk::hide_in_scene(w, id, ctx);
             if ctx.game.scenes.in_scene() { return; }
+            talk::busy(ctx, false);
             place_at_spot(w, id, ctx, f32::from_bits(0x4049_0fdc));
             talk::show(w, id);
             to_seq(w, id, ctx, 1);
@@ -242,7 +260,10 @@ fn states_0d3e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         3 => {
             if price < bolts { return w.mobys[id].set_state(4, -1); }
-            if talk::offer(w, id, ctx, 2.5, 0x12f2, &[price]) { ctx.game.show_bolts = Some(0xb4); }
+            if talk::offer(w, id, ctx, 2.5, 0x12f2, &[price]) {
+                ctx.game.show_bolts = Some(0xb4);
+                talk::mark(w, id, ctx);
+            }
         }
         4 => {
             if bolts < price {
@@ -252,6 +273,7 @@ fn states_0d3e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if !can_talk(w, id, ctx, 2.5, 10) || !ctx.level.in_cuboid(w.mobys[id].pv_i(SELLER_ZONE), ctx.hero.pos) { return; }
             ctx.game.show_bolts = Some(0xb4);
             say(ctx, 0x12f1, &[price]);
+            talk::mark(w, id, ctx);
             if ctx.hero.items.pressed & crate::pad::button::TRIANGLE != 0 {
                 ctx.game.scenes.queue.push(0x3c);
                 ctx.game.scenes.start_queue(ctx.hero.hp);
@@ -259,8 +281,10 @@ fn states_0d3e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         5 => {
+            talk::busy(ctx, true);
             talk::hide_in_scene(w, id, ctx);
             if ctx.game.scenes.in_scene() { return; }
+            talk::busy(ctx, false);
             place_at_spot(w, id, ctx, f32::from_bits(0xbfc9_0fdc));
             talk::show(w, id);
             let group = w.mobys[id].group as i32;
@@ -276,6 +300,7 @@ fn states_0d3e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if let Some(t) = link(w, id, TOLD) { w.mobys[t].timer = 1; }
             bring_back(w, id, ctx);
             ctx.game.help(0x9dc, 0x33);
+            ctx.game.autosave(-1);
             w.delete(id);
         }
         _ => {}
@@ -320,14 +345,17 @@ fn states_0da8(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         1 => {
             if can_talk(w, id, ctx, 6.5, 10) {
+                talk::mark(w, id, ctx);
                 ctx.game.scenes.queue.push(0x3d);
                 ctx.game.scenes.start_queue(ctx.hero.hp);
                 w.mobys[id].set_state(2, -1);
             }
         }
         2 => {
+            talk::busy(ctx, true);
             talk::hide_in_scene(w, id, ctx);
             if ctx.game.scenes.in_scene() { return; }
+            talk::busy(ctx, false);
             talk::show(w, id);
             let m = &w.mobys[id];
             let pos = add(scale(m.rows[0], 4.0), m.pos);

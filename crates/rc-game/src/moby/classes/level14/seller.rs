@@ -9,8 +9,8 @@
 //! * **0**: no part; item 7 or 0x31 had (`0x1a7b07` / `0x1a7b31`) or the scene 0x7f seen: gone. His grid cells
 //!   (`0x3253d8` = L01 `0x313ae0`, the rebuild here). The scene 0x7e seen: the part ([`part`], `0x4271d8`) and 2;
 //!   else 1.
-//! * **1**: Ratchet can talk to him (crate::moby::talk::can_talk, 2.5; the talk record marked: not ported) and the
-//!   scene 0x7e queued (it must go in): started; 2.
+//! * **1**: Ratchet can talk to him (crate::moby::talk::can_talk, 2.5; the talk record marked, crate::moby::talk::mark)
+//!   and the scene 0x7e queued (it must go in): started; 2.
 //! * **2**: hidden in the scene mode; after the scene shown, turned about (π, `0x2f7a68` = L00 `0x2efe60`); with the
 //!   part (made again when gone) sequence 1, then 3 short of the price, else 4.
 //! * **3** (the price or more → 4): while Ratchet can talk to him the bolt counter for 180 ticks (`0x3152e0` = L00
@@ -25,8 +25,9 @@
 //! body 0.3 of it, the pitch −1°..30°), the part at his joint 2 (`0x32cf00` = L00 `0x3253f0`,
 //! crate::moby::classes::enemies::place_part; the original's between the asks and the aims).
 //!
-//! Not ported: the level's NPC busy word `0x1b2268` while his scenes play, the talk record (`0x33a0e8` = L01
-//! `0x3259b0`), the autosave after the sale (`0x315028(0, −1)` = L00 `0x30d658`).
+//! The talk record (`0x33a0e8` = L01 `0x3259b0`, crate::moby::talk::mark) is also marked with the texts 0x1327 /
+//! 0x1328; the level's NPC busy word `0x1b2268` (crate::moby::talk::busy) is set while his scenes play (2, 5); the
+//! autosave after the sale (`0x315028(0, −1)` = L00 `0x30d658`, crate::game::GameState::autosave) in 5.
 
 use crate::moby::talk::{self, seen, Layout, Timer, Turns};
 use crate::moby::{ai, Ctx, MobyWorld};
@@ -86,14 +87,18 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         1 => {
-            if talk::can_talk(w, id, ctx, R, 10) && ctx.game.scenes.queue.push(0x7e) {
+            if !talk::can_talk(w, id, ctx, R, 10) { return; }
+            talk::mark(w, id, ctx);
+            if ctx.game.scenes.queue.push(0x7e) {
                 ctx.game.scenes.start_queue(ctx.hero.hp);
                 w.mobys[id].set_state(2, -1);
             }
         }
         2 => {
+            talk::busy(ctx, true);
             talk::hide_in_scene(w, id, ctx);
             if ctx.game.scenes.in_scene() { return; }
+            talk::busy(ctx, false);
             turn_about(w, id);
             talk::show(w, id);
             part(w, id, ctx);
@@ -105,6 +110,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if talk::can_talk(w, id, ctx, R, 10) {
                 ctx.game.show_bolts = Some(0xb4);
                 talk::say(ctx, 0x1327, &[PRICE]);
+                talk::mark(w, id, ctx);
             }
         }
         4 => {
@@ -115,6 +121,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if !talk::can_talk(w, id, ctx, R, 10) { return; }
             ctx.game.show_bolts = Some(0xb4);
             talk::say(ctx, 0x1328, &[PRICE]);
+            talk::mark(w, id, ctx);
             if ctx.hero.items.pressed & crate::pad::button::TRIANGLE != 0 {
                 ctx.game.bolts = (bolts - PRICE) as u32;
                 if ctx.game.scenes.queue.push(0x7f) {
@@ -124,9 +131,11 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         5 => {
+            talk::busy(ctx, true);
             talk::hide_in_scene(w, id, ctx);
             if let Some(p) = held(w, id) { if ctx.game.scenes.mode == crate::scene::SCENE { talk::hide(w, p); } }
             if ctx.game.scenes.in_scene() { return; }
+            talk::busy(ctx, false);
             talk::show(w, id);
             let group = w.mobys[id].group;
             if group != -1 { w.poke_group(group as i32, 1); }
@@ -137,6 +146,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if !had(ctx, 0x31) {
                 for k in [0x69, 0x31] { if let Some(b) = ctx.game.items.get_mut(k) { *b = 1; } }
             }
+            ctx.game.autosave(-1);
             turn_about(w, id);
             if crate::moby::classes::props::seq(w, id, ctx) != 0 { ctx.host.set_anim(&w.mobys[id], 0, 0, 10); }
             w.mobys[id].set_state(6, -1);

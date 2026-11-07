@@ -47,8 +47,9 @@
 //! ([`draw_results`], `0x421f80`, Hrugis `0x4254c8`, Gorn `0x431c88`); else, after the mission's tick with no results
 //! up, the mission's HUD (`0x41f478`, not ported: no callback here).
 //!
-//! Not ported: the mission's HUD and pause items (`0x41f478`), the autosave after a reward
-//! (`0x325a28(0, −1)`), the second help 0xa18 (Hrugis / Gorn, `0x380780`), the fog's restore on the reset, the
+//! The reward asks for the autosave once the win is counted (`0x325a28(0, −1)`, crate::game::GameState::autosave).
+//!
+//! Not ported: the mission's HUD and pause items (`0x41f478`), the second help 0xa18 (Hrugis / Gorn, `0x380780`), the fog's restore on the reset, the
 //! sound stopped on the reward (the ship's `+0x270`), Hrugis's 75 clouds (`0x427150(75, 16)`) and its first
 //! mission's two arcs (`0x39ea50`), the gate race's spark pickup (`0x42e6b0`, class 0x126c) and the gates' own
 //! update and draw (class 0x114a: its colour `+8`, on `+0xc`).
@@ -323,6 +324,7 @@ fn reward(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, lv: &Level, m: usize) {
         set(w, id, pv::RESULTS, 1);
         if let Some(b) = ctx.game.flags.get_mut(lv.won + m) { *b = (n + 1).min(0xff) as u8; }
         ctx.game.bolts = ctx.game.bolts.wrapping_add(bolts as u32);
+        ctx.game.autosave(-1);
     }
     set(w, id, super::HELD, 1);
     if out(w, id, pv::T_RESULTS) {

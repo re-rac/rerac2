@@ -22,8 +22,11 @@
 //! the looking one again (the same blend) unless in it, and its animation speed 0.9..1.1 (`0x35ba30`). Then its look
 //! (crate::moby::talk::look: in sequence 2).
 //!
-//! Not ported: the level's NPC busy word `0x1b2568` while its scenes play, the talk record (`0x370ab0`), the autosave
-//! (`0x34cc58(0, −1)`); the debug print `0x2e3ff0` of state 5 does nothing.
+//! The talk record (`0x370ab0`, crate::moby::talk::mark) is marked with Ratchet in its cuboid in 1 and with the texts
+//! 0x1320 / 0x1321; the level's NPC busy word `0x1b2568` (crate::moby::talk::busy) is set while its scenes play (2, 5);
+//! the autosave after the sale (`0x34cc58(0, −1)`, crate::game::GameState::autosave).
+//!
+//! Not ported: the debug print `0x2e3ff0` of state 5 does nothing.
 
 use crate::moby::classes::props::{seq, wrapped};
 use crate::moby::talk::{self, link, seen, set_flag, Layout, Timer};
@@ -54,14 +57,17 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         1 => {
             if ctx.level.in_cuboid(w.mobys[id].pv_i(ZONE), ctx.hero.pos) {
+                talk::mark(w, id, ctx);
                 ctx.game.scenes.queue.push(0x4a);
                 ctx.game.scenes.start_queue(ctx.hero.hp);
                 w.mobys[id].set_state(2, -1);
             }
         }
         2 => {
+            talk::busy(ctx, true);
             talk::hide_in_scene(w, id, ctx);
             if ctx.game.scenes.in_scene() { return; }
+            talk::busy(ctx, false);
             talk::show(w, id);
             let pos = [f32::from_bits(0x43e4_0a3d), f32::from_bits(0x437b_3d71), f32::from_bits(0x4289_d70a)];
             ctx.hero.teleport(pos, [0.0, 0.0, f32::from_bits(0xc006_0a93)]);
@@ -70,7 +76,10 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         3 => {
             if PRICE < bolts { return w.mobys[id].set_state(4, -1); }
-            if talk::offer(w, id, ctx, R, 0x1320, &[PRICE]) { ctx.game.show_bolts = Some(0xb4); }
+            if talk::offer(w, id, ctx, R, 0x1320, &[PRICE]) {
+                ctx.game.show_bolts = Some(0xb4);
+                talk::mark(w, id, ctx);
+            }
         }
         4 => {
             if bolts < PRICE {
@@ -79,6 +88,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
             if !talk::offer(w, id, ctx, R, 0x1321, &[PRICE]) { return; }
             ctx.game.show_bolts = Some(0xb4);
+            talk::mark(w, id, ctx);
             if ctx.hero.items.pressed & crate::pad::button::TRIANGLE != 0 {
                 for s in [0x4b, 7, 0x4c] { ctx.game.scenes.queue.push(s); }
                 ctx.game.scenes.start_queue(ctx.hero.hp);
@@ -86,8 +96,10 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         5 => {
+            talk::busy(ctx, true);
             talk::hide_in_scene(w, id, ctx);
             if ctx.game.scenes.in_scene() { return; }
+            talk::busy(ctx, false);
             talk::show(w, id);
             let group = w.mobys[id].group as i32;
             w.poke_group(group, 1);
@@ -99,6 +111,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 ctx.game.show_bolts = Some(0xb4);
             }
             if let Some(t) = link(w, id, TOLD) { w.mobys[t].timer = 1; }
+            ctx.game.autosave(-1);
             w.delete(id);
         }
         6 => {

@@ -103,15 +103,16 @@
 //! 1): the glow `0x2ed370` (crate::fx::halo) at its tail and the streak `0x2ed6d8(scroll, 0.25, tail, trail, 4)`
 //! (crate::fx::streak), both `0x103080`.
 //!
+//! The weapon mod: Shock on the moby a shot hits (`0x4126b8(m, 0x29, the hand)`) and on each moby the upgraded glove's
+//! plasma hits (`0x4126b8(m, 0x40, the hand)`; crate::moby::weapon_mods).
+//!
 //! Not ported (the upgraded glove): the free mobys' check of the shot's make (`0x1b1d40` below 0x11: none), the
-//! search's class list (`$gp−0x90`: {0, 0x1367}, of no class of type 5), the weapon mods on the plasma's hits
-//! (`0x4126b8`). The gravity frames and moving frames (`0x37f538` /
+//! search's class list (`$gp−0x90`: {0, 0x1367}, of no class of type 5). The gravity frames and moving frames (`0x37f538` /
 //! `0x37f618` / `0x37f5f8`, `0x380e08` / `0x380e58`, the down `0x37ecc0` of the frames: the port's crate::gravity
 //! stands in for the up); the level's moving frame (`0x1adb0c`, the tables `0x238730` / `0x2388c0` by the turret's
 //! index: what it lands on carries it with its turn; null on the ported levels), the water's ripple (`0x37d5a0`, with
 //! the ripple module: G-REN-009) and splash moby (`0x39f938`: class 0x307, in no level), the water's patch and plane
-//! heights for the bubbles (`0x31d7a0`: the bubble's own height here, as the port's water does); the weapon mods on the
-//! shots' hits (`0x4126b8`); the shots' line through the gravity frames (`0x380e58`). The original keeps the table's
+//! heights for the bubbles (`0x31d7a0`: the bubble's own height here, as the port's water does); the shots' line through the gravity frames (`0x380e58`). The original keeps the table's
 //! moby pointers and the shots' owners as pointers; the port keeps moby indices.
 
 use crate::collision::QueryFlags;
@@ -875,6 +876,9 @@ fn step_shots(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     let mut tm = HitTemplate::new(damage, Some(id), 0x0021_0000, [d[0], d[1], d[2], 0.0]);
                     tm.kind = (TURRET as u16 as u32) << 16 | 0x0305;
                     w.deliver_hit_any(t, &tm, [0.0; 4]);
+                    // `0x4126b8(t, 0x29, the hand)` (crate::moby::weapon_mods).
+                    let owner = w.mobys[id].parent;
+                    crate::moby::weapon_mods::shock(w, ctx, t, MINI_TURRET, owner);
                     6
                 }
             }
@@ -1168,7 +1172,12 @@ pub fn update_plasma(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             tm.kind = (PLASMA as u16 as u32) << 16 | 0x0305;
             let near = ctx.scene.map(|sc| crate::collision::coll_sphere_mobys(sc, pos, 1.0, QueryFlags(0), Some(id))).unwrap_or_default();
             for t in near {
-                if w.mobys[t].mode & 0x5000 != 0 { w.deliver_hit_any(t, &tm, [0.0; 4]); }
+                if w.mobys[t].mode & 0x5000 != 0 {
+                    w.deliver_hit_any(t, &tm, [0.0; 4]);
+                    // `0x4126b8(t, 0x40, the hand)` (crate::moby::weapon_mods).
+                    let owner = w.mobys[id].parent;
+                    crate::moby::weapon_mods::shock(w, ctx, t, 0x40, owner);
+                }
             }
             crate::moby::blast::smoke_burst(w, ctx, 1.0, 13.0, Some(id), at, 0);
             let m = &mut w.mobys[id];

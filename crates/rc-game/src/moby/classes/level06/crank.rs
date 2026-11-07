@@ -26,8 +26,9 @@
 //!   let go (`0x479d50(3)`).
 //! * **4**: sinking 1/120 a tick to 0.5 below rest, then the amount 1, 5. **5**: the amount 1.
 //!
-//! Not ported: the amount's entry in the checkpoint's pvar log (`0x39b620(+0x00, 4, m, 2, 0x21dc20)`: restored after a
-//! death; nothing in the port keeps pvars across the restart).
+//! The amount is noted in the level's state log as it is finished (`0x39b620(+0x00, 4, m, 2, 0x21dc50)`,
+//! crate::game::GameState::log_state: at the amount 1 in 3 and before the mission and checkpoint, [`finish`]), so a
+//! death after the checkpoint gives the respawned crank its amount back (crate::save::replay_log).
 
 use crate::hero::physics::{add, add_rot, approach, approach_angle, atan2, dist, dist2, dot, euler_rows, len2, rot_dist, scale, spring, sub, sub_rot};
 use crate::moby::{Ctx, MobyWorld};
@@ -61,8 +62,17 @@ fn finish(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &w.mobys[id];
     let c = m.pv_i(CHECKPOINT);
     if c == -1 || crate::moby::director::mission_is_done(ctx.game, m.mission as i32) { return; }
+    log_amount(w, id, ctx);
+    let m = &w.mobys[id];
     let Some((pos, rot)) = ctx.level.cuboid_place(c) else { return };
     crate::moby::director::finish(ctx, m.mission as i32, pos, rot);
+}
+
+/// `0x39b620(m + 0x68 → +0x00, 4, m, 2, log)`: the amount into the level's state log.
+fn log_amount(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
+    let m = &w.mobys[id];
+    let v = m.pv_f(AMOUNT).to_le_bytes();
+    ctx.game.log_state(m, 2, AMOUNT as i32, &v);
 }
 
 /// 0x0b57 (module docs).
@@ -177,6 +187,8 @@ fn turn(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         if m.pv_i(AGAIN) != 0 {
             m.state = 1;
         } else if m.pv_f(AMOUNT) == 1.0 {
+            log_amount(w, id, ctx);
+            let m = &mut w.mobys[id];
             m.state = 4;
             let uid = m.uid;
             ctx.game.count_uid(uid);

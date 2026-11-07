@@ -1224,9 +1224,10 @@ pub(crate) fn hologram(m: &mut crate::moby::Moby, phase: usize, on: bool, rng: &
 /// 1.5 times its scale (else it is gone at once), turning 4.5° a tick; Ratchet in its cuboid `+0x04` asks for the
 /// scene 0x26 (`0x2f4ee8`, then `0x2f5030`: the chain started) and it waits (2), hidden while the scene plays. Once no
 /// scene is asked for or playing (`0x371ba8`) Ratchet is put at the cuboid `+0x08` (`0x2b9e68`), the Dynamo
-/// is his (`0x2f46e0`), asked for in his hand (`0x3227d8`) and it is gone.
+/// is his (`0x2f46e0`), asked for in his hand (`0x3227d8`), the autosave (`0x303030(0, −1)` = L00 `0x30d658`,
+/// crate::game::GameState::autosave) and it is gone.
 ///
-/// Not ported: its sparkle (`0x3cff58`), the message 0x1225 (`0x327448`), the autosave (`0x30d658`), the camera of
+/// Not ported: its sparkle (`0x3cff58`), the message 0x1225 (`0x327448`), the camera of
 /// the moby `+0x0c` (`0x42d968`), the help 0x9b9 after three minutes.
 pub fn update_0a95(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     use crate::hero::items::DYNAMO;
@@ -1267,6 +1268,7 @@ pub fn update_0a95(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             ctx.game.get_item(DYNAMO);
             let held = ctx.game.held;
             ctx.hero.items.ask(held, DYNAMO);
+            ctx.game.autosave(-1);
             w.delete(id);
         }
         _ => {}
@@ -1839,10 +1841,12 @@ pub fn update_0a1e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// * **Every tick** (not deleted): its idle and look (crate::moby::talk::idle / look: looking in sequence 0, no
 ///   fidget, the pitch within ±10°, `0x3d4804..0x3d4bb8`; the aims `0x31a0e0`).
 ///
-/// Not ported: the talk record it marks (`0x325980(0x3259d8(m))`: the level's talk list `0x1c5d20` / `0x28ead0`, its
-/// record `0x139a34 + 0x10·i`; the missions' kinds 4 and 5 read it), its prop's set-up and joint (`0x309b28`,
-/// `0x315f20`, `0x31a700(m, prop, 2, 0)`), the scene flag `0x1b22a8`, the camera `0x42d968` of `+0x12c` and the
-/// autosave `0x303030` after the sale (as the Dynamo's).
+/// It marks its talk record (`0x3259b0`, crate::moby::talk::mark) once the scene 0x27 is queued and with the texts
+/// 0x1300 / 0x12fe, holds the level's NPC busy word `0x1b22a8` (crate::moby::talk::busy) while its scenes play, and
+/// asks for the autosave `0x303030(0, −1)` after the sale (crate::game::GameState::autosave).
+///
+/// Not ported: its prop's set-up and joint (`0x309b28`, `0x315f20`, `0x31a700(m, prop, 2, 0)`), the camera
+/// `0x42d968` of `+0x12c`.
 pub fn update_0ace(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     use crate::moby::talk::{self, Layout, Timer};
     const LOOK: Layout = Layout { look_seq: 0, fidget: None, idle: 0x11e, seen: Timer::Word(0x114), glance: Timer::Word(0x118), pitch: 0.174_532_95 };
@@ -1885,14 +1889,17 @@ fn states_0ace(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         1 => {
             if !ctx.level.in_cuboid(w.mobys[id].pv_i(ZONE), ctx.hero.pos) { return; }
             if ctx.game.scenes.queue.push(0x27) {
+                crate::moby::talk::mark(w, id, ctx);
                 ctx.game.scenes.start_queue(ctx.hero.hp);
                 w.mobys[id].set_state(2, -1);
             }
         }
         2 | 5 => {
             let state = w.mobys[id].state;
+            crate::moby::talk::busy(ctx, true);
             if ctx.game.scenes.mode == crate::scene::SCENE { show(w, false); }
             if ctx.game.scenes.in_scene() { return; }
+            crate::moby::talk::busy(ctx, false);
             show(w, true);
             if state == 2 {
                 if let Some((pos, rot)) = ctx.level.cuboid_place(w.mobys[id].pv_i(ZONE)) {
@@ -1912,6 +1919,7 @@ fn states_0ace(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             ctx.hero.items.ask(held, TRACTOR);
             ctx.game.messages.push(crate::msgbox::Request::Text { text: 0x1226, ticks: None });
             ctx.game.help(0x9bc, 0x13);
+            ctx.game.autosave(-1);
             if let Some(c) = prop(w) { w.delete(c); }
             w.delete(id);
         }
@@ -1926,6 +1934,7 @@ fn states_0ace(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             ctx.game.show_bolts = Some(0xb4);
             let text = if state == 3 { 0x1300 } else { 0x12fe };
             ctx.game.messages.push(crate::msgbox::Request::SecondFormatted { text, n: price, ticks: Some(1) });
+            crate::moby::talk::mark(w, id, ctx);
             if state == 4 && ctx.hero.items.pressed & crate::pad::button::TRIANGLE != 0 && ctx.game.scenes.queue.push(0x28) {
                 ctx.game.scenes.start_queue(ctx.hero.hp);
                 w.mobys[id].set_state(5, -1);

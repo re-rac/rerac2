@@ -35,23 +35,24 @@
 //!
 //! A scene hides it (not on Joba) until it ends.
 //!
+//! **The screens**: the select's ([`draw_select`]), the race's HUD from the start and the standings after the finish
+//! (crate::moby::classes::race::hud). The view's angle `+0x28c` is the view's (`0x1bdc70`) while racing ([`boosts`])
+//! and in the select, the play's again once Ratchet is off.
+//!
 //! Not ported (left, with their addresses):
-//! * The HUD's screen callbacks (`0x32e338`) but the select's ([`draw_select`]): the standings `0x4127a8` (the
-//!   decomp's `DrawRaceStandingsHud`, set each tick of state 3: its scrolling list walks the standings chain
-//!   `+0x39c` / `+0x3a0` and the racers' `+0x1a4`, which the port does not keep), the race's HUD `0x4188b8` (set at
-//!   the start: the turbo, weapon and boost gauges, the place and lap, the track strip with the racers' marks and
-//!   their springs `+0x1cc..+0x1e0`, the wrong-way text 0x2e2b), so the counters show in their place; the bike's glow `0x40e2e0` → `0x40e658` / `0x40e340`; the
-//!   results' message box (`0x1a7cd0` / `0x1a7cd4`: △ goes on at once here).
-//! * The pause menu's race items (`0x40c170` restart, `0x40c190` quit, `0x40c1a8`; the words `$gp+0x18c8` /
-//!   `$gp+0x18d0` they set are read here: crate::moby::classes::race::Globals::restart / quit).
-//! * The weapons (`0x410460`: the pickups 0x0ab8, shots `0x3fa7e0`, missiles `0x3fa5a8`, mines `0x3fbd80`), the draft
-//!   (`0x41a2f8`), the post-finish route choice (`0x4143d0`), the engine sounds (`0x40f4a0`, and the other loops kept
-//!   at `+0x328` / `+0x330` / `+0x3bc` / `+0x714` / `+0x748` / `+0x74c`), the trails (`0x417528`, `0x416390`), the sprays
-//!   and sparks (`0x40d260`, `0x40d3e0`, `0x40d5d0`, `0x40d878`), the crash's debris (`0x408538`) and camera shake
-//!   (`0x1b96e0..`), the view angle's FOV (`+0x28c` → `0x1bdc30`), the afterimage (`0x322a98` on `+0x4e0`), the
-//!   pilot's Clank (0x12df / 0x50a) and head aim (`+0x3c0`), the race frame `0x1b31a0`, the best times (`0x1a7370`),
-//!   the autosave after a race (`0x30d658`), the fades (`0x308410`), the help texts on the set-up (`0x3153d0(0x36)`,
-//!   `0x3446f8(5)`), the race camera.
+//! * The bike's glow callback (`0x40e2e0` → `0x40e658` / `0x40e340`); the results' message box (`0x1a7cd0` /
+//!   `0x1a7cd4`: △ goes on at once here).
+//! * The pause menu's race items (`0x40c170` restart, `0x40c190` quit, `0x40c1a8` the countdown again: the state 0
+//!   puts them in the pause list's slots `0x1aa6c0` / `0x1aa6c8` / `0x1aa6cc`; they set `0x1a8ee4` 1, `0x1a8ed0` 2 and
+//!   the words `$gp+0x18c8` / `$gp+0x18d0` read here, crate::moby::classes::race::Globals::restart / quit): the pause
+//!   list has no level rows.
+//! * The weapons' projectiles ([`weapons`]), the draft (`0x41a2f8`: the lock on the racer `+0x734` ahead, its ring
+//!   `0x273318` and missile), the post-finish route choice (`0x4143d0`), the trails (`0x417528`, `0x416390`), the
+//!   sprays and sparks (`0x40d260`, `0x40d3e0`, `0x40d5d0`, `0x40d878`), the crash's debris (`0x408538`) and camera
+//!   shake (`0x1b96e0..`), the afterimage (`0x322a98` on `+0x4e0`), the pilot's Clank (0x12df / 0x50a) and head aim
+//!   (`+0x3c0`), the autosave after a race (`0x30d658`; `0x1a8ed0[5]`, `0x132af8(93)`), the fades (`0x308410`), the
+//!   help texts on the set-up (`0x3153d0(0x36)`, `0x3446f8(5)`), the race camera (not looked into: the play's
+//!   camera follows the hidden Ratchet here).
 //! * The gp word `$gp+0x3018` the mount waits for (≥ 4): taken as met.
 
 use super::{find_progress, nearest_index, off_track, slide, track_progress, RouteSet};
@@ -80,7 +81,7 @@ fn cd_i(m: &mut Moby, off: usize) -> bool {
 /// The race's wins (`0x40b6c0`: the flag byte `0x1395b8 + 0x4d + k`, Joba's `+0x57`) and losses (`0x40b758`: `+0x52`,
 /// Joba's `+0x5c`) of race `k`.
 fn wins(ctx: &Ctx, k: i32) -> i32 { wins_in(ctx.game, k) }
-fn wins_in(game: &crate::game::GameState, k: i32) -> i32 { flag(game, if game.level == 0xb { 0x57 } else { 0x4d }, k) }
+pub(super) fn wins_in(game: &crate::game::GameState, k: i32) -> i32 { flag(game, if game.level == 0xb { 0x57 } else { 0x4d }, k) }
 fn losses(ctx: &Ctx, k: i32) -> i32 { flag(ctx.game, if ctx.game.level == 0xb { 0x5c } else { 0x52 }, k) }
 fn flag(game: &crate::game::GameState, base: usize, k: i32) -> i32 {
     if !matches!(game.level, 4 | 0xb) { return 0; }
@@ -127,6 +128,12 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         3 => finished(w, id, ctx),
         4 => off(w, id, ctx),
         _ => {}
+    }
+    // The race HUD's lap box counts `$gp+0x18dc` down as it draws (crate::moby::classes::race::hud::draw); its sound
+    // 0xd at 173 (`0x383ff0(0xd, 0, bike)`) is played here.
+    if ctx.game.screen_callback == Some(crate::hud::ScreenCallback::RaceHud { moby: id }) && w.race.lap_shown == 0xad && !w.race.lap_sound {
+        ctx.host.play_sound(&w.mobys[id], 0xd, 0);
+        w.race.lap_sound = true;
     }
 }
 
@@ -292,6 +299,8 @@ fn racing(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     match sub {
         0 => {
             w.race.select_cam = false;
+            // The select's screen sets the view's angle to the bike's (`0x40c228`: tan(`+0x28c`° / 2)).
+            ctx.game.cam_tweaks.blend.tan = Some((w.mobys[id].pv_f(0x28c) * 0.008_726_647).tan());
             select(w, id, ctx);
             // `0x32e338(0, 0x40c228)` each tick of the select.
             ctx.game.screen_callback = Some(crate::hud::ScreenCallback::RaceSelect { moby: id });
@@ -318,8 +327,8 @@ fn racing(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 w.rebuild(p, &*ctx.host);
             }
             w.mobys[id].mode &= 0xffbe;
-            // `0x32e338(0, 0x4188b8)`: the race's HUD (not ported: no callback here).
-            ctx.game.screen_callback = None;
+            // `0x32e338(0, 0x4188b8)`: the race's HUD (crate::moby::classes::race::hud::draw).
+            ctx.game.screen_callback = Some(crate::hud::ScreenCallback::RaceHud { moby: id });
             w.race.count = 0;
             w.race.start_boost = false;
             w.race.on_water = false;
@@ -435,7 +444,8 @@ fn respawn(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     m.rot = rot;
     let set = RouteSet::of(m);
     let (mut link, mut point) = (m.pv_i(0x314), m.pv_i(0x318));
-    let p = find_progress(&w.race.paths, &set, place, &mut link, &mut point);
+    let r = &mut w.race;
+    let p = find_progress(&r.paths, &set, place, &mut link, &mut point, Some(&mut r.frame));
     let m = &mut w.mobys[id];
     m.set_pv_i(0x314, link);
     m.set_pv_i(0x318, point);
@@ -461,25 +471,34 @@ fn respawn(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 fn finished(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     ride(w, id, ctx);
     w.race.finished += 1;
+    // The standings' sound as a racer behind the bike comes in (`0x4127a8`: `0x383ff0(0x16, 0x11, bike)`, the racer's
+    // finish time the clock + the ticks since the bike's).
+    let (place, due) = (w.mobys[id].pv_i(0x320), w.race.clock + w.race.finished);
+    if racers(w, id).into_iter().any(|r| { let m = &w.mobys[r]; let k = m.pv_b(0xa2) as i32; k < 0xb && place < k && m.pv_i(0x1a0) == due }) {
+        ctx.host.play_sound(&w.mobys[id], 0x16, 0x11);
+    }
     let level = ctx.game.level;
     let m = &w.mobys[id];
     if m.pos[2] < m.pv_f(0x26c) || off_track(level, m.pv_i(0x314), m.pv_i(0x318), m.pos[2]) {
         let route = m.pv_i(0x6d0);
         w.race.paths.ensure(ctx.level, route);
         let k = nearest_index(&w.race.paths, level, &w.mobys[id], route, true);
-        let paths = &w.race.paths;
+        let r = &mut w.race;
+        let paths = &r.paths;
         let m = &mut w.mobys[id];
         m.pos = paths.point(route, k);
-        let t = k as f32 * paths.step(route) + if w.race.on_water { 15.0 } else { 5.0 };
+        let t = k as f32 * paths.step(route) + if r.on_water { 15.0 } else { 5.0 };
         autopilot_at(paths, m, route, t);
         let set = RouteSet::of(m);
         let (mut link, mut point) = (m.pv_i(0x314), m.pv_i(0x318));
-        let p = find_progress(paths, &set, m.pos, &mut link, &mut point);
+        let p = find_progress(paths, &set, m.pos, &mut link, &mut point, Some(&mut r.frame));
         let m = &mut w.mobys[id];
         m.set_pv_i(0x314, link);
         m.set_pv_i(0x318, point);
         m.set_pv_f(0x310, p);
     }
+    // `0x32e338(0, 0x4127a8)` each tick: the standings (crate::moby::classes::race::hud::standings).
+    ctx.game.screen_callback = Some(crate::hud::ScreenCallback::RaceStandings { moby: id });
     cd_i(&mut w.mobys[id], 0x398);
     if 0 < w.mobys[id].pv_i(0x398) || ctx.hero.items.pressed & button::TRIANGLE == 0 { return; }
     stop(w, id, ctx);
@@ -519,6 +538,8 @@ fn off(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let music = if ctx.game.level == 0xb { w.mobys[id].pv_i(0x484) } else { w.mobys[id].pv_i(0x480) };
     let Some((p, mut r)) = ctx.level.cuboid_place(home) else { return };
     if w.race.select_cam { r[2] = 0.92; }
+    // The view's angle back to the play's (`0x41c340`: tan 0.5622).
+    ctx.game.cam_tweaks.blend.tan = Some((crate::camera::PLAY_FOV * 0.5).tan());
     if w.mobys[id].pv_i(0x320) == 1 && race == 0 { set_race(w, ctx, 1); }
     ctx.hero.ride_off();
     ctx.hero.view_lock = 0;
@@ -655,6 +676,11 @@ fn start(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_i(0x4b0, 0);
         m.set_pv_i(0x4a8, 0);
         m.set_pv_i(0x4ac, 0);
+        // The race's frame (crate::moby::classes::race::Frame): at the bike, its rows (the across one negated); the
+        // HUD's speed marks.
+        let rows = m.rows;
+        w.race.frame = super::Frame { origin: m.pos, rows: [rows[0], scale(rows[1], -1.0), rows[2]] };
+        w.race.hud.start();
     }
     let group = |w: &MobyWorld, o: usize| -> Vec<usize> {
         usize::try_from(w.mobys[id].pv_i(o)).ok().and_then(|g| w.groups.get(g)).cloned().unwrap_or_default()
@@ -821,7 +847,9 @@ fn ride(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].scale = class_scale * 0.25;
     drive(w, id, ctx);
     pilot_pose(w, id, ctx);
-    boosts(w, id, ctx);
+    weapons(w, id, ctx);
+    // `0x417528`, the trails: not ported.
+    engine_sounds(w, id, ctx);
     if w.mobys[id].state == 3 {
         respawn_pick(w, id, ctx);
         let set = RouteSet::of(&w.mobys[id]);
@@ -829,12 +857,140 @@ fn ride(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let rm = &w.mobys[r];
             let (mut link, mut point) = (rm.pv_i(0x120), rm.pv_i(0x124));
             let wrap = rm.pv_i(0x160) != 0;
-            let p = track_progress(&w.race.paths, &set, rm.pos, &mut link, &mut point, wrap);
+            let p = track_progress(&w.race.paths, &set, rm.pos, &mut link, &mut point, wrap, None);
             let rm = &mut w.mobys[r];
             rm.set_pv_i(0x120, link);
             rm.set_pv_i(0x124, point);
             rm.set_pv_f(0x11c, p);
         }
+    }
+}
+
+/// L04 `0x1b09c0` (L11 its copy): the weapons' counts by the choice 1..4 (the shots' bursts, the missiles, the mines,
+/// the shield's ticks).
+const CHOICES: [i32; 5] = [0, 100, 3, 1, 600];
+
+/// `0x410460(m)` (`func_L04_0040EF50`): the race's weapons.
+/// * The ram: the mobys within 0.7 of Ratchet's head (`0x189f00`, taken here as 1 over his place) 3 ticks of its
+///   velocity on (`0x2e14b0`'s gather, flags 0, his moby spared), the crates and the class 0x85 among them, take a hit
+///   (`0x31d4c8`: 1, flags 0x10000, its way 7 × the velocity, from his place).
+/// * The boosts ([`boosts`]).
+/// * The weapon pickups 0x0ab8 (group `+0x260`, with the record's flag 1) within 1 and past their rest (their `+0`):
+///   one with no weapon of its own (its `+4` −1) deals a new one at random of 1..4 (not the one held), any other the
+///   one held again; 4 is the shield (`+0x4d8` for [`CHOICES`]`[4]` ticks: no crash, `+0x4dc`), else `+0x360` the
+///   weapon and `+0x364` its count, `+0x368` none; the pickup's sound (not finished), its rest 300. The pickup's
+///   spray (`0x40d5d0`) is not ported.
+/// * The shield's ticks; its end readies the cooldown (`+0x768`, `+0x764` 40).
+/// * Not finished, the weapon held fires: shots (1) held L1 / L2 every 3 ticks, missiles (2) and mines (3) pressed
+///   every 30 ticks, each its count down (out: none). The shots play the sound 7, the missiles 8.
+///
+/// Not ported: the projectiles — shots `0x3f9320` (class 0x0abc, with their trail and glow particles), missiles
+/// `0x3fba68` (0x0abd, aimed by `0x410190` at the racers and mines ahead) and mines `0x3fd240` (0x0abe, the sound 9):
+/// none of the three classes is in Barlow's or Joba's class table (the census), so what they leave on the original
+/// is to be seen in PCSX2; the gun's joint (`0x2a0af8`, alternating), the missile's voice `0x2d6cc8(47)`.
+fn weapons(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let vel = w.mobys[id].pv_v(0x290);
+    let head = add(ctx.hero.pos, [0.0, 0.0, 1.0]);
+    let probe = add(scale(vel, 3.0), head);
+    let near = ctx.scene.map(|sc| crate::collision::mobys::coll_sphere_mobys(sc, probe, 0.7, crate::collision::QueryFlags(0), ctx.hero_moby)).unwrap_or_default();
+    let dir = scale(vel, 7.0);
+    for k in near {
+        if !(crate::moby::aim::is_crate(w, k) || w.mobys.get(k).is_some_and(|m| m.o_class == 0x85)) { continue; }
+        let t = crate::moby::hits::HitTemplate::new(1.0, ctx.hero_moby, 0x10000, [dir[0], dir[1], dir[2], 0.0]);
+        let p = ctx.hero.pos;
+        w.deliver_hit_any(k, &t, [p[0], p[1], p[2], 1.0]);
+    }
+    boosts(w, id, ctx);
+    let finished = w.mobys[id].state == 3;
+    let group = usize::try_from(w.mobys[id].pv_i(0x260)).ok().and_then(|g| w.groups.get(g)).cloned().unwrap_or_default();
+    if super::record(ctx.game.level, w.race.race).flags & 1 != 0 && w.mobys[id].pv_i(0x260) != -1 {
+        for p in group {
+            if w.mobys[p].o_class != 0x0ab8 || w.mobys[p].pvars.len() < 8 { continue; }
+            if w.mobys[p].pv_i(0) != 0 || 1.0 <= len(sub(w.mobys[p].pos, w.mobys[id].pos)) { continue; }
+            let held = w.mobys[id].pv_i(0x360);
+            let mut choice = held;
+            if w.mobys[p].pv_i(4) == -1 {
+                loop {
+                    choice = ctx.game.rng.rand_range(1, 4);
+                    if held != choice { break; }
+                }
+            }
+            let m = &mut w.mobys[id];
+            if choice == 4 {
+                m.set_pv_i(0x4d8, 1);
+                m.set_pv_i(0x4dc, CHOICES[4]);
+            } else {
+                m.set_pv_i(0x360, choice);
+                m.set_pv_i(0x364, CHOICES[choice.clamp(0, 4) as usize]);
+                m.set_pv_i(0x368, 0);
+            }
+            if !finished { ctx.host.play_sound_of(&w.mobys[id], 0x0ab8, 0, 0); }
+            w.mobys[p].set_pv_i(0, 300);
+        }
+    }
+    let m = &mut w.mobys[id];
+    if m.pv_i(0x4d8) != 0 {
+        m.set_pv_i(0x768, 0);
+        if cd_i(m, 0x4dc) {
+            m.set_pv_i(0x4d8, 0);
+            m.set_pv_i(0x768, 1);
+        }
+    }
+    if m.pv_i(0x768) != 0 && cd_i(m, 0x764) {
+        m.set_pv_i(0x768, 0);
+        m.set_pv_i(0x764, 40);
+    }
+    if finished { return; }
+    let (held, pressed) = (ctx.hero.items.held, ctx.hero.items.pressed);
+    let fire = button::L1 | button::L2;
+    let (rest, sound, input) = match m.pv_i(0x360) {
+        1 => (3, Some(7), held),
+        2 => (30, Some(8), pressed),
+        3 => (30, None, pressed),
+        _ => return,
+    };
+    if !cd_i(m, 0x368) || input & fire == 0 { return; }
+    m.set_pv_i(0x368, rest);
+    if let Some(k) = sound { ctx.host.play_sound(&w.mobys[id], k, 0); }
+    let m = &mut w.mobys[id];
+    if cd_i(m, 0x364) { m.set_pv_i(0x360, 0); }
+}
+
+/// `0x40f4a0(m, s)` (`func_L04_0040DF90`): the engine's two loops — `+0x330` the sound 0 (finished 20) and `+0x334` 1
+/// (21), started again whenever not playing (mode 5); by `e` = the speed + the boost − 0.05 (at least 0), the first's
+/// volume `1024·(1 − min(3e, 1))` and bend `2816·min(3e, 1)`, the second's volume `1024·(0.2 + 0.94·e/0.45)` (past
+/// 0.85 of 0.45: `0.2 + 0.8·(1.85 − e/0.45)`) and bend `−2816·(1 − e/0.45)`. A third sound `+0x328` stops when the
+/// ticks `+0x324` of its `+0x32c` run out.
+fn engine_sounds(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let finished = w.mobys[id].state == 3;
+    let m = &mut w.mobys[id];
+    if m.pv_i(0x32c) != 0 && cd_i(m, 0x324) {
+        let h = m.pv_i(0x328);
+        if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
+        m.set_pv_i(0x32c, 0);
+        m.set_pv_i(0x328, -1);
+        m.set_pv_i(0x324, 0);
+    }
+    let e = (m.pv_f(0x30c) + m.pv_f(0x27c) - 0.050_000_004).max(0.0);
+    for (o, k) in [(0x330, if finished { 20 } else { 0 }), (0x334, if finished { 21 } else { 1 })] {
+        let h = w.mobys[id].pv_i(o);
+        if h == -1 || !ctx.host.sound_playing(h) {
+            let h = ctx.host.play_sound(&w.mobys[id], k, 5);
+            w.mobys[id].set_pv_i(o, h);
+        }
+    }
+    let m = &w.mobys[id];
+    let (a, b) = (m.pv_i(0x330), m.pv_i(0x334));
+    if a != -1 && ctx.host.sound_playing(a) {
+        let t = (e * 3.0).min(1.0);
+        ctx.host.set_sound_volume(a, (1024.0 * (1.0 - t)) as i32);
+        ctx.host.set_sound_bend(a, (t * 2816.0) as i32);
+    }
+    if b != -1 && ctx.host.sound_playing(b) {
+        let o = e / 0.45;
+        let t = if o < 0.85 { o * 0.941_176_4 + 0.2 } else { (1.0 - (o - 0.85)) * 0.8 + 0.2 };
+        ctx.host.set_sound_volume(b, (1024.0 * t) as i32);
+        ctx.host.set_sound_bend(b, ((1.0 - o) * -2816.0) as i32);
     }
 }
 
@@ -893,6 +1049,8 @@ fn boosts(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let m = &mut w.mobys[id];
         m.set_pv_f(0x27c, b);
         m.set_pv_f(0x28c, fov);
+        // The view's angle (`0x1bdc70` = tan(`+0x28c`° / 2), `0x305e48`) while not finished.
+        if !finished { ctx.game.cam_tweaks.blend.tan = Some((fov * 0.008_726_647).tan()); }
     }
     let group = |o: usize| -> Vec<usize> { usize::try_from(w.mobys[id].pv_i(o)).ok().and_then(|g| w.groups.get(g)).cloned().unwrap_or_default() };
     let (pickups, jets) = (group(0x25c), group(0x254));
@@ -1185,7 +1343,8 @@ fn autopilot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let water = w.race.on_water;
     let m = &w.mobys[id];
     let (mut link, mut point) = (m.pv_i(0x314), m.pv_i(0x318));
-    let p = track_progress(&w.race.paths, &set, m.pos, &mut link, &mut point, wrap);
+    let r = &mut w.race;
+    let p = track_progress(&r.paths, &set, m.pos, &mut link, &mut point, wrap, Some(&mut r.frame));
     let route = m.pv_i(0x6d0);
     w.race.paths.ensure(ctx.level, route);
     let paths = &w.race.paths;
@@ -1313,7 +1472,8 @@ fn finish(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
         let (old_link, old_point) = (m.pv_i(0x314), m.pv_i(0x318));
         let prev = m.pv_f(0x310);
         let (mut link, mut point) = (old_link, old_point);
-        let p = track_progress(&w.race.paths, &set, m.pos, &mut link, &mut point, lap != 0);
+        let r = &mut w.race;
+        let p = track_progress(&r.paths, &set, m.pos, &mut link, &mut point, lap != 0, Some(&mut r.frame));
         let m = &mut w.mobys[id];
         m.set_pv_f(0x3b8, prev);
         m.set_pv_f(0x310, p);
@@ -1330,7 +1490,11 @@ fn finish(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     if ctx.level.in_cuboid(m.pv_i(0x190), m.pos) && m.pv_i(0x31c) != 0 {
         if w.race.lap < 2 {
             w.race.lap += 1;
+            // The HUD's lap box for 180 ticks with this lap's time (`$gp+0x18dc` / `$gp+0x18e0`).
+            w.race.lap_shown = 180;
+            w.race.lap_sound = false;
             ctx.host.play_sound(&w.mobys[id], 13, 0);
+            w.race.lap_time = w.race.g1918;
             w.race.g1918 = 0;
             w.mobys[id].set_pv_i(0x31c, 0);
         } else {
@@ -1347,6 +1511,7 @@ fn finish(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
             m.set_pv_i(0x658, 0);
             m.state = 3;
             m.set_pv_i(0x398, 60);
+            w.race.finished = 0;
             ctx.host.play_sound(&w.mobys[id], 23, 0);
             for (o, k) in [(0x330, 20), (0x334, 21)] {
                 let h = w.mobys[id].pv_i(o);
@@ -1355,7 +1520,9 @@ fn finish(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
                 w.mobys[id].set_pv_i(o, h);
             }
             ranks(w, id, ctx);
-            // `0x412490` (`func_L04_00410f80`) not ported; then `0x40f758`, which stops the two loops just started.
+            // `0x412490`: the standings chain and the places by the finish times; then `0x40f758`, which stops the two
+            // loops just started.
+            super::hud::standings_chain(w, id, ctx);
             stop_sounds(w, id, ctx);
             let race = w.race.race;
             if w.mobys[id].pv_i(0x320) != 1 {
@@ -1375,11 +1542,23 @@ fn finish(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
                     ctx.game.bolts = ctx.game.bolts.wrapping_add((prize * if multiplier { 10 } else { 1 }) as u32);
                 }
             }
+            // The best time (`0x1a7368` / `0x1a737c` by the race, saved with the game).
+            if w.mobys[id].pv_i(0x320) != -1 {
+                let k = race.clamp(0, 4) as usize + if level == 4 { 0 } else { 5 };
+                let best = &mut ctx.game.race_times[k];
+                if w.race.clock < *best || *best == 0 { *best = w.race.clock; }
+            }
             let limit = if level == 4 { 7800 } else { 8820 };
             let ticks = w.race.clock;
             if 0 < ticks && ticks / 6 <= limit / 6 {
                 let k = if level == 4 { 2 } else { 3 };
-                if let Some(b) = ctx.game.skill_points.get_mut(k) { if *b == 0 { *b = 1; } }
+                // The standings' text 0x1233 for 300 ticks (`$gp+0x18fc`).
+                if let Some(b) = ctx.game.skill_points.get_mut(k) {
+                    if *b == 0 {
+                        *b = 1;
+                        w.race.skill_shown = 300;
+                    }
+                }
             }
             return true;
         }
@@ -1453,7 +1632,7 @@ fn ranks(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
         let rm = &w.mobys[r];
         let (mut link, mut point) = (rm.pv_i(0x120), rm.pv_i(0x124));
         let wrap = rm.pv_i(0x160) != 0;
-        let p = track_progress(&w.race.paths, &set, rm.pos, &mut link, &mut point, wrap);
+        let p = track_progress(&w.race.paths, &set, rm.pos, &mut link, &mut point, wrap, None);
         let rm = &mut w.mobys[r];
         rm.set_pv_i(0x120, link);
         rm.set_pv_i(0x124, point);
@@ -1485,9 +1664,10 @@ fn ranks(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
 /// k, on Joba 0x2e32 / 0x2e31 (flag 0x10) at 190 − k, 0x2e5b (flag 2) at 210 − k (190 − k off Joba); the prize
 /// (`"%s %d %s"`, or `"%s ?"` with none: 0x1b0900) at 210 + k; its wins (0x2e14) at 230 + k.
 ///
-/// Not ported: the best time (`0x1a7368` / `0x1a737c` by the race: 0x305e at (306, 230 + k), and the wins' text 110
-/// to the left — the best times are not kept, so it is not drawn), the GUI's view tangent it sets for its sprites
-/// (`0x1bdc70`: tan 0.5622, then the bike's `+0x28c`), the wide screen's 0.9 (`0x1a7b98`), the PAL sizes.
+/// The best time of an open race (its words crate::game::GameState::race_times): see the code.
+///
+/// Not ported: the GUI's view tangent it sets for its sprites (`0x1bdc70`: tan 0.5622, the GUI's own here; then the
+/// bike's `+0x28c`, which its tick sets: [`boosts`]), the wide screen's 0.9 (`0x1a7b98`), the PAL sizes.
 pub fn draw_select(w: &MobyWorld, id: usize, inp: &crate::hud::ScreenIn, out: &mut Vec<crate::hud::ScreenDraw>) -> bool {
     use crate::hud::{format_int, lerp_rgba, text_of, Align, Draw, ScreenDraw};
     let _ = id;
@@ -1544,6 +1724,18 @@ pub fn draw_select(w: &MobyWorld, id: usize, inp: &crate::hud::ScreenIn, out: &m
         text(out, 1, text_of(inp, 0x2e5b, usize::MAX), [256.0, 190.0 - k], Align::Centre);
     }
     text(out, 1, prize_text(rec.prizes[won.clamp(0, 2) as usize] == 0), [256.0, 210.0 + k], Align::Centre);
-    text(out, 1, format_int(&text_of(inp, 0x2e14, usize::MAX), won), [256.0, 230.0 + k], Align::Centre);
+    // The best time (`0x1a7368` / `0x1a737c` by the race): `"%s %d :%d.%d"` (`":0%d"` under 10 seconds) of 0x305e,
+    // the minutes, seconds and tenths, font 2 centred 50 right of the middle; the wins' text 110 left of it then.
+    let best = game.race_times[pick.clamp(0, 4) as usize + if joba { 5 } else { 0 }];
+    let mut left = 0.0;
+    if best != 0 {
+        left = 110.0;
+        let (m, sec, tenth) = ((best / 3600) % 60, (best / 60) % 60, (best / 6) % 10);
+        let fmt: &[u8] = if sec < 10 { b"%s %d :0%d.%d" } else { b"%s %d :%d.%d" };
+        use super::hud::Arg;
+        let line = super::hud::format(fmt, &[Arg::S(&text_of(inp, 0x305e, usize::MAX)), Arg::D(m), Arg::D(sec), Arg::D(tenth)]);
+        out.push(ScreenDraw::Text { font: 2, text: line, pos: [306.0, 230.0 + k], scale: 1.0, colour: white, align: Align::Centre });
+    }
+    text(out, 1, format_int(&text_of(inp, 0x2e14, usize::MAX), won), [256.0 - left, 230.0 + k], Align::Centre);
     true
 }

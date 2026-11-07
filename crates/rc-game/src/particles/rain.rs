@@ -6,18 +6,20 @@
 //! | 0 | [`drop`] `0x3280b8(ground, pos, kind, vel)` | `0x3282b8` ([`update_drop`]) | a drop: a ribbon falling with gravity, moved with the camera, gone under the height map |
 //! | 1 | [`splash`] `0x3284b8(pos, alpha)` | `0x328590` ([`update_splash`]) | a splash on the ground: a sprite through its frames, fading over 27 ticks |
 //!
+//! A drop's landing ([`land`], `0x31c778`): a ring on water or a splash on the ground under a point.
+//!
 //! The drops stop on the level's height map (`0x31c630`, [`top`]) and on the floor word `0x1b27b0` (never written on
 //! Oozla: 0). The drop's update is the same on every level but 0xf, which skips the 0..1024 box.
 
 use super::{rec, Particles};
-use crate::hero::physics::{add, scale};
+use crate::hero::physics::{add, len2, scale, sub, V3};
 use crate::rng::Rng;
 use rc_formats::height_map::HeightMap;
 
 pub const DROP: u8 = 0;
 pub const SPLASH: u8 = 1;
 /// `0x1b27b0`: the floor the drops never fall below (0: never written on the weather's levels).
-const FLOOR: f32 = 0.0;
+pub(crate) const FLOOR: f32 = 0.0;
 /// The splash's life in ticks.
 const SPLASH_LIFE: i16 = 0x1b;
 
@@ -139,4 +141,35 @@ pub fn update_splash(sys: &mut Particles, i: usize) {
     }
     let def = sys.def_frame(SPLASH, ((SPLASH_LIFE as i32 - t) / 3) as usize);
     sys.pool.recs[i][2] = def;
+}
+
+/// `0x31c778(p)` (L00 `0x326b28`, the decomp's `func_002B0668`): a drop landing under `p` (the weather's splashes,
+/// crate::moby::classes::weather; the Thermanator's cold shot on water, crate::moby::classes::thermanator): a line
+/// down from the rain's top over `p` plus one step to two steps and 2 under it (no map: from `p` to 20 under the camera, inside 0..1024 only; nothing when the top is 5 or more above
+/// the camera) through the world and the mobys (flags 0x12); on water, quicksand or a slide (surfaces 0, 3, 4) a ring
+/// 0.61 above the hit (`0x32f9b8(randf(0.4, 0.6), 5250, …)`, super::water::ring), else a splash with the
+/// alpha `(d·3.1833334 + 64) & 0xff` for its xy distance d from the camera.
+#[allow(clippy::too_many_arguments)]
+pub fn land(sys: &mut Particles, rng: &mut Rng, coll: Option<&rc_formats::collision::Collision>, scene: Option<&crate::collision::mobys::MobyScene>, map: Option<&rc_formats::height_map::HeightMap>, live: bool, cam: V3, p: V3) {
+    let (from, to) = match map {
+        None => {
+            if p[0] <= 0.0 || p[1] <= 0.0 || 1024.0 <= p[0] || 1024.0 <= p[1] { return; }
+            (p, [p[0], p[1], cam[2] - 20.0])
+        }
+        Some(m) => {
+            let t = top(map, live, p) + m.step;
+            if cam[2] + 5.0 <= t { return; }
+            ([p[0], p[1], t], [p[0], p[1], t - (m.step + m.step) - 2.0])
+        }
+    };
+    let Some(coll) = coll else { return };
+    let Some(hit) = crate::collision::coll_line_m(coll, scene, from, to, crate::collision::QueryFlags(0x12), None) else { return };
+    let at = hit.point;
+    if matches!(hit.surface_id(), 0 | 3 | 4) {
+        let size = rng.randf(0.4, 0.6);
+        super::water::ring(sys, rng, size, 5250.0, [at[0], at[1], at[2] + 0.61], false, None);
+    } else {
+        let d = len2(sub(at, cam));
+        splash(sys, at, ((d * 3.183_333_4 + 64.0) as i32) & 0xff);
+    }
 }

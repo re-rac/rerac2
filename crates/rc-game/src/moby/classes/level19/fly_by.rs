@@ -14,7 +14,7 @@
 //!   flight's ticks its (`+0x2c`). Each tick the cutaway's camera (its pvars `+0x00` place, `+0x18` yaw) along the
 //!   way from `+0x18`'s place (`+0x30` up) to `+0x1c`'s (`+0x34` up), at `0.45 + 0.45·sin((1 − left/ticks)·π − π/2)`
 //!   of it, facing along it; the ticks left counted down (`0x2ec0d0` = L00 `0x2eeab0`), and out, the autosave
-//!   (`0x30af90` = L00 `0x30d658(0, −1)`, not ported) and 1.
+//!   (`0x30af90` = L00 `0x30d658(0, −1)`, crate::game::GameState::autosave) and 1.
 
 use crate::hero::physics::{add, atan2, scale, sub};
 use crate::moby::{countdown, Ctx, MobyWorld};
@@ -70,13 +70,13 @@ pub fn update_0c35(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
             if done(ctx, w.mobys[id].pv_i(pv::MISSION)) && w.mobys[id].pv_i(pv::ARMED) != 0 { w.mobys[id].set_state(2, -1); }
         }
-        2 => fly(w, id),
+        2 => fly(w, id, ctx),
         _ => {}
     }
 }
 
 /// State 2 (module docs).
-fn fly(w: &mut MobyWorld, id: usize) {
+fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &w.mobys[id];
     let (cut, from, to) = (idx(w, m.pv_i(pv::CUTAWAY)), idx(w, m.pv_i(pv::FROM)), idx(w, m.pv_i(pv::TO)));
     if w.mobys[id].first() {
@@ -101,5 +101,8 @@ fn fly(w: &mut MobyWorld, id: usize) {
     let mut left = w.mobys[id].pv_i(pv::LEFT);
     let out = countdown(&mut left);
     w.mobys[id].set_pv_i(pv::LEFT, left);
-    if out { w.mobys[id].set_state(1, -1); }
+    if out {
+        ctx.game.autosave(-1);
+        w.mobys[id].set_state(1, -1);
+    }
 }

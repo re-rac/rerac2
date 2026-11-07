@@ -32,15 +32,16 @@ const HEAD_SCALE: f32 = f32::from_bits(0x3ff3_3333);
 /// * **0**: update distance 0xff. Scene 0x9a seen (`0x139800` bit 26): its partner `+0x124` and it deleted; scene
 ///   0x98 seen (bit 24): it deleted. Else its shadow slab (0, 0.2; `0x31b670`) and 1.
 /// * **1**: Ratchet can talk to it (crate::moby::talk::can_talk, within 2·2.5, from the tenth frame; the talk record
-///   `0x32d3f8` not ported): scene 0x98 queued and the chain started (`0x2f24f8` / `0x2f2640` = L00 `0x2f4ee8` /
+///   `0x32d3f8` marked, crate::moby::talk::mark): scene 0x98 queued and the chain started (`0x2f24f8` / `0x2f2640` = L00 `0x2f4ee8` /
 ///   `0x2f5030`); then 2.
-/// * **2**: hidden while the scene plays; once it is over (`0x36f938` = L00 `0x371ba8`), shown and deleted.
+/// * **2**: hidden while the scene plays (the NPC busy word `0x1b26a8` set, crate::moby::talk::busy); once it is over
+///   (`0x36f938` = L00 `0x371ba8`), shown and deleted.
 /// * Out of state 0 each tick: the level's census ([`census`]), the idle and the look (crate::moby::talk::idle /
 ///   look). In a scene with the actors' big heads, the first scene actor of 0x0e3e takes the head node at 1.9
 ///   (`0x42bd30`).
 ///
 /// Not ported: the level's count of the census classes (`0x42bba0` into `$gp+0x2f68`) when `0x1b2488` is 5 and at its
-/// set-up (the trader counts them live); the NPC-busy word `0x1b26a8` (crate::moby::talk); with the big heads its own
+/// set-up (the trader counts them live); with the big heads its own
 /// head asks 2.75 (talk::look) where the game asks 1.9 (`+0x70`).
 pub fn update_1254(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     actor_heads_of(w, ctx, HEAD_CLASS);
@@ -58,14 +59,19 @@ pub fn update_1254(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.shadow_slab = [0.0, f32::from_bits(0x3e4c_cccd)];
         }
         1 => {
-            if talk::can_talk(w, id, ctx, R, 10) && ctx.game.scenes.queue.push(SCENE_TALK as i32) {
-                ctx.game.scenes.start_queue(ctx.hero.hp);
-                w.mobys[id].set_state(2, -1);
+            if talk::can_talk(w, id, ctx, R, 10) {
+                talk::mark(w, id, ctx);
+                if ctx.game.scenes.queue.push(SCENE_TALK as i32) {
+                    ctx.game.scenes.start_queue(ctx.hero.hp);
+                    w.mobys[id].set_state(2, -1);
+                }
             }
         }
         2 => {
+            talk::busy(ctx, true);
             talk::hide_in_scene(w, id, ctx);
             if !ctx.game.scenes.in_scene() {
+                talk::busy(ctx, false);
                 talk::show(w, id);
                 return w.delete(id);
             }
@@ -117,7 +123,8 @@ fn triangle(ctx: &Ctx) -> bool { ctx.hero.items.pressed & crate::pad::button::TR
 /// * **1** (short; enough → 2): while Ratchet can talk to it (2.5) the text 0x132e with 9.
 /// * **2** (enough; short → 1): while he can, the text 0x132f with 9; △ queues the deal's scene 0x9a and starts it; 3.
 /// * **3**: hidden in the scene mode, and its prop `+0x80` too; after the scene: shown, 9 stones off, its group's timers
-///   1 (`0x31a340`), the prop deleted, the autosave (`0x30af90` = L00 `0x30d658(0, −1)`, not ported); 4 with 16 or
+///   1 (`0x31a340`), the prop deleted, the autosave (`0x30af90` = L00 `0x30d658(0, −1)`,
+///   crate::game::GameState::autosave); 4 with 16 or
 ///   fewer, else 5.
 /// * **4** / **5**: as 1 / 2 with 16, the texts 0x1330 / 0x1331 and the scene 0x99; 6.
 /// * **6**: hidden in the scene mode; after it: 16 stones off, shown, its group's timers 1, the flag `+0x89`, the
@@ -133,7 +140,8 @@ fn triangle(ctx: &Ctx) -> bool { ctx.hero.items.pressed & crate::pad::button::TR
 /// * Then the level's census ([`census`]) and its head's aim (list 0, at 0.02 damped 0.3; with the big heads `+0x70`
 ///   2.75): it asks no turn, so the head only springs back.
 ///
-/// Not ported: the NPC-busy word `0x1b26a8` set while its scenes play; the talk record (`0x32d3f8`); the autosaves.
+/// The NPC busy word `0x1b26a8` (crate::moby::talk::busy) is set while its scenes play (3, 6); the talk record
+/// (`0x32d3f8`, crate::moby::talk::mark) is marked with the texts 0x132f, 0x1331, 0x1332 / 0x1334 (7) and 0x1333.
 pub fn update_1313(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     talk::actor_heads(w, id, ctx, HEAD_SCALE);
     trader(w, id, ctx);
@@ -167,18 +175,22 @@ fn trader(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         2 => {
             if stones(ctx) < PRICE_A { 1 } else {
-                if !talk::offer(w, id, ctx, R, 0x132f, &[PRICE_A]) || !triangle(ctx) { return; }
+                if !talk::offer(w, id, ctx, R, 0x132f, &[PRICE_A]) { return; }
+                talk::mark(w, id, ctx);
+                if !triangle(ctx) { return; }
                 ctx.game.scenes.queue.push(SCENE_DEAL_A as i32);
                 ctx.game.scenes.start_queue(ctx.hero.hp);
                 3
             }
         }
         3 => {
+            talk::busy(ctx, true);
             talk::hide_in_scene(w, id, ctx);
             if ctx.game.scenes.mode == crate::scene::SCENE {
                 if let Some(p) = link(w, id, PROP) { talk::hide(w, p); }
             }
             if ctx.game.scenes.in_scene() { return; }
+            talk::busy(ctx, false);
             talk::show(w, id);
             ctx.game.moonstones -= PRICE_A;
             let group = w.mobys[id].group;
@@ -187,6 +199,7 @@ fn trader(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 w.delete(p);
                 w.mobys[id].set_pv_i(PROP, -1);
             }
+            ctx.game.autosave(-1);
             if (stones(ctx) as u32) <= PRICE_B as u32 { 4 } else { 5 }
         }
         4 => {
@@ -194,15 +207,19 @@ fn trader(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         5 => {
             if stones(ctx) < PRICE_B { 4 } else {
-                if !talk::offer(w, id, ctx, R, 0x1331, &[PRICE_B]) || !triangle(ctx) { return; }
+                if !talk::offer(w, id, ctx, R, 0x1331, &[PRICE_B]) { return; }
+                talk::mark(w, id, ctx);
+                if !triangle(ctx) { return; }
                 ctx.game.scenes.queue.push(SCENE_DEAL_B as i32);
                 ctx.game.scenes.start_queue(ctx.hero.hp);
                 6
             }
         }
         6 => {
+            talk::busy(ctx, true);
             talk::hide_in_scene(w, id, ctx);
             if ctx.game.scenes.in_scene() { return; }
+            talk::busy(ctx, false);
             ctx.game.moonstones -= PRICE_B;
             talk::show(w, id);
             let group = w.mobys[id].group;
@@ -212,11 +229,14 @@ fn trader(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let mut n = if flag(ctx, F_84) { 1 } else { 2 };
             if flag(ctx, F_86) { n -= 1; }
             if n < 1 { ctx.game.help(0xa10, 0x67); } else { ctx.game.help(0xa0f, 0x66); }
+            ctx.game.autosave(-1);
             if stones(ctx) < 1 { 7 } else { 8 }
         }
         7 => {
             if 0 < stones(ctx) { 8 } else {
-                if left(w) == 0 { talk::offer(w, id, ctx, R, 0x1334, &[0]); } else { talk::offer(w, id, ctx, R, 0x1332, &[]); }
+                if !talk::can_talk(w, id, ctx, R, 10) { return; }
+                if left(w) == 0 { talk::say(ctx, 0x1334, &[0]); } else { talk::say(ctx, 0x1332, &[]); }
+                talk::mark(w, id, ctx);
                 return;
             }
         }
@@ -225,7 +245,9 @@ fn trader(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if s < 1 { 7 } else {
                 let each = if ctx.game.challenge { WORTH * 10 } else { WORTH };
                 let worth = s.wrapping_mul(each);
-                if !talk::offer(w, id, ctx, R, 0x1333, &[s, worth]) || !triangle(ctx) { return; }
+                if !talk::offer(w, id, ctx, R, 0x1333, &[s, worth]) { return; }
+                talk::mark(w, id, ctx);
+                if !triangle(ctx) { return; }
                 ctx.game.bolts = (ctx.game.bolts as i32).wrapping_add(worth) as u32;
                 ctx.game.moonstones = 0;
                 ctx.game.show_bolts = Some(0xb4);

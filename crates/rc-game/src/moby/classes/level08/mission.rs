@@ -34,7 +34,8 @@
 //! * **1**: out of a scene (`0x3800c0`, crate::scene::Scenes::in_scene) and 6 ticks in: flag `0x1c` + 0x19 = 1;
 //!   scene 0x55 queued — when it goes in: started, the checkpoint's chunk 0, the cut in, `0x1b2514` = 1, the fade
 //!   1.2 (`0x1b2420`), the parked ship hidden ([`hide_ship`]), chunk 0; 2.
-//! * **2**: out of a scene and 6 ticks in: flag 0x1a = 1, the autosave (`0x319bc8(0, −1)`, not ported); 3.
+//! * **2**: out of a scene and 6 ticks in: flag 0x1a = 1, the autosave (`0x319bc8(0, −1)`,
+//!   crate::game::GameState::autosave); 3.
 //! * **3**: Ratchet in the area `+0x00` (`0x339420`): scene 0x56 queued — when it goes in, started; 4.
 //! * **4**: in a scene (`0x1a8f00` = 2) the moby `+0x30` deleted; out of one and 6 ticks in: the wrench put on its row
 //!   (as above) with its message (`0x3004b0`, crate::game::GameState::upgrade_message), the swap, the moby `+0x08`'s
@@ -226,7 +227,8 @@ pub fn update_0c2a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         2 => {
             if !ctx.game.scenes.in_scene() && 6 <= w.mobys[id].state_ticks as u16 {
                 set_flag(ctx, 0x1a);
-                // `0x319bc8(0, −1)`: the autosave (not ported).
+                // `0x319bc8(0, −1)`: the autosave.
+                ctx.game.autosave(-1);
                 w.mobys[id].set_state(3, -1);
             }
         }
@@ -245,7 +247,8 @@ pub fn update_0c2a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     let (uid, mission) = (w.mobys[k].uid, w.mobys[k].mission);
                     ctx.game.uid_gone(uid, mission);
                 }
-                // `0x319bc8(0, −1)`: the autosave (not ported).
+                // `0x319bc8(0, −1)`: the autosave.
+                ctx.game.autosave(-1);
                 w.mobys[id].set_state(5, -1);
             }
         }

@@ -721,8 +721,9 @@ pub fn update_0f13(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// within 0.75), its parts on it (`0x384d28`), until after 10 ticks the fly-by is over (`0x42a508`): the ship hidden,
 /// Ratchet walked 2 out of [1] along its yaw (state 4); once he is not walking, state 5. Else state 4 at once. In
 /// the states 4 and 5 the parts are hidden. State 2's first tick plays the level's sound 0x17 past the split
-/// (`0x3607e8(0x17, 0, 0)` at `0x384984`, the fly-by's tune). Not ported: the item 0x18 (`0x2f51a0`), the ship's
-/// engine glow and draw callback, the level name (`0x30d658`). The placed view [4] is reset (`0x42b9f0`) at the
+/// (`0x3607e8(0x17, 0, 0)` at `0x384984`, the fly-by's tune). Into state 5 the save is forced (`0x30d658(1, −1)`,
+/// crate::game::GameState::save_forced). Not ported: the item 0x18 (`0x2f51a0`), the ship's engine glow and draw
+/// callback. The placed view [4] is reset (`0x42b9f0`) at the
 /// fly-by's end and on state 4's first tick.
 pub fn update_1330(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let ship = |w: &MobyWorld| ai_link(w, id, 0x18);
@@ -823,8 +824,11 @@ pub fn update_1330(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 ctx.game.occlusion = 2;
                 ctx.game.cameras.reset_placed(w.mobys[id].pv_i(0x10));
             }
-            let m = &mut w.mobys[id];
-            if !(0x62..=0x64).contains(&ctx.hero.state) { m.set_state(5, -1); }
+            if !(0x62..=0x64).contains(&ctx.hero.state) {
+                // `0x30d658(1, −1)`: the save forced (crate::game::GameState::save_forced).
+                ctx.game.save_forced(-1);
+                w.mobys[id].set_state(5, -1);
+            }
         }
         _ => {}
     }
@@ -1567,17 +1571,23 @@ fn scene_lists(level: i32) -> &'static [&'static [i32]] {
 /// its "new planet" banner `0x325270` (`crate::travel::new_planet_banner`, not for 0x18)), the
 /// mission done (`0x3132a8`), with [0xb] set (≥ 1; in the scenes' tick ≠ 0) and the word [0xc]'s top half the
 /// checkpoint at the cuboid [4] (else where Ratchet is; in the scenes' tick where it is), then with [0xc]'s low byte
-/// ≠ −1 the level change to it (`0x2f50f8(level, 1)`: Aranos's last trigger sends Ratchet to Oozla, level 1). Not
-/// ported: the autosave `0x30d658` it asks for otherwise.
+/// ≠ −1 the level change to it (`0x2f50f8(level, 1)`: Aranos's last trigger sends Ratchet to Oozla, level 1); else,
+/// with the planet unlocked or the mission done now, or [0xf] set (outside the scenes' tick also [0xb] ≠ −1), the
+/// autosave (`0x30d658(0, −1)`, crate::game::GameState::autosave).
 fn reward_0f6e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, in_scene_tick: bool) {
     let m = &w.mobys[id];
     let item = m.pv_b(9) as i8 as i32;
     let g = &mut *ctx.game;
+    let mut changed = false;
     if item != -1 {
+        changed = true;
         g.unlock_planet(item);
         if item != 0x18 { crate::travel::new_planet_banner(g, item); }
     }
-    if m.mission != 0xff && g.missions.get(g.level.max(0) as usize * 0x10 + m.mission as usize).is_some_and(|b| b & 0x80 == 0) { g.mission_done(m.mission); }
+    if m.mission != 0xff && g.missions.get(g.level.max(0) as usize * 0x10 + m.mission as usize).is_some_and(|b| b & 0x80 == 0) {
+        changed = true;
+        g.mission_done(m.mission);
+    }
     let b = m.pv_b(0xb) as i8;
     let set = if in_scene_tick { b != 0 } else { 1 <= b };
     if set && m.pv_i(0xc) as u32 & 0xffff_0000 != 0 {
@@ -1588,7 +1598,11 @@ fn reward_0f6e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, in_scene_tick: bool)
         }
     }
     let to = m.pv_i(0xc) as u8 as i8;
-    if to != -1 { g.go_to_level(to as i32, true); }
+    if to != -1 {
+        g.go_to_level(to as i32, true);
+    } else if (changed || m.pv_b(0xf) != 0) && (in_scene_tick || b != -1) {
+        g.autosave(-1);
+    }
 }
 
 /// 0x0f6e (`0x40ffa0`, a scene trigger with a reward): gone at the start when its planet `+0x68`[9] is unlocked

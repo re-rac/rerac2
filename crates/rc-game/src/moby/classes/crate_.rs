@@ -22,7 +22,9 @@
 //! sphere there (0.05 a tick): twice it, every moby but the crate takes 2 damage, flags 1 (the crates near break, Ratchet
 //! is hurt); three times it, every moby but Ratchet takes 4, flags 0x10000, knocked out 1 and up 1 (`0x31def8`).
 //!
-//! Not ported: the class 0x1f6's flag test beyond the damage, the dust puffs (`0x334528`), the other classes' break
+//! The break raises its dust (crate::particles::break_dust).
+//!
+//! Not ported: the class 0x1f6's flag test beyond the damage, the other classes' break
 //! sounds (`0x360698`), the respawn's stacking search (`0x31c9d8`), Ratchet's contact `0x18a3a8` (no writer found).
 //!
 //! A nanotech crate (0x1f5, 0x200) holds a nanotech cluster from its start (crate::moby::classes::nanotech, `+0xfc`).
@@ -300,6 +302,9 @@ fn break_crate(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, explosive: bool) {
         guard += 1;
         if guard > 64 { break; }
     }
+    // Its dust (crate::particles::break_dust::burst: six puffs 0.3 up it).
+    let at = w.mobys[id].pos;
+    if let Some(sys) = ctx.parts.as_deref_mut() { crate::particles::break_dust::burst(sys, &mut ctx.game.rng, at); }
     // The recent-breaks count: decays by a quarter of the ticks since the last break (none within 0xf0: reset).
     let g = &mut *ctx.game;
     let since = g.frame - g.last_break_frame;

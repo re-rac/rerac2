@@ -48,8 +48,8 @@
 //! lock cheat (`0x18b270` → `0x18aa18`, `0x32b4d0`); the first-person target search (`0x2ae668`); the targets of class
 //! 0xa8d / 0xa8e (`0x37e328`'s health-block height); the throw's jitter `0x3dd3a0` works out and drops (its three draws
 //! are made); the pools `0x3dd7a0` clears in the trail slot's memory and the ten records `0x3dd720` ages (nothing writes
-//! them); the gravity frames' trackers and bends (`0x37f538` / `0x37f618` / `0x37f5f8`, `0x380e08`); the weapon mods'
-//! effects on a hit (`0x3f9f70`).
+//! them); the gravity frames' trackers and bends (`0x37f538` / `0x37f618` / `0x37f5f8`, `0x380e08`). The moby a
+//! meteor strikes takes Acid (`0x3f9f70(m, 0x3f, the hand)`, crate::moby::weapon_mods).
 
 use crate::hero::items::{row, LAVA};
 use crate::hero::physics::{add, add_rot, atan2, cross, dist, dist2, euler_rows, rot_dist, scale, set_len, sub, unit, V3};
@@ -335,6 +335,9 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
             let mut tm = HitTemplate::new(damage, Some(id), 0x91_0000, [d[0], d[1], d[2], NO_KNOCK_LIMIT]);
             tm.kind = (w.mobys[t].o_class as u16 as u32) << 16 | 0x0105;
             w.deliver_hit_any(t, &tm, [0.0; 4]);
+            // `0x3f9f70(t, 0x3f, the hand)` (crate::moby::weapon_mods).
+            let owner = w.mobys[id].parent;
+            crate::moby::weapon_mods::acid(w, ctx, t, 0x3f, owner);
             w.mobys[id].set_pv_i(pv::MET_MOBY, 1);
             sparks(ctx, o.point, normal, 3);
         }

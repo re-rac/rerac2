@@ -66,7 +66,9 @@
 //! `0x802080` at 0x7f) fading in over its first 20 ticks; the Mega's lightning through its seven points
 //! (crate::fx::ribbon: FX 0x17 and 0xe three times as wide, `0xff5050` / `0xff1010` at a random 0.5..1 of 0x7f / 0x30).
 //!
-//! Not ported: the weapon mods' effects on a hit (`0x3f9f70`), the gravity frames' bends (`0x380e08`, `0x37f538` /
+//! The weapon mod: Acid on the moby a blade hits (`0x3f9f70(m, 0x41 upgraded / 0x16, the hand)`, crate::moby::weapon_mods).
+//!
+//! Not ported: the gravity frames' bends (`0x380e08`, `0x37f538` /
 //! `0x37f618`, the velocity flattened along the up), the lock a cheat or the Lock-On mod holds (`0x18b270`), the
 //! after-images' one-ghost setting (`0x1adb0c`: two here), the trail slot's other users (the Lava Gun's class
 //! `0x41b198`: their eviction frees this slot's after-images, [`Pool::slot`]). 
@@ -622,6 +624,9 @@ pub fn update_blade(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 let n = w.mobys[id].pv_s(0x2c) + 1;
                 w.mobys[id].set_pv_s(0x2c, n);
                 if (if lv != 0 { 2 } else { 3 }) <= n { w.mobys[id].state = 1; }
+                // `0x3f9f70(m, 0x41 / 0x16, hand)` (crate::moby::weapon_mods).
+                let owner = w.mobys[id].parent;
+                crate::moby::weapon_mods::acid(w, ctx, hm, if lv != 0 { 0x41 } else { crate::hero::items::CHOPPER }, owner);
             }
             None => { ctx.host.play_sound(&w.mobys[id], 2, 0); }
         }

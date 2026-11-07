@@ -13,9 +13,8 @@
 //!   (state 2, `+0x274`), its goal the next point anyway, the goal's timer 2000000; then the AI state 0xc, the AI tick
 //!   ([`space::think`]) and the hits alone (`0x383130(m, 0, 1, 1)`).
 //! * **State 2**: the wait; out → 1.
-//!
-//! Not ported: the path's markers each tick in states 0 and 1 (`0x35b558(m, path, 0x8000ff00, 0x81, 0.75, 1)`: a
-//! particle of type 0x29 at each point, its frame from `0x1ff364`, 2 ticks; crate::particles has not the type).
+//! * **The path's markers** each tick in states 0 and 1 ([`markers`]): a marker (crate::particles::marker, type 0x29)
+//!   at each point of its path, green, for 2 ticks.
 
 use crate::moby::classes::space::{self, a};
 use crate::moby::{mode, Ctx, MobyWorld};
@@ -44,6 +43,12 @@ pub(crate) fn restart(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
     space::set_ai_i(w, id, a::TIMER, 2_000_000);
 }
 
+/// `0x35b558(m, path, 0x8000ff00, 0x81, 0.75, 1)`: a marker at each point of its path (crate::particles::marker::path).
+fn markers(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
+    let points = usize::try_from(w.mobys[id].pv_i(PATH)).ok().and_then(|p| ctx.level.paths.get(p));
+    if let Some(sys) = ctx.parts.as_deref_mut() { crate::particles::marker::path(sys, id, points.map(|v| v.as_slice()), 0x8000_ff00, 0x81, 0.75, 1); }
+}
+
 /// `0x438750`.
 pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].pv_i(space::STARTED) == 0 {
@@ -58,10 +63,12 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_i(WAIT, 0);
         space::set_ai_i(w, id, a::SPEED_AT, SPEED as i32 + 1);
         space::set_ai_i(w, id, 0x150, 0xffff);
+        markers(w, id, ctx);
         return;
     }
     match w.mobys[id].state {
         1 => {
+            markers(w, id, ctx);
             if space::arrived(w, id) {
                 let pts = path(w, id, ctx);
                 let index = w.mobys[id].pv_i(POINT);

@@ -235,6 +235,11 @@ pub enum ScreenCallback {
     /// L04 `0x40c228` (L11 its copy): the hoverbike race select of the bike `moby`
     /// (crate::moby::classes::race::bike::draw_select).
     RaceSelect { moby: usize },
+    /// L04 `0x4188b8` (L11 `0x408408`): the hoverbike race's HUD of the bike `moby`
+    /// (crate::moby::classes::race::hud::draw).
+    RaceHud { moby: usize },
+    /// L04 `0x4127a8` (L11 `0x402450`): the race's standings after the finish (crate::moby::classes::race::hud::standings).
+    RaceStandings { moby: usize },
 }
 
 impl ScreenCallback {
@@ -254,6 +259,8 @@ impl ScreenCallback {
             ScreenCallback::MissionSelect { moby } => mission::draw_select(w, moby, inp, out),
             ScreenCallback::MissionResults { moby, mission: m } => mission::draw_results(w, moby, m, inp, out),
             ScreenCallback::RaceSelect { moby } => crate::moby::classes::race::bike::draw_select(w, moby, inp, out),
+            ScreenCallback::RaceHud { moby } => crate::moby::classes::race::hud::draw(w, moby, inp, out),
+            ScreenCallback::RaceStandings { moby } => crate::moby::classes::race::hud::standings(w, moby, inp, out),
         }
     }
 }
@@ -264,6 +271,8 @@ pub struct ScreenIn<'a> {
     pub game: &'a crate::game::GameState,
     pub hero: &'a crate::hero::Hero,
     pub texts: &'a dyn Fn(u32) -> Vec<u8>,
+    /// Font 2's glyphs (the measures some draws take: `0x2e9b58`, `0x2eaf70` with its measure flag).
+    pub glyphs_2: Option<&'a [Glyph; 256]>,
 }
 
 /// One screen draw of a class's HUD code (a [`ScreenCallback`], a [`HudSlots`] callback or a second-list callback
@@ -281,6 +290,13 @@ pub enum ScreenDraw {
     /// A quad of FX texture `fx` on the screen (`0x2e89d8` / L05 `0x3008c0`'s rectangle, `0x2e8e68`'s turned quad):
     /// its corners in strip order (pixels), each with its place in the texture (texels), MODULATEd by `colour`.
     Fx { fx: u16, corners: [[f32; 2]; 4], st: [[f32; 2]; 4], colour: u32 },
+    /// A GUI sprite through a matrix (`0x3819a8`, crate::gui::sprite_mat: its x and z rows `m`).
+    SpriteMat { id: u32, pos: [f32; 2], frame: f32, m: [[f32; 2]; 2], colour: u32 },
+    /// The help panel's box (`0x2e9548` and `0x30d8d0`, crate::help): `rect` its y0, y1, x0, x1; the rounded fill in
+    /// `fill` and the border in `edge`, each with `alpha` or'd into its top byte.
+    Panel { rect: [i32; 4], alpha: i32, fill: u32, edge: u32 },
+    /// Text laid out by `0x2eb050`'s layout and drawn in font 2 (`0x2eaf70`, crate::help::text_box).
+    Wrap { text: Vec<u8>, layout: crate::help::Layout, colour: u32 },
 }
 
 /// The FX textures the class screen draws take ([`ScreenDraw::Fx`]; the engine loads them into the HUD's layer): the
@@ -417,6 +433,16 @@ pub fn screen_quads(draws: &[ScreenDraw], sprites: &HashMap<u32, Sprite>, fonts:
                 if colour >> 24 == 0 { continue; }
                 let Some((tex, _)) = fx(*id) else { continue };
                 out.push(Quad { pos: *corners, uv: *st, tex, rgba: colour.to_le_bytes() });
+            }
+            ScreenDraw::SpriteMat { id, pos, frame, m, colour } => {
+                if let Some(sp) = sprites.get(id) { gui::sprite_mat(&mut out, Some(*id), sp, *pos, *frame, *m, colour.to_le_bytes(), gui::MENU_TAN); }
+            }
+            &ScreenDraw::Panel { rect: [y0, y1, x0, x1], alpha, fill, edge } => {
+                crate::help::rounded_box(&mut out, y0, y1, x0, x1, alpha, fill);
+                crate::help::border(&mut out, sprites, y0, y1, x0, x1, alpha, edge);
+            }
+            ScreenDraw::Wrap { text, layout, colour } => {
+                if let Some((g, _)) = fonts[1] { crate::help::text_box(&mut out, text, layout, g, colour.to_le_bytes()); }
             }
         }
     }

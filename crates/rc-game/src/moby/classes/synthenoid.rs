@@ -77,8 +77,11 @@
 //! (crate::moby::classes::synthenoid_bomb, its class sound 3). The deploy sends out 0x0b02 with the row upgraded, and a
 //! base drone in the field (not leaving) swaps itself for one at its place and leaves (`0x3ed5c0`).
 //!
+//! The weapon mod: Shock on a moby a shot hits with its collision on (`0x4126b8(m, 0x3d upgraded / 0x1f, the drone)`,
+//! crate::moby::weapon_mods).
+//!
 //! Not ported: the gravity frames' bends (`0x380e08`, `0x380e58`) and the moving frames (`$gp−0x14e4`), the
-//! lock cheat (`0x18b270`), the weapon mods' effects on a hit (`0x4126b8`), the unreachable branch of state 1 (its
+//! lock cheat (`0x18b270`), the unreachable branch of state 1 (its
 //! leaving's ticks past 20 there: a random sequence-1 blend and speed).
 
 use crate::collision::QueryFlags;
@@ -711,8 +714,15 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, start: V3) {
     let ended = match hit {
         Some(o) => {
             if let Some(t) = o.moby { w.deliver_hit_any(t, &tmpl, [o.point[0], o.point[1], o.point[2], 1.0]); }
-            // `0x3ef018(point, 15 / 10, …)`: the same burst with a moby or not (a moby's weapon mods not ported).
+            // `0x3ef018(point, 15 / 10, …)`: the same burst with a moby or not.
             burst(ctx, o.point);
+            // A moby with its collision (`+0x98`): `0x4126b8(t, 0x3d / 0x1f, the drone)` by the row's level
+            // (crate::moby::weapon_mods).
+            if let Some(t) = o.moby.filter(|&t| w.mobys[t].has_collision) {
+                let item = if ctx.game.upgrade_level(SYNTHENOID) != 0 { 0x3d } else { SYNTHENOID };
+                let owner = w.mobys[id].parent;
+                crate::moby::weapon_mods::shock(w, ctx, t, item, owner);
+            }
             true
         }
         None => {

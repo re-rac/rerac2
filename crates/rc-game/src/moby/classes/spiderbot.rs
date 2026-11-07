@@ -83,8 +83,7 @@
 //! tables; the port shares the base bot's mesh and wobbles.
 //!
 //! Not ported: the sphere's copy is the frame at full size (the game's is 256×256 CT16) and its TEST 0x5380b Z writes (ATST GEQUAL 0x80 with the
-//! copy's alpha) are left out (the effects write no Z here); the weapon mods
-//! on the blast's hits (`0x422630`); the gravity frames and moving frames (`0x386d68` / `0x386e48`, `0x388638` /
+//! copy's alpha) are left out (the effects write no Z here); the gravity frames and moving frames (`0x386d68` / `0x386e48`, `0x388638` /
 //! `0x3886f0`, `0x326450`), the level-specific refusal under 462.43 (`0x1a8ff4`) and the landing on the lava level's
 //! surface 3 (`0x1a79f8`); the camera's blend in (its record's blend kind 1, `0x2db6b8`: a cut here) and its `+0x28` /
 //! `+0x2c` set to (−10.75, 4) while the bot blows up (nothing reads them); `0x189ff2`; PAL's screen scale on the
@@ -907,6 +906,7 @@ fn sweep(w: &MobyWorld, ctx: &Ctx, id: usize, from: V3, to: V3, vel: &mut V3) ->
 /// `0x3faaa0`: the blast's hits, its first 21 ticks — every moby with health or one the lines test (mode 0x4000), not
 /// Ratchet, within the reach (at most 8) takes the record's damage (`+0x60`: 12) with flags 0x830000 along the line
 /// from the bot. The upgraded bot's (`0x403320`): every tick, its row's damage (18, 30, 100), flags 0x810000.
+/// Each moby hit takes Acid (`0x3f9f70(m, 0x20, the hand)`, the upgraded bot's 0x4e; crate::moby::weapon_mods).
 fn blast(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let l = layout(w.mobys[id].o_class);
     let plus = w.mobys[id].o_class == PLUS_BOT;
@@ -922,8 +922,14 @@ fn blast(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         tm.kind = (x.o_class as u16 as u32) << 16 | 0x0305;
         let p = x.pos;
         w.deliver_hit_any(t, &tm, [p[0], p[1], p[2], 1.0]);
+        // `0x3f9f70(t, 0x20 / 0x4e, the hand)` (crate::moby::weapon_mods).
+        let owner = usize::try_from(w.mobys[id].pv_i(l.hand)).ok();
+        crate::moby::weapon_mods::acid(w, ctx, t, if plus { PLUS_ITEM } else { SPIDERBOT }, owner);
     }
 }
+
+/// The upgraded glove's row (the weapon mods' item for its bot's blast, `0x403320`).
+const PLUS_ITEM: i32 = 0x4e;
 
 /// `0x2496d0`'s wobbles (98: `0x3facb0` turns `0x61 + 1` of them).
 const WOBBLES: usize = 98;

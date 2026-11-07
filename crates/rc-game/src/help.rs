@@ -34,7 +34,7 @@ const BORDER_RGB: u32 = 0x00f0_c070;
 
 /// `0x2eb050`'s layout (the words `+0..+0x16`): the lines drawn between `top` and `bottom`, the text between `x0` and
 /// `x1` anchored at `x` (flags bit 0: centred), at `y` (bit 1: centred on it), `line` apart; bit 2 measures only.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Layout {
     pub top: i32,
     pub bottom: i32,
@@ -126,7 +126,7 @@ pub fn text_box(out: &mut Vec<Quad>, text: &[u8], l: &Layout, glyphs: &[Glyph; 2
 
 /// `0x2e9548(y0, y1, x0, x1, alpha, colour)`: a filled box with its left and right edges rounded (rows of 2, 1 and 1
 /// pixels, 1, 2 and 4 in from the ends).
-fn rounded_box(out: &mut Vec<Quad>, y0: i32, y1: i32, x0: i32, x1: i32, alpha: i32, colour: u32) {
+pub(crate) fn rounded_box(out: &mut Vec<Quad>, y0: i32, y1: i32, x0: i32, x1: i32, alpha: i32, colour: u32) {
     let rgba = gui::rgba(((alpha as u32) << 24) | colour);
     let mut rect = |y0: i32, y1: i32, x0: i32, x1: i32| {
         let (y0, y1, x0, x1) = (y0 as f32, y1 as f32, x0 as f32, x1 as f32);
@@ -144,7 +144,7 @@ fn rounded_box(out: &mut Vec<Quad>, y0: i32, y1: i32, x0: i32, x1: i32, alpha: i
 /// `0x42f3b0(y0, y1, x0, x1, gui, alpha, colour)`: the border — the side piece 0x57 at the left (mirrored) and
 /// right edges, its frame `((y1 − y0) − 26) / 112 · 0.311 + 0.0375`; the top and bottom piece 0x58 16 in from both
 /// corners, mirrored to the four, its frame `((x1 − x0) − 150) / 306 · 0.433 + 0.102`.
-fn border(out: &mut Vec<Quad>, sprites: &HashMap<u32, Sprite>, y0: i32, y1: i32, x0: i32, x1: i32, alpha: i32, colour: u32) {
+pub(crate) fn border(out: &mut Vec<Quad>, sprites: &HashMap<u32, Sprite>, y0: i32, y1: i32, x0: i32, x1: i32, alpha: i32, colour: u32) {
     let rgba = gui::rgba(((alpha as u32) << 24) | colour);
     let (y0, y1, x0, x1) = (y0 as f32, y1 as f32, x0 as f32, x1 as f32);
     let fy = ((y1 - y0) - 26.0) * 0.008_928_572 * 0.311 + 0.0375;

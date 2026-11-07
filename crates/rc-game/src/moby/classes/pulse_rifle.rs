@@ -76,8 +76,9 @@
 //! Its glow in the hand (`0x2a7ed8`'s case 0x17): two green glows at its joints 2 and 3 (crate::hero::items,
 //! crate::fx::HeroGlow).
 //!
-//! Not ported: the pad rumble (`0x2d6d60` / `0x2d6f38`), the lock cheat (`0x18b270`), the weapon mods' effects on a hit
-//! (`0x4126b8`), the moving frames (`$gp−0x14e4`: their aim straight at a lock or the scope's target, the shot's mode 2,
+//! The weapon mod: Shock on the moby a shot hits (`0x4126b8(m, 0x17, the hand)`, crate::moby::weapon_mods).
+//!
+//! Not ported: the pad rumble (`0x2d6d60` / `0x2d6f38`), the lock cheat (`0x18b270`), the moving frames (`$gp−0x14e4`: their aim straight at a lock or the scope's target, the shot's mode 2,
 //! and the frame's carry `0x380e58` / bends `0x380e08`), the LOD ranges the zoom widens (`0x36a1c0`, `0x1aa100`: the
 //! engine's LOD is its own), `0x18ccd0` (set to 0xffff while zooming; no reader on Aranos), the impact's upgraded branch
 //! (`0x3a9668` → `0x320538` and a sphere of the row's `+0x64`: the upgraded rows swap the hand for the Vaporizer's,
@@ -608,6 +609,11 @@ pub fn hit(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, from: V3) -> bool {
     let Some(o) = ctx.coll.and_then(|c| crate::collision::coll_line_m(c, ctx.scene, from, to, QueryFlags(0), ctx.hero_moby)) else { return false };
     if let Some(target) = o.moby { w.deliver_hit_any(target, &t, [o.point[0], o.point[1], o.point[2], 1.0]); }
     impact(ctx, o.point);
+    // `0x4126b8(target, 0x17, the hand)` (crate::moby::weapon_mods).
+    if let Some(target) = o.moby {
+        let owner = w.mobys[id].parent;
+        crate::moby::weapon_mods::shock(w, ctx, target, crate::hero::items::PULSE, owner);
+    }
     true
 }
 

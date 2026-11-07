@@ -376,6 +376,8 @@ pub fn park_ship(w: &mut MobyWorld, host: &dyn MobyHost, g: &mut GameState, game
     if m.shine != 0 { m.shine = 8; }
     w.rebuild(id, host);
     t.ship = Some(id);
+    // `0x3035e0`: the ship listed at the level's talk slot 0 (crate::moby::talk::register).
+    crate::moby::talk::register(w, g, id, 0);
     Some(id)
 }
 
@@ -680,7 +682,7 @@ pub fn menu_tick(g: &mut GameState, pad: &PadState) -> Vec<MenuOut> {
     let rows = map_rows(g);
     let unlocked: Vec<bool> = (0..LEVELS as i32).map(|l| g.planets.get(l as usize).is_some_and(|&b| b != 0)).collect();
     let in_list = |l: i32| rows.contains(&l) && !(l == 0 && level != 0);
-    let flags = missions::Flags { planets: &g.planets, items: &g.items, visited: &g.visited, scenes_seen: &g.scenes_seen };
+    let flags = missions::Flags { planets: &g.planets, items: &g.items, visited: &g.visited, scenes_seen: &g.scenes_seen, talk: &g.talk_records };
     let m = &mut g.travel.menu;
     m.frame = m.frame.wrapping_add(1);
     m.backdrop.tick(m.selected);

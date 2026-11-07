@@ -73,8 +73,10 @@
 //! (platinum's `0x398500`, the camera `0x4183f8`) and at its end the message 0x129a, the item, Ratchet idle, the
 //! camera behind him.
 //!
-//! Not ported: the blocking fades of the reward's show (`0x2dd378(10)`); the autosaves at the transporter's and the
-//! reward's ends (`0x303030`, G-LVL-006); the companion moby 0x0660 the boss makes (`0x3a7680`); its tail's aim
+//! The autosaves (`0x303030(0, −1)`, crate::game::GameState::autosave): the transporter's at its end when it has a
+//! mission or a planet (`+0x6`), the reward's after its show.
+//!
+//! Not ported: the blocking fades of the reward's show (`0x2dd378(10)`); the companion moby 0x0660 the boss makes (`0x3a7680`); its tail's aim
 //! (`0x31cfa0`, G-ENM-001); the cutscene lock `0x18c0d5` it sets while it holds Ratchet and Ratchet's `0x18a010`;
 //! the path lengths `0x338aa8` its paths are given (the port's paths carry none); the 0x0b24's trail and splash
 //! particles (`0x3dbbe8`, `0x3db898`, G-PRT-001); the reward's rings and sparkles (`0x418188`,
@@ -254,7 +256,9 @@ pub fn update_0e38(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             w.mobys[id].set_state(3, -1);
         }
         3 => {
+            crate::moby::talk::busy(ctx, true);
             if ctx.game.scenes.in_scene() { return; }
+            crate::moby::talk::busy(ctx, false);
             let planet = w.mobys[id].pv_s(6) as i32;
             if planet != -1 {
                 ctx.game.unlock_planet(planet);
@@ -273,6 +277,7 @@ pub fn update_0e38(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             ctx.hero.request_state(0, true);
             let m = &w.mobys[id];
             ctx.host.music_request(m.pv_i(0x14), m.pv_i(0x10));
+            if m.mission != 0xff || m.pv_s(6) != -1 { ctx.game.autosave(-1); }
             w.delete(id);
         }
         _ => {}
@@ -1201,6 +1206,8 @@ pub fn update_reward(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             w.delete(id);
         }
         2 => {
+            // The level's busy word (`0x1b22a8`, crate::moby::talk::busy): the HUD off through the show.
+            crate::moby::talk::busy(ctx, true);
             let (hp, hr) = (ctx.hero.pos, ctx.hero.rot);
             let a = ctx.host.anim(&w.mobys[id]);
             let playing = a.is_some_and(|a| a.seq_a == 1);
@@ -1230,6 +1237,7 @@ pub fn update_reward(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             ctx.hero.teleport(p, r);
             ctx.hero.request_state(0, false);
             ctx.game.cameras.camera_script2(crate::script_camera::RELEASE_CUT_BEHIND, ctx.hero);
+            ctx.game.autosave(-1);
             w.delete(id);
         }
         _ => {}

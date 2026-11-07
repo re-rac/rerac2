@@ -945,8 +945,8 @@ fn leave(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// `0x3fe240(m, n)`: challenge `n` won — the first win of the first challenge (its own line and the Electrolyzer,
 /// `0x2f8668(0x26)`; its `0x326bd0(0x26)` leaves the item asked for as it was, so only the slots of the other kinds
-/// would change), else the bolts and XP (`0x3fe398`, `0x3fe4a8`); its win counted. Not ported: the autosave after
-/// (`0x311738(0, -1)`).
+/// would change), else the bolts and XP (`0x3fe398`, `0x3fe4a8`); its win counted; the autosave after (`0x311738(0, −1)`,
+/// crate::game::GameState::autosave).
 fn reward(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, n: i32) {
     if n == 0 && wins(ctx.game, 0) == 0 {
         say(w, id, ctx, 7);
@@ -964,6 +964,7 @@ fn reward(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, n: i32) {
     if let Some(k) = win_flag(n) {
         if let Some(f) = ctx.game.flags.get_mut(k) { *f = f.saturating_add(1); }
     }
+    ctx.game.autosave(-1);
 }
 
 /// `0x3fe7c8`: the wave's crates lifted — for each kind (`+0xc8` 0x01f5, then `+0xc4` 0x01ff) as many out as it asks

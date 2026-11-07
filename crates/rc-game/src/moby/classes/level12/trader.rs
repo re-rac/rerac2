@@ -6,8 +6,8 @@
 //! * **0**: item 7 had (`0x1a7b07`): gone. Else the part made (`0x314d78` = L00 `0x311320`) with his draw and update
 //!   distances, light, ambient and glow, drawn, rebuilt; 2 with his scene 0x75 seen (`0x1397dc & 0x200000`), else 1.
 //!   His grid cells (`0x321458`, the rebuild here).
-//! * **1**: Ratchet can talk to him (crate::moby::talk::can_talk, 2.5; the talk record marked: not ported) and the
-//!   scene 0x75 queued (it must go in): started; 2.
+//! * **1**: Ratchet can talk to him (crate::moby::talk::can_talk, 2.5; the talk record marked, crate::moby::talk::mark)
+//!   and the scene 0x75 queued (it must go in): started; 2.
 //! * **2** / **5**: in the scene mode he and the part hidden; after the scene both shown — 2: 4 with item 0x31
 //!   (`0x1a7b31`), else 3; 5: the part deleted, his group's timers 1 (`0x3203b8` = L00 `0x31c970`) and, item 7 not had
 //!   yet, items 0x31 and 0x69 taken, item 7 his (`0x2f7dc8` = L00 `0x2f46e0`), the message 0x1245 (`0x32a8f0` = L00
@@ -22,8 +22,9 @@
 //! else 0. **The look** (crate::moby::talk::look_with) in his looking sequences 0 and 2. The part at his joint 2 (`0x328018` =
 //! L00 `0x3253f0`, crate::moby::classes::enemies::place_part).
 //!
-//! Not ported: the level's NPC busy word `0x1b2be8` while his scenes play, the talk record (`0x334f38`), the autosave
-//! after the trade (`0x3110b0(0, −1)`).
+//! The talk record (`0x334f38`, crate::moby::talk::mark) is also marked with the texts 0x1325 / 0x1326; the level's
+//! NPC busy word `0x1b2b68` (crate::moby::talk::busy) is set while his scenes play (2, 5); the autosave after the trade
+//! (`0x3110b0(0, −1)`, crate::game::GameState::autosave).
 
 use crate::moby::classes::props::{seq, wrapped};
 use crate::moby::talk::{self, seen, Layout, Timer};
@@ -42,12 +43,14 @@ fn had(ctx: &Ctx, item: usize) -> bool { ctx.game.items.get(item).is_some_and(|&
 fn part(w: &MobyWorld, id: usize) -> Option<usize> { talk::link(w, id, HOLD) }
 
 /// He and his part hidden in the scene mode; true once the scene is over (both shown).
-fn wait_scene(w: &mut MobyWorld, id: usize, ctx: &Ctx) -> bool {
+fn wait_scene(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
+    talk::busy(ctx, true);
     if ctx.game.scenes.mode == crate::scene::SCENE {
         talk::hide(w, id);
         if let Some(p) = part(w, id) { talk::hide(w, p); }
     }
     if ctx.game.scenes.in_scene() { return false; }
+    talk::busy(ctx, false);
     talk::show(w, id);
     true
 }
@@ -66,7 +69,9 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             w.rebuild(id, &*ctx.host);
         }
         1 => {
-            if talk::can_talk(w, id, ctx, R, 10) && ctx.game.scenes.queue.push(0x75) {
+            if !talk::can_talk(w, id, ctx, R, 10) { return; }
+            talk::mark(w, id, ctx);
+            if ctx.game.scenes.queue.push(0x75) {
                 ctx.game.scenes.start_queue(ctx.hero.hp);
                 w.mobys[id].set_state(2, -1);
             }
@@ -78,11 +83,15 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         3 => {
             if had(ctx, TOKEN) { return w.mobys[id].set_state(4, -1); }
-            if talk::can_talk(w, id, ctx, R, 10) { ctx.game.prompt.announce(0x1325, 2); }
+            if talk::can_talk(w, id, ctx, R, 10) {
+                ctx.game.prompt.announce(0x1325, 2);
+                talk::mark(w, id, ctx);
+            }
         }
         4 => {
             if !had(ctx, TOKEN) { return w.mobys[id].set_state(3, -1); }
             if !talk::offer(w, id, ctx, R, 0x1326, &[]) { return; }
+            talk::mark(w, id, ctx);
             if ctx.hero.items.pressed & crate::pad::button::TRIANGLE != 0 && ctx.game.scenes.queue.push(0x76) {
                 ctx.game.scenes.start_queue(ctx.hero.hp);
                 w.mobys[id].set_state(5, -1);
@@ -98,6 +107,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 for k in [TOKEN, 0x69] { if let Some(b) = ctx.game.items.get_mut(k) { *b = 0; } }
                 ctx.game.get_item(GIFT as i32);
                 ctx.game.messages.push(crate::msgbox::Request::Text { text: 0x1245, ticks: None });
+                ctx.game.autosave(-1);
                 w.delete(id);
             }
         }

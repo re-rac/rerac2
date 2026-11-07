@@ -12,18 +12,20 @@
 //! * **3**: Ratchet in its cuboid. The flag 0x2e off: in the level's first 10 frames (`0x1b2308`) with the flag 0x1d
 //!   and the arrival scene not played, the scene 0x66 queued and started, cut in (crate::moby::talk::cut_in), the
 //!   arrival done; 4. The flag 0x2e on: the scene 0x67 and then 0xb queued and started, cut in, the arrival done; 5.
-//! * **4**: hidden in the scene mode; after it: the checkpoint at Ratchet (`0x356db8`), shown; 3.
+//! * **4**: hidden in the scene mode; after it: the checkpoint at Ratchet (`0x356db8`), shown, the autosave; 3.
 //! * **5**: hidden in the scene mode; after it: planet 0xb unlocked with its banner (`0x31eba0` / `0x321640`), its
-//!   mission done (`0x30f520`; with a mission not done yet, `0x19b2e8`), the checkpoint, shown, and it is gone.
+//!   mission done (`0x30f520`; with a mission not done yet, `0x19b2e8`), the checkpoint, the autosave, shown, and it is
+//!   gone.
 //! * **6**: Ratchet in its cuboid in the first 10 frames with the flag 0x1d and the arrival not played: the scene 0x66,
 //!   cut in, the arrival done; 7.
-//! * **7**: hidden in the scene mode; after it: shown, 8, the checkpoint, and it is gone.
+//! * **7**: hidden in the scene mode; after it: shown, 8, the checkpoint, the autosave, and it is gone.
 //!
 //! In any state but 0 its idle and look (crate::moby::talk: looking in sequence 1, fidgeting in 2; its timers are
 //! half-words, `+0x110` / `+0x112`, the idle one `+0x114`).
 //!
-//! Not ported: the level's NPC busy word `0x1b2528` while its scenes play, the talk record, the autosaves (`0x3098d0(0,
-//! −1)`).
+//! The talk record (crate::moby::talk::mark) is marked once the scene 0x63 is queued (1) and once 0x67 and 0xb are
+//! (3); the level's NPC busy word `0x1b2528` (crate::moby::talk::busy) is set while its scenes play (2, 4, 5, 7); the
+//! autosaves are `0x3098d0(0, −1)` (crate::game::GameState::autosave).
 
 use crate::moby::talk::{self, flag, seen, set_flag, Layout, Timer};
 use crate::moby::{Ctx, MobyWorld};
@@ -46,9 +48,10 @@ fn inside(w: &MobyWorld, id: usize, ctx: &Ctx) -> bool { ctx.level.in_cuboid(w.m
 fn arrival(w: &MobyWorld, ctx: &Ctx) -> bool { ctx.game.frame < 10 && flag(ctx, TALKED) && !w.talk.arrival_done }
 
 /// The scenes' queue: `ids` queued (the first must go in), started and cut in; the arrival done.
-fn play(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, ids: &[i32], next: u8) {
+fn play(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, ids: &[i32], next: u8, mark: bool) {
     if !ctx.game.scenes.queue.push(ids[0]) { return; }
     for &s in &ids[1..] { ctx.game.scenes.queue.push(s); }
+    if mark { talk::mark(w, id, ctx); }
     ctx.game.scenes.start_queue(ctx.hero.hp);
     talk::cut_in(ctx.game);
     w.talk.arrival_done = true;
@@ -71,13 +74,16 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         1 => {
             if inside(w, id, ctx) && ctx.game.scenes.queue.push(0x63) {
+                talk::mark(w, id, ctx);
                 ctx.game.scenes.start_queue(ctx.hero.hp);
                 w.mobys[id].set_state(2, -1);
             }
         }
         2 | 4 | 5 | 7 => {
+            talk::busy(ctx, true);
             talk::hide_in_scene(w, id, ctx);
             if ctx.game.scenes.in_scene() { return; }
+            talk::busy(ctx, false);
             talk::show(w, id);
             let (pos, rot) = (ctx.hero.pos, ctx.hero.rot);
             match state {
@@ -89,6 +95,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 }
                 4 => {
                     ctx.game.save_checkpoint(pos, rot);
+                    ctx.game.autosave(-1);
                     w.mobys[id].set_state(3, -1);
                 }
                 5 => {
@@ -96,11 +103,13 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     crate::travel::new_planet_banner(ctx.game, PLANET);
                     ctx.game.mission_done(w.mobys[id].mission);
                     ctx.game.save_checkpoint(pos, rot);
+                    ctx.game.autosave(-1);
                     w.delete(id);
                 }
                 _ => {
                     w.mobys[id].set_state(8, -1);
                     ctx.game.save_checkpoint(pos, rot);
+                    ctx.game.autosave(-1);
                     w.delete(id);
                 }
             }
@@ -108,13 +117,13 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         3 => {
             if !inside(w, id, ctx) { return; }
             if !flag(ctx, DONE) {
-                if arrival(w, ctx) { play(w, id, ctx, &[0x66], 4); }
+                if arrival(w, ctx) { play(w, id, ctx, &[0x66], 4, false); }
             } else {
-                play(w, id, ctx, &[0x67, 0xb], 5);
+                play(w, id, ctx, &[0x67, 0xb], 5, true);
             }
         }
         6 => {
-            if inside(w, id, ctx) && arrival(w, ctx) { play(w, id, ctx, &[0x66], 7); }
+            if inside(w, id, ctx) && arrival(w, ctx) { play(w, id, ctx, &[0x66], 7, false); }
         }
         _ => {}
     }

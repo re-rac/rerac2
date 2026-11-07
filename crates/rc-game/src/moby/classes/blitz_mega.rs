@@ -33,7 +33,11 @@
 //! fill (`0x808080` at 255 of it).
 //!
 //! Not ported: the muzzle's six glows (`0x33ff78`, particles of type 0x5c: the port's particles have no such type);
-//! the pad rumble (`0x2d6d60` / `0x2d6f38`); the weapon mods on the hits (`0x3f9f70`); the gravity frames' bends.
+//! the pad rumble (`0x2d6d60` / `0x2d6f38`); the gravity frames' bends. Its hits take Acid as the Blitz Gun's, as item
+//! 0x44 ([`MEGA_ITEM`], crate::moby::weapon_mods).
+
+/// The upgraded row's id (the weapon mods' item, `0x3f9f70(m, 0x44, hand)`).
+pub const MEGA_ITEM: i32 = 0x44;
 
 use super::blitz::{cooldown, count_s, cross_ba, qturn, quad, ST};
 use crate::collision::QueryFlags;
@@ -204,6 +208,8 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         for m in crate::collision::coll_sphere_mobys(sc, at, 1.5, QueryFlags(1), ctx.hero_moby) {
             if Some(m) == ctx.hero_moby { continue; }
             w.deliver_hit_any(m, &t, [0.0; 4]);
+            // `0x3f9f70(m, 0x44, hand)` (crate::moby::weapon_mods).
+            crate::moby::weapon_mods::acid(w, ctx, m, MEGA_ITEM, Some(id));
         }
     }
     pellets(w, id, ctx, &mut t, fwd, r.damage);

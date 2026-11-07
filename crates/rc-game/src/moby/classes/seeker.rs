@@ -60,7 +60,10 @@
 //!
 //! Its glow in the hand (`0x2a7ed8`'s case 0x18): crate::hero::items.
 //!
-//! Not ported: the lock cheat (`0x18b270` → `0x18aa18`), the weapon mods' effects on a hit (`0x4126b8`), the gravity
+//! The weapon mod: Shock on the moby a missile strikes and on each its splash touches (`0x4126b8(m, 0x43 upgraded /
+//! 0x18, the hand)`, crate::moby::weapon_mods).
+//!
+//! Not ported: the lock cheat (`0x18b270` → `0x18aa18`), the gravity
 //! frames and moving frames (`0x380e08`, `0x37f538` / `0x37f618` / `0x37f5f8`), the light word copied at the make
 //! (`0x313330` → `+0x38`, unread), the 0x13a0 blast's heat shimmer (its `+0x18`, crate::moby::blast). The missile's
 //! loop sound is let go when it goes (the engine frees a deleted moby's sounds); the word `0x25c5cc` both hands set to
@@ -571,9 +574,15 @@ fn explode(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, struck: Option<usize>) {
     let pos = m.pos;
     let mut t = HitTemplate::new(damage, Some(id), 0x81_0000, [d[0], d[1], d[2], NO_KNOCK_LIMIT]);
     t.kind = (m.o_class as u16 as u32) << 16 | 0x0203;
-    if let Some(s) = struck { w.deliver_hit_any(s, &t, [0.0; 4]); }
+    // `0x4126b8(m, 0x43 / 0x18, the hand)` on the moby struck and on each the splash touches (crate::moby::weapon_mods).
+    let item = if ctx.game.upgrade_level(SEEKER) != 0 { 0x43 } else { SEEKER };
+    let owner = m.parent;
+    if let Some(s) = struck {
+        w.deliver_hit_any(s, &t, [0.0; 4]);
+        crate::moby::weapon_mods::shock(w, ctx, s, item, owner);
+    }
     t.damage = splash;
-    w.sphere_hit(ctx.scene, pos, 2.0, 1, struck, Some(&t));
+    for s in w.sphere_hit_list(ctx.scene, pos, 2.0, 1, struck, Some(&t)) { crate::moby::weapon_mods::shock(w, ctx, s, item, owner); }
     ctx.host.play_sound(&w.mobys[id], 2, 0);
     crate::moby::blast::burst(w, ctx, pos, &crate::moby::blast::Blast { size: 0.75, bursts: [0, 1, 0], puffs: 0x14, streaks: 0x2d, light: false, shake: true });
 }

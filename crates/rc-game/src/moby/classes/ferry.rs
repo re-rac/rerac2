@@ -33,8 +33,10 @@
 //!   sways 4.5° at 70°/s and 100°/s (`0x365330` = L00 `0x3244e8`, crate::moby::classes::props), its move into its
 //!   platform block (`0x363680` = L00 `0x322668`) and Ratchet carried (crate::moby::carry_hero_with).
 //!
-//! Not ported: its talk record's moving word (`0x370b60` = the decomp's `func_L06_0036F728`, in 2..6: G-CLS-008, as
-//! crate::moby::talk); the debug lines of its first route (`$gp+0x4e4` 0); on the ride with Ratchet on it
+//! **First each tick** (past level 11's deletion): its talk record's word set to whether it moves, its state in 2..6
+//! (`0x370b60(m, 0x3e5200(m))` = the decomp's `func_L06_0036F728`, crate::moby::talk::set_word).
+//!
+//! Not ported: the debug lines of its first route (`$gp+0x4e4` 0); on the ride with Ratchet on it
 //! (`0x3e5408`, the ledge or the ground) the hero words `0x18a032` / `0x18a034` (4 / 8: his air states refused) and its camera path (`0x3e64d8`: the path `+0xf8` of 7
 //! points rebuilt from the table `0x296f80` through its frame, its index into `0x18c31e`), as
 //! crate::moby::classes::level17::lifts; the fuse effect 0x09bb.
@@ -249,6 +251,8 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         w.delete(id);
         return;
     }
+    let moving = (2..=6).contains(&w.mobys[id].state) as i32;
+    crate::moby::talk::set_word(w, id, ctx, moving);
     let (old, old_rot) = (w.mobys[id].pos, w.mobys[id].rot);
     let route = w.mobys[id].timer as usize;
     match w.mobys[id].state {

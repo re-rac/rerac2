@@ -55,7 +55,7 @@ const FADE_STEP: f32 = f32::from_bits(0x3c03_126f);
 /// * **0**: the chunk now (`+0x20`), `+0x10` / `+0x14` 0, `+0x8c` the save's mission done. With the goal's mission
 ///   not done the riser `+0x70` goes 20 up (its height kept in `+0x74`, `+0x7c` 0), else `+0x7c` 1. Then 1.
 /// * **1**: the save's mission done and Ratchet in cuboid `+0x28`: once, the autosave (`0x321b70` = L00 `0x30d658(0,
-///   −1)`, not ported). In chunk 2 in cuboid `+0x60`, once: the music `+0x80`. In cuboid `+0x2c` with the goal not
+///   −1)`, crate::game::GameState::autosave). In chunk 2 in cuboid `+0x60`, once: the music `+0x80`. In cuboid `+0x2c` with the goal not
 ///   done: the goal done, the moby `+0x4c` hooked (≥ 0), the troopers of the groups `+0x50` / `+0x54` sent away
 ///   ([`dismiss_group`]), the switch to chunk 2 at place 3, 5. Without the goal: with the holder `+0x6c`'s timer byte
 ///   not 1, the riser not risen and both gunships `+0x64` / `+0x68` gone (or not gunships): 7.
@@ -98,7 +98,8 @@ pub fn update_0c36(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let hero = ctx.hero.pos;
             let at = |ctx: &Ctx, c: i32| ctx.level.in_cuboid(c, hero);
             if p(w, pv::SAVED) == 0 && mission_is_done(ctx.game, p(w, pv::MISSION_SAVE)) && at(ctx, p(w, pv::AT_SAVE)) {
-                // `0x321b70(0, −1)`: the autosave (not ported).
+                // `0x321b70(0, −1)`: the autosave.
+                ctx.game.autosave(-1);
                 w.mobys[id].set_pv_i(pv::SAVED, 1);
             }
             if ctx.game.variant == 2 && p(w, pv::MUSIC_ON) == 0 && at(ctx, p(w, pv::AT_MUSIC)) {

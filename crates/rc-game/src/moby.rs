@@ -53,6 +53,7 @@ pub mod slide;
 pub mod sparks;
 pub mod talk;
 pub mod target_search;
+pub mod weapon_mods;
 
 use crate::hero::physics::{add, scale, V3};
 use crate::hero::Hero;
@@ -513,6 +514,10 @@ pub trait MobyHost {
     /// `0x3602f0(handle)`: stop a sound; `0x3602a8(moby, handle)`: it still plays.
     fn stop_sound(&mut self, _handle: i32) {}
     fn sound_playing(&self, _handle: i32) -> bool { false }
+    /// `0x384410(handle, v)` (L01 `0x356d98`): the playing sound's volume scale (`+0x10`, 0x400 = 1).
+    fn set_sound_volume(&mut self, _handle: i32, _vol: i32) {}
+    /// `0x384430(handle, pb)` (L00 `0x360a10`): the playing sound's pitch bend (`+0x14`).
+    fn set_sound_bend(&mut self, _handle: i32, _pb: i32) {}
     /// The chunk switch's sound part (`0x3082e0(k, track)`: chunk `k`'s sound bank, the sounds and the music stopped,
     /// `track` started; crate::audio::chunk), through [`Ctx::switch_chunk`].
     fn switch_chunk_sound(&mut self, _k: i32, _track: i32) {}
@@ -725,6 +730,8 @@ pub struct MobyWorld {
     pub beams: crate::fx::beams::Beams,
     /// What `0x3228f8` reads of Ratchet's hand (crate::upgrades::hitter_item), kept by the item pass.
     pub hitters: crate::upgrades::Hitters,
+    /// The weapon mods' tables and arcs (weapon_mods: Acid `0x253330`, Shock `0x2565a0`, the arcs `0x256b40`).
+    pub mods: weapon_mods::Mods,
 }
 
 /// The instance data the static spawn reads besides the records (gameplay sections 20, 22..25).
@@ -828,6 +835,15 @@ impl MobyWorld {
             if class.is_some() { self.rebuild(id, host); }
         }
         self.first_created = self.mobys.len();
+        // `0x302abc`: on a level (`0x1a79f8` ≥ 0) each record's talk slot (word 0x74) lists its moby (talk::register).
+        if 0 <= rules.game.level {
+            for (i, r) in records.iter().enumerate() {
+                let k = r.base.talk_slot();
+                if let (true, Ok(id)) = (k != -1, usize::try_from(map[i])) { talk::register(self, rules.game, id, k); }
+            }
+        }
+        // A respawn's checkpoint restore (`0x359d58` after `0x3012a0`): the state log back into the mobys.
+        if !rules.fresh { crate::save::replay_log(&rules.game.state_log, self); }
         self.groups = data.groups.iter().map(|g| g.iter().filter_map(|&r| map.get(r as usize).and_then(|&x| usize::try_from(x).ok())).collect()).collect();
         self.ties = data.ties.clone();
         self.shrubs = data.shrubs.clone();
@@ -924,6 +940,8 @@ impl MobyWorld {
             if let Some(f) = self.mobys[id].update { f(self, id, ctx); }
             if self.mobys[id].mode & mode::NO_MATRIX == 0 { self.rebuild(id, &*ctx.host); }
         }
+        // The weapon mods' managers 0x0d04 / 0x1136 (weapon_mods: no mobys of their own here).
+        weapon_mods::tick(self, ctx);
         if ai::death_log() { self.watch_deaths(ctx); }
     }
 

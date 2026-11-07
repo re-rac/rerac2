@@ -22,8 +22,7 @@
 //!
 //! It neither fires nor takes hits (no `0x37c7a8`).
 //!
-//! Not ported: the exhaust (`0x418af0`: −0.503 behind, three puffs 0.4·(30..40)/60 back, the descriptors
-//! `0x1b0f58` / `0x1b0f68` / `0x1b0f78`, not in crate::particles).
+//! Its exhaust: [`exhaust`].
 
 use crate::hero::physics::{dist, dot, sub, unit};
 use crate::moby::{Ctx, MobyWorld};
@@ -137,6 +136,27 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
     }
+    exhaust(w, id, ctx);
     super::engine(w, id, ctx);
     w.rebuild(id, &*ctx.host);
+}
+
+/// `0x418af0` (L10 `0x417a88`, L15 `0x421338`; the decomp's `func_L05_00417550`): the nozzle 0.503 behind it in its
+/// frame (`0x307840`), four copies each jittered ±0.1 on each axis (`0x3391e0`; the first unused), then three exhaust
+/// puffs (crate::particles::exhaust, the fighter's descriptors 0..2: `$gp+0x1f08..`, the same words on the three
+/// levels) from the other three, each moving back `0.4·randf(30, 40)/60` a tick in its frame.
+fn exhaust(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
+    let m = &w.mobys[id];
+    let r = m.rows;
+    let tail: [f32; 3] = std::array::from_fn(|k| m.pos[k] + r[0][k] * f32::from_bits(0xbf00_c49c));
+    let g = &mut ctx.game.rng;
+    let mut jitter = || -> [f32; 3] { std::array::from_fn(|k| tail[k] + g.randf(-0.1, 0.1)) };
+    jitter();
+    let marks = [jitter(), jitter(), jitter()];
+    let Some(sys) = ctx.parts.as_deref_mut() else { return };
+    for (k, at) in marks.into_iter().enumerate() {
+        let g = &mut ctx.game.rng;
+        let vel = [-(g.randf(30.0, 40.0) * 0.016_666_668) * 0.4, 0.0, 0.0];
+        crate::particles::exhaust(sys, g, m, id, at, vel, k);
+    }
 }

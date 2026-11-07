@@ -600,15 +600,29 @@ fn tick(
         // `entry`'s landing on arrival (rc_game::travel): after a trip by the ship, the landing scene at the start.
         if fresh { travel_arrival(p, lv); }
     }
+    // `0x2fa968`: the NPC busy word cleared each frame (its holders set it again every tick they want the HUD off:
+    // rc_game::moby::talk::busy).
+    p.game.npc_busy = false;
+    // `0x30d658(0, level)` asked by a moby last tick (rc_game::game::GameState::autosave): the autosave with the card
+    // (rc_game::save::autosave: the talk records' places, the game stored, the card's save while auto-save is on).
+    if let Some((force, level)) = p.game.autosave_ask.take() {
+        if let Some(c) = card.as_deref_mut() {
+            let clock = if crate::determinism::deterministic() { [0; 8] } else { crate::clock::clock_now() };
+            if rc_game::save::autosave(&mut p.game, p.mobys.as_ref().map(|m| &m.world), &mut c.mc, &mut c.save, force, level, clock) {
+                // The forced save's caller (Aranos's arrival 0x1330): the card's flag 0x200 once it is queued.
+                if force { c.mc.flags |= 0x200; }
+                println!("play: autosave (level {level}{})", if force { ", forced" } else { "" });
+            }
+        }
+    }
     // `0x2f50f8`: the level's main loop ends; the next level loads (crate::level_switch) and replaces this one.
     if let Some(to) = p.game.next_level.take() {
         // `0x2f50f8(level, 1)`: the autosave `0x30d658(0, level)` (the card's active slot, auto-save on), the game
         // stored with the next level standing in as its level.
         if std::mem::take(&mut p.game.next_level_save) && 0 <= to {
             if let Some(c) = card.as_deref_mut() {
-                p.game.store(&mut c.save);
                 let clock = if crate::determinism::deterministic() { [0; 8] } else { crate::clock::clock_now() };
-                if c.mc.memcard_save(&mut c.save, false, to, clock) { println!("play: autosave for level {to}"); }
+                if rc_game::save::autosave(&mut p.game, p.mobys.as_ref().map(|m| &m.world), &mut c.mc, &mut c.save, false, to, clock) { println!("play: autosave for level {to}"); }
             }
         }
         if to < 0 {
@@ -1237,7 +1251,8 @@ fn tick(
     if weapon.is_some() {
         if let Some(r) = mobys.level.items.get(p.game.item_row(it.item)).filter(|r| r.mega) { p.hud.weapon.set_xp(p.game.weapon_xp(it.item), r.xp_max); }
     }
-    p.hud.tick(p.hero.hp, p.game.max_health, sb, sh, weapon);
+    // `0x30df80`: not while the NPC busy word is set (rc_game::moby::talk::busy).
+    if !p.game.npc_busy { p.hud.tick(p.hero.hp, p.game.max_health, sb, sh, weapon); }
     // The boss bar's own update (`0x2f2458`): its ticks left counted down, gone at 0.
     p.game.boss_bar = p.game.boss_bar.and_then(|(f, t)| (1 < t).then_some((f, t - 1)));
     // The side meter's tick (`0x2fcb48`, rc_game::hud::SideMeter; this runs in play).
@@ -2442,6 +2457,8 @@ fn draw_hud(
                 let menu = menu.chain((0..8).map(|f| (0xeaa7, f)));
                 // The crystals' / moonstones' counter (rc_game::moby::classes::level08::counter, icon 0xeaa2).
                 let menu = menu.chain([(0xeaa2, 1), (0xeaa2, 2)]);
+                // The hoverbike race's weapon icon (rc_game::moby::classes::race::hud::WEAPON_ICON, by the weapon).
+                let menu = menu.chain((0..3).map(|f| (rc_game::moby::classes::race::hud::WEAPON_ICON, f)));
                 for (id, f) in menu {
                     if !h.has_icon(id) || icons.contains_key(&(id, f)) { continue; }
                     if let Ok(t) = h.decode_frame_raw(h.icon_frame(id, f as i32)) {
@@ -2638,16 +2655,18 @@ fn draw_hud(
         {
             let a = hud.data.assets();
             let texts = |id: u32| rc_formats::strings::find_index(&p.texts, id as i32).map(|i| p.texts[i].text.clone()).unwrap_or_else(|| a.strings.get(id).to_vec());
-            let inp = rc_game::hud::ScreenIn { game: &p.game, hero: &p.hero, texts: &texts };
+            let inp = rc_game::hud::ScreenIn { game: &p.game, hero: &p.hero, texts: &texts, glyphs_2: Some(&a.glyphs_2) };
             if let Some(m) = p.mobys.as_mut() { rc_game::hud::list_screen(&mut m.world, &inp, &mut class_draws); }
-            screen = match (rc_game::hud::ScreenCallback::current(&p.game, &p.hero), p.mobys.as_mut()) {
+            // The NPC busy word (rc_game::moby::talk::busy): the HUD's draw `0x30e200` does nothing.
+            let busy = p.game.npc_busy;
+            screen = match (rc_game::hud::ScreenCallback::current(&p.game, &p.hero).filter(|_| !busy), p.mobys.as_mut()) {
                 (Some(rc_game::hud::ScreenCallback::Spiderbot), Some(m)) => rc_game::moby::classes::spiderbot::draw_screen(&m.world, (&a.glyphs_2, 2), &mut screen_draws, &mut screen_text),
                 (Some(cb), Some(m)) => cb.draw(&mut m.world, &inp, &mut class_draws),
                 _ => false,
             };
             // Then the class HUD callbacks (L08 / L19 `0x31a090`'s slots, rc_game::hud::HudSlots), or'd with it.
             slots = match (&p.ship, p.mobys.as_mut()) {
-                (None, Some(m)) => p.game.hud_slots.draw(&mut m.world, &inp, &mut class_draws),
+                (None, Some(m)) if !busy => p.game.hud_slots.draw(&mut m.world, &inp, &mut class_draws),
                 _ => false,
             };
             let icon = |id: u16, f: u16| hud.icons.get(&(id, f)).map(|&(i, s)| (rc_game::gui::Tex::Slot(i), s));
@@ -2656,7 +2675,7 @@ fn draw_hud(
             quads.extend(rc_game::hud::screen_quads(&class_draws, &a.sprites, [Some((&a.glyphs, 1)), Some((&a.glyphs_2, 2)), font_3], &icon, &fx));
         }
         let mut draws = if p.ship.is_some() || screen { screen_draws } else { Vec::new() };
-        if p.ship.is_none() && !screen && !slots { draws.extend(p.hud.draw(p.game.bolts)); }
+        if p.ship.is_none() && !screen && !slots && !p.game.npc_busy { draws.extend(p.hud.draw(p.game.bolts)); }
         // The boss bar while a fight refreshes it (`0x2f2158`).
         if let (None, Some((f, _))) = (&p.ship, p.game.boss_bar) { rc_game::hud::boss_bar(f, p.game.boss_icon, &mut draws); }
         // The side meter while a weapon refreshes it (`0x2fc5c8`: the Sheepinator's drain).

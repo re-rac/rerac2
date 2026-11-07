@@ -3,17 +3,18 @@
 //!
 //! In its variant's region (`0x3178b8`) it stamps the loaded variant on the height map (`0x1a94c0` = `0x1c9a40`) and,
 //! every tick from its first, rains around the camera: the drops of [`tick`] (crate::particles::rain) and, for the
-//! rain, the splashes of [`land`]. The wind ([`reset_wind`]) changes every 2..10 s.
+//! rain, the splashes of crate::particles::rain::land. The wind ([`reset_wind`]) changes every 2..10 s.
 //!
-//! Not ported: the snow's flakes (type 0x49, `0x332f80`: only levels 0xc / 0x13 / 0x200 snow, none of them ported);
-//! the frame-load words `0x1b208c` / `0x1b2090` that cut the drops by up to 40 % past 0.8 (read as 0: every drop).
+//! The snow makes flakes (crate::particles::flake, type 0x49) where the rain makes drops.
+//!
+//! Not ported: the frame-load words `0x1b208c` / `0x1b2090` that cut the drops by up to 40 % past 0.8 (read as 0: every drop).
 
 use std::f32::consts::TAU;
 
 use crate::hero::physics::{len, len2, sub, V3};
 use crate::level::LevelData;
 use crate::moby::{Ctx, MobyWorld};
-use crate::particles::{rain, water, Particles};
+use crate::particles::{flake, rain, Particles};
 use crate::rng::Rng;
 
 /// `$gp+0x5fc`: the rain's slowest fall a second.
@@ -87,7 +88,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// kind 0 within 8 of the camera, else kind 1; and 1.4·n more about the camera within 8, at full speed, kind 0. A drop
 /// is made only where the rain's top (`0x31c630`) is under its start, and ends there (or 5 under the camera, the
 /// higher). The rain then tests 1.4·n places within 30 of the point 30 ahead and 1.4·n within 8 of the point 4 ahead
-/// for a splash ([`land`]).
+/// for a splash (crate::particles::rain::land).
 fn tick(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, cam: V3, snow: bool) {
     let rng = &mut ctx.game.rng;
     let wx = &mut w.weather;
@@ -116,7 +117,7 @@ fn tick(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, cam: V3, snow: bool) {
         if h < cam[2] + ABOVE {
             let low = cam[2] - BELOW;
             let ground = if low < h { h } else { low };
-            if !snow { rain::drop(sys, rng, ground, p, kind, vel); }
+            if snow { flake::flake(sys, rng, p, kind, vel, ground); } else { rain::drop(sys, rng, ground, p, kind, vel); }
         }
     };
     let c = ahead(16.0);
@@ -139,37 +140,7 @@ fn tick(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, cam: V3, snow: bool) {
         let c = ahead(d);
         for _ in 0..n {
             let p = around(rng, c, reach);
-            land(sys, rng, ctx.coll, ctx.scene, map, live, cam, p);
+            rain::land(sys, rng, ctx.coll, ctx.scene, map, live, cam, p);
         }
-    }
-}
-
-/// `0x31c778(p)`: a drop landing under `p`: a line down from the rain's top over `p` plus one step to two steps and 2
-/// under it (no map: from `p` to 20 under the camera, inside 0..1024 only; nothing when the top is 5 or more above
-/// the camera) through the world and the mobys (flags 0x12); on water, quicksand or a slide (surfaces 0, 3, 4) a ring
-/// 0.61 above the hit (`0x32f9b8(randf(0.4, 0.6), 5250, …)`, crate::particles::water::ring), else a splash with the
-/// alpha `(d·3.1833334 + 64) & 0xff` for its xy distance d from the camera.
-#[allow(clippy::too_many_arguments)]
-fn land(sys: &mut Particles, rng: &mut Rng, coll: Option<&rc_formats::collision::Collision>, scene: Option<&crate::collision::mobys::MobyScene>, map: Option<&rc_formats::height_map::HeightMap>, live: bool, cam: V3, p: V3) {
-    let (from, to) = match map {
-        None => {
-            if p[0] <= 0.0 || p[1] <= 0.0 || 1024.0 <= p[0] || 1024.0 <= p[1] { return; }
-            (p, [p[0], p[1], cam[2] - 20.0])
-        }
-        Some(m) => {
-            let t = rain::top(map, live, p) + m.step;
-            if cam[2] + 5.0 <= t { return; }
-            ([p[0], p[1], t], [p[0], p[1], t - (m.step + m.step) - 2.0])
-        }
-    };
-    let Some(coll) = coll else { return };
-    let Some(hit) = crate::collision::coll_line_m(coll, scene, from, to, crate::collision::QueryFlags(0x12), None) else { return };
-    let at = hit.point;
-    if matches!(hit.surface_id(), 0 | 3 | 4) {
-        let size = rng.randf(0.4, 0.6);
-        water::ring(sys, rng, size, 5250.0, [at[0], at[1], at[2] + 0.61], false, None);
-    } else {
-        let d = len2(sub(at, cam));
-        rain::splash(sys, at, ((d * 3.183_333_4 + 64.0) as i32) & 0xff);
     }
 }

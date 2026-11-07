@@ -46,7 +46,7 @@
 //! R2's for the strafe, □'s pressure the brake on the levels 8, 21 and 30 (0x0f2f also 16), else the jump): as the
 //! hovership's (hovership::drive, with the stick not by the power) — the yaw 240°/s (0x0f2f 120°/s, its steer's mix
 //! −0.5), the hover height 2.2 (0x0f2f 1.5) by the power, 0.4 (0x0f2f 0) at none; the playback speed (`+0x48`) eased
-//! (0.02) toward twice the throttle; the ground under its next place (hovership::ground_below): a surface of kind 1 /
+//! (0.02) toward twice the throttle; the ground under its next place (hovership::ground_hit): a surface of kind 1 /
 //! 0xb close loses it; the jump's first 30 ticks of 180 lift it 50/s², else gravity 14/s². Over the hover height its
 //! pitch eases (0.01) toward the stick's (20°), and its push is had unless on level 8; at it the jump starts (its
 //! timer 0, the jump's input past 0.2), it holds (hovership::settle: the spring 0.1, the brake 5%, the drag 1%, 0.8%
@@ -64,8 +64,7 @@
 //!   from 2 up to the bar's cut (`+0xa8` / `+0x98`) are the set's own (copied by state 0 to `0x243b20` / `0x25cd30`
 //!   once a level) and the rest `0x80000000`: the HUD's layer holds the FX textures decoded, not their indices, so
 //!   the bar is not drawn (its words are kept).
-//! * The dust under them while ridden (`0x3b5d10`, the hovership's `0x41fd70`; 0x0f2f's `0x40bcf0`) and 0x085c's
-//!   vacuum camera shake (`0x1b9c60`).
+//! * 0x085c's vacuum camera shake (`0x1b9c60`) beside its dust ([`dust`]).
 //! * 0x085c's guns (`0x3b5c48`: two 0x09a1 mobys, `0x3c1468`, kept at its joints 7 / 8; their update `0x3c14f8`
 //!   fires when its timer byte is set): no level carries the class 0x09a1, so they are created classless and do
 //!   nothing; the port creates none.
@@ -78,6 +77,7 @@ use crate::collision::{coll_sphere_m, QueryFlags};
 use crate::hero::physics::{add, add_rot, len, set_len, sub, sub_rot};
 use crate::moby::{Ctx, MobyWorld};
 use crate::pad::button;
+use crate::particles::hover_dust;
 
 pub const EARLY: i16 = 0x085c;
 pub const MUSEUM: i16 = 0x0f2f;
@@ -297,7 +297,7 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, c: &Craft, input: bool) {
     ctx.host.set_anim_speed(&w.mobys[id], s + (throttle * c.anim - s) * 0.02);
     let pos = w.mobys[id].pos;
     let mut next = add(pos, vel);
-    let (height, special, normal) = hs::ground_below(ctx, next, id);
+    let (height, special, normal, mut last) = hs::ground_hit(ctx, next, id);
     let low = height + hover;
     if pos[2] < low + 0.3 && special { w.mobys[id].set_state(5, -1); }
     let m = &mut w.mobys[id];
@@ -331,6 +331,7 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, c: &Craft, input: bool) {
     let back = sub(next, ctr);
     let hit = ctx.coll.and_then(|coll| coll_sphere_m(coll, None, ctr, c.sphere, QueryFlags(0), Some(id)).or_else(|| coll_sphere_m(coll, ctx.scene, ctr, c.sphere, QueryFlags(2), Some(id))));
     if let Some(hit) = hit {
+        last = Some(hs::LastHit { point: hit.point, surface: hit.surface_id() });
         if matches!(hit.surface_id(), 1 | 0xb) { w.mobys[id].set_state(5, -1); }
         if !(hit.moby.is_some() && hit.moby == ctx.hero_moby) {
             let mut pushed = hit.pushed_centre.unwrap_or(ctr);
@@ -341,7 +342,31 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, c: &Craft, input: bool) {
             m.set_pv_v(pv::VEL, vel);
         }
     }
+    if w.mobys[id].state == 3 { dust(w, id, ctx, c, last); }
     hs::hits_on(w, id, ctx, &c.strike, c.damage, along);
+}
+
+/// State 3's dust (0x085c `0x3b5d10`, 0x0f2f `0x40bcf0`: crate::particles::hover_dust) at the global hit's point:
+/// with L1 held and the power under 0.98 a ring (0x085c: by the nearest raritanium, `+0x68` under 10 (`$gp+0x1050`),
+/// [`hover_dust::VACUUM_NEAR`] and a camera shake, not ported, else [`hover_dust::VACUUM`]; 0x0f2f:
+/// [`hover_dust::VACUUM`]); then always [`hover_dust::IDLE`]. 0x0f2f's start colour on the levels 0x15 / 0x1e is
+/// [`hover_dust::MUSEUM_START`].
+fn dust(w: &MobyWorld, id: usize, ctx: &mut Ctx, c: &Craft, last: Option<hs::LastHit>) {
+    let m = &w.mobys[id];
+    let hit = last.unwrap_or(hs::LastHit { point: m.pos, surface: -1 });
+    let t = &hover_dust::TABLE;
+    let early = c.hull.own == EARLY;
+    let start = if !early && matches!(ctx.game.level, 0x15 | 0x1e) { hover_dust::MUSEUM_START } else { t.colours.0 };
+    let colours = hover_dust::colours(t, hit.surface, start);
+    let vacuum = m.pv_f(c.power) < 0.98 && ctx.hero.items.held & button::L1 != 0;
+    let near = early && m.pv_f(e::NEAR_D) < 10.0;
+    let Some(sys) = ctx.parts.as_deref_mut() else { return };
+    let (rows, carry, g) = (m.rows, m.pv_v(pv::VEL), &mut ctx.game.rng);
+    if vacuum {
+        let ring = if near { &hover_dust::VACUUM_NEAR } else { &hover_dust::VACUUM };
+        hover_dust::ring(sys, g, t, colours, &rows, carry, hit.point, ring);
+    }
+    hover_dust::ring(sys, g, t, colours, &rows, carry, hit.point, &hover_dust::IDLE);
 }
 
 /// The bar while ridden, both crafts (module docs).

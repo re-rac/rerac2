@@ -68,7 +68,7 @@
 //! 0.084375·spin, the points beside it from a circle in the hand's x-z plane (`0x3a3838`), its own arcs (`0x3a3568`).
 //!
 //! Not ported: the gravity frames' trackers and bends (`0x37f538` / `0x37f618` / `0x37f5f8`, `0x380e08` / `0x380ec0`),
-//! the lock cheat (`0x18b270`), the weapon mods' effects on a hit (`0x3f9f70`), the GS test register the draws set
+//! the lock cheat (`0x18b270`), the GS test register the draws set
 //! (`0x37c948`), the ball point's spring (`0x31ec88`: the update resets it every tick, so the draw always snaps), the
 //! words `$gp+0x5a8` / `$gp+0x5ac` the shot writes and nothing reads.
 
@@ -341,6 +341,9 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, slot: i32, at: V3, d
     Some(id)
 }
 
+/// The weapon mods' item (`0x3f9f70(m, 0x3e, the hand)` on the storm's and its arcs' hits; crate::moby::weapon_mods).
+const MOD_ITEM: i32 = 0x3e;
+
 /// `0x3bc078` (module docs).
 pub fn update_ball(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].pvars.resize(crate::moby::PVAR_BYTES, 0);
@@ -372,6 +375,9 @@ pub fn update_ball(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 let mut tm = HitTemplate::new(damage, Some(id), 0x21_0000, [d[0], d[1], d[2], 0.0]);
                 tm.kind = (BALL as u16 as u32) << 16 | 0x0301;
                 w.deliver_hit_any(t, &tm, [0.0; 4]);
+                // `0x3f9f70(t, 0x3e, the hand)` (crate::moby::weapon_mods).
+                let owner = w.mobys[id].parent;
+                crate::moby::weapon_mods::acid(w, ctx, t, MOD_ITEM, owner);
             }
             let (pos, fwd) = (w.mobys[id].pos, w.mobys[id].rows[0]);
             let tau = f32::from_bits(0x40c9_0fdb);
@@ -526,6 +532,9 @@ fn step_arcs(w: &mut MobyWorld, ctx: &mut Ctx, ball: usize) {
                     let mut tm = HitTemplate::new(arc_damage(ctx.game), Some(ball), 0x21_0000, [d[0], d[1], d[2], 0.0]);
                     tm.kind = (BALL as u16 as u32) << 16 | 0x0301;
                     w.deliver_hit_any(t, &tm, [0.0; 4]);
+                    // `0x3f9f70(t, 0x3e, the storm's hand)` (crate::moby::weapon_mods).
+                    let owner = w.mobys[ball].parent;
+                    crate::moby::weapon_mods::acid(w, ctx, t, MOD_ITEM, owner);
                     ctx.host.play_sound(&w.mobys[ball], 1, 0);
                     let back = set_len(d, -1.0);
                     burst(ctx, &mut a.to, back, 9, 0xff_0000);

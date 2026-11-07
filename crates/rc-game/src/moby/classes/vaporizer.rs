@@ -69,10 +69,12 @@
 //!
 //! Its glow in the hand (`0x2a7ed8`'s case 0x17 upgraded): crate::hero::items.
 //!
+//! The weapon mod: Shock on each moby the impact touches (`0x4126b8(m, 0x42, the source's owner)`,
+//! crate::moby::weapon_mods).
+//!
 //! Not ported: the pad rumble (`0x2d6d60(0x296a60)` / `0x2d6f38`), the lock cheat (`0x18b270`), the LOD ranges the zoom
 //! widens (`0x36a1c0`, `$gp−0x4ef0`), the moving frames (`$gp−0x14e4`: the shot's mode 2 and its aim straight at a lock
-//! or the scope's target, `0x380e58` / `0x380e08`), the gravity frames' up (`0x326448`: world up), the weapon mods'
-//! effects on a hit (`0x4126b8(moby, 0x42, owner)`), the impact's base-row branch (green twinkles: the shot is only made
+//! or the scope's target, `0x380e58` / `0x380e08`), the gravity frames' up (`0x326448`: world up), the impact's base-row branch (green twinkles: the shot is only made
 //! by the upgraded hand). The base rifle shot's upgraded impact (`0x3a9668` → `0x320538`) has no caller with an upgraded
 //! row (the upgrade swaps the hand to this one).
 
@@ -611,9 +613,19 @@ fn hit(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, from: V3) -> bool {
     impact(w, id, ctx, o.point, &r);
     match o.moby {
         None => true,
-        Some(m) => w.mobys.get(m).is_some_and(|x| x.has_collision),
+        Some(m) if w.mobys.get(m).is_some_and(|x| x.has_collision) => true,
+        Some(m) => {
+            // `0x4126b8(m, 0x42, the hand)` (crate::moby::weapon_mods; `0x31d100` passed it: its collision record has
+            // no faces).
+            let owner = w.mobys[id].parent;
+            crate::moby::weapon_mods::shock(w, ctx, m, MOD_ITEM, owner);
+            false
+        }
     }
 }
+
+/// The weapon mods' item (`0x4126b8(m, 0x42, ..)`, crate::moby::weapon_mods).
+const MOD_ITEM: i32 = 0x42;
 
 /// `0x3f6830(source, at)` (module docs): the template's way the source's first pvar word as a vector (the shot's
 /// velocity; for the point-blank hit, called with the hand, its first four pvar words as they are).
@@ -622,7 +634,9 @@ fn impact(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, at: V3, r: &ItemRow) {
     let d = unit(w.mobys[id].pv_v(0));
     let mut t = HitTemplate::new(blast_damage(r), Some(id), 0x81_0000, [d[0], d[1], d[2], NO_KNOCK_LIMIT]);
     t.kind = (w.mobys[id].o_class as u16 as u32) << 16 | 0x0203;
-    w.sphere_hit(ctx.scene, at, 2.0, 1, ctx.hero_moby, Some(&t));
+    // `0x4126b8(m, 0x42, the source's owner)` on each moby touched (crate::moby::weapon_mods).
+    let owner = w.mobys[id].parent;
+    for m in w.sphere_hit_list(ctx.scene, at, 2.0, 1, ctx.hero_moby, Some(&t)) { crate::moby::weapon_mods::shock(w, ctx, m, MOD_ITEM, owner); }
 }
 
 /// `0x3f6b90` (module docs): gone once the slot is not the Vaporizer's; else the shot's trail and the slot's beams and

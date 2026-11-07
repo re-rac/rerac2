@@ -70,8 +70,11 @@
 //!
 //! Its glow in the hand (`0x2a7ed8`'s case 0x1c, crate::hero::items): its word pulses `0xff202020` .. `0xffefefef`.
 //!
+//! The weapon mod: Acid on the moby the ball strikes and on an arc's target (`0x3f9f70(m, 0x1c, the hand)`,
+//! crate::moby::weapon_mods, which also draws its Shock arcs with this file's strip and sparks).
+//!
 //! Not ported: the gravity frames' trackers and bends (`0x37f538` / `0x37f618` / `0x37f5f8`, `0x380e08`), the lock
-//! cheat (`0x18b270`, `0x32b4d0`), the weapon mods' effects on a hit (`0x3f9f70`), the loop sound's random pitch
+//! cheat (`0x18b270`, `0x32b4d0`), the loop sound's random pitch
 //! (`0x360a10`; its random draw is kept), the GS test register the draws set (`0x37c948`), the ball point's spring
 //! (`0x31ec88`: the update resets it every tick, so the draw always snaps), the words `$gp+0x1694` / `$gp+0x1698` the
 //! shot writes and nothing reads, the strips' fixed alpha (ALPHA 0x68) as the vertex alpha of an additive quad (the
@@ -117,7 +120,7 @@ pub struct Wobble {
 }
 
 impl Wobble {
-    pub(super) fn step(&mut self, k: f32) -> V3 {
+    pub(crate) fn step(&mut self, k: f32) -> V3 {
         for i in 0..3 { self.angles[i] = add_rot(self.angles[i], self.speeds[i] * k); }
         [self.angles[0].cos() * self.amps[0], self.angles[1].sin() * self.amps[1], -self.angles[2].sin() * self.amps[2]]
     }
@@ -239,7 +242,7 @@ pub(super) fn aim_at(w: &MobyWorld, ctx: &Ctx, t: usize) -> V3 {
 
 /// `0x3ea9c0` / `0x3cd150(t, out, p₀, p₁, a, b)`: the cubic from `p0` to `p1` (`(f₆·t³ + (f₁ − f₆)·t² + (p₁ − a)·t + p₀`,
 /// f₁ = a − p₀, f₆ = (b − p₁) − f₁); exactly the ends at 0 and 1.
-pub(super) fn cubic(t: f32, p0: V3, p1: V3, a: V3, b: V3) -> V3 {
+pub(crate) fn cubic(t: f32, p0: V3, p1: V3, a: V3, b: V3) -> V3 {
     if t == 0.0 { return p0; }
     if t == 1.0 { return p1; }
     let (t2, t3) = (t * t, t * t * t);
@@ -534,6 +537,9 @@ fn step_arcs(w: &mut MobyWorld, ctx: &mut Ctx, ball: usize) {
                     w.deliver_hit_any(t, &tm, [0.0; 4]);
                     a.hit = true;
                     sparks(ctx, a.to, 10, 1);
+                    // `0x3f9f70(t, 0x1c, the ball's hand)` (crate::moby::weapon_mods).
+                    let owner = w.mobys[ball].parent;
+                    crate::moby::weapon_mods::acid(w, ctx, t, PLASMA_COIL, owner);
                 }
             }
             if countdown(&mut a.life) {
@@ -613,6 +619,9 @@ pub fn update_ball(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 strike(w, ctx, id, t, vel);
                 let at = w.mobys[id].pos;
                 sparks(ctx, at, 10, 1);
+                // `0x3f9f70(t, 0x1c, the hand)` (crate::moby::weapon_mods).
+                let owner = w.mobys[id].parent;
+                crate::moby::weapon_mods::acid(w, ctx, t, PLASMA_COIL, owner);
                 break;
             }
             if w.mobys[id].pv_link(0x38).is_none() {
@@ -699,7 +708,7 @@ pub fn update_ball(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// one time in two 1.5 times as fast — 0.35 of the size (60 ticks), else drifting toward the camera at their speed —
 /// 2.05 (40 ticks); kind 1 (on a moby) the other way about, 0.25 (40) and 0.3 (60); each in `0x7f800000` and a white
 /// one 0.7 / 0.245 / 1.435 / 0.175 / 0.21 of the size turning the other way; their `+0x09` 0x74.
-fn sparks(ctx: &mut Ctx, at: V3, n: i32, kind: i32) {
+pub(crate) fn sparks(ctx: &mut Ctx, at: V3, n: i32, kind: i32) {
     let Some(sys) = ctx.parts.as_deref_mut() else { return };
     let g = &mut ctx.game.rng;
     let cam = ctx.host.camera_pos();
@@ -771,7 +780,7 @@ fn facing(out: &mut Vec<crate::fx::FxQuad>, size: f32, roll: f32, at: V3, rgb: u
 /// `way × (camera − point)`, the way to the next point), two quads a segment: FX `fx[0]` `wide[0]` across in `ca`, FX
 /// `fx[1]` `wide[1]` across in `cb` with s stepping a third a segment; their fixed alpha `fix` and `fix / 3`.
 #[allow(clippy::too_many_arguments)]
-fn strip(out: &mut Vec<crate::fx::FxQuad>, points: &[V3], cam: V3, fx: [usize; 2], wide: [f32; 2], ca: [u32; 4], cb: [u32; 4], fix: i32) {
+pub(crate) fn strip(out: &mut Vec<crate::fx::FxQuad>, points: &[V3], cam: V3, fx: [usize; 2], wide: [f32; 2], ca: [u32; 4], cb: [u32; 4], fix: i32) {
     let n = points.len();
     if n < 3 { return; }
     let across = |i: usize| {
@@ -798,7 +807,7 @@ fn strip(out: &mut Vec<crate::fx::FxQuad>, points: &[V3], cam: V3, fx: [usize; 2
 }
 
 /// `0x3cdb20(points, n)`: the last point the one before plus the last step.
-pub(super) fn extrapolate(points: &mut Vec<V3>) {
+pub(crate) fn extrapolate(points: &mut Vec<V3>) {
     let n = points.len();
     if n < 2 { return; }
     points.push(add(points[n - 1], sub(points[n - 1], points[n - 2])));

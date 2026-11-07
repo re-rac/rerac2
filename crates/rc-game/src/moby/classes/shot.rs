@@ -17,7 +17,10 @@
 //! +0x2c the speed, +0x30 the range, +0x38 the ticks left, +0x3c 1 / the ticks, +0x40 1.0, +0x44..+0x4c the spin (per
 //! tick); from [`TRAIL`] the trail's points (the class's slot of the gadget trail buffer `0x32b3b0`, 40 of 0x10 bytes).
 //!
-//! Not ported: a hit moby's reaction to the shot (`0x4126b8`) and its `+0x98` test, the gravity boots' bend
+//! The weapon mod: Shock on a moby the shot hits with its collision on (`0x4126b8(m, 0x1e, the hand)`,
+//! crate::moby::weapon_mods).
+//!
+//! Not ported: the impact's `+0x98` test (a moby without its collision takes the moby impact here), the gravity boots' bend
 //! (`0x37f538` / `0x37f618`), the first-person aim (`0x380ef8`).
 
 use crate::hero::items::{row, LANCER};
@@ -140,6 +143,11 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 Some(o) => {
                     if let Some(m) = o.moby { w.deliver_hit_any(m, &t, [o.point[0], o.point[1], o.point[2], 1.0]); }
                     if let Some(sys) = ctx.parts.as_deref_mut() { impact(sys, &mut ctx.game.rng, o.point, cam, o.moby.is_some()); }
+                    // `0x4126b8(m, 0x1e, the hand)` on a moby with its collision (`+0x98`; crate::moby::weapon_mods).
+                    if let Some(m) = o.moby.filter(|&m| w.mobys[m].has_collision) {
+                        let owner = w.mobys[id].parent;
+                        crate::moby::weapon_mods::shock(w, ctx, m, LANCER, owner);
+                    }
                     ctx.host.play_sound(&w.mobys[id], 0, 0);
                     hide(w, id);
                 }

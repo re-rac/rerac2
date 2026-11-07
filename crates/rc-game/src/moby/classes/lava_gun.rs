@@ -44,7 +44,7 @@
 //! it sheds a glow sprite at (0.06, −0.509, 0).
 //!
 //! Not ported: the gravity frames' trackers and bends (`0x37f538` / `0x37f618` / `0x37f5f8`, `0x380e08`), the lock
-//! cheat (`0x18b270`, `0x32b4d0`), the weapon mods' effects on a hit (`0x3f9f70`), the GS test register the draw sets
+//! cheat (`0x18b270`, `0x32b4d0`), the GS test register the draw sets
 //! (`0x37c948`), the 125 records past the pools no code reads (`$gp+0x23f8`). Its upgrade (rows 0x3f on) is the Meteor Gun,
 //! crate::moby::classes::meteor.
 
@@ -130,12 +130,15 @@ fn stop_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 }
 
 /// A hit on `target` from the hand (`0x31d158` + `0x31d378`): along the hand to it, flags 0x910000, its kind the
-/// target's class `<< 16 | 0x0109`; then the hand's class sound 1.
+/// target's class `<< 16 | 0x0109`; Acid (`0x3f9f70(target, 0x1d, hand)`, crate::moby::weapon_mods); then the hand's
+/// class sound 1.
 fn hit(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, target: usize, damage: f32) {
     let d = unit(sub(w.mobys[target].pos, w.mobys[hand].pos));
     let mut t = HitTemplate::new(damage, Some(hand), 0x91_0000, [d[0], d[1], d[2], NO_KNOCK_LIMIT]);
     t.kind = (w.mobys[target].o_class as u16 as u32) << 16 | 0x0109;
     w.deliver_hit_any(target, &t, [0.0; 4]);
+    // `0x3f9f70(target, 0x1d, hand)` (crate::moby::weapon_mods).
+    crate::moby::weapon_mods::acid(w, ctx, target, crate::hero::items::LAVA, Some(hand));
     ctx.host.play_sound(&w.mobys[hand], 1, 0);
 }
 

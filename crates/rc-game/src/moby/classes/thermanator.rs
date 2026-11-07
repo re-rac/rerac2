@@ -71,12 +71,12 @@
 //! **A hit** ([`count`]): the mover's `+0xbc` up; at 25 or more the dialogue's held line let go (`0x2b6d28`); its
 //! group (`+0x21`) all given the count.
 //!
-//! Not ported: the shots' impact splash or puff (`0x326b28(pos + 1 up)`: a ring on the water `0x339b60` or a puff
-//! `0x332660`), the hot shot's draw (`0x3e1ee0`: its flames `0x3e1ee0` / `0x3e2028` and puffs `0x3e2948` →
-//! `0x3e2af0`; their places, sizes and colours are kept only as the counts that time its end), the reach's debug
+//! **The hot shot's draw** ([`draw_hot`], `0x3e1ee0`): its scorch, flames, glow and puffs.
+//!
+//! Not ported: the puffs' heat shimmer ([`draw_hot`]), the reach's debug
 //! override (`0x381320`: 4.5 here), the target's missing-pvars message (`0x2a48f0`).
 
-use crate::hero::physics::{add, add_rot, len, scale, set_len, unit, V3};
+use crate::hero::physics::{add, add_rot, atan2, dist, len, len2, scale, set_len, sub, unit, V3};
 use crate::moby::{ai, countdown, mode, Ctx, MobyWorld};
 
 /// The item.
@@ -143,12 +143,11 @@ mod hot {
     pub const GONE: usize = 0x5c;
 }
 
-/// The hot shots' flames (`0x247880`, 100 of 0x40 bytes: their owner and turn) and puffs (`0x2533e0`, 300 of 0x50:
-/// their owner and ticks), as far as their counts go (module docs).
+/// The hot shots' flames (`0x247880`, 100 of 0x40 bytes) and puffs (`0x2533e0`, 300 of 0x50) (module docs).
 #[derive(Clone, Debug, Default)]
 pub struct Mem {
-    flames: Vec<Option<(usize, f32)>>,
-    puffs: Vec<Option<(usize, i32)>>,
+    flames: Vec<Option<Flame>>,
+    puffs: Vec<Option<Puff>>,
     /// `gp+0x14e8`: the flames' table cleared this level.
     cleared: bool,
 }
@@ -158,6 +157,36 @@ impl Mem {
         if self.flames.len() < 100 { self.flames.resize(100, None); }
         if self.puffs.len() < 300 { self.puffs.resize(300, None); }
     }
+}
+
+/// A flame (`0x40` bytes): `+0x00` its way out in the shot's frame, `+0x10` its place, `+0x20` that way as a unit,
+/// `+0x30` its turn, `+0x34` its shot.
+#[derive(Clone, Copy, Debug)]
+struct Flame {
+    owner: usize,
+    off: V3,
+    pos: V3,
+    turn: f32,
+}
+
+/// A puff (`0x50` bytes): `+0x00` its place, `+0x10` its velocity, `+0x20` / `+0x24` its spin and angle, `+0x28` its
+/// size, `+0x2c` / `+0x30` its colour and the colour drawn, `+0x34` / `+0x38` its alpha and the alpha drawn, `+0x3c`
+/// its blend (1 normal, 2 additive), `+0x40` / `+0x44` its life left and its life, `+0x48` its shot.
+#[derive(Clone, Copy, Debug)]
+struct Puff {
+    owner: usize,
+    pos: V3,
+    vel: V3,
+    spin: f32,
+    angle: f32,
+    size: f32,
+    color: u32,
+    color2: u32,
+    alpha: i32,
+    alpha2: i32,
+    kind: i32,
+    life: i32,
+    duration: i32,
 }
 
 fn kind(w: &MobyWorld, m: usize) -> i16 { w.mobys.get(m).and_then(|x| w.class(x.o_class)).map_or(0, |c| c.kind) }
@@ -413,10 +442,16 @@ pub fn burst(ctx: &mut Ctx, at: V3) {
     }
 }
 
-/// The cold shot's water met (states 1 and 2): its z the grid's height there, the burst unless the mover was turning,
-/// **3** for 80 ticks.
+/// The cold shot's water met (states 1 and 2): the landing splash under it from 1 above (`0x326b28`,
+/// crate::particles::rain::land: a ring on the water, or a splash on the ground), its z the grid's height there, the
+/// burst unless the mover was turning, **3** for 80 ticks.
 fn splash(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let p = w.mobys[id].pos;
+    let aux = w.weather.aux(ctx.level, &*ctx.game);
+    let cam = ctx.host.camera_pos();
+    if let Some(sys) = ctx.parts.as_deref_mut() {
+        crate::particles::rain::land(sys, &mut ctx.game.rng, ctx.coll, ctx.scene, aux.map, aux.live, cam, [p[0], p[1], p[2] + 1.0]);
+    }
     if let Some(h) = w.liquid.height(p) { w.mobys[id].pos[2] = h; }
     if w.mobys[id].pv_i(cold::TURNING) == 0 { burst(ctx, w.mobys[id].pos); }
 }
@@ -515,46 +550,58 @@ fn hit_hot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, met: Option<usize>) {
     w.mobys[id].set_pv_i(hot::TURNING, 0);
 }
 
-/// `0x3e1d08`: a flame for the shot (three `randf(±1)`: its way out, 0.1275, for the draw).
+/// `0x3e1d08`: a flame for the shot, its way out three `randf(±1)` at 0.1275, its turn 0.
 fn flame(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.therm.ready();
     let Some(slot) = w.therm.flames.iter().position(Option::is_none) else { return };
     let g = &mut ctx.game.rng;
-    for _ in 0..3 { g.randf(-1.0, 1.0); }
-    w.therm.flames[slot] = Some((id, 0.0));
+    let off = [g.randf(-1.0, 1.0), g.randf(-1.0, 1.0), g.randf(-1.0, 1.0)];
+    w.therm.flames[slot] = Some(Flame { owner: id, off: set_len(off, 0.1275), pos: w.mobys[id].pos, turn: 0.0 });
     let n = w.mobys[id].pv_i(hot::FLAMES);
     w.mobys[id].set_pv_i(hot::FLAMES, n + 1);
 }
 
-/// `0x3e2590`: a puff for the shot (its ticks 50..60; its draw's place, size, colour and turn drawn too).
-fn puff(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+/// `0x3e2590(shot, at, size)`: a puff for the shot at `at` (the shot's place; its w −1 would put it 0.3 behind the
+/// shot, never the case here) jittered ±0.015 on each axis: its alpha 80..200, its colour `(c, c/2, c/4)` for `c`
+/// 96..128, its blend by the shot's puffs made (`+0x50`: even 1, odd 2), its life 50..60, its spin `randf_signed(180,
+/// 720)` degrees a second, a random angle, rising `randf(0.01, 0.015)` a tick.
+fn puff(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, size: f32) {
     w.therm.ready();
     let Some(slot) = w.therm.puffs.iter().position(Option::is_none) else { return };
     let g = &mut ctx.game.rng;
-    g.rand_range(80, 200);
-    g.rand_range(96, 128);
+    let alpha = g.rand_range(80, 200);
+    let c = g.rand_range(96, 128) as u32;
+    let color = c + ((c << 7) & 0xff00) + ((c << 14) & 0xff_0000);
+    let kind = w.mobys[id].pv_i(hot::MADE) % 2 + 1;
     let life = g.rand_range(50, 60);
-    g.randf_signed(180.0, 720.0);
-    g.rand_angle();
+    let spin = g.randf_signed(180.0, 720.0) * f32::from_bits(0x3998_825c);
+    let angle = g.rand_angle();
     let j = f32::from_bits(0x3c75_c28f);
-    for _ in 0..3 { g.randf(-j, j); }
-    g.randf(f32::from_bits(0x3c23_d70a), j);
-    w.therm.puffs[slot] = Some((id, life));
+    let mut pos = w.mobys[id].pos;
+    for k in &mut pos { *k += g.randf(-j, j); }
+    let vel = [0.0, 0.0, g.randf(f32::from_bits(0x3c23_d70a), j)];
+    w.therm.puffs[slot] = Some(Puff { owner: id, pos, vel, spin, angle, size, color, color2: color, alpha, alpha2: alpha, kind, life, duration: life });
     let m = &mut w.mobys[id];
     m.set_pv_i(hot::PUFFS, m.pv_i(hot::PUFFS) + 1);
     m.set_pv_i(hot::MADE, m.pv_i(hot::MADE) + 1);
 }
 
-/// `0x3e1dd8` + `0x3e27e8`: the shot's flames turn, its puffs age (one `randf(0.001, 0.003)` each, their growth).
+/// `0x3e1dd8` + `0x3e27e8`: the shot's flames ride it (their way out through its rows, from its place) and turn 36°
+/// (gone at 360°); its puffs age — the drawn alpha its alpha by the life left, the drawn colour half that share of its
+/// colour (`0x2f0000`), the angle on by the spin, the size up `randf(0.001, 0.003)`, the place on by the velocity, the
+/// velocity × 0.99, the life down (out: gone).
 fn age(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.therm.ready();
     let (step, full) = (f32::from_bits(0x3f20_d97d), f32::from_bits(0x40c9_0fdb));
+    let (rows, at) = (w.mobys[id].rows, w.mobys[id].pos);
     let mut gone = 0;
     for f in w.therm.flames.iter_mut() {
         let done = match f {
-            Some((o, a)) if *o == id => {
-                *a += step;
-                full <= *a
+            Some(x) if x.owner == id => {
+                let o = x.off;
+                x.pos = std::array::from_fn(|k| o[0] * rows[0][k] + o[1] * rows[1][k] + o[2] * rows[2][k] + at[k]);
+                x.turn += step;
+                full <= x.turn
             }
             _ => false,
         };
@@ -568,9 +615,15 @@ fn age(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let mut gone = 0;
     for p in w.therm.puffs.iter_mut() {
         let done = match p {
-            Some((o, life)) if *o == id => {
-                ctx.game.rng.randf(f32::from_bits(0x3a83_126f), f32::from_bits(0x3b44_9ba6));
-                countdown(life)
+            Some(x) if x.owner == id => {
+                let t = x.life as f32 / x.duration as f32;
+                x.alpha2 = (x.alpha as f32 * t) as i32;
+                x.color2 = crate::hud::lerp_rgba(t * 0.5, 0, x.color);
+                x.angle = add_rot(x.angle, x.spin);
+                x.size += ctx.game.rng.randf(f32::from_bits(0x3a83_126f), f32::from_bits(0x3b44_9ba6));
+                x.pos = add(x.pos, x.vel);
+                x.vel = scale(x.vel, 0.99);
+                countdown(&mut x.life)
             }
             _ => false,
         };
@@ -603,7 +656,8 @@ pub fn update_hot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         1 => {
             let old = step(w, id, f32::from_bits(GRAVITY));
             flame(w, id, ctx);
-            puff(w, id, ctx);
+            let size = dist(old, w.mobys[id].pos) * 0.5;
+            puff(w, id, ctx, size);
             if let Some((met, n)) = line(w, ctx, id, old) {
                 let at = w.mobys[id].pos;
                 {
@@ -630,7 +684,7 @@ pub fn update_hot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         2 => {
-            puff(w, id, ctx);
+            puff(w, id, ctx, 0.1);
             let m = &mut w.mobys[id];
             let mut v = m.pv_v(0);
             m.pos = add(m.pos, v);
@@ -666,6 +720,59 @@ pub fn update_hot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => {}
     }
     age(w, id, ctx);
+    // `0x2e7920(0x3e1ee0, shot)`: its draw ([`draw_hot`]).
+    w.register_draw(id);
+}
+
+/// `0x3e1ee0`, the hot shot's draw: in states 2..3 its scorch where it hit (`0x3e2258`: FX 0x2e, normal blending,
+/// `0x204080` at the level `+0x58`, lying on the face (its normal `+0x20`, 0.025 off it), size `0.75·(1 − (1 − t)²)`
+/// for `t` = 1 − its ticks `+0x44` / 20); its flames (`0x3e2028`: each two additive FX 0x2e sprites, `0x103080` of
+/// 0.125 and `0x7f7f7f` of 0.0625, 0.011 toward the camera, at the alpha `128·(cos(turn − π) + 1)/2`); itself (two
+/// additive FX 0xb sprites at alphas `randi(0x20, 0x40)`: `0x7f7f7f` of 0.125 pushed 0.3 toward the camera and
+/// `0x103080` of 0.225 pushed 0.31); its puffs (`0x3e2948` → `0x3e2af0`: an FX 0x2e sprite each, its drawn colour and
+/// alpha, its blend, its size and angle). Not ported: the puffs' heat shimmer (`0x2ee160` / `0x2ee190` / `0x2ee188`:
+/// a frame-distortion sprite of `2·size·a` with `a` = `(cos(angle) + 1)/2`, 0.05·cos(angle) off each axis).
+pub fn draw_hot(w: &MobyWorld, id: usize, rng: &mut crate::rng::Rng, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
+    let m = &w.mobys[id];
+    if (2..=3).contains(&m.state) {
+        let f = m.pv_i(hot::TICKS) as f32 / 20.0;
+        let e = 1.0 - f;
+        let size = (1.0 - (1.0 - e) * (1.0 - e)) * 0.75;
+        let n = m.pv_v(hot::NORMAL);
+        let rgba = 0x0020_4080u32.wrapping_add((m.pv_i(hot::LEVEL) as u32) << 24);
+        quad(out, m.pv_v(hot::AT), n, set_len(n, 0.025), 0.0, size, rgba, 0x2e, false);
+    }
+    for f in w.therm.flames.iter().flatten().filter(|f| f.owner == id) {
+        let a = (((f.turn - std::f32::consts::PI).cos() + 1.0) * 0.5 * 128.0) as i32 as u32;
+        sprite(out, cam, f.pos, 0x0010_3080u32.wrapping_add(a << 24), 0x2e, true, 0.125, 0.011);
+        sprite(out, cam, f.pos, 0x007f_7f7fu32.wrapping_add(a << 24), 0x2e, true, 0.0625, 0.011);
+    }
+    let a = rng.rand_range(0x20, 0x40) as u32;
+    sprite(out, cam, m.pos, 0x007f_7f7fu32.wrapping_add(a << 24), 0xb, true, 0.125, 0.3);
+    let a = rng.rand_range(0x20, 0x40) as u32;
+    sprite(out, cam, m.pos, 0x0010_3080u32.wrapping_add(a << 24), 0xb, true, 0.225, 0.31);
+    for p in w.therm.puffs.iter().flatten().filter(|p| p.owner == id) {
+        let d = sub(cam, p.pos);
+        quad(out, p.pos, d, [0.0; 3], p.angle, p.size, p.color2.wrapping_add((p.alpha2 as u32) << 24), 0x2e, p.kind == 2);
+    }
+}
+
+/// `0x3e23d8(pos, rgb, alpha, fx, blend, size, roll, push)` with no roll: [`quad`] facing the camera, `push` toward it.
+#[allow(clippy::too_many_arguments)]
+fn sprite(out: &mut Vec<crate::fx::FxQuad>, cam: V3, pos: V3, rgba: u32, fx: usize, additive: bool, size: f32, push: f32) {
+    let d = sub(cam, pos);
+    quad(out, pos, d, set_len(d, push), 0.0, size, rgba, fx, additive);
+}
+
+/// The quads of `0x3e23d8` / `0x3e2258` / `0x3e2af0`: the square (0, ±1, ±1) × `size` (`0x3e2168`, `0x3e21f0`) through
+/// the rows of the angles (`0x2ef6d8`: `roll`, then pitch and yaw toward `toward`) at `pos + off` (`0x2eb998`).
+#[allow(clippy::too_many_arguments)]
+fn quad(out: &mut Vec<crate::fx::FxQuad>, pos: V3, toward: V3, off: V3, roll: f32, size: f32, rgba: u32, fx: usize, additive: bool) {
+    let rows = crate::hero::physics::euler_rows([roll, -atan2(len2(toward), toward[2]), atan2(toward[0], toward[1])]);
+    let at = add(pos, off);
+    let corner = |y: f32, z: f32| add(at, add(scale(rows[1], y * size), scale(rows[2], z * size)));
+    let corners = [corner(-1.0, -1.0), corner(-1.0, 1.0), corner(1.0, -1.0), corner(1.0, 1.0)];
+    out.push(crate::fx::FxQuad { fx, additive, corners, st: [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]], rgba: [rgba; 4] });
 }
 
 /// `0x410b58` (module docs); `0x37dfc0`'s own tests: not in Ratchet's states 0x17..0x1b / 0x6f / 0x62 nor in a scene.

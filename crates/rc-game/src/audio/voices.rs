@@ -331,6 +331,18 @@ impl SoundSlots {
         i as i32
     }
 
+    /// `0x384410(slot, v)` (L01 `0x356d98`, the decomp's `func_L01_00355BA0`): the slot's volume scale (`+0x10`, a
+    /// halfword store), sent with the next update.
+    pub fn set_volume(&mut self, slot: i32, vol: i32) {
+        if let Some(s) = usize::try_from(slot).ok().and_then(|i| self.slots.get_mut(i)) { s.vol = vol & 0xffff; }
+    }
+
+    /// `0x384430(slot, pb)` (L00 `0x360a10`, `func_002E5F40`): the slot's pitch bend (`+0x14`), sent with the next
+    /// update.
+    pub fn set_bend(&mut self, slot: i32, pb: i32) {
+        if let Some(s) = usize::try_from(slot).ok().and_then(|i| self.slots.get_mut(i)) { s.pb = pb; }
+    }
+
     /// `release_voice_slot` (0x2a1348).
     pub fn release(&mut self, slot: i32) {
         let Ok(i) = usize::try_from(slot) else { return };

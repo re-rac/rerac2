@@ -56,7 +56,9 @@
 //! `$gp+0x2670` read as the gun Ratchet rides (crate::hero::Hero::vehicle, set and cleared where the gun sets it);
 //! the sound handles start at −1.
 //!
-//! Not ported: the autosaves (`0x30d658`), the camera records' resets (`0x4370f0`), the prints (`0x2a6170`), the
+//! The fight's start and end ask for the autosave (`0x306e20(0, −1)` = L00 `0x30d658`, crate::game::GameState::autosave).
+//!
+//! Not ported: the camera records' resets (`0x4370f0`), the prints (`0x2a6170`), the
 //! missile's class-sphere write (`0x30b158`), the glints' byte 9, the turret global's clear at the set-up.
 
 use crate::hero::physics::{add, add_rot, approach, approach_angle, atan2, cross, dist, dot, ease, ease_speed, len, len2, rot_dist, scale, set_len, set_len2, sub, sub_rot, turn_ease, V3};
@@ -1299,6 +1301,8 @@ fn start_fight(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if let Some(b) = usize::try_from(w.mobys[id].pv_i(pv::BRIDGE)).ok().and_then(|b| w.mobys.get_mut(b)) { b.once |= 4; }
     if let Some((p, r)) = ctx.level.cuboid_place(w.mobys[id].pv_i(pv::CHECKPOINT)) { ctx.game.save_checkpoint(p, r); }
     say_one_of(w, id, ctx, 0, 2);
+    // `0x306e20(0, −1)`: the autosave (crate::game::GameState::autosave).
+    ctx.game.autosave(-1);
     w.mobys[id].set_state(2, 1);
 }
 
@@ -1314,6 +1318,7 @@ fn end_fight(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     ctx.game.unlock_planet(0x11);
     for k in parts(w, id).into_iter().flatten() { w.delete(k); }
     ctx.host.music_request(w.mobys[id].pv_i(pv::MUSIC_END), -1);
+    ctx.game.autosave(-1);
     w.delete(id);
 }
 

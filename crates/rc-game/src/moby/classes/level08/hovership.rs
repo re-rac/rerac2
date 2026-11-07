@@ -5,7 +5,7 @@
 //!
 //! Its earlier siblings, the Insomniac Museum's 0x085c and 0x0f2f (crate::moby::classes::level21::hovercraft), run
 //! the same code with their own tables; the pieces they share are here ([`prologue`], [`hero_ready`] / [`offer`] /
-//! [`board`], [`drive`], [`ground_below`], [`slope`], [`settle`], [`slide`], [`hits_on`], [`wreck`], [`bob_sway`],
+//! [`board`], [`drive`], [`ground_hit`], [`slope`], [`settle`], [`slide`], [`hits_on`], [`wreck`], [`bob_sway`],
 //! [`vacuum`]), each over the pvar places the three have in common (`+0x00` the velocity, `+0x20..+0x28` the roll's
 //! and pitch's speeds and the yaw, `+0x30` home, `+0x48..+0x58` the bob, sway and height).
 //!
@@ -76,10 +76,9 @@
 //! Not ported:
 //! * The nearest raritanium's marker moby (`+0x74`, `0x436c68` / `0x436d08`) and the HUD state behind it (`+0x88`,
 //!   `+0x8a`, `+0x8c`, `$gp+0x2a38`, `$gp+0x29a4`).
-//! * The dust under it (`0x41fd70`), the vacuum's camera shake (`0x1b9b20`), its engine trail (`0x33a4f0` /
+//! * The vacuum's camera shake (`0x1b9b20`), its engine trail (`0x33a4f0` /
 //!   `0x33a550`), the sound `+0x18c` (`0x329d28`), the raritanium's glitter (`0x3d5350`, the crystals' glitter with
 //!   its own colours: crate::moby::classes::level08::crystal::glitter).
-//! * The global hit's lowest point (`0x1bff68`) it lowers to its height.
 //! * The world sphere `0x2edbd0` (a list of its own at `$gp+0x3610`): the port's world sphere test.
 //! * The get-off's `0x33e830()`, `0x189f28` and the hero moby's `+0x9c` (crate::hero::vehicle).
 
@@ -90,6 +89,7 @@ use crate::moby::blast::{self, Explosion};
 use crate::moby::hits::HitTemplate;
 use crate::moby::{ai, Ctx, MobyWorld};
 use crate::pad::button;
+use crate::particles::hover_dust;
 use rc_formats::moby_anim::JointModifier;
 
 pub const HOVERSHIP: i16 = 0x0eef;
@@ -200,6 +200,8 @@ const PULL: f32 = 0.1;
 const SHRINK: f32 = 0.01;
 const DRIFT: f32 = 2.0;
 const HELD: i32 = 0x78;
+/// `0x1b02cc`: the dust's nearer ring within this of the nearest raritanium.
+const VACUUM_NEAR: f32 = 10.0;
 
 /// The hovership's hull (the shared [`prologue`]).
 const HULL: Hull = Hull { own: HOVERSHIP, flash: pv::FLASH, cool: pv::COOL, last: pv::LAST_HIT, health: pv::HEALTH, rest: HIT_REST, scale: SCALE };
@@ -331,9 +333,23 @@ pub(crate) fn drive(m: &crate::moby::Moby, d: &Drive, roll: usize, yaw: usize, p
 }
 
 /// The ground under `next` (`0x32a160(0.5, next, 0)`: the line from 0.5 up): its height (0: none), whether it is of
-/// the kinds 1 / 0xb, its normal.
-pub(crate) fn ground_below(ctx: &Ctx, next: V3, id: usize) -> (f32, bool, V3) {
+/// the kinds 1 / 0xb, its normal, and the hit itself (the global hit's point and surface the dust reads, [`LastHit`]).
+pub(crate) fn ground_hit(ctx: &Ctx, next: V3, id: usize) -> (f32, bool, V3, Option<LastHit>) {
     let ground = ctx.coll.and_then(|c| coll_line_m(c, ctx.scene, [next[0], next[1], next[2] + 0.5], [next[0], next[1], 0.01], QueryFlags(2), Some(id)));
+    let last = ground.map(|g| LastHit { point: g.point, surface: g.surface_id() });
+    let (h, s, n) = ground_of(ground);
+    (h, s, n, last)
+}
+
+/// The global hit (`0x1bff40`, the museum's `0x1c00a0`) as the dust reads it after the flight: the last query that met
+/// something (the sphere's, else the ground line's) — its point (`+0x20`) and surface (`0x2ee1d8`).
+#[derive(Clone, Copy)]
+pub(crate) struct LastHit {
+    pub point: V3,
+    pub surface: i32,
+}
+
+fn ground_of(ground: Option<crate::collision::CollOutput>) -> (f32, bool, V3) {
     let height = ground.map_or(0.0, |g| g.point[2]);
     let special = ground.is_some_and(|g| matches!(g.surface_id(), 1 | 0xb));
     (height, special, ground.map_or([0.0, 0.0, 1.0], |g| g.normal))
@@ -527,8 +543,11 @@ pub fn update_0eef(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 keep_sound(w, id, ctx, pv::IDLE, 9);
             }
             steer(w, id, ctx);
-            fly(w, id, ctx);
-            if w.mobys[id].state == 3 { vacuum_sounds(w, id, ctx); }
+            let last = fly(w, id, ctx);
+            if w.mobys[id].state == 3 {
+                vacuum_sounds(w, id, ctx);
+                dust(w, id, ctx, last);
+            }
             hits(w, id, ctx);
             if !fresh && ctx.hero.vehicle.moby == Some(id) && ctx.hero.items.pressed & button::TRIANGLE != 0 {
                 get_off(w, id, ctx);
@@ -622,8 +641,8 @@ pub(crate) fn vacuum(w: &mut MobyWorld, id: usize) {
     }
 }
 
-/// The flight (module docs).
-fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+/// The flight (module docs); the global hit after it ([`LastHit`]: the dust's).
+fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> Option<LastHit> {
     let ridden = w.mobys[id].state == 3;
     let (mut turn, mut throttle, mut pitch_in, mut brake, mut strafe) = if ridden { controls(ctx) } else { (0.0, 0.0, 0.0, 0.0, 0.0) };
     let m = &w.mobys[id];
@@ -660,7 +679,7 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     let pos = m.pos;
     let mut next = add(pos, vel);
-    let (height, special, normal) = ground_below(ctx, next, id);
+    let (height, special, normal, mut last) = ground_hit(ctx, next, id);
     let low = height + hover;
     if pos[2] < low + 0.3 && special { w.mobys[id].set_state(5, -1); }
     let mut airborne = true;
@@ -703,9 +722,10 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     });
     let solid = w.class(HOVERSHIP).is_some_and(|k| k.has_collision);
     w.mobys[id].has_collision = solid;
-    let Some(hit) = hit else { return };
+    let Some(hit) = hit else { return last };
+    last = Some(LastHit { point: hit.point, surface: hit.surface_id() });
     if matches!(hit.surface_id(), 1 | 0xb) { w.mobys[id].set_state(5, -1); }
-    if hit.moby.is_some() && hit.moby == ctx.hero_moby { return; }
+    if hit.moby.is_some() && hit.moby == ctx.hero_moby { return last; }
     let mut give = 1.0;
     let mut pushed = hit.pushed_centre.unwrap_or(c);
     if airborne {
@@ -722,6 +742,7 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let vel = slide(m.pv_v(pv::VEL), hit.normal, give, WALL_SLOW);
     m.set_pv_v(pv::VEL, vel);
     if m.pos[2] < m.pv_f(pv::KILL_Z) { m.set_state(5, -1); }
+    last
 }
 
 /// State 3's vacuum sounds (module docs): □ held with the power under 0.98 — sound 1 once (unless resting), then
@@ -757,6 +778,24 @@ fn vacuum_sounds(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     } else {
         keep_sound(w, id, ctx, pv::IDLE, 9);
     }
+}
+
+/// State 3's dust (`0x41fd70`, crate::particles::hover_dust) at the global hit's point lowered to its height: with
+/// □ held and the power under 0.98, a ring by the nearest raritanium (`+0x68` under 10: [`hover_dust::VACUUM_NEAR`] and
+/// a camera shake, not ported; else [`hover_dust::VACUUM`]); then always [`hover_dust::IDLE`].
+fn dust(w: &MobyWorld, id: usize, ctx: &mut Ctx, last: Option<LastHit>) {
+    let m = &w.mobys[id];
+    let mut hit = last.unwrap_or(LastHit { point: m.pos, surface: -1 });
+    if m.pos[2] < hit.point[2] { hit.point[2] = m.pos[2]; }
+    let Some(sys) = ctx.parts.as_deref_mut() else { return };
+    let t = &hover_dust::TABLE;
+    let c = hover_dust::colours(t, hit.surface, t.colours.0);
+    let (rows, carry, g) = (m.rows, m.pv_v(pv::VEL), &mut ctx.game.rng);
+    if m.pv_f(pv::POWER) < 0.98 && ctx.hero.items.held & button::SQUARE != 0 {
+        let ring = if m.pv_f(pv::NEAR_D) < VACUUM_NEAR { &hover_dust::VACUUM_NEAR } else { &hover_dust::VACUUM };
+        hover_dust::ring(sys, g, t, c, &rows, carry, hit.point, ring);
+    }
+    hover_dust::ring(sys, g, t, c, &rows, carry, hit.point, &hover_dust::IDLE);
 }
 
 /// Its hits on the mobys (module docs).

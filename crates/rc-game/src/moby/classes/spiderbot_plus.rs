@@ -47,9 +47,11 @@
 //! (`0x2fdb60(5, 0, 1, 0.8, 0.25)`, kept 1 above it). **2**: the mobys of class type 5 or mode 0x4000 within 3 take 10
 //! (20 on the level 3 row) with flags 0x810000 along the way from it; the light let go; gone.
 //!
+//! The weapon mod: Acid on each moby a shot or a shell hits (`0x3f9f70(m, 0x4e, the bot's hand)`, crate::moby::weapon_mods).
+//!
 //! Not ported: the explosion mobys these make (`0x416c40`: the class 0x139d at the shell's blast; `0x405858`'s class
-//! 0x139f at a shot's hit, and its two sparks `0x33fbb8`): the port has neither class nor that particle; the weapon
-//! mods on the hits (`0x3f9f70`); the gravity frames' bends (`0x37f538` / `0x37f618`, `0x380e08` / `0x380ec0`). The
+//! 0x139f at a shot's hit, and its two sparks `0x33fbb8`): the port has neither class nor that particle; the gravity
+//! frames' bends (`0x37f538` / `0x37f618`, `0x380e08` / `0x380ec0`). The
 //! aim search's class list (`0x1b0c8c`: 0, 0x0e79) is not passed (neither is of class type 5). With ✕ and □ both held
 //! the original aims a shot at a target with a point it did not set this tick (its stack's leftovers): the port
 //! takes the target's aim point.
@@ -413,6 +415,9 @@ fn shot_hit(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, from: V3) {
             let mut tm = HitTemplate::new(damage, Some(id), 0x0021_0000, [d[0], d[1], d[2], 0.0]);
             tm.kind = (SHOT as u16 as u32) << 16 | 0x0305;
             w.deliver_hit_any(t, &tm, [0.0; 4]);
+            // `0x3f9f70(t, 0x4e, the bot's hand)` (crate::moby::weapon_mods).
+            let owner = bot_hand(w, w.mobys[id].pv_i(0x20));
+            crate::moby::weapon_mods::acid(w, ctx, t, MOD_ITEM, owner);
         }
     }
     ctx.host.play_sound_of(&w.mobys[id], PLUS_BOT, 7, 0);
@@ -532,7 +537,20 @@ fn lob_blast(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         tm.kind = (x.o_class as u16 as u32) << 16 | 0x0305;
         let p = x.pos;
         w.deliver_hit_any(t, &tm, [p[0], p[1], p[2], 1.0]);
+        // `0x3f9f70(t, 0x4e, the bot's hand)` (crate::moby::weapon_mods).
+        let owner = bot_hand(w, w.mobys[id].pv_i(0x34));
+        crate::moby::weapon_mods::acid(w, ctx, t, MOD_ITEM, owner);
     }
+}
+
+/// The weapon mods' item of the upgraded glove's hits (`0x3f9f70(m, 0x4e, ..)`, crate::moby::weapon_mods).
+const MOD_ITEM: i32 = 0x4e;
+
+/// The hand of the bot a shot or shell names (its word: the bot's index; the bot's `+0xb8`, its pvar
+/// [`super::spiderbot::PLUS`]`.hand`).
+fn bot_hand(w: &MobyWorld, bot: i32) -> Option<usize> {
+    let b = w.mobys.get(usize::try_from(bot).ok()?)?;
+    usize::try_from(b.pv_i(super::spiderbot::PLUS.hand)).ok()
 }
 
 /// `0x4063c8(shell, to, from)`: `|vel|·10` blue sparks (`0x339848`: 42000 shrinking 500..1000 a tick, 30..45 ticks,

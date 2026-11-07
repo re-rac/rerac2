@@ -234,7 +234,7 @@ fn crashed(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 let set = super::RouteSet::of(&w.mobys[b]);
                 let m = &w.mobys[id];
                 let (mut link, mut point) = (m.pv_i(0x120), m.pv_i(0x124));
-                let p = super::find_progress(&w.race.paths, &set, pos, &mut link, &mut point);
+                let p = super::find_progress(&w.race.paths, &set, pos, &mut link, &mut point, None);
                 let m = &mut w.mobys[id];
                 m.set_pv_i(0x120, link);
                 m.set_pv_i(0x124, point);

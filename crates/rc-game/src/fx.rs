@@ -31,6 +31,7 @@
 //! | `0x3ddaa8` | the Meteor Gun's meteor 0x0b2e | its trail, glow and scorches ([`crate::moby::classes::meteor::draw`]) |
 //! | `0x41c328` | the Lava Gun in the hand 0x05c9 drawn | its stream, muzzle glows and burning pools ([`crate::moby::classes::lava_gun::draw`]) |
 //! | `0x410b58` | the Thermanator in the hand 0x0fb0 aimed at a grid mover | the landing marker at its arc's end ([`crate::moby::classes::thermanator::draw`]) |
+//! | `0x3e1ee0` | the Thermanator's hot shot 0x0bd7 | its scorch, flames, glow and puffs ([`crate::moby::classes::thermanator::draw_hot`]) |
 //! | `0x3c5c98` (first list) | the Shield Charger's shield 0x0a5c holding | its arcs, sphere, halo and comets ([`crate::moby::classes::shield::draw`]) |
 //! | `0x3e9f18` / `0x3cd2d8` | the Plasma Coil in the hand 0x0c4a / its ball 0x0a9b | the hand's lightning and glints; the ball's arcs, rays and glow ([`crate::moby::classes::plasma_coil::draw_hand`], [`crate::moby::classes::plasma_coil::draw_ball`]) |
 //! | `0x3ec108` | the Mini-Turret Glove in the hand 0x0c5a | where its throw lands ([`crate::moby::classes::turret::draw_marker`]) |
@@ -354,6 +355,8 @@ pub fn callbacks(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut
     crate::shadows::draw(&w.shadows, &mut out);
     out.append(&mut w.update_quads);
     for id in w.draws.clone() { one(w, host, game, hero_state, view, cam, id, false, &mut out, &mut frame); }
+    // The Shock manager's callback (`0x412cb8`, crate::moby::weapon_mods: no moby of its own here).
+    crate::moby::weapon_mods::draw(w, &mut game.rng, cam, &mut out);
     Lists { first, second: out, frame }
 }
 
@@ -403,6 +406,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::synthenoid::SHOT => crate::moby::classes::synthenoid::draw(w, id, cam, out),
         crate::moby::classes::lava_gun::HAND_CLASS => crate::moby::classes::lava_gun::draw(w, id, &mut game.rng, cam, out),
         crate::moby::classes::thermanator::HAND_CLASS => crate::moby::classes::thermanator::draw(w, id, hero_state, game.scenes.mode, game.frame, out),
+        crate::moby::classes::thermanator::HOT => crate::moby::classes::thermanator::draw_hot(w, id, &mut game.rng, cam, out),
         crate::moby::classes::meteor::METEOR => crate::moby::classes::meteor::draw(w, id, &mut game.rng, cam, out),
         crate::moby::classes::plasma_coil::HAND_CLASS => crate::moby::classes::plasma_coil::draw_hand(w, host, id, &mut game.rng, cam, out),
         crate::moby::classes::plasma_coil::BALL => crate::moby::classes::plasma_coil::draw_ball(w, id, &mut game.rng, cam, out),
