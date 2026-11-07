@@ -18,8 +18,9 @@
 //!   `$gp+0x2aa8..+0x2ab0`); then, his prompt gone or the reach under 0.25: Ratchet at the middle (his state 100)
 //!   stands still (0x6f) with the beam full (1.95), 3; not walking, 4.
 //! * **3** the beam (drawn) fades by 1/15 a tick; out: without a chunk Ratchet is put on the partner 0.2 up, facing
-//!   its way (`0x2bd368`), the partner powers down (4: its arms out, the beam from 0, its sound 1), and this pad is
-//!   back at 1 with its beam full and its arms in; with a chunk, 5.
+//!   its way, the camera reset behind him (`0x2bd368`, crate::cameras::Cameras::reset), the partner powers down (4:
+//!   its arms out, the beam from 0, its sound 1), and this pad is back at 1 with its beam full and its arms in; with a
+//!   chunk, 5.
 //! * **4** the beam (drawn) grows back to 1.95 by 1/15, then the arms tilt down and come in (eased to 0), 1.
 //! * **5** (into a chunk) the white `+0x3c` from 1 down by 0.02 a tick; past −0.2 the partner arrives (6), the chunk
 //!   switch (`0x3082e0(+0x38, +0x40)`, crate::moby::Ctx::switch_chunk: its music track `+0x40`, 0 when negative), Ratchet on the partner 0.2 up standing still (0x6f),
@@ -215,8 +216,10 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     if m.pv_i(pv::PARTNER2) != -1 && mission_done(ctx, m.pv_i(pv::MISSION2)) { to = m.pv_i(pv::PARTNER2); }
                     if let Some(p) = usize::try_from(to).ok().filter(|&p| p < w.mobys.len()) {
                         let (at, rot) = (w.mobys[p].pos, w.mobys[p].rot);
+                        // `0x2bd368(.., 0, 1)`: the camera reset behind him.
                         ctx.hero.teleport([at[0], at[1], at[2] + 0.2], rot);
                         ctx.hero.request_state(0, true);
+                        ctx.game.cameras.reset();
                         let pm = &mut w.mobys[p];
                         pm.state = 4;
                         for o in [pv::BEAM, pv::REACH_V, pv::TILT_V] { pm.set_pv_i(o, 0); }
@@ -279,6 +282,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     let (at, rot) = (w.mobys[p].pos, w.mobys[p].rot);
                     ctx.hero.teleport([at[0], at[1], at[2] + 0.2], rot);
                     ctx.hero.request_state(0x6f, true);
+                    ctx.game.cameras.reset();
                 }
                 place_arms(w, id, ctx);
                 w.mobys[id].set_state(1, -1);
