@@ -425,6 +425,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::maktar::NODE => crate::moby::classes::maktar::draw_0c82(w, id, cam, out),
         0x0c81 => crate::moby::classes::maktar::draw_0c81(w, id, cam, out),
         crate::moby::classes::barrier::CLASS if first => crate::moby::classes::barrier::draw(w, id, cam, out),
+        crate::moby::classes::strands::BARRIER => crate::moby::classes::strands::draw(w, id, cam, out),
         0x0a9c => crate::moby::classes::maktar::draw_0a9c(w, id, out),
         crate::moby::classes::fighters::MASTER if first => {
             let mid = w.mobys[id].pv_v(crate::moby::classes::arena::MIDDLE_AT);

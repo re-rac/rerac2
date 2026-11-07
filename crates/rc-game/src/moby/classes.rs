@@ -31,6 +31,7 @@ pub mod blitz_mega;
 pub mod bouncer;
 pub mod bolt;
 pub mod button;
+pub mod strands;
 pub mod bosses;
 pub mod carriers;
 pub mod chopper;
@@ -150,6 +151,9 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x47 => Some(wrench::update),
         // The floor button (L00 `0x3b8de0`; placed on levels 6, 13 and 17).
         button::CLASS => Some(button::update_08a1),
+        // The strand curtains (L06 `0x401b40` / `0x3e7268`; placed on levels 6, 13 and 17).
+        strands::BARRIER => Some(strands::update_barrier),
+        strands::FIELD => Some(strands::update_field),
         0x5d2 => Some(lancer::update),
         // The Heavy Lancer's hand (`0x3e5dc8` calls the Lancer's `0x3a8060`; crate::upgrades).
         lancer::HEAVY_CLASS => Some(lancer::update),

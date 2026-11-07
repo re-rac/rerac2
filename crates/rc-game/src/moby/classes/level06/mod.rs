@@ -3,7 +3,8 @@
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
 //!
 //! The seller of planet 7's coordinates 0x0ccf: [`host`]. The spinning breakables 0x0fc1 / 0x0fc0: [`spinners`]. The
-//! floor button 0x08a1: crate::moby::classes::button. The water sheet 0x093e (`0x404680` / `0x403ac0`): crate::water::ocean.
+//! floor button 0x08a1: crate::moby::classes::button. The barrier 0x08a0 and its strand field 0x0431:
+//! crate::moby::classes::strands. The water sheet 0x093e (`0x404680` / `0x403ac0`): crate::water::ocean.
 //! The liquid grid 0x0fb2 / 0x0fd6 / 0x0fce / 0x0fcf / 0x0fe4 (`0x4581c8`): crate::water::grid.
 //!
 //! Not ported (level 6's other classes):
@@ -13,9 +14,6 @@
 //! * Ratchet's: the ferry 0x0330 (`0x3e5460`, L11 `0x3b7340`: a ride on paths with its own controls), 0x0947
 //!   (`0x404c60`: a swimmer that grabs Ratchet in the water, his state 0x12, and throws him out, his state 0x6f
 //!   `0x2f96e8`), 0x0b57 (`0x41b200`, Ratchet's state 0x37 and the level's scene functions `0x479xxx`).
-//! * The draws: 0x08a0 (`0x401b40`:
-//!   nine shuffled symbols in a column, its draw `0x401f00` reading the table in its moby `+0x68`[3]'s pvars,
-//!   `+0x2c00` / `+0x12de0`).
 //! * The hints 0x0cdd (`0x4321e8`: help 0x9df / 0x9e0 / 0x9e1 / 0x9e2 / 0x9db / 0x9b5 by cuboids; it reads Ratchet's
 //!   `0x18c2d4` and the byte `0x1a7b27`, not mapped, and the uids gone for good `0x21ecc4`), 0x1240 (`0x465f18`: the level's table `0x1b21c4`, `0x47c358`).
 
