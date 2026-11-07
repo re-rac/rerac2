@@ -3,6 +3,12 @@
 //! `0x3d55e8`, L19 `0x3c1cc8`; the decomp's `func_L08_003D4190`). Ratchet rides it in his state 0x31
 //! (crate::hero::vehicle). L08 addresses below.
 //!
+//! Its earlier siblings, the Insomniac Museum's 0x085c and 0x0f2f (crate::moby::classes::level21::hovercraft), run
+//! the same code with their own tables; the pieces they share are here ([`prologue`], [`hero_ready`] / [`offer`] /
+//! [`board`], [`drive`], [`ground_below`], [`slope`], [`settle`], [`slide`], [`hits_on`], [`wreck`], [`bob_sway`],
+//! [`vacuum`]), each over the pvar places the three have in common (`+0x00` the velocity, `+0x20..+0x28` the roll's
+//! and pitch's speeds and the yaw, `+0x30` home, `+0x48..+0x58` the bob, sway and height).
+//!
 //! **The hovership** (its pvars: `+0x00` the velocity, `+0x20` the roll's speed, `+0x24` the pitch's, `+0x28` the
 //! yaw, `+0x30` its home, `+0x48` / `+0x4c` the bob's phase and height, `+0x50` / `+0x54` the sway's phases, `+0x58`
 //! its height before the bob, `+0x5c` the throttle, `+0x60` its health, `+0x68` / `+0x6c` the nearest raritanium's
@@ -64,7 +70,7 @@
 //!
 //! Not ported:
 //! * The HUD's callback `0x41edd0` (the vehicle's health bar, the vacuum's texts 0x2dee / 0x2ded / 0x2def, the
-//!   nearest raritanium's distance 0x3076 and its mark): the port has no draw hook for a class's screen text. Its
+//!   nearest raritanium's distance 0x3076 and its mark): its slot would be crate::hud::HudSlots's. Its
 //!   reset of `+0x68` / `+0x6c` (1 000 000, none) after the moby loop is done here at the end of the hovership's own
 //!   update while it is ridden.
 //! * The nearest raritanium's marker moby (`+0x74`, `0x436c68` / `0x436d08`) and the HUD state behind it (`+0x88`,
@@ -122,11 +128,11 @@ mod pv {
     pub const IDLE: usize = 0x1b4;
 }
 
-const DEG: f32 = 0.017_453_294;
+pub(crate) const DEG: f32 = 0.017_453_294;
 /// Degrees a second as radians a tick.
-const DEG_TICK: f32 = 0.000_290_888_25;
-const PER_TICK: f32 = 0.016_666_668;
-const PER_TICK2: f32 = 0.000_277_777_78;
+pub(crate) const DEG_TICK: f32 = 0.000_290_888_25;
+pub(crate) const PER_TICK: f32 = 0.016_666_668;
+pub(crate) const PER_TICK2: f32 = 0.000_277_777_78;
 
 // `$gp+0x2890..` (L08 `0x1b1880..`).
 const ROTOR_SPIN: f32 = 660.0;
@@ -190,6 +196,246 @@ const SHRINK: f32 = 0.01;
 const DRIFT: f32 = 2.0;
 const HELD: i32 = 0x78;
 
+/// The hovership's hull (the shared [`prologue`]).
+const HULL: Hull = Hull { own: HOVERSHIP, flash: pv::FLASH, cool: pv::COOL, last: pv::LAST_HIT, health: pv::HEALTH, rest: HIT_REST, scale: SCALE };
+/// Its bob and sway ([`bob_sway`]).
+const BOB: Bob = Bob { amp: BOB_AMP, rate: BOB_RATE, sway: SWAY };
+/// Its hits ([`hits_on`]).
+const STRIKE: Strike = Strike { radius: HIT_R, down: HIT_DOWN, fast: HIT_FAST, joint: 1 };
+/// Its steering ([`drive`]).
+const DRIVE: Drive = Drive { yaw_rate: YAW_RATE, steer_rate: STEER_RATE, steer_mix: STEER_MIX, steer_low: STEER_LOW, bank: BANK, bank_mix: BANK_MIX, bank_ease: BANK_EASE, back: BACK, turn_push: TURN_PUSH, push: PUSH, top: TOP_SPEED };
+/// Its hold over the ground ([`settle`]).
+const SETTLE: Settle = Settle { ground_slow: GROUND_SLOW, spring: SPRING, brake: BRAKE, drag: DRAG, across: DRAG_ACROSS };
+
+// The pieces the hovercraft share: the hovership 0x0eef here and its earlier siblings, the Insomniac Museum's
+// 0x085c / 0x0f2f (crate::moby::classes::level21::hovercraft). Each is the same code in each update with the
+// update's own `$gp` table and pvar places.
+
+/// A hovercraft's pvars and constants for [`prologue`]: its class, its flash's, hit rest's, last hitter's and
+/// health's places, the hit's rest and its scale (of its class's).
+pub(crate) struct Hull {
+    pub own: i16,
+    pub flash: usize,
+    pub cool: usize,
+    pub last: usize,
+    pub health: usize,
+    pub rest: u8,
+    pub scale: f32,
+}
+
+/// Each tick's start (module docs): the hit's rest counted down (out: the last hitter forgotten); in state 0 its
+/// height kept, else put back under the bob and a hit taken — not from its own class or the classes 0x0942 / 0x0fff,
+/// and not the last hitter while the rest lasts: flashed grey (0xd2), the damage off its health (and `0x18b65c`), 5 at
+/// none, the hitter kept, the rest set; the hit cleared. Its flash run and its scale set.
+pub(crate) fn prologue(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, h: &Hull) {
+    {
+        let m = &mut w.mobys[id];
+        let mut c = m.pv_b(h.cool) as i32;
+        let out = crate::moby::countdown(&mut c);
+        m.set_pv_b(h.cool, c as u8);
+        if out { m.set_pv_i(h.last, 0); }
+    }
+    if w.mobys[id].state == 0 {
+        let z = w.mobys[id].pos[2];
+        w.mobys[id].set_pv_f(pv::LAST_Z, z);
+    } else {
+        let z = w.mobys[id].pv_f(pv::LAST_Z);
+        w.mobys[id].pos[2] = z;
+        if let Some(hit) = w.hit_message(id) {
+            let src = hit.tmpl.source;
+            let class = src.and_then(|s| w.mobys.get(s)).map(|s| s.o_class);
+            let m = &mut w.mobys[id];
+            let last = ai::link(m, h.last);
+            if let Some(c) = class {
+                if c != h.own && c != 0x0942 && c != 0x0fff && (src != last || m.pv_b(h.cool) == 0) {
+                    for k in 7..10 { m.set_pv_b(h.flash + k, 0xd2); }
+                    ai::flash_start(m, h.flash);
+                    let hp = m.pv_f(h.health) - hit.tmpl.damage;
+                    ctx.hero.vehicle.health = hp;
+                    m.set_pv_f(h.health, hp);
+                    if hp <= 0.0 { m.set_state(5, -1); }
+                    ai::set_link(m, h.last, src);
+                    m.set_pv_b(h.cool, h.rest);
+                }
+            }
+        }
+        w.clear_hit(id);
+    }
+    ai::flash(&mut w.mobys[id], h.flash);
+    let class_scale = w.class(h.own).map_or(1.0, |c| c.scale);
+    w.mobys[id].scale = class_scale * h.scale;
+}
+
+/// Ratchet free to take a hovercraft: not in the states 0x1c / 0x16 / 0x39 / 0x6f, not in the groups 2..5, 7, 10,
+/// 0x10 or past 0xc, with health, in play, on the ground and not on the classes 0x013e / 0x046f.
+pub(crate) fn hero_ready(w: &MobyWorld, ctx: &Ctx) -> bool {
+    let h = &*ctx.hero;
+    let busy_state = matches!(h.state, 0x1c | 0x16 | 0x39 | 0x6f);
+    let busy_group = matches!(h.group, 2 | 3 | 4 | 5 | 7 | 10 | 0x10) || 0xc < h.group;
+    if busy_state || busy_group || h.hp < 1 || ctx.game.scenes.mode != crate::scene::PLAY || h.grounded_ticks == 0 { return false; }
+    !h.ground_moby.and_then(|g| w.mobys.get(g)).is_some_and(|c| c.o_class == 0x013e || c.o_class == 0x046f)
+}
+
+/// Ratchet's moby within `reach` of the craft's sphere (`0x3203d0`) and not in 0x31: the prompt 0x12ea (owner 7);
+/// true when △ is pressed on it.
+pub(crate) fn offer(w: &MobyWorld, id: usize, ctx: &mut Ctx, reach: f32) -> bool {
+    if reach <= sphere_gap(w, id, ctx.hero_moby, ctx) || ctx.hero.state == 0x31 { return false; }
+    let ready = ctx.game.prompt.request(PROMPT.0, PROMPT.1, 1) != 0;
+    ctx.hero.items.pressed & button::TRIANGLE != 0 && ready
+}
+
+/// The way on: Ratchet in 0x31 (`0x2d31f8(0x31, 0)`) in his sequence `seq` (blend 15) at its place and angles,
+/// `0x18b650` it; the craft in 3.
+pub(crate) fn board(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, seq: u8) {
+    let (pos, rot) = (w.mobys[id].pos, w.mobys[id].rot);
+    ctx.hero.ride_on(id, pos, rot, false);
+    ctx.hero.anim_req = Some((15.0, seq, 0));
+    w.mobys[id].set_state(3, -1);
+}
+
+/// The steering's constants: the yaw's rate (°/s), the steer's speed (/s), mix and low, the bank (°), its mix and
+/// ease, the backward throttle's factor, the turn's push, the push (/s²) and the top speed (/s).
+pub(crate) struct Drive {
+    pub yaw_rate: f32,
+    pub steer_rate: f32,
+    pub steer_mix: f32,
+    pub steer_low: f32,
+    pub bank: f32,
+    pub bank_mix: f32,
+    pub bank_ease: f32,
+    pub back: f32,
+    pub turn_push: f32,
+    pub push: f32,
+    pub top: f32,
+}
+
+/// The yaw turned by the stick × the steer (`min(speed, rate)/rate · mix + 1 − mix + low·(1 − power)`), the roll's
+/// speed eased toward the bank by the stick (by the power and the throttle) less its roll, the throttle (×`back`
+/// backwards) and its push along the forward row (`(1 − speed/top)²`): (yaw, roll's speed, throttle, push).
+pub(crate) fn drive(m: &crate::moby::Moby, d: &Drive, roll: usize, yaw: usize, power: f32, speed: f32, turn: f32, throttle: f32) -> (f32, f32, f32, f32) {
+    let top = d.top * PER_TICK;
+    let rate = d.steer_rate * PER_TICK;
+    let steer = speed.min(rate) / rate * d.steer_mix + (1.0 - d.steer_mix) + d.steer_low * (1.0 - power);
+    let yaw = add_rot(m.pv_f(yaw), d.yaw_rate * turn * steer * DEG_TICK);
+    let roll = m.pv_f(roll) + (d.bank * turn * DEG * power * (d.bank_mix * throttle + (1.0 - d.bank_mix)) - m.rot[0]) * d.bank_ease;
+    let throttle = if throttle < 0.0 { throttle * d.back } else { throttle };
+    let sign = if throttle < 0.0 { -1.0 } else { 1.0 };
+    let damping = ((top - speed) / top).powi(2);
+    let acc = (throttle + d.turn_push * turn.abs() * sign) * PER_TICK2 * d.push * damping;
+    (yaw, roll, throttle, acc)
+}
+
+/// The ground under `next` (`0x32a160(0.5, next, 0)`: the line from 0.5 up): its height (0: none), whether it is of
+/// the kinds 1 / 0xb, its normal.
+pub(crate) fn ground_below(ctx: &Ctx, next: V3, id: usize) -> (f32, bool, V3) {
+    let ground = ctx.coll.and_then(|c| coll_line_m(c, ctx.scene, [next[0], next[1], next[2] + 0.5], [next[0], next[1], 0.01], QueryFlags(2), Some(id)));
+    let height = ground.map_or(0.0, |g| g.point[2]);
+    let special = ground.is_some_and(|g| matches!(g.surface_id(), 1 | 0xb));
+    (height, special, ground.map_or([0.0, 0.0, 1.0], |g| g.normal))
+}
+
+/// The ground's slope ahead (the pitch of the frame its normal makes with the forward row).
+pub(crate) fn slope(rows: &[V3; 3], n: V3) -> f32 {
+    let n = unit(n);
+    let b1 = cross(rows[0], n);
+    let b0 = cross(b1, n);
+    angles_of(&[b0, b1, n])[1]
+}
+
+/// The hold over the ground's constants: the slowing on it, the spring, the brake, the drag and the drag across.
+pub(crate) struct Settle {
+    pub ground_slow: f32,
+    pub spring: f32,
+    pub brake: f32,
+    pub drag: f32,
+    pub across: f32,
+}
+
+/// Near the ground: under it (by 0.1) or on a surface of kind 1 / 0xb, put on it and slowed; the spring holds it
+/// toward `low`, the brake slows it across the ground, it drags (and more across its side row). (velocity, height).
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn settle(s: &Settle, mut vel: V3, mut z: f32, low: f32, height: f32, special: bool, brake: f32, rows: &[V3; 3]) -> (V3, f32) {
+    if z + 0.1 < height || special {
+        z = height;
+        vel = scale(vel, s.ground_slow);
+    }
+    vel[2] += ((low - z) * s.spring - vel[2]) * s.spring;
+    if 0.0 < brake {
+        let k = 1.0 - s.brake * brake;
+        vel[0] *= k;
+        vel[1] *= k;
+    }
+    vel = scale(vel, s.drag);
+    let mut l = [dot(vel, rows[0]), dot(vel, rows[1]), dot(vel, rows[2])];
+    l[1] *= s.across;
+    (add(add(scale(rows[0], l[0]), scale(rows[1], l[1])), scale(rows[2], l[2])), z)
+}
+
+/// The velocity slid along a face of normal `n` (`give` of it kept, then × `slow`).
+pub(crate) fn slide(vel: V3, n: V3, give: f32, slow: f32) -> V3 {
+    let s = unit(cross(cross(n, vel), n));
+    scale(set_len(s, dot(vel, s) * give), slow)
+}
+
+/// The hits' constants: the spheres' radii, the first's drop under joint 0, the speed (/s) past which the second
+/// hits, and the second's joint.
+pub(crate) struct Strike {
+    pub radius: (f32, f32),
+    pub down: f32,
+    pub fast: f32,
+    pub joint: usize,
+}
+
+/// Its hits on the mobys: a sphere at its joint 0 (`down` under it) hits the mobys (`damage`, flags 0x10000, along
+/// `along`); past `fast` a second at its joint `s.joint`.
+pub(crate) fn hits_on(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, s: &Strike, damage: f32, along: V3) {
+    let m = &w.mobys[id];
+    let t = HitTemplate::new(damage, Some(id), 0x1_0000, [along[0], along[1], along[2], 0.0]);
+    let mut c = ctx.host.joint(m, 0).unwrap_or(m.pos);
+    c[2] += s.down;
+    w.sphere_hit(ctx.scene, c, s.radius.0, 0, Some(id), Some(&t));
+    let m = &w.mobys[id];
+    if s.fast * PER_TICK < len(m.pv_v(pv::VEL)) {
+        let c = ctx.host.joint(m, s.joint).unwrap_or(m.pos);
+        w.sphere_hit(ctx.scene, c, s.radius.1, 0, Some(id), Some(&t));
+    }
+}
+
+/// State 5's end: an explosion at its joint 0 (flashes 4 and 2 past 9, 10 embers, 3 billows, 16 flares, the light
+/// 15, the shake, one debris), back home; 0.
+pub(crate) fn wreck(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let m = &w.mobys[id];
+    let at = ctx.host.joint(m, 0).unwrap_or(m.pos);
+    let e = Explosion { flash: 4.0, flash2: 2.0, near: 9.0, size: 1.0, light: 15.0, embers: 10, billows: 3, flares: 16, sound: -1, shake: true, debris: 1, lod: -1, flags: 0x81_0001, ..Default::default() };
+    blast::explode(w, ctx, Some(id), Some(at), &e);
+    let m = &mut w.mobys[id];
+    m.pos = m.pv_v(pv::HOME);
+    m.set_state(0, -1);
+}
+
+/// The bob and sway: the bob's amplitude and rate (°/s), the sway's (°, °/s, °/s).
+pub(crate) struct Bob {
+    pub amp: f32,
+    pub rate: f32,
+    pub sway: (f32, f32, f32),
+}
+
+/// After the states: its height kept, the bob (by the power), the sway (crate::moby::classes::props::sway, by the
+/// power), its angles from the yaw, the roll's and pitch's speeds.
+pub(crate) fn bob_sway(m: &mut crate::moby::Moby, b: &Bob, power: f32) {
+    m.set_pv_f(pv::LAST_Z, m.pos[2]);
+    let phase = add_rot(m.pv_f(pv::BOB_PHASE), b.rate * power * DEG_TICK);
+    m.set_pv_f(pv::BOB_PHASE, phase);
+    let bob = phase.sin() * b.amp * power;
+    m.set_pv_f(pv::BOB, bob);
+    m.pos[2] += bob * power;
+    let k = power * DEG_TICK;
+    super::super::props::sway(m, b.sway.0 * DEG, b.sway.1 * k, b.sway.2 * k, pv::SWAY_A, pv::SWAY_B);
+    m.rot[2] = m.pv_f(pv::YAW);
+    m.rot[0] = add_rot(m.rot[0], m.pv_f(pv::ROLL));
+    m.rot[1] = add_rot(m.rot[1], m.pv_f(pv::PITCH));
+}
+
 /// `0x41fc10`: (turn, throttle, pitch, brake, strafe) — the stick's x and y reversed, ✕ − ○, □'s pressure, L2 − R2
 /// (all but the pitch and the brake at most 1 each way).
 fn controls(ctx: &Ctx) -> (f32, f32, f32, f32, f32) {
@@ -244,40 +490,8 @@ pub fn update_0eef(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let m = &mut w.mobys[id];
         m.drawn = 1;
         m.mode &= !1;
-        let mut c = m.pv_b(pv::COOL) as i32;
-        let out = crate::moby::countdown(&mut c);
-        m.set_pv_b(pv::COOL, c as u8);
-        if out { m.set_pv_i(pv::LAST_HIT, 0); }
     }
-    if w.mobys[id].state == 0 {
-        let z = w.mobys[id].pos[2];
-        w.mobys[id].set_pv_f(pv::LAST_Z, z);
-    } else {
-        let z = w.mobys[id].pv_f(pv::LAST_Z);
-        w.mobys[id].pos[2] = z;
-        if let Some(hit) = w.hit_message(id) {
-            let src = hit.tmpl.source;
-            let class = src.and_then(|s| w.mobys.get(s)).map(|s| s.o_class);
-            let m = &mut w.mobys[id];
-            let last = ai::link(m, pv::LAST_HIT);
-            if let Some(c) = class {
-                if c != HOVERSHIP && c != 0x0942 && c != 0x0fff && (src != last || m.pv_b(pv::COOL) == 0) {
-                    for k in 7..10 { m.set_pv_b(pv::FLASH + k, 0xd2); }
-                    ai::flash_start(m, pv::FLASH);
-                    let hp = m.pv_f(pv::HEALTH) - hit.tmpl.damage;
-                    ctx.hero.vehicle.health = hp;
-                    m.set_pv_f(pv::HEALTH, hp);
-                    if hp <= 0.0 { m.set_state(5, -1); }
-                    ai::set_link(m, pv::LAST_HIT, src);
-                    m.set_pv_b(pv::COOL, HIT_REST);
-                }
-            }
-        }
-        w.clear_hit(id);
-    }
-    ai::flash(&mut w.mobys[id], pv::FLASH);
-    let class_scale = w.class(HOVERSHIP).map_or(1.0, |c| c.scale);
-    w.mobys[id].scale = class_scale * SCALE;
+    prologue(w, id, ctx, &HULL);
     let ridden = ctx.hero.vehicle.moby == Some(id);
     let v = &mut ctx.hero.vehicle;
     v.bar = if ridden && w.mobys[id].state != 0 { (v.health / v.max_health * 200.0) as i32 } else { 200 };
@@ -318,13 +532,7 @@ pub fn update_0eef(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         5 => {
             get_off(w, id, ctx);
-            let m = &w.mobys[id];
-            let at = ctx.host.joint(m, 0).unwrap_or(m.pos);
-            let e = Explosion { flash: 4.0, flash2: 2.0, near: 9.0, size: 1.0, light: 15.0, embers: 10, billows: 3, flares: 16, sound: -1, shake: true, debris: 1, lod: -1, flags: 0x81_0001, ..Default::default() };
-            blast::explode(w, ctx, Some(id), Some(at), &e);
-            let m = &mut w.mobys[id];
-            m.pos = m.pv_v(pv::HOME);
-            m.set_state(0, -1);
+            wreck(w, id, ctx);
         }
         _ => {}
     }
@@ -333,22 +541,10 @@ pub fn update_0eef(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// State 1's way in (module docs); true the tick it is taken.
 fn try_get_on(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
-    let h = &*ctx.hero;
-    let busy_state = matches!(h.state, 0x1c | 0x16 | 0x39 | 0x6f | 0x62 | 0x31);
-    let busy_group = matches!(h.group, 2 | 3 | 4 | 5 | 7 | 10 | 0x10) || 0xc < h.group;
-    if busy_state || busy_group || h.hp < 1 || ctx.game.scenes.mode != crate::scene::PLAY || h.grounded_ticks == 0 { return false; }
-    if let Some(c) = h.ground_moby.and_then(|g| w.mobys.get(g)) {
-        if c.o_class == 0x013e || c.o_class == 0x046f { return false; }
-    }
-    if GET_ON <= sphere_gap(w, id, ctx.hero_moby, ctx) { return false; }
-    let ready = ctx.game.prompt.request(PROMPT.0, PROMPT.1, 1) != 0;
-    if ctx.hero.items.pressed & button::TRIANGLE == 0 || !ready { return false; }
+    if matches!(ctx.hero.state, 0x62 | 0x31) || !hero_ready(w, ctx) || !offer(w, id, ctx, GET_ON) { return false; }
     let m = &w.mobys[id];
     ctx.host.music_request(m.pv_i(pv::MUSIC_ON.0), m.pv_i(pv::MUSIC_ON.1));
-    let (pos, rot) = (m.pos, m.rot);
-    ctx.hero.ride_on(id, pos, rot, false);
-    ctx.hero.anim_req = Some((15.0, RIDE_SEQ as u8, 0));
-    w.mobys[id].set_state(3, -1);
+    board(w, id, ctx, RIDE_SEQ as u8);
     stop_sound(w, id, ctx, pv::IDLE);
     ctx.hero.view_lock = 1;
     true
@@ -406,7 +602,7 @@ fn steer(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// `0x41fad8`: the vacuum wakes the classes 0x0942 / 0x0962 / 0x0fff / 0x1002 within 35 across (their timer byte's
 /// bit 1; their update and draw distances raised to 5 past the distance).
-fn vacuum(w: &mut MobyWorld, id: usize) {
+pub(crate) fn vacuum(w: &mut MobyWorld, id: usize) {
     let at = w.mobys[id].pos;
     for m in w.mobys.iter_mut() {
         if 0x80 <= m.state || !matches!(m.o_class, 0x0942 | 0x0962 | 0x0fff | 0x1002) { continue; }
@@ -433,15 +629,8 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let mut vel = m.pv_v(pv::VEL);
     let speed = len(vel) * power;
     let top = TOP_SPEED * PER_TICK;
-    let rate = STEER_RATE * PER_TICK;
     pitch_in *= DEG * PITCH_IN;
-    let steer = speed.min(rate) / rate * STEER_MIX + (1.0 - STEER_MIX) + STEER_LOW * (1.0 - power);
-    let yaw = add_rot(m.pv_f(pv::YAW), YAW_RATE * turn * steer * DEG_TICK);
-    let roll = m.pv_f(pv::ROLL) + (BANK * turn * DEG * power * (BANK_MIX * throttle + (1.0 - BANK_MIX)) - m.rot[0]) * BANK_EASE;
-    if throttle < 0.0 { throttle *= BACK; }
-    let sign = if throttle < 0.0 { -1.0 } else { 1.0 };
-    let damping = ((top - speed) / top).powi(2);
-    let acc = (throttle + TURN_PUSH * turn.abs() * sign) * PER_TICK2 * PUSH * damping;
+    let (yaw, roll, throttle, acc) = drive(m, &DRIVE, pv::ROLL, pv::YAW, power, speed, turn, throttle);
     // The rotors.
     let mut rates = [power * DEG_TICK * ROTOR_SPIN, 0.0, 0.0];
     for (k, r) in rates.iter_mut().enumerate().skip(1) {
@@ -463,39 +652,19 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     let pos = m.pos;
     let mut next = add(pos, vel);
-    // The ground under the next place (`0x32a160(0.5, next, 0)`).
-    let ground = ctx.coll.and_then(|c| coll_line_m(c, ctx.scene, [next[0], next[1], next[2] + 0.5], [next[0], next[1], 0.01], QueryFlags(2), Some(id)));
-    let height = ground.map_or(0.0, |g| g.point[2]);
-    let special = ground.is_some_and(|g| matches!(g.surface_id(), 1 | 0xb));
+    let (height, special, normal) = ground_below(ctx, next, id);
     let low = height + hover;
     if pos[2] < low + 0.3 && special { w.mobys[id].set_state(5, -1); }
     let mut airborne = true;
     vel[2] -= GRAVITY * PER_TICK2;
     let m = &mut w.mobys[id];
     if height != 0.0 {
-        let n = unit(ground.map_or([0.0, 0.0, 1.0], |g| g.normal));
-        let b1 = cross(rows[0], n);
-        let b0 = cross(b1, n);
-        let slope = angles_of(&[b0, b1, n])[1];
         let pitch = m.pv_f(pv::PITCH);
-        let to = add_rot(-slope, pitch_in * 0.5 * PITCH_MIX * (power + 1.0));
+        let to = add_rot(-slope(&rows, normal), pitch_in * 0.5 * PITCH_MIX * (power + 1.0));
         m.set_pv_f(pv::PITCH, add_rot(pitch, sub_rot(to, pitch) * PITCH_EASE));
         if next[2] < low + 0.2 {
             airborne = false;
-            if next[2] + 0.1 < height || special {
-                next[2] = height;
-                vel = scale(vel, GROUND_SLOW);
-            }
-            vel[2] += ((low - next[2]) * SPRING - vel[2]) * SPRING;
-            if 0.0 < brake {
-                let k = 1.0 - BRAKE * brake;
-                vel[0] *= k;
-                vel[1] *= k;
-            }
-            vel = scale(vel, DRAG);
-            let mut l = [dot(vel, rows[0]), dot(vel, rows[1]), dot(vel, rows[2])];
-            l[1] *= DRAG_ACROSS;
-            vel = add(add(scale(rows[0], l[0]), scale(rows[1], l[1])), scale(rows[2], l[2]));
+            (vel, next[2]) = settle(&SETTLE, vel, next[2], low, height, special, brake, &rows);
         }
         let mut thrust = set_len(rows[0], acc);
         if m.pv_f(pv::PITCH) < -0.785_398_24 {
@@ -542,10 +711,7 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     let m = &mut w.mobys[id];
     m.pos = add(pushed, back);
-    let n = hit.normal;
-    let mut vel = m.pv_v(pv::VEL);
-    let s = unit(cross(cross(n, vel), n));
-    vel = scale(set_len(s, dot(vel, s) * give), WALL_SLOW);
+    let vel = slide(m.pv_v(pv::VEL), hit.normal, give, WALL_SLOW);
     m.set_pv_v(pv::VEL, vel);
     if m.pos[2] < m.pv_f(pv::KILL_Z) { m.set_state(5, -1); }
 }
@@ -587,17 +753,8 @@ fn vacuum_sounds(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// Its hits on the mobys (module docs).
 fn hits(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let m = &w.mobys[id];
-    let vel = m.pv_v(pv::VEL);
-    let t = HitTemplate::new(by_level(ctx, DAMAGE), Some(id), 0x1_0000, [vel[0], vel[1], vel[2], 0.0]);
-    let mut c = ctx.host.joint(m, 0).unwrap_or(m.pos);
-    c[2] += HIT_DOWN;
-    w.sphere_hit(ctx.scene, c, HIT_R.0, 0, Some(id), Some(&t));
-    if HIT_FAST * PER_TICK < len(vel) {
-        let m = &w.mobys[id];
-        let c = ctx.host.joint(m, 1).unwrap_or(m.pos);
-        w.sphere_hit(ctx.scene, c, HIT_R.1, 0, Some(id), Some(&t));
-    }
+    let vel = w.mobys[id].pv_v(pv::VEL);
+    hits_on(w, id, ctx, &STRIKE, by_level(ctx, DAMAGE), vel);
 }
 
 /// `0x420068`: off the hovership — the music (`+0x198`, `+0x1a0`), the HUD's callback off, Ratchet idle with the view
@@ -635,17 +792,7 @@ fn coll_sphere_line(coll: &rc_formats::collision::Collision, ctx: &Ctx, a: V3, b
 fn after(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &mut w.mobys[id];
     let power = m.pv_f(pv::POWER);
-    m.set_pv_f(pv::LAST_Z, m.pos[2]);
-    let phase = add_rot(m.pv_f(pv::BOB_PHASE), BOB_RATE * power * DEG_TICK);
-    m.set_pv_f(pv::BOB_PHASE, phase);
-    let bob = phase.sin() * BOB_AMP * power;
-    m.set_pv_f(pv::BOB, bob);
-    m.pos[2] += bob * power;
-    let k = power * DEG_TICK;
-    super::super::props::sway(m, SWAY.0 * DEG, SWAY.1 * k, SWAY.2 * k, pv::SWAY_A, pv::SWAY_B);
-    m.rot[2] = m.pv_f(pv::YAW);
-    m.rot[0] = add_rot(m.rot[0], m.pv_f(pv::ROLL));
-    m.rot[1] = add_rot(m.rot[1], m.pv_f(pv::PITCH));
+    bob_sway(m, &BOB, power);
     if m.state == 3 {
         let mut off = set_len(m.rows[0], -0.5);
         if off[2] < 0.0 { off[2] = 0.0; }

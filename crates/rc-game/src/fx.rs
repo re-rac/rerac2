@@ -68,6 +68,7 @@
 //! | `0x42fce0` (L08; L09 `0x423498`, L19 `0x4223e8`; first list) | the liquid lids 0x11fe / 0x12af / 0x12b4 | the frame's lids' layers and sheens ([`crate::water::lid::draw`]) |
 //! | `0x3e94a0` → `0x3a35e8` (L04; L06 `0x3c1100`, L08 `0x3d1440` → `0x38e260`, L18, L20; first list, the second under water) | the liquid grid's mover of record 0 | every drawn patch's water and sheen ([`crate::water::grid::draw`]) |
 //! | `0x421db8` / `0x38abf0` (L12; first list) | Todano's mesh water 0x1113 / 0x1350 | its mesh's two layers ([`crate::water::mesh::draw`]) |
+//! | `0x384b38` (L21, first list) | the museum's pool 0x1198 | its grid's refraction and reflection layers (crate::moby::classes::level21::ripples::draw) |
 //! | `0x390d60` (L14; L19 `0x383a18`; the world's list `0x2e77e0`, here the first) | the sinking pit 0x135f | its 7 × 7 waving cells (crate::moby::classes::level14::pit::draw) |
 //! | `0x432150` (L14) | the energy field 0x1164 | its halo, rings, core and rays (crate::moby::classes::level14::energy::draw) |
 //! | `0x41e3b8` (L16, first list) | the sweeping laser 0x1162 | its beam (crate::moby::classes::level16::laser::draw) |
@@ -473,7 +474,8 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
                 || level20::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
                 || crate::moby::classes::level10::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
                 || crate::moby::classes::level15::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
-                || level18::draw(w, host, game, hero_state, view, cam, id, first, out, frame);
+                || level18::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
+                || crate::moby::classes::level21::draw(w, host, game, hero_state, view, cam, id, first, out, frame);
         }
     }
 }

@@ -6,6 +6,8 @@ pub mod commentary;
 pub mod emitter;
 pub mod exhibits;
 pub mod flung;
+pub mod hovercraft;
+pub mod ripples;
 pub mod toys;
 pub mod zone;
 
@@ -19,7 +21,21 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         flung::CLASS => Some(flung::update_0c46),
         commentary::CLASS => Some(commentary::update_130e),
         zone::CLASS => Some(zone::update_12e7),
+        // Also in the overlays of levels 8 and 19 (L08 `0x3c7f00`, L19 `0x3b7610`: the same code), placed on the museum only.
+        hovercraft::EARLY => Some(hovercraft::update_085c),
+        hovercraft::MUSEUM => Some(hovercraft::update_0f2f),
+        ripples::CLASS => Some(ripples::update_1198),
         // 0x0b84 (`0x3da5d8`, L00 `0x4450c0`): only a debug print (`0x2a48f0`), so crate::moby::classes::props::update_empty.
         _ => None,
     }
+}
+
+/// This level's draw callbacks (crate::fx): true when the moby's class is one of them (the pool 0x1198's, first list).
+#[allow(clippy::too_many_arguments)]
+pub fn draw(w: &mut crate::moby::MobyWorld, _host: &dyn crate::moby::MobyHost, _game: &mut crate::game::GameState, _hero_state: i32, _view: &crate::particles::BSphereView, cam: crate::hero::physics::V3, id: usize, first: bool, out: &mut Vec<crate::fx::FxQuad>, _frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
+    match w.mobys[id].o_class {
+        ripples::CLASS if first => ripples::draw(w, id, cam, out),
+        _ => return false,
+    }
+    true
 }
