@@ -10,10 +10,21 @@ pub mod dropship;
 pub mod hatch;
 pub mod launcher;
 pub mod pad;
+pub mod prey;
 pub mod props;
 pub mod seller;
 pub mod stalker;
 pub mod traffic;
+
+/// This level's draw callbacks (crate::fx's, the second list).
+#[allow(clippy::too_many_arguments)]
+pub fn draw(w: &mut crate::moby::MobyWorld, host: &dyn crate::moby::MobyHost, _game: &mut crate::game::GameState, _hero_state: i32, _view: &crate::particles::BSphereView, cam: crate::hero::physics::V3, id: usize, first: bool, out: &mut Vec<crate::fx::FxQuad>, _frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
+    match w.mobys[id].o_class {
+        prey::CLASS if !first => prey::draw(w, host, id, cam, out),
+        _ => return false,
+    }
+    true
+}
 
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
@@ -25,6 +36,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         breakables::BIT_PANEL => Some(breakables::update_1186),
         breakables::BOLT_PANEL => Some(breakables::update_12a5),
         hatch::CLASS => Some(hatch::update_1151),
+        prey::CLASS => Some(prey::update_0ef4),
         stalker::CLASS => Some(stalker::update_0f0a),
         // `0x436980`: L09's `0x3f85e8`, the shadow alone.
         stalker::BODY => Some(super::level09::trooper::update_0d0e),

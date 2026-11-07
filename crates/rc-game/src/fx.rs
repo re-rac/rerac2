@@ -456,7 +456,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::endako_c::SENTRY => crate::moby::classes::endako_c::draw_beam(w, id, game.frame, cam, out),
         // The levels' own (their modules' draws).
         _ => {
-            use crate::moby::classes::{level04, level06, level08, level09, level11, level12, level13, level14, level16, level17, level19, level20, level26};
+            use crate::moby::classes::{level04, level06, level08, level09, level11, level12, level13, level14, level16, level17, level18, level19, level20, level26};
             let _ = level04::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
                 || level06::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
                 || level08::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
@@ -470,7 +470,8 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
                 || level16::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
                 || level26::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
                 || level20::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
-                || crate::moby::classes::level10::draw(w, host, game, hero_state, view, cam, id, first, out, frame);
+                || crate::moby::classes::level10::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
+                || level18::draw(w, host, game, hero_state, view, cam, id, first, out, frame);
         }
     }
 }

@@ -268,7 +268,7 @@ pub fn at_most(v: V3, max: f32) -> V3 { if max != 0.0 && max < len(v) { set_len(
 fn playing(mode: i32) -> bool { mode == crate::scene::PLAY }
 
 /// `0x320440`: an angle wrapped to [−π, π).
-fn wrap(a: f32) -> f32 { use std::f32::consts::PI; ((a + PI) * 0.159_154_94).rem_euclid(1.0) * std::f32::consts::TAU - PI }
+pub(crate) fn wrap(a: f32) -> f32 { use std::f32::consts::PI; ((a + PI) * 0.159_154_94).rem_euclid(1.0) * std::f32::consts::TAU - PI }
 
 fn phases(s: &mut Slot) {
     s.phase[0] = add_rot(s.phase[0], 0.174_532_95);

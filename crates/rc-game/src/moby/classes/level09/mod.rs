@@ -9,6 +9,7 @@ pub mod director;
 pub mod flyer;
 pub mod gunship;
 pub mod hover_pad;
+pub mod patrol;
 pub mod props;
 pub mod scroll;
 pub mod talker;
@@ -19,11 +20,14 @@ pub mod waker;
 /// This level's draw callbacks (crate::fx): true when the moby's class is one of them. The bolt's is also L16's,
 /// L18's, L19's and L20's.
 #[allow(clippy::too_many_arguments)]
-pub fn draw(w: &mut crate::moby::MobyWorld, _host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, _hero_state: i32, view: &crate::particles::BSphereView, cam: crate::hero::physics::V3, id: usize, first: bool, out: &mut Vec<crate::fx::FxQuad>, _frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
+pub fn draw(w: &mut crate::moby::MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, _hero_state: i32, view: &crate::particles::BSphereView, cam: crate::hero::physics::V3, id: usize, first: bool, out: &mut Vec<crate::fx::FxQuad>, _frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
     match w.mobys[id].o_class {
         towers::MANAGER if !first => crate::fx::beams::draw_dobbo(w, id, game, view, cam, out),
         bolt::CLASS if first => bolt::draw(w, id, &mut game.rng, cam, out),
         critter::CLASS => critter::draw(w, id, cam, out),
+        // The drawer's group draw (`0x3ff960`) and a robot's spot (`0x3fec60`), both on the second list.
+        patrol::CLASS if !first && w.mobys[id].state == 5 => patrol::draw_group(w, host, id, view, cam, out),
+        patrol::CLASS if !first => patrol::draw_spot(w, id, cam, out),
         _ => return false,
     }
     true
@@ -34,6 +38,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
         talker::CLASS => Some(talker::update_0e5e),
         critter::CLASS => Some(critter::update_0d90),
+        patrol::CLASS => Some(patrol::update_0d30),
         // Also level 12's (L12 `0x408a28`, the same code and data).
         hover_pad::CLASS => Some(hover_pad::update_0e84),
         // Also level 16's (L16 `0x3eb260`, the same code).

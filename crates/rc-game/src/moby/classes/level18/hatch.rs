@@ -14,11 +14,13 @@
 //!
 //! It counts its ticks in the state (`+0x96`) itself, to 0xffff.
 //!
-//! Not ported: its opener `0x3fc970` (the decomp's `func_L18_003FB500`, L19 `0x3e0eb8`, L20 `0x400af8`: → 2 with
-//! `+0x28` its dust flag; with dust, an explosion `0x2abbb8` and class 0x1152's sound 1). Its callers, 0x0f0a's
-//! state 7 and the shared L18 code at `0x2c4000`, are not ported either. The dust (`0x3fca90`: 1..2 puffs
-//! `0x35a848` = L02 `0x345d88`, the particle burst the port lacks, on the template `$gp+0x1570`, jittered 0.5, 8..12
-//! a second back along its first row).
+//! Its opener ([`open`], `0x3fc970`, the decomp's `func_L18_003FB500`, L19 `0x3e0eb8`, L20 `0x400af8`) and the place
+//! inside it ([`entry`], `0x3fca58`, L19 `0x3e0fa0`, L20 `0x400be0`) serve the prey 0x0ef4's state 7
+//! (crate::moby::classes::level18::prey).
+//!
+//! Not ported: the opener's other caller, the director's streamed spawns (`0x3fbd90`, the only one with dust). The
+//! dust (`0x3fca90`: 1..2 puffs `0x35a848` = L02 `0x345d88`, the particle burst the port lacks, on the template
+//! `$gp+0x1570`, jittered 0.5, 8..12 a second back along its first row).
 
 use crate::hero::physics::{add, scale, sub};
 use crate::moby::{Ctx, MobyWorld};
@@ -44,6 +46,32 @@ fn move_other(w: &mut MobyWorld, id: usize, d: Option<[f32; 3]>, at: [f32; 3]) {
         Some(d) => add(o.pos, d),
         None => at,
     };
+}
+
+/// `0x3fca58(hatch, out)`: the place inside it — its place at the set-up, 1 lower.
+pub fn entry(w: &MobyWorld, id: usize) -> [f32; 3] {
+    let p = w.mobys[id].pv_v(HOME);
+    [p[0], p[1], p[2] - 1.0]
+}
+
+/// `0x3fc970(hatch, dust)`: opened — unless open already (state 2: true), state 2 with `+0x28` the dust; with dust an
+/// explosion at it (crate::moby::blast::explode: 5 embers, 3 billows, 8 flares, flashes 5 / 4.9, near 32, size 2,
+/// shaking, one piece of debris, flags 0x810001) and class 0x1152's sound 1 (`0x37c980` = L00 `0x360698`).
+pub fn open(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, dust: bool) -> bool {
+    if w.mobys[id].state == 2 { return true; }
+    let m = &mut w.mobys[id];
+    m.set_state(2, -1);
+    m.set_pv_i(0x28, dust as i32);
+    if dust {
+        let e = crate::moby::blast::Explosion {
+            embers: 5, billows: 3, flares: 8, flash: 5.0, flash2: 4.9, near: 32.0, size: 2.0, sound: -1, shake: true, debris: 1, lod: -1, flags: 0x81_0001,
+            ..Default::default()
+        };
+        crate::moby::blast::explode(w, ctx, Some(id), None, &e);
+        ctx.host.play_sound_of(&w.mobys[id], SOUNDS, 1, 0);
+    }
+    w.changed = true;
+    false
 }
 
 /// 0x1151 (module docs).

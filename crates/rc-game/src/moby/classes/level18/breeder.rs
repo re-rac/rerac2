@@ -367,7 +367,7 @@ fn touch(w: &mut MobyWorld, id: usize, ctx: &Ctx, r: f32, damage: f32, flags: u3
 }
 
 /// `0x35e438(p, path, 0)`: the path's point nearest `p` (−1 no path).
-fn nearest_point(ctx: &Ctx, p: V3, path: i32) -> i16 {
+pub(super) fn nearest_point(ctx: &Ctx, p: V3, path: i32) -> i16 {
     let Some(pts) = usize::try_from(path).ok().and_then(|i| ctx.level.paths.get(i)).filter(|v| !v.is_empty()) else { return -1 };
     let mut best = 1e11;
     let mut at = 0;

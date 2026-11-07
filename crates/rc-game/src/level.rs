@@ -65,6 +65,22 @@ impl LevelData {
         region as i32 == variant
     }
 
+    /// The chunk gate some of the chunked levels' objects start their updates with, on the level load's chunk root
+    /// (L09 `0x1c9f00`, L08 `0x1ca080`; the decomp's `D_L09_001C9F80`): its plane count `+0xc` and planes 0's and 1's
+    /// heights `+0x28` / `+0x38` (the settings' variant planes' points), the chunk now word 0 (`variant`). True when
+    /// `z` lies on another chunk's side: under plane 0 in chunk 1, over it in chunk 0; with two planes, over plane 1 in
+    /// chunk 1 or under it in chunk 2. Never on a level without planes.
+    pub fn off_chunk(&self, variant: i32, z: f32) -> bool {
+        let n = self.variant_planes.len();
+        let Some(low) = self.variant_planes.first().map(|p| p.0[2]) else { return false };
+        if (z < low && variant == 1) || (low < z && variant == 0) { return true; }
+        if n == 2 {
+            let high = self.variant_planes[1].0[2];
+            if (high < z && variant == 1) || (z < high && variant == 2) { return true; }
+        }
+        false
+    }
+
     /// `0x321858(p, i)`: `p` inside the cuboid `i` (−1, or out of range: never).
     pub fn in_cuboid(&self, i: i32, p: V3) -> bool {
         let Some(c) = usize::try_from(i).ok().and_then(|i| self.cuboids.get(i)) else { return false };
