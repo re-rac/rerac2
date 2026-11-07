@@ -10,6 +10,18 @@
 //! * **0x07ef** ([`update_07ef`], `0x3f5e50`, 1 placed): deletes itself.
 //! * **0x0c4b** ([`update_0c4b`], `0x42cdf0`, 1 placed): opens and closes when its group pokes it.
 //! * **0x0e8e** ([`update_0e8e`], `0x44c848`, 1 placed): sets two flag bytes when Ratchet comes in.
+//! * **0x0feb** ([`update_0feb`], `0x45da00`, 3 placed; the decomp's `func_L06_0045C3E8`): a vent that sprays on and
+//!   off. Its pvars: `+0x00` / `+0x04` the off and on timers, `+0x08` its hiss. Its alpha 0x80 each tick.
+//!   * **A hit** (flags 0x4010000, `0x35df18`) from anything but a 0x0fe5: its group's timers 0 when it was on
+//!     (`0x35cb88` = L00 `0x31c970`, crate::moby::MobyWorld::poke_group), its sound 1, a blast 1 above it
+//!     (`0x43b580`: 1.25; 0x19 / 0x14 / 0x14, 0x14 puffs, 0x2d streaks), its pieces (`0x367668`: 3..6 across and up,
+//!     mask 0x7f), the level's bolts once (`0x367558`), deleted.
+//!   * **0**: alpha 0x80; off for 40..250 ticks; no hiss; 2.
+//!   * **1** (on): Ratchet within 32, its spray ([`spray`]). Its on timer out: off for 200..250, its hiss stopped, 2,
+//!     its group's timers 0.
+//!   * **2** (off): its off timer out with its timer byte 0: on for 200..250, its hiss (class sound 0, flags 4) unless
+//!     it plays, 1, its group's timers 1.
+//!   * Its hit let go (`+0xa8` −1) each tick.
 
 use crate::hero::physics::add_rot;
 use crate::moby::{Ctx, MobyWorld};
@@ -332,4 +344,107 @@ pub fn update_0e8e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         if let Some(b) = ctx.game.flags.get_mut(k) { *b = 1; }
     }
     w.mobys[id].set_state(1, -1);
+}
+
+/// 0x0feb's spray (`0x45dce8`): from 3.3 ± 0.05 up and ±0.1 across its place, 1.5 along its yaw, two sprays
+/// (crate::particles::spray, size 0.5, floor 50.4, 40 ticks; along its yaw at 1.9..2.1 a second, up 1.4..1.6); one in
+/// three not (`randi(3)` ≠ 1) another of 180 ticks; one not another of 0.75 at 1.5..2.5 along and 1.2/60..0.03 up;
+/// one in three (`randi(3)` = 1) another of 0.75 at 1.5..2.5 along and 1.2..1.8 up (`$gp+0x2a80..+0x2aa8`).
+fn spray(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
+    let Some(sys) = ctx.parts.as_deref_mut() else { return };
+    let rng = &mut ctx.game.rng;
+    let m = &w.mobys[id];
+    let dt = 0.016_666_668f32;
+    let mut pos = m.pos;
+    pos[2] += rng.randf(-0.05, 0.05) + 3.3;
+    pos[0] += rng.randf(-0.1, 0.1);
+    pos[1] += rng.randf(-0.1, 0.1);
+    let (c, s) = (m.rot[2].cos(), m.rot[2].sin());
+    pos[0] += c * 1.5;
+    pos[1] += s * 1.5;
+    let floor = f32::from_bits(0x4249_999a);
+    let vel = |rng: &mut crate::rng::Rng, along: (f32, f32), up: (f32, f32)| {
+        let x = c * rng.randf(along.0 * dt, along.1 * dt);
+        let y = s * rng.randf(along.0 * dt, along.1 * dt);
+        [x, y, rng.randf(up.0, up.1)]
+    };
+    let v = vel(rng, (1.9, 2.1), (1.4 * dt, 1.6 * dt));
+    crate::particles::spray::spawn(sys, rng, 0.5, floor, pos, v, 40);
+    crate::particles::spray::spawn(sys, rng, 0.5, floor, pos, v, 40);
+    if rng.randi(3) != 1 {
+        let v = vel(rng, (1.9, 2.1), (1.4 * dt, 1.6 * dt));
+        crate::particles::spray::spawn(sys, rng, 0.5, floor, pos, v, 180);
+    }
+    if rng.randi(3) != 1 {
+        let v = vel(rng, (1.5, 2.5), (1.2 * dt, f32::from_bits(0x3cf5_c290)));
+        crate::particles::spray::spawn(sys, rng, 0.75, floor, pos, v, 180);
+    }
+    if rng.randi(3) == 1 {
+        let v = vel(rng, (1.5, 2.5), (1.2 * dt, 1.8 * dt));
+        crate::particles::spray::spawn(sys, rng, 0.75, floor, pos, v, 180);
+    }
+}
+
+/// 0x0feb (module docs).
+pub fn update_0feb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    use crate::moby::countdown;
+    if w.mobys[id].pvars.len() < 0xc { w.mobys[id].pvars.resize(0xc, 0); }
+    w.mobys[id].alpha = 0x80;
+    let hit = w.hit_message(id).filter(|h| h.tmpl.flags & 0x0401_0000 != 0);
+    if let Some(h) = hit {
+        if h.tmpl.source.and_then(|s| w.mobys.get(s)).map_or(true, |s| s.o_class != 0x0fe5) {
+            if w.mobys[id].state == 1 { w.poke_group(w.mobys[id].group as i32, 0); }
+            ctx.host.play_sound(&w.mobys[id], 1, 0);
+            let p = w.mobys[id].pos;
+            let b = crate::moby::blast::Blast { size: 1.25, bursts: [0x19, 0x14, 0x14], puffs: 0x14, streaks: 0x2d, light: true, shake: true };
+            crate::moby::blast::burst(w, ctx, [p[0], p[1], p[2] + 1.0], &b);
+            crate::moby::shards::break_into(w, id, ctx, (3.0, 6.0), (3.0, 6.0), 0x7f, [0.0; 3], 0xff);
+            crate::moby::bolts::level_drop(w, id, 0.0, 1, ctx);
+            w.delete(id);
+            return;
+        }
+    }
+    match w.mobys[id].state {
+        0 => {
+            let t = ctx.game.rng.rand_range(40, 250);
+            let m = &mut w.mobys[id];
+            m.set_pv_i(0, t);
+            m.state = 2;
+            m.set_pv_i(8, -1);
+        }
+        1 => {
+            if crate::hero::physics::dist(w.mobys[id].pos, ctx.hero.pos) < 32.0 { spray(w, id, ctx); }
+            let mut t = w.mobys[id].pv_i(4);
+            let out = countdown(&mut t);
+            w.mobys[id].set_pv_i(4, t);
+            if out {
+                let t = ctx.game.rng.rand_range(200, 250);
+                let h = w.mobys[id].pv_i(8);
+                if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
+                let m = &mut w.mobys[id];
+                m.set_pv_i(0, t);
+                m.set_pv_i(8, -1);
+                m.state = 2;
+                w.poke_group(w.mobys[id].group as i32, 0);
+            }
+        }
+        2 => {
+            let mut t = w.mobys[id].pv_i(0);
+            let out = countdown(&mut t);
+            w.mobys[id].set_pv_i(0, t);
+            if out && w.mobys[id].timer == 0 {
+                let t = ctx.game.rng.rand_range(200, 250);
+                w.mobys[id].set_pv_i(4, t);
+                let h = w.mobys[id].pv_i(8);
+                if !(h != -1 && ctx.host.sound_playing(h)) {
+                    let h = ctx.host.play_sound(&w.mobys[id], 0, 4);
+                    w.mobys[id].set_pv_i(8, h);
+                }
+                w.mobys[id].state = 1;
+                w.poke_group(w.mobys[id].group as i32, 1);
+            }
+        }
+        _ => {}
+    }
+    w.mobys[id].hit_slot = -1;
 }
