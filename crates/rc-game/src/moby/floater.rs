@@ -1,6 +1,6 @@
 //! The floating platforms' rocking (L00 `0x32bd98` set-up, `0x32c0b0` step; L01 `0x3213a8` / `0x3216c0`): a block
 //! in the moby's pvars that tilts it under Ratchet's weight, sinks it a little and wobbles it, the moby's rows built
-//! here (mode 0x100). Oozla's lily pads (0x0a56) use it.
+//! here (mode 0x100). Oozla's lily pads (0x0a56) use it, and Ratchet's parked ship (crate::travel, its own tunables).
 //!
 //! **The block** (offsets from its start; x and y are the tilts, z the sink): `+0x00` the home place, `+0x10` the
 //! pivot (a local point kept at home), `+0x20` the home angles, `+0x30` the offsets, `+0x3c` their velocities, `+0x48`
@@ -69,9 +69,13 @@ pub fn init(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, b: usize, p: &Params) {
 }
 
 /// `0x32c0b0(m, block, 0)`: one step under Ratchet.
-pub fn step(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, b: usize) {
-    let on = ctx.hero.ground_moby == Some(id) && 2 <= ctx.hero.grounded_ticks;
-    let hero = ctx.hero.pos;
+pub fn step(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, b: usize) { step_at(w, id, ctx, b, None) }
+
+/// `0x32c0b0(m, block, weight)`: one step, the weight at `weight` when given (the parked ship passes Ratchet's place
+/// while he stands on one of its parts, crate::travel), else Ratchet's while he has stood on the moby 2 ticks.
+pub fn step_at(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, b: usize, weight: Option<V3>) {
+    let on = weight.is_some() || (ctx.hero.ground_moby == Some(id) && 2 <= ctx.hero.grounded_ticks);
+    let hero = weight.unwrap_or(ctx.hero.pos);
     let m = &mut w.mobys[id];
     let old = m.pos;
     let mut f = [0.0f32; 3];

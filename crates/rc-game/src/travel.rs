@@ -126,6 +126,21 @@ const GROUND_LIFT: f32 = 0.4;
 /// `0x361050`'s ease of the ship's z (`0x31ed78(target, 1/1800, 1/1800, 1/60)`).
 const Z_ACCEL: f32 = 1.0 / 1800.0;
 const Z_MAX: f32 = 1.0 / 60.0;
+/// The parked ship's rocking (`0x361050` → `0x32bd98` / `0x32c0b0`, crate::moby::floater; the game's block is
+/// `0x220da0`, kept here in its pvars at `+0x40`): its tunables at `$gp−0x2d18..` (gain, clamp, kick, wobble, wobble
+/// speed in degrees a second, response, damping).
+const ROCK: usize = 0x40;
+const ROCK_SET: usize = 0x10;
+const ROCK_BASE: usize = 0x14;
+const SHIP_ROCK: crate::moby::floater::Params = crate::moby::floater::Params {
+    gain: [0.005; 3],
+    damping: [0.025; 3],
+    clamp: [0.5, 0.5, 1.0],
+    response: [0.05, 0.03, 0.1],
+    kick: [0.01; 3],
+    speed: [57.0, 74.0, 85.0],
+    amplitude: [0.03, 0.03, 0.17],
+};
 /// `0x1a8f80`: the engine part that glows, by the hull's bit (`0x1a7af8 >> 3 & 2`: shorts 0x10d7 / 0x10d9).
 const GLOW_PARTS: [i16; 2] = [0x10d7, 0x10d9];
 /// `0x1ac570` / `0x1ac580`: Ratchet's and Clank's seats in the fly-away.
@@ -409,17 +424,51 @@ fn ship_ground(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         if ctx.game.ship_parts.is_empty() { crate::moby::classes::props::ship_parts(w, id, ctx); }
         return;
     }
-    let pos = w.mobys[id].pos;
-    let target = ground(ctx, pos).map_or(pos[2], |g| g + GROUND_LIFT);
-    let (mut z, mut vel) = (pos[2], ctx.game.travel.z_vel);
+    if w.mobys[id].pvars.len() < ROCK + 0xb0 { w.mobys[id].pvars.resize(ROCK + 0xb0, 0); }
+    // The set-up (with the parts' making): its height on the ground (0.4 over it; none under it: where it is), kept
+    // as the rocking's base (`$gp−0x2ca8`), and the rocking block (`0x32bd98`).
+    if w.mobys[id].pv_b(ROCK_SET) == 0 {
+        let pos = w.mobys[id].pos;
+        let base = ground(ctx, pos).map_or(pos[2], |g| g + GROUND_LIFT);
+        w.mobys[id].pos[2] = base;
+        w.mobys[id].set_pv_f(ROCK_BASE, base);
+        crate::moby::floater::init(w, id, ctx, ROCK, &SHIP_ROCK);
+        w.mobys[id].pvars[ROCK_SET] = 1;
+    }
+    // Ratchet within 6 with something within 2 over his centre (`0x189f00`; once so, the line's top 0.4 toward the
+    // ship tested too): the base 0.75 higher (`+0xbc`); the block's home height eased to it.
+    let (pos, centre) = (w.mobys[id].pos, add(ctx.hero.pos, [0.0, 0.0, 1.0]));
+    let mut blocked = false;
+    if dist3(pos, ctx.hero.pos) < 6.0 {
+        let top = add(centre, [0.0, 0.0, 2.0]);
+        if w.mobys[id].timer != 0 {
+            blocked = w.coll_line(ctx, centre, top, 0, ctx.hero_moby).is_some();
+            if !blocked {
+                let d = sub(pos, ctx.hero.pos);
+                let d = scale([d[0], d[1], 0.0], 0.4 / dist2(pos, ctx.hero.pos).max(1e-6));
+                blocked = w.coll_line(ctx, centre, add(top, d), 0, ctx.hero_moby).is_some();
+            }
+        } else {
+            blocked = w.coll_line(ctx, centre, top, 0, ctx.hero_moby).is_some();
+        }
+    }
+    w.mobys[id].timer = blocked as u8;
+    let target = w.mobys[id].pv_f(ROCK_BASE) + if blocked { 0.75 } else { 0.0 };
+    let (mut z, mut vel) = (w.mobys[id].pv_f(ROCK + 8), ctx.game.travel.z_vel);
     approach(target, Z_ACCEL, Z_MAX, &mut z, &mut vel);
     ctx.game.travel.z_vel = vel;
-    w.mobys[id].pos[2] = z;
+    w.mobys[id].set_pv_f(ROCK + 8, z);
     // The arrival's own ship (0x1330) places the parts on itself while it flies by; the parked ship (at Aranos's
     // placeholder (20, 20, 20)) leaves them to it then [port].
     let flyby = w.mobys.iter().any(|m| m.o_class == 0x1330 && m.state < 0x80 && (1..=3).contains(&m.state));
     if !flyby { crate::moby::classes::props::ride_ship_parts(w, id, ctx); }
+    // Ratchet's weight: on one of its parts 2 ticks or more, his place (`0x32c0b0(ship, block, 0x189ea0)`).
+    let on_part = 1 < ctx.hero.grounded_ticks && ctx.hero.ground_moby.is_some_and(|g| ctx.game.ship_parts.contains(&g));
+    let weight = on_part.then_some(ctx.hero.pos);
+    crate::moby::floater::step_at(w, id, ctx, ROCK, weight);
 }
+
+fn dist3(a: V3, b: V3) -> f32 { ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt() }
 
 /// `0x361628`: the parked ship's update (module docs).
 pub fn ship_update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
@@ -451,14 +500,14 @@ pub fn ship_update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let other = ctx.hero.ground_moby.is_some_and(|r| w.mobys.get(r).is_some_and(|m| m.o_class != SHIP));
     let d3 = ((pos[0] - hero[0]).powi(2) + (pos[1] - hero[1]).powi(2) + (pos[2] - hero[2]).powi(2)).sqrt();
     let d2 = dist2(pos, hero);
-    let mut near = w.mobys[id].pv_i(0xc) as i16 != 0;
+    let mut near = w.mobys[id].pv_s(0xc) != 0;
     if !near {
         if (d3 < 8.0 || riding) && !other && (d2 < 6.0 || riding) { near = true; }
     } else if 6.1 < d2 && !riding {
         near = false;
     }
     if w.mobys[id].mode & 1 != 0 { near = false; }
-    w.mobys[id].set_pv_i(0xc, near as i32);
+    w.mobys[id].set_pv_s(0xc, near as i16);
     if !near { return; }
     // `0x327a28(2, 0x12ea, 1)`: the prompt's lease; △ (`0x138324 & 0x10`) with it: the hatch spot, the lease
     // released (`0x327b60(2)`), the take-off asked for.

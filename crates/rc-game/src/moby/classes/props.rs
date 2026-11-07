@@ -939,8 +939,15 @@ pub fn ride_ship_parts(w: &mut MobyWorld, ship: usize, ctx: &mut Ctx) {
         let pm = &mut w.mobys[p];
         pm.mode = if hidden { pm.mode | 0x41 } else { pm.mode & 0xffbe };
         pm.has_collision = coll;
+        let (old, old_yaw) = (pm.pos, pm.rot[2]);
         put_part(w, p, pos, rows);
+        // Its angles from its rows (`0x320000`) and, in play, Ratchet carried by its move (its platform block
+        // `+0x20`, `0x322668`): the ship rocks under him (crate::travel).
+        let pm = &mut w.mobys[p];
+        pm.rot = crate::moby::attach::angles_of(&pm.rows);
+        let (new, yaw) = (pm.pos, pm.rot[2]);
         w.rebuild(p, &*ctx.host);
+        if play && !hidden { crate::moby::carry_hero(ctx, p, old, old_yaw, new, yaw); }
     }
 }
 

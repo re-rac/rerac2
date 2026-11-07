@@ -1034,8 +1034,9 @@ pub(crate) fn react_start(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, dir: [f32
 
 /// `0x327e38(m, react, flag)`: the frame's damage — the hit (flags 0x10000, while the health block's wait is over)
 /// scaled for its own class's and for the flag, its damage taken off the health; the kind: 4 dead, 3 a big hit
-/// (at least `+0x5c` of the most), 2 a hurt (at least `+0x58`, or a wrench hit), 1 a graze, 6 the flag's; a hurt
-/// not long after the last (90 / 300 ticks) does at least the hurt's share. Unless dying or spinning (or already
+/// (at least `+0x5c` of the most), 2 a hurt (at least `+0x58`, or a wrench hit), 1 a graze, 6 the flag's; a hit
+/// past the window since the last reaction (90 ticks for a weapon whose damage a second reaches the hurt's share, else
+/// 300) does at least the hurt's share. Unless dying or spinning (or already
 /// hurting with `+0x75` / mid-flight), the reaction starts (the hit's direction, else straight back) and the moby
 /// goes into its hurt state. Returns the kind.
 pub fn take_damage(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, flag: bool) -> i32 {
@@ -1081,8 +1082,13 @@ fn damage_tick(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, flag: bool) -> i32 {
     if dmg == 0.0 { return 0; }
     m.set_pv_s(r + 0x70, hit.and_then(|h| h.tmpl.source).map_or(-1, |s| s as i16));
     let most = m.pv_s(h + 4) as f32;
-    // The wrench's stagger factor (`0x262544` of its row) is 0: the window is 300 ticks.
-    let window = if most * m.pv_f(r + 0x58) <= 0.0 { 0x5a } else { 300 };
+    // The window: 90 ticks when the hit's damage times its weapon's shots a second (the record's `+0x44`,
+    // `0x262544 + 0xe0·0x139568[+0x17]`; the hitter's item, `+0x17`) reaches the hurt's share, else 300 — a stream
+    // of small hits staggers the moby again every 90 ticks; the wrench (rate 0) every 300.
+    let item = m.pv_b(h + 0x17);
+    let rate = if item == 0xff { 0.0 } else { crate::hero::items::row(ctx.game, item as i32).map_or(0.0, |row| row.rate) };
+    let m = &mut w.mobys[id];
+    let window = if most * m.pv_f(r + 0x58) <= dmg * rate { 0x5a } else { 300 };
     if m.pv_b(r + 0x77) == 0 && window < (ctx.game.frame - m.pv_i(r + 0x44)).abs() {
         dmg = dmg.max(most * m.pv_f(r + 0x58));
     }
