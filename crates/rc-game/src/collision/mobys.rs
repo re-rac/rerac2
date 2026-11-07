@@ -84,6 +84,8 @@ pub struct CollMoby {
     pub(crate) o_class: i16,
     /// +0x94 ≠ 0: the class has a collision blob.
     pub(crate) collision: bool,
+    /// Ratchet may hang from its ledges (crate::moby::Moby::grabbable).
+    pub(crate) grab: bool,
 }
 
 /// Where the moby pass reads mobys from (the live table in the moby loop, a snapshot for the hero).

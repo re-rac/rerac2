@@ -520,7 +520,16 @@ impl Moby {
             key: self.key(),
             o_class: self.o_class,
             collision: self.has_collision,
+            grab: self.grabbable(),
         }
+    }
+
+    /// `0x2ad000`'s test of a ledge on a moby (mode 0x20 for both blocks): its health block's flags `+0x1e` bit 0
+    /// (`0x31fa20`), else its platform block's `+0x3c` bit 0 (`0x322028`).
+    pub fn grabbable(&self) -> bool {
+        if self.mode & 0x20 == 0 { return false; }
+        if ai::health_of(self).is_some_and(|h| self.pv_s(h + 0x1e) & 1 != 0) { return true; }
+        self.pv_i(8) != 0 && self.pv_i(ai::block(self, 8) + 0x3c) & 1 != 0
     }
 }
 
