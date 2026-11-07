@@ -257,7 +257,7 @@ impl Hero {
             if self.state == 0x2a && self.timer < 0x14 {
                 let at = add(self.pos, [0.0, 0.0, 0.6]);
                 let (s, c) = self.grind.yaw.sin_cos();
-                self.hits_out.push(super::HeroHit { centre: at, r: 1.0, damage: 1.0, flags: 0x10000, dir: [c, s, 0.0], joints: None });
+                self.hits_out.push(super::HeroHit { centre: at, r: 1.0, damage: 1.0, flags: 0x10000, dir: [c, s, 0.0], joints: None, ..Default::default() });
             }
             let _ = anim;
             return;

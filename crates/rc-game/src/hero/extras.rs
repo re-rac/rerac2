@@ -123,7 +123,7 @@ impl Hero {
                 spring(self.ground_z + 0.17, 0.04, 0.3, 0.125, &mut z, &mut v);
                 (self.pos[2], self.gear.hover_v) = (z, v);
                 let at = add(add(self.pos, [0.0, 0.0, 1.0]), scale(self.disp, 3.0));
-                self.hits_out.push(super::HeroHit { centre: at, r: 0.57, damage: 1.0, flags: 0x10000, dir: scale(self.disp, 7.0), joints: None });
+                self.hits_out.push(super::HeroHit { centre: at, r: 0.57, damage: 1.0, flags: 0x10000, dir: scale(self.disp, 7.0), joints: None, ..Default::default() });
             }
             0x82 => {
                 let g = &mut self.gear;

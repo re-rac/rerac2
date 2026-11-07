@@ -556,14 +556,15 @@ fn unit_columns(r: [V3; 3]) -> [V3; 3] {
 fn hand_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
     // The body's hits of this tick (the Thruster-Pack's ram).
     for h in std::mem::take(&mut ctx.hero.hits_out) {
-        let t = crate::moby::hits::HitTemplate::new(h.damage, ctx.hero_moby, h.flags, [h.dir[0], h.dir[1], h.dir[2], 0.0]);
+        let mut t = crate::moby::hits::HitTemplate::new(h.damage, ctx.hero_moby, h.flags, [h.dir[0], h.dir[1], h.dir[2], h.limit]);
+        t.kind = h.kind;
         let mut c = h.centre;
         if let (Some([a, b]), Some(hm)) = (h.joints, ctx.hero_moby) {
             if let (Some(pa), Some(pb)) = (ctx.host.joint(&world.mobys[hm], a), ctx.host.joint(&world.mobys[hm], b)) {
                 c = [(pa[0] + pb[0]) * 0.5, (pa[1] + pb[1]) * 0.5, (pa[2] + pb[2]) * 0.5];
             }
         }
-        world.sphere_hit(ctx.scene, c, h.r, 0, ctx.hero_moby, Some(&t));
+        world.sphere_hit(ctx.scene, c, h.r, h.query, ctx.hero_moby, Some(&t));
     }
     // `0x2b21f0`'s head: in water (`0x2adff8`: the swim groups 0x11 / 0x12, the states 0x67 / 0x7f / 0x72 / 0x73),
     // the groups 0x15 / 0x16 / 0x1f keep the items away and the △ menu shut (`0x18c0dc`, `0x18c0d7`); the wrench

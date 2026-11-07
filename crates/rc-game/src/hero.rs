@@ -433,7 +433,7 @@ pub struct Hero {
 }
 
 /// A hit Ratchet's body deals (`0x2e14b0` + `0x31d4c8`): a sphere, the damage, the flags, the direction.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct HeroHit {
     pub centre: V3,
     pub r: f32,
@@ -442,6 +442,10 @@ pub struct HeroHit {
     pub dir: V3,
     /// Centred between two of Ratchet's joints instead (the item pass reads them).
     pub joints: Option<[usize; 2]>,
+    /// The sphere's query flags (`0x2e14b0`'s third argument) and the template's `t[6]` / `t[3]` the caller sets.
+    pub query: u32,
+    pub kind: u32,
+    pub limit: f32,
 }
 
 impl Default for Hero {

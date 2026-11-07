@@ -189,7 +189,7 @@ impl Hero {
                 // Walking into the class 0xcb: a 100 hit (flags 0x10000) from a sphere at the head, the radius + 0.2
                 // (the classes 0x1366 / 0x1367's own reactions `0x38a988` / `0x38c5e8` are theirs).
                 let head = add(self.pos, [0.0, 0.0, 1.0]);
-                self.hits_out.push(super::HeroHit { centre: head, r: self.cap_radius + 0.2, damage: 100.0, flags: 0x10000, dir: [0.0; 3], joints: None });
+                self.hits_out.push(super::HeroHit { centre: head, r: self.cap_radius + 0.2, damage: 100.0, flags: 0x10000, dir: [0.0; 3], joints: None, ..Default::default() });
             }
             0x63 => {
                 let d = sub(self.walk_to.pos, self.pos);
