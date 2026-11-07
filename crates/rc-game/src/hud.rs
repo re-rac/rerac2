@@ -224,6 +224,49 @@ pub enum ScreenCallback {
     Spiderbot,
 }
 
+/// A class's HUD callback in one of the GUI object's four draw slots (L08 / L19 only: `+0x3f9f8 + 8·slot`, the
+/// argument and the function; [`HudSlots`]).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SlotCallback {
+    /// L08 `0x3dc980` / L19 `0x3c5780`: the crystals' / moonstones' counter of the moby 0x09f3 `moby` (the draw reads
+    /// it through `$gp+0x1448`, which the counter sets to itself; crate::moby::classes::level08::counter::draw).
+    Counter { moby: usize },
+}
+
+/// The class HUD callbacks (L08 `0x31a090(arg, f, slot)`, L19 `0x30b458`): four slots the HUD's draw (L08 `0x31a7b8`,
+/// L00's `0x30e200`) runs after the screen callback ([`ScreenCallback`]), in their order; the results are or'd with
+/// the screen callback's, and non-zero takes the counters' place. Cleared with the level's state.
+///
+/// Their callers: Tabora's and Grelbin's counter 0x09f3 (slot 2, crate::moby::classes::level08::counter). Next: the
+/// hovership's `0x41edd0` (its health bar and the vacuum's texts, crate::moby::classes::level08::hovership).
+///
+/// Not ported: the argument (0 from every caller; the draws do not read it), the second set of two slots
+/// (`+0x3fa18`, no setter found on these levels), the counters' L08 / L19 extra when a callback takes their place
+/// (`0x2e28d8(2)` → `0x31a6e8`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct HudSlots(pub [Option<SlotCallback>; 4]);
+
+impl HudSlots {
+    /// `0x31a090(arg, f, slot)`: slot `slot` runs `f` (none: nothing); false past the fourth.
+    pub fn set(&mut self, f: Option<SlotCallback>, slot: usize) -> bool {
+        let Some(s) = self.0.get_mut(slot) else { return false };
+        *s = f;
+        true
+    }
+
+    /// The HUD draw's pass over the slots (struct docs): each callback's draws into `out`; true when one takes the
+    /// counters' place.
+    pub fn draw(&self, w: &mut crate::moby::MobyWorld, game: &crate::game::GameState, out: &mut Vec<Draw>) -> bool {
+        let mut taken = false;
+        for f in self.0.iter().flatten() {
+            taken |= match *f {
+                SlotCallback::Counter { moby } => crate::moby::classes::level08::counter::draw(w, moby, game, out),
+            };
+        }
+        taken
+    }
+}
+
 /// One draw of the HUD.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Draw {

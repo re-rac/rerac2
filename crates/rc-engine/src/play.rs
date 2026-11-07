@@ -1123,6 +1123,7 @@ fn tick(
     p.game.cam_tweaks.fov_step();
     // The mobys' asks of the follow camera last one tick (taken by its update; dropped while it does not run).
     (p.game.cam_tweaks.follow_dist, p.game.cam_tweaks.follow_pivot) = (None, None);
+    p.game.cam_tweaks.follow = Default::default();
     // The first-person camera's view lock (`0x18c0d5`: Ratchet hides and faces the view, rc_game::hero).
     if cam.view_lock && p.hero.view_lock == 0 { p.hero.view_lock = 1; }
     // The ship's camera (class 0x19, rc_game::ship): its update flies the ship and is the view.
@@ -2420,6 +2421,8 @@ fn draw_hud(
                 let menu = menu.chain((0..16).map(|f| (rc_game::ship::HUD_ICONS, f)));
                 // The boss bar's pictures (rc_game::hud::boss_bar, icon 0xeaa7 by boss).
                 let menu = menu.chain((0..8).map(|f| (0xeaa7, f)));
+                // The crystals' / moonstones' counter (rc_game::moby::classes::level08::counter, icon 0xeaa2).
+                let menu = menu.chain([(0xeaa2, 1), (0xeaa2, 2)]);
                 for (id, f) in menu {
                     if !h.has_icon(id) || icons.contains_key(&(id, f)) { continue; }
                     if let Ok(t) = h.decode_frame_raw(h.icon_frame(id, f as i32)) {
@@ -2612,7 +2615,15 @@ fn draw_hud(
             (Some(rc_game::hud::ScreenCallback::Spiderbot), Some(m)) => rc_game::moby::classes::spiderbot::draw_screen(&m.world, (&hud.data.assets().glyphs_2, 2), &mut screen_draws, &mut screen_text),
             _ => false,
         };
-        let mut draws = if p.ship.is_some() || screen { screen_draws } else { p.hud.draw(p.game.bolts) };
+        // Then the class HUD callbacks (L08 / L19 `0x31a090`'s slots, rc_game::hud::HudSlots), or'd with it.
+        let mut slot_draws = Vec::new();
+        let slots = match (&p.ship, p.mobys.as_mut()) {
+            (None, Some(m)) => p.game.hud_slots.draw(&mut m.world, &p.game, &mut slot_draws),
+            _ => false,
+        };
+        let mut draws = if p.ship.is_some() || screen { screen_draws } else { Vec::new() };
+        draws.append(&mut slot_draws);
+        if p.ship.is_none() && !screen && !slots { draws.extend(p.hud.draw(p.game.bolts)); }
         // The boss bar while a fight refreshes it (`0x2f2158`).
         if let (None, Some((f, _))) = (&p.ship, p.game.boss_bar) { rc_game::hud::boss_bar(f, p.game.boss_icon, &mut draws); }
         // The side meter while a weapon refreshes it (`0x2fc5c8`: the Sheepinator's drain).

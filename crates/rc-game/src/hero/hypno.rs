@@ -136,7 +136,7 @@ impl Hero {
 
     /// `0x2b2cd8`: the motion stopped — the push, the velocity, the displacement, the effective velocity and its
     /// vertical part, the momentum, the tumble's velocities, the yaw velocity, the forward speed and |eff|.
-    fn stop_motion(&mut self) {
+    pub fn stop_motion(&mut self) {
         (self.push, self.vel, self.disp, self.eff, self.eff_v, self.momentum) = ([0.0; 3], [0.0; 3], [0.0; 3], [0.0; 3], [0.0; 3], [0.0; 3]);
         self.rot_vel = [0.0; 2];
         self.yaw_vel = 0.0;

@@ -7,7 +7,9 @@ pub mod breakables;
 pub mod buyer;
 pub mod breather;
 pub mod burrower;
+pub mod counter;
 pub mod crystal;
+pub mod glider;
 pub mod hovership;
 pub mod lift;
 pub mod mission;
@@ -38,6 +40,9 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         hovership::HOVERSHIP => Some(hovership::update_0eef),
         hovership::RARITANIUM => Some(hovership::update_099a),
         seesaw::CLASS => Some(seesaw::update_090d),
+        // Also levels 9 and 19's (L09 `0x3bfb08`, L19 `0x3bded8`; the counter L19 `0x3c5b50`): the same code and data.
+        glider::CLASS => Some(glider::update_0905),
+        counter::CLASS => Some(counter::update_09f3),
         crystal::CRYSTAL => Some(crystal::update_096a),
         crystal::LEFT => Some(crystal::update_08c4),
         crystal::CARRIER => Some(crystal::update_0e78),

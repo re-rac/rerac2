@@ -264,13 +264,36 @@ pub struct CamTweaks {
     /// `0x422690(h, rate)`: [`FollowCamera::set_dist`] / [`FollowCamera::set_pivot_h`] as its update starts).
     pub follow_dist: Option<(f32, f32)>,
     pub follow_pivot: Option<(f32, f32)>,
+    /// A moby's other asks this tick of the follow camera's setters ([`FollowAsks`]; the glider 0x0905's,
+    /// crate::moby::classes::level08::glider).
+    pub follow: FollowAsks,
+    /// `$gp+0x3054` / `+0x3058` (L08; L00's in its code): the smoothed look's spring and damping (`0x423050`, 0.01 and
+    /// 0.2), which the glider changes while it flies. Kept across ticks.
+    pub look_spring: [f32; 2],
     /// `0x1b8fc0`: the camera's own shift this tick (a moby's: the sinking pit's lift, crate::moby::classes::level14::
     /// pit), added to the platform carry (`0x4278c8`) and cleared by the camera update (`0x2d9f38`).
     pub shift: V3,
 }
 
 impl Default for CamTweaks {
-    fn default() -> Self { CamTweaks { slots: [CamTweak::default(); 32], last: -1, fov: 1.124_3, turn: None, off: [0.0; 3], blend: FovBlend::default(), follow_dist: None, follow_pivot: None, shift: [0.0; 3] } }
+    fn default() -> Self { CamTweaks { slots: [CamTweak::default(); 32], last: -1, fov: 1.124_3, turn: None, off: [0.0; 3], blend: FovBlend::default(), follow_dist: None, follow_pivot: None, follow: FollowAsks::default(), look_spring: LOOK_SPRING, shift: [0.0; 3] } }
+}
+
+/// The smoothed look's spring and damping (`0x423050`'s `$gp` pair) as the level starts.
+pub const LOOK_SPRING: [f32; 2] = [0.01, 0.2];
+
+/// A moby's asks of the follow camera's setters for one tick, taken as its update starts (as the moby loop runs
+/// before the camera): the look height `0x425f98(h, rate, add)`, the scripted pitch `0x426030`, the horizontal and
+/// vertical springs `0x426080` / `0x4260c8`, the look from the smoothed target `0x426138` (D+0x136 = 1 while the follow
+/// camera is current) and the run-toward lock `0x426110`.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct FollowAsks {
+    pub look_h: Option<(f32, f32, bool)>,
+    pub pitch: Option<f32>,
+    pub h_spring: Option<(f32, f32)>,
+    pub v_spring: Option<(f32, f32)>,
+    pub look_from_s: bool,
+    pub lock_toward: bool,
 }
 
 /// `0x3f8fea69`: the play's field of view (the level start's `0x32c858` and the weapons put away blend back to it).
@@ -745,6 +768,13 @@ impl FollowCamera {
         }
         if let Some((d, rate)) = tweaks.follow_dist.take() { self.set_dist(d, rate, false); }
         if let Some((h, rate)) = tweaks.follow_pivot.take() { self.set_pivot_h(h, rate); }
+        let a = std::mem::take(&mut tweaks.follow);
+        if let Some((h, rate, add)) = a.look_h { self.set_look_h(h, rate, add); }
+        if let Some(p) = a.pitch { self.set_script_pitch(p); }
+        if let Some((k, d)) = a.h_spring { self.set_h_spring(k, d); }
+        if let Some((k, d)) = a.v_spring { self.set_v_spring(k, d); }
+        if a.look_from_s { self.look_from_s = 1; }
+        if a.lock_toward { self.lock_toward(); }
         self.step(inp, tweaks);
         tweaks.off = self.off;
         tweaks.shift = [0.0; 3];
@@ -758,7 +788,7 @@ impl FollowCamera {
         self.platform_carry(inp, tweaks.shift);
         let req = tweaks.apply(self, inp);
         self.state_tweaks(inp, req);
-        self.targets(inp);
+        self.targets(inp, tweaks.look_spring);
         self.leash();
         self.stick(inp);
         if self.avoidance(inp) { return; }
@@ -1215,8 +1245,8 @@ impl FollowCamera {
     /// `0x423150`: the target mode and the vertical target, the springs of the smoothed target (horizontal kh / dh,
     /// vertical kv / dv), the look point (blended from the target to the smoothed one over 90 ticks while
     /// `look_from_s`), the smoothed look (`0x423050`), the pivot, and the ceiling / floor lines 20 along up from 0.5
-    /// above the feet that keep the pivot inside.
-    fn targets(&mut self, inp: &CamInput) {
+    /// above the feet that keep the pivot inside. `spring`: the smoothed look's ([`CamTweaks::look_spring`]).
+    fn targets(&mut self, inp: &CamInput, spring: [f32; 2]) {
         let h = inp.hero;
         self.target_mode(inp);
         let v = self.vertical_target(inp);
@@ -1242,7 +1272,7 @@ impl FollowCamera {
         if dec_timer(&mut self.mode_t) != 0 { self.mode_prev = self.mode; }
         let tm = self.mode_t as f32 * self.mode_inv;
         let tgt = add(lo, if self.mode == 1 { h.pos } else { self.target });
-        let (k, dd) = if matches!(self.mode, 1 | 3 | 5 | 6 | 7) { (0.06 + (0.01 - 0.06) * tm, 0.4 + (0.2 - 0.4) * tm) } else { (0.01, 0.2) };
+        let (k, dd) = if matches!(self.mode, 1 | 3 | 5 | 6 | 7) { (0.06 + (spring[0] - 0.06) * tm, 0.4 + (spring[1] - 0.4) * tm) } else { (spring[0], spring[1]) };
         self.look_s = interp3(self.look_s, tgt, k, dd, &mut self.look_s_vel);
         // The pivot and the lines.
         let base = add(h.pos, scale(up_s, 0.5));
