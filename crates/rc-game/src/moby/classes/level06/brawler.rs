@@ -31,7 +31,7 @@
 
 use crate::hero::physics::{add, approach, atan2, dist, dist2, ease, rot_dist, scale, set_len, spring, sub, turn_ease, V3};
 use crate::moby::classes::props::{seq, wrapped};
-use crate::moby::{ai, countdown, Ctx, MobyWorld};
+use crate::moby::{ai, Ctx, MobyWorld};
 
 pub const CLASS: i16 = 0x0bba;
 pub const SWITCH_CLASS: i16 = 0x0fdc;
@@ -92,18 +92,6 @@ fn keys(w: &mut MobyWorld, id: usize, b: u8) {
 }
 fn steady(w: &MobyWorld, id: usize, ctx: &Ctx) -> bool { ctx.host.anim(&w.mobys[id]).is_some_and(|a| a.seq_a == a.seq_b) }
 fn seeing(w: &MobyWorld, id: usize, off: usize) -> bool { w.mobys[id].pv_i(off) == 1 }
-fn tick_s(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut t = w.mobys[id].pv_s(off) as i32;
-    let out = countdown(&mut t);
-    w.mobys[id].set_pv_s(off, t as i16);
-    out
-}
-fn tick_i(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut t = w.mobys[id].pv_i(off);
-    let out = countdown(&mut t);
-    w.mobys[id].set_pv_i(off, t);
-    out
-}
 fn yaw_to(w: &MobyWorld, id: usize, p: V3) -> f32 {
     let q = w.mobys[id].pos;
     atan2(p[0] - q[0], p[1] - q[1])
@@ -313,17 +301,17 @@ fn engage(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             st(w, id, 8, 2);
             0x12
         } else {
-            if !tick_i(w, id, WAIT) { return; }
+            if !w.mobys[id].count_i(WAIT) { return; }
             st(w, id, 7, 2);
             0x13
         }
     } else if w.mobys[id].pv_s(SITS) != 0 {
-        if !tick_i(w, id, WAIT) { return; }
+        if !w.mobys[id].count_i(WAIT) { return; }
         w.mobys[id].set_pv_s(SITS, 0);
         st(w, id, 7, 2);
         if ctx.game.rng.randi(2) == 0 { 0x11 } else { 0x13 }
     } else {
-        if !tick_i(w, id, WAIT) { return; }
+        if !w.mobys[id].count_i(WAIT) { return; }
         st(w, id, 9, 2);
         0x12
     };
@@ -446,7 +434,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let t = w.mobys[id].pv_v(T_POINT);
     match w.mobys[id].state {
         1 => {
-            let out = tick_s(w, id, T24C);
+            let out = w.mobys[id].count_s(T24C);
             let sits = w.mobys[id].pv_s(SITS) != 0;
             if out && !sits {
                 anim(w, id, ctx, 2, 0, 0x14);
@@ -460,7 +448,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         4 => {
             let (y, off, g) = (w.mobys[id].pv_f(W_YAW), w.mobys[id].pv_f(OFFSET), w.mobys[id].pv_v(W_GOAL));
-            if walk(w, id, ctx, y, 4.0, 0.25, off, g) || tick_s(w, id, T24C) {
+            if walk(w, id, ctx, y, 4.0, 0.25, off, g) || w.mobys[id].count_s(T24C) {
                 st(w, id, 5, -1);
                 anim(w, id, ctx, 7, 0, 10);
                 keys(w, id, 8);
@@ -637,7 +625,7 @@ fn throw(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, t: V3) {
 /// toward it (1/1200, 0.01, 0.18) and not below it.
 fn tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     ai::flash(&mut w.mobys[id], FLASH);
-    tick_s(w, id, T24A);
+    w.mobys[id].count_s(T24A);
     let m = &mut w.mobys[id];
     if m.state_ticks != -1 { m.state_ticks += 1; }
     let g = ai::ground_z(ctx, 0.5, w.mobys[id].pos, 0);

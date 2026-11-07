@@ -9,7 +9,7 @@
 //! each packet's u, wrapped at 0x1000, `+0x68`[0xc]); the port's models have no such scroll.
 
 use crate::hero::physics::{add, dot, euler_rows, scale, sub, V3};
-use crate::moby::{Ctx, MobyWorld};
+use crate::moby::{stop_loop, Ctx, MobyWorld};
 
 /// Its looped sound's handle (`+0x68`[0x10]).
 const SOUND: usize = 0x10;
@@ -17,12 +17,6 @@ const SOUND: usize = 0x10;
 fn uid_done(w: &MobyWorld, id: usize, ctx: &Ctx) -> bool {
     let uid = w.mobys[id].uid;
     ctx.game.uid_dead.get(uid.max(0) as usize).is_some_and(|&d| d != 0) || ctx.game.uid_count(uid) != 0
-}
-
-fn stop_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let h = w.mobys[id].pv_i(SOUND);
-    if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
-    w.mobys[id].set_pv_i(SOUND, -1);
 }
 
 /// 0x0f00 (`0x413cf0`, two placed): a force field, a plane `+0x68`[8] (s16) across and `[0xa]` (s16) high on its
@@ -36,7 +30,7 @@ pub fn update_0f00(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         if let Some(f) = ctx.game.flags.get_mut(0x22) { *f = 1; }
         let uid = w.mobys[id].uid;
         ctx.game.count_uid(uid);
-        stop_sound(w, id, ctx);
+        stop_loop(w, id, ctx, SOUND);
         return w.delete(id);
     }
     match w.mobys[id].state {
@@ -75,7 +69,7 @@ pub fn update_0f00(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if f < 0.0 { m.state = 3 } else { m.alpha = (f * 20.0) as i32 as u8 }
         }
         3 => {
-            stop_sound(w, id, ctx);
+            stop_loop(w, id, ctx, SOUND);
             w.delete(id);
         }
         _ => {}

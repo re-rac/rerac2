@@ -55,15 +55,6 @@ pub(super) fn seq_b(w: &MobyWorld, id: usize, ctx: &Ctx) -> u8 { super::props::s
 /// `0x311358(m, s, frame, blend)` unless `s` plays.
 pub(super) fn play(w: &MobyWorld, id: usize, ctx: &mut Ctx, s: u8, frame: u8, blend: i32) { set_seq(w, id, ctx, s, frame, blend.clamp(0, 255) as u8); }
 
-/// A countdown on a pvar word (`0x2e3de8`).
-pub(super) fn tick_down(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let m = &mut w.mobys[id];
-    let mut t = m.pv_i(off);
-    let r = countdown(&mut t);
-    m.set_pv_i(off, t);
-    r
-}
-
 /// The target moby (`+0x240`) and its place, when it has one.
 pub(super) fn target(w: &MobyWorld, id: usize) -> Option<(usize, V3)> {
     ai::link(&w.mobys[id], T_MOBY).and_then(|t| w.mobys.get(t).map(|m| (t, m.pos)))
@@ -225,7 +216,7 @@ fn go_to(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3, offset: f32) -> 
 /// The weave of its charge: 50° side to side with the level's frame (`0x3164e0` wraps the phase).
 fn weave(ctx: &Ctx) -> f32 {
     let ph = ctx.game.frame as f32 * 0.011_635_531;
-    let wrapped = ((ph + std::f32::consts::PI) * 0.159_154_94).fract() * std::f32::consts::TAU - std::f32::consts::PI;
+    let wrapped = crate::hero::physics::wrap(ph);
     wrapped.sin() * 0.872_664_7
 }
 
@@ -421,11 +412,11 @@ fn tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             w.mobys[id].set_pv_i(0x330, t);
         }
     }
-    if w.mobys[id].pv_i(T_FOUND) != 1 { tick_down(w, id, 0x330); }
+    if w.mobys[id].pv_i(T_FOUND) != 1 { w.mobys[id].count_i(0x330); }
     let m = &mut w.mobys[id];
     if (m.state_ticks as u16) < 0xfffe { m.state_ticks = m.state_ticks.wrapping_add(1); }
-    tick_down(w, id, 0x32c);
-    tick_down(w, id, 0x334);
+    w.mobys[id].count_i(0x32c);
+    w.mobys[id].count_i(0x334);
 }
 
 /// Into the bite (sub-state 4): stopped, sequence 10 from `$gp+0xd80`.
@@ -543,7 +534,7 @@ fn swim(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let mut v = m.pv_f(0x214);
             approach(goal, 0.001_111_111_2, &mut v);
             m.set_pv_f(0x214, v);
-            if tick_down(w, id, 0x32c) {
+            if w.mobys[id].count_i(0x32c) {
                 if seq_b(w, id, ctx) != 4 {
                     let b = ctx.game.rng.rand_range(0x12, 0x18);
                     play(w, id, ctx, 4, 0, b);
@@ -558,7 +549,7 @@ fn swim(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.set_pv_v(0x2e0, at);
         }
         3 => {
-            if tick_down(w, id, 0x360) { jump(w, id, ctx); }
+            if w.mobys[id].count_i(0x360) { jump(w, id, ctx); }
             return;
         }
         // The hidden one (5) only waits for the check below.
@@ -650,7 +641,7 @@ fn bank(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let mut v = m.pv_f(0x214);
             approach(goal, 0.001_111_111_2, &mut v);
             m.set_pv_f(0x214, v);
-            if tick_down(w, id, 0x32c) {
+            if w.mobys[id].count_i(0x32c) {
                 if w.mobys[id].timer == 0 {
                     w.mobys[id].set_pv_i(0x32c, 0xb4);
                     idle(w, id, ctx, 0);
@@ -668,7 +659,7 @@ fn bank(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 let at = w.mobys[id].pos;
                 ai::move_step(w, id, ctx, yaw, at);
             }
-            if tick_down(w, id, 0x32c) {
+            if w.mobys[id].count_i(0x32c) {
                 if !wrapped(w, id, ctx) { return; }
                 let t = ctx.game.rng.rand_range(0x78, 400);
                 w.mobys[id].set_pv_i(0x32c, t);

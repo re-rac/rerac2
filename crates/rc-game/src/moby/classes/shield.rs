@@ -43,9 +43,10 @@
 //! plays (`0x3603c8`), the GS test register the draws set (`0x37c948`).
 
 use crate::hero::items::{row, SHIELD};
-use crate::hero::physics::{add, cross, scale, set_len, sub, unit, V3};
+use crate::hero::physics::{add, cross, scale, set_len, sub, V3};
 use crate::moby::hits::HitTemplate;
-use crate::moby::{countdown, Ctx, MobyWorld};
+use crate::moby::{countdown, stop_loop, Ctx, MobyWorld};
+use crate::quat::qrot;
 
 /// The shield's class (item 0x2d's row `+0x04`) and the upgraded one's (rows 0x4d / 0x6b / 0x6c).
 pub const CLASS: i16 = 0xa5c;
@@ -109,21 +110,8 @@ pub struct Mem {
     pub zap: super::shield_zap::Mem,
 }
 
-/// `0x321b28(out, v, q)`: `v` turned by `q` (`q·v·q*`).
-fn qrot(q: crate::quat::Q, v: V3) -> V3 {
-    use crate::quat::mul;
-    let t = mul(mul(q, [v[0], v[1], v[2], 0.0]), [-q[0], -q[1], -q[2], q[3]]);
-    [t[0], t[1], t[2]]
-}
-
 /// `0x2eef88(out, a, b)` = b × a.
 fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
-
-/// `0x321c00(a, out, v, axis)`: `v` turned by `a` about `axis` (under 1e-5 none).
-fn turn(v: V3, axis: V3, a: f32) -> V3 {
-    if a.abs() < 1e-5 { return v; }
-    crate::gravity::rotate(v, unit(axis), a)
-}
 
 /// `0x37fa58(damage)`: what of a hit gets past the shield (module docs).
 pub fn absorb(shield: &mut f32, wait: &mut i32, damage: f32) -> f32 {
@@ -192,13 +180,6 @@ pub fn deploy(w: &mut MobyWorld, ctx: &mut Ctx) {
     ctx.host.play_sound(&w.mobys[id], 1, 0);
 }
 
-/// The loop sound let go when still playing (`0x3602f0`).
-fn stop_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let s = w.mobys[id].pv_i(0xc);
-    if s != -1 && ctx.host.sound_playing(s) { ctx.host.stop_sound(s); }
-    w.mobys[id].set_pv_i(0xc, -1);
-}
-
 /// `0x3c51d8` (module docs).
 pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].pvars.resize(crate::moby::PVAR_BYTES, 0);
@@ -214,7 +195,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     // The upgraded shield falls at its 40th zap (`$gp+0xf04`, cleared as any falls).
     if !holds(w, ctx) || w.shield.zaps == ZAPS {
         w.shield.zaps = 0;
-        stop_sound(w, id, ctx);
+        stop_loop(w, id, ctx, 0xc);
         ctx.hero.damage.shield = 0.0;
         ctx.hero.damage.shield_wait = 0;
         ctx.host.play_sound(&w.mobys[id], 2, 0);
@@ -391,7 +372,7 @@ fn arcs(w: &mut MobyWorld, ctx: &mut Ctx, joint: V3) {
             let v = sub(a.points[i], cam);
             let ang = g.randf(f32::from_bits(0x3db2_b8c4), f32::from_bits(0x3fa7_8d37)) * sign;
             sign = -sign;
-            d = turn(d, v, ang);
+            d = crate::camera::rot(d, ang, v);
             a.points[i + 1] = add(a.points[i], d);
         }
     }

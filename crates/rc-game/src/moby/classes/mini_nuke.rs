@@ -116,9 +116,6 @@ impl Default for Mem {
     fn default() -> Self { Mem { group: None, recs: vec![None; RECORDS], caps: [None; CAP_SLOTS], scroll: [0.0; 2], mesh: None } }
 }
 
-/// `0x321c00(angle, out, v, axis)`.
-fn rotate(v: V3, angle: f32, axis: V3) -> V3 { crate::moby::classes::gravity_bomb::rotate(v, angle, axis) }
-
 /// `0x3e7978` (module docs).
 pub fn start(w: &mut MobyWorld, ctx: &mut Ctx, id: usize) {
     let (centre, normal) = (w.mobys[id].pos, w.mobys[id].pv_v(0));
@@ -149,7 +146,7 @@ fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, angle: f32, kind: u8, at: V3) -> Opti
     let mut f = Flare { alpha0: alpha, alpha, kind, blend: 2, ..Default::default() };
     match kind {
         0 => {
-            f.dir = rotate(g.axis, r.rand_angle(), g.normal);
+            f.dir = crate::camera::rot(g.axis, r.rand_angle(), g.normal);
             let k = r.randf(0.0, 1.25);
             let rise = g.rise * k;
             f.rise = [rise, rise, 0.0];
@@ -166,7 +163,7 @@ fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, angle: f32, kind: u8, at: V3) -> Opti
             f.spin[2] = 0.0;
         }
         1 => {
-            f.dir = rotate(g.axis, r.rand_angle(), g.normal);
+            f.dir = crate::camera::rot(g.axis, r.rand_angle(), g.normal);
             f.colour[2] = r.rand_range(0, 0xd) as u32 * 0x1_0101;
             let s = r.randf(0.25, 0.5);
             f.size[0] = s;
@@ -179,7 +176,7 @@ fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, angle: f32, kind: u8, at: V3) -> Opti
             f.spin[2] = 0.0;
         }
         _ => {
-            f.dir = rotate(g.axis, angle, g.normal);
+            f.dir = crate::camera::rot(g.axis, angle, g.normal);
             f.colour[2] = r.rand_range(1, 10) as u32 * 0x1_0101;
             let s = r.randf(0.15, 0.25) * 0.5;
             f.size[0] = s;
@@ -391,7 +388,7 @@ fn cap_record(w: &mut MobyWorld, rng: &mut crate::rng::Rng, at: V3) -> Option<us
     g.count += 1;
     let alpha = rng.rand_range(0x5f, 0x7f);
     let mut f = Flare { alpha0: alpha, alpha, kind: 1, blend: 2, ..Default::default() };
-    f.dir = rotate(g.axis, rng.rand_angle(), g.normal);
+    f.dir = crate::camera::rot(g.axis, rng.rand_angle(), g.normal);
     f.colour[2] = rng.rand_range(0, 0xd) as u32 * 0x1_0101;
     let s = rng.randf(0.25, 0.5);
     f.size[0] = s;

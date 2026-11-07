@@ -26,10 +26,10 @@
 //!     (`+0x100`, quaternions), the newest `+0x194`, `+0x190` of them kept, drawn through three blades
 //!     ([`blades`]) by the engine's trail (crate::fx::trails::history).
 
-use crate::hero::physics::{add, cross, scale, set_len, sub, unit, V3};
+use crate::hero::physics::{add, add_rot, cross, scale, set_len, sub, through, unit, V3};
 use crate::moby::attach::{rows_of, turn};
 use crate::moby::{countdown, floater, Ctx, MobyWorld};
-use std::f32::consts::{FRAC_PI_2, PI};
+use std::f32::consts::FRAC_PI_2;
 
 pub const FLOATER: i16 = 0x0af4;
 pub const MOTE: i16 = 0x0c00;
@@ -53,15 +53,6 @@ pub fn update_0af4(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => {}
     }
 }
-
-/// `0x2f0140`: `a + b` wrapped into −π..π.
-fn wrapped_add(a: f32, b: f32) -> f32 {
-    let d = a + b;
-    if PI <= d { d - PI - PI } else if d < -PI { d + PI + PI } else { d }
-}
-
-/// `v` through the rows `r` (`0x2ef5b8`).
-fn through(v: V3, r: &[V3; 3]) -> V3 { std::array::from_fn(|k| v[0] * r[0][k] + v[1] * r[1][k] + v[2] * r[2][k]) }
 
 /// `0x326010(rows, v, 0)`: the rows turned so that row 2 lies along `v`. The quaternion's axis is
 /// ½·(unit(v) × row 2), its w −√(1 − |axis|²): the game's arithmetic, not a true half angle.
@@ -111,11 +102,11 @@ pub fn update_0c00(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         1 => {
             let basis = [m.pv_v(0x50), m.pv_v(0x60), m.pv_v(0x70)];
-            let a = wrapped_add(m.pv_f(0x184), m.pv_f(0x180));
+            let a = add_rot(m.pv_f(0x184), m.pv_f(0x180));
             m.set_pv_f(0x184, a);
-            m.pos = add(through([a.cos(), a.sin(), 0.0], &basis), centre);
-            let t = wrapped_add(a, FRAC_PI_2);
-            let tangent = through([t.cos(), t.sin(), 0.0], &basis);
+            m.pos = add(through(&basis, [a.cos(), a.sin(), 0.0]), centre);
+            let t = add_rot(a, FRAC_PI_2);
+            let tangent = through(&basis, [t.cos(), t.sin(), 0.0]);
             m.rows = rows_along(&m.rows, tangent);
             m.rows = turn(&rows_of([0.0, 0.0, m.pv_f(0x188)]), &m.rows);
             if ctx.game.frame & 0xff == 0 { orthonormal(&mut m.rows); }
@@ -178,7 +169,7 @@ fn trail_step(w: &mut MobyWorld, id: usize, frame: i32) {
 pub fn blades() -> [V3; 6] {
     let r = rows_of([0.0, 0.0, f32::from_bits(0x4006_0a93)]);
     let mut p = [[3.7, -0.3, 0.0], [3.7, 0.3, 0.0], [0.0; 3], [0.0; 3], [0.0; 3], [0.0; 3]];
-    for k in 2..6 { p[k] = through(p[k - 2], &r); }
+    for k in 2..6 { p[k] = through(&r, p[k - 2]); }
     p
 }
 

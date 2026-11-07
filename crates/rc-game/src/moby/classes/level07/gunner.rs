@@ -38,7 +38,7 @@
 //! cheat's scale (`0x31dba0`); the template the fireball's line test carries (`0x2d4778`'s last argument: the sphere's
 //! hit stands for it).
 
-use crate::hero::physics::{add, add_rot, atan2, dot, euler_rows, rot_dist, scale, set_len, sub, turn_ease, V3};
+use crate::hero::physics::{add, add_rot, atan2, dot, euler_rows, rot_dist, scale, set_len, sub, V3};
 use crate::moby::classes::props::{group_alive, set_seq, wrapped};
 use crate::moby::{ai, Ctx, MobyWorld};
 
@@ -62,16 +62,6 @@ const GRAVITY: f32 = f32::from_bits(0x3bb6_0b61);
 fn ask_camera(ctx: &mut Ctx) {
     ctx.game.cam_tweaks.follow_dist = Some((CAM.0, CAM_RATE));
     ctx.game.cam_tweaks.follow_pivot = Some((CAM.1, CAM_RATE));
-}
-
-/// `0x323dc8(yaw, m)`: its facing eased toward `yaw` at the movement block's turn limits.
-fn face(w: &mut MobyWorld, id: usize, yaw: f32) {
-    let m = &mut w.mobys[id];
-    let (a, b, c) = (m.pv_f(MV + 0x14), m.pv_f(MV + 0x18), m.pv_f(MV + 0x1c));
-    let (mut r, mut v) = (m.rot[2], m.pv_f(MV + 0xb4));
-    turn_ease(yaw, a, b, c, &mut r, &mut v, 0);
-    m.rot[2] = r;
-    m.set_pv_f(MV + 0xb4, v);
 }
 
 fn yaw_to(w: &MobyWorld, id: usize, p: V3) -> f32 {
@@ -295,7 +285,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             w.mobys[id].set_pv_i(o, keep);
             let t = w.mobys[id].pv_v(TARGET);
             let yaw = yaw_to(w, id, t);
-            face(w, id, yaw);
+            crate::moby::ai::face_at(&mut w.mobys[id], MV, yaw);
             let m = &w.mobys[id];
             if m.pv_i(MV + 0x80) < 0x1f && m.state_ticks < 0x79 { return; }
             3

@@ -170,16 +170,6 @@ pub struct Globals {
     pub tables: Option<std::sync::Arc<GlowTables>>,
 }
 
-/// `0x321c00(angle, out, v, axis)`: `v` turned `angle` about `axis` (an angle under 1e-5 keeps it).
-fn rotate(v: V3, angle: f32, axis: V3) -> V3 {
-    if angle.abs() < 1e-5 { return v; }
-    let k = set_len(axis, 1.0);
-    let (s, c) = angle.sin_cos();
-    let d = k[0] * v[0] + k[1] * v[1] + k[2] * v[2];
-    let x = cross(k, v);
-    std::array::from_fn(|i| v[i] * c + x[i] * s + k[i] * d * (1.0 - c))
-}
-
 /// `0x31bc68(a, b, c, d, t)`: the cubic from `b` (t = 0) to `c` (t = 1).
 pub(crate) fn cubic(a: f32, b: f32, c: f32, d: f32, t: f32) -> f32 {
     let f = (d - c) - (a - b);
@@ -314,7 +304,7 @@ fn follow(w: &mut MobyWorld, id: usize) {
 
 /// `0x3a0730`: the master turns each direction about its axis.
 fn turn(g: &mut Globals) {
-    for k in 0..8 { g.dirs[k] = set_len(rotate(g.dirs[k], TURN, g.axes[k]), DIR_LEN); }
+    for k in 0..8 { g.dirs[k] = set_len(crate::camera::rot(g.dirs[k], TURN, g.axes[k]), DIR_LEN); }
 }
 
 fn orb_of(w: &MobyWorld, id: usize, k: usize) -> Option<usize> { usize::try_from(w.mobys[id].pv_i(pv::ORBS + 4 * k) - 1).ok() }
@@ -323,7 +313,7 @@ fn set_orb(w: &mut MobyWorld, id: usize, k: usize, o: Option<usize>) { w.mobys[i
 /// `0x3a0678`: orb `k`'s place: its direction tilted, at its radius (state 2), from the centre, bobbing.
 fn orb_pos(w: &MobyWorld, id: usize, k: usize, parts: Option<&particles::Particles>) -> V3 {
     let m = &w.mobys[id];
-    let mut v = rotate(w.nanotech.dirs[k], m.pv_f(pv::TILT), m.pv_v(pv::AXIS));
+    let mut v = crate::camera::rot(w.nanotech.dirs[k], m.pv_f(pv::TILT), m.pv_v(pv::AXIS));
     if let (Some(o), Some(s), 2) = (orb_of(w, id, k), parts, m.state) { v = set_len(v, rec::ff(&s.pool.recs[o], orb::RADIUS)); }
     let mut q = add(m.pv_v(pv::CENTRE), v);
     q[2] += m.pv_f(pv::BOB);
@@ -449,12 +439,12 @@ fn heal_test(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let mut d = sub(chest(ctx), at);
     d[2] -= 0.5;
     let c = cross([0.0, 0.0, FAN], d);
-    let fan = set_len(rotate(cross(d, c), -std::f32::consts::FRAC_PI_2, d), FAN);
+    let fan = set_len(crate::camera::rot(cross(d, c), -std::f32::consts::FRAC_PI_2, d), FAN);
     let half = scale(d, 0.5);
     let Some(s) = ctx.parts.as_deref_mut() else { return };
     for k in 0..8 {
         let Some(o) = orb_of(w, id, k) else { continue };
-        let ctrl = add(half, rotate(fan, k as f32 * 0.448_549_7, d));
+        let ctrl = add(half, crate::camera::rot(fan, k as f32 * 0.448_549_7, d));
         let n = ctx.game.rng.rand_range(ORB_FLIGHT.0, ORB_FLIGHT.1) as i16;
         let r = &mut s.pool.recs[o];
         rec::set_v3(r, orb::CTRL, ctrl);
@@ -582,7 +572,7 @@ fn glints(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let d = sub(ctx.host.camera_pos(), at);
     let rng = &mut ctx.game.rng;
     let speed = rng.randf(GLINT_SPEED.0 * 0.016_666_668, GLINT_SPEED.1 * 0.016_666_668);
-    let v = rotate(scale(particles::GRAVITY, speed), rng.rand_angle(), d);
+    let v = crate::camera::rot(scale(particles::GRAVITY, speed), rng.rand_angle(), d);
     let hero = ctx.hero.pos;
     let rgba = GLINT_RGBA[kind(w, id)];
     let rot = rng.randi(0xff) as u8;

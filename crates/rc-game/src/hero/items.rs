@@ -569,7 +569,7 @@ fn hand_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
     // the groups 0x15 / 0x16 / 0x1f keep the items away and the △ menu shut (`0x18c0dc`, `0x18c0d7`); the wrench
     // is put away (`0x18c0de`) in water, on a ledge (group 3) and in the states 0x31 / 0x12 / 0x82.
     let h = &mut *ctx.hero;
-    let in_water = (0x11..=0x12).contains(&h.group) || matches!(h.state, 0x67 | 0x7f | 0x72 | 0x73);
+    let in_water = h.feet_kept();
     if matches!(h.group, 0x15 | 0x16 | 0x1f) || in_water {
         h.items.no_use = 1;
         h.no_menu = 1;

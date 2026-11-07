@@ -101,7 +101,7 @@
 //! groups to beam back to (`0x2e0558`); the push on a moving floor moby (`0x3234d0`); the light `0x31bcac`. 0x0964's
 //! child is the cage 0x0972 ([`update_0972`]).
 
-use crate::hero::physics::{add, add_rot, atan2, set_len, V3};
+use crate::hero::physics::{add, add_rot, atan2, set_len, through, V3};
 use crate::moby::blast::{self, Blast, Explosion};
 use crate::moby::{bolts, countdown, joint_aim, shards, Ctx, MobyWorld};
 
@@ -115,9 +115,6 @@ fn frame_point(w: &MobyWorld, id: usize, v: V3) -> V3 {
     let m = &w.mobys[id];
     add(through(&m.rows, v), m.pos)
 }
-
-/// `0x2f02d8(out, v, m + 0xc0)` (L00 `0x2ef318`): `v` through the moby's rows.
-fn through(r: &[V3; 3], v: V3) -> V3 { std::array::from_fn(|k| v[0] * r[0][k] + v[1] * r[1][k] + v[2] * r[2][k]) }
 
 /// State 1 of every breakable: a hit with [`BREAK_FLAGS`] while `+0x68`[0] = 0 breaks it (2); the hit record let go.
 fn wait_hit(w: &mut MobyWorld, id: usize) {

@@ -23,7 +23,7 @@
 //! Not ported: the point light its first tick takes (`0x30fd98(0, 0, place, 0)`: radius 0, black, never set again),
 //! the GS test the draw sets after (`0x391158(0x47, 0x5360b)`).
 
-use crate::hero::physics::{add, add_rot, atan2, set_len, sub, V3};
+use crate::hero::physics::{add, add_rot, atan2, set_len, sub, wrap, V3};
 use crate::moby::{Ctx, MobyWorld};
 
 const POINTS: usize = 20;
@@ -53,9 +53,6 @@ pub struct Fence {
 impl Default for Fence {
     fn default() -> Self { Fence { count: 0x14, lay: true, phase_a: 0.0, phase_b: 0.0, phase_c: 0.0, scroll: 0.0, strands: Default::default() } }
 }
-
-/// `0x332a10`: an angle wrapped to [−π, π).
-fn wrap(a: f32) -> f32 { ((a + std::f32::consts::PI) * 0.159_154_94).rem_euclid(1.0) * std::f32::consts::TAU - std::f32::consts::PI }
 
 /// 0x0ee0 (module docs).
 pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {

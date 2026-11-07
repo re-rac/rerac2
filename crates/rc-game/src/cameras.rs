@@ -193,7 +193,6 @@ fn chords(level: &LevelData, i: i32) -> (Vec<[f32; 4]>, f32) {
 /// Rows looking along `fwd` with `up` up (`0x2eef88` pairs: left = up × forward, up = forward × left).
 fn rows_about(fwd: V3, up: V3) -> [V3; 3] {
     let f = set_len(fwd, 1.0);
-    let cross = |a: V3, b: V3| [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
     let l = set_len(cross(up, f), 1.0);
     let u = cross(f, l);
     [f, l, u]

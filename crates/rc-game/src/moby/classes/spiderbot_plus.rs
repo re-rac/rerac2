@@ -67,6 +67,7 @@ use crate::moby::hits::HitTemplate;
 use crate::moby::{aim, countdown, mode, Ctx, Moby, MobyWorld};
 use crate::pad::button::{CROSS, L1, SQUARE};
 use rc_formats::moby_anim::JointModifier;
+use crate::gravity::to_local;
 
 /// The shot and the shell.
 pub const SHOT: i16 = 0x0eaa;
@@ -123,9 +124,6 @@ pub fn release(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.spiderbot.charge_sound = -1;
 }
 
-/// `v` in the frame of `rows` (`0x2ef9b0` the transpose, `0x2ef318`).
-fn local(v: V3, rows: &[V3; 3]) -> V3 { [dot(v, rows[0]), dot(v, rows[1]), dot(v, rows[2])] }
-
 /// `0x2eef88(out, a, b)`: `b × a`.
 fn cr(a: V3, b: V3) -> V3 { cross(b, a) }
 
@@ -152,7 +150,7 @@ pub fn gun(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let aim_at = target.map(|t| aim::aim_point(w, t));
     if held & CROSS == 0 {
         if let Some(p) = aim_at {
-            w.mobys[id].set_pv_v(pv::WANT, local(unit(sub(p, head)), &rows));
+            w.mobys[id].set_pv_v(pv::WANT, to_local(unit(sub(p, head)), &rows));
         } else if held & SQUARE != 0 {
             w.mobys[id].set_pv_v(pv::WANT, [1.0, 0.0, 0.0]);
         } else if ctx.game.rng.rand() % 0x6f == 0 {
@@ -262,7 +260,7 @@ fn charge(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let s = w.spiderbot.charge_sound;
     if s == -1 || !ctx.host.sound_playing(s) { w.spiderbot.charge_sound = ctx.host.play_sound(&w.mobys[id], 4, 4); }
     let rows = w.mobys[id].rows;
-    w.mobys[id].set_pv_v(pv::WANT, local(unit(vel), &rows));
+    w.mobys[id].set_pv_v(pv::WANT, to_local(unit(vel), &rows));
 }
 
 /// `0x37e328(1.75, reach, 0.1, 3/3600, .., from, 0, bot)` under plain gravity: `reach` along the bot's facing (with

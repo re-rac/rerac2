@@ -385,7 +385,7 @@ fn elev_way(w: &mut MobyWorld, id: usize, pts: &[[f32; 4]], a: usize, b: usize) 
     w.mobys[id].set_pv_v(0xe0, v);
 }
 
-/// The ride to the height `z` (states 1 and 3): its sound 0 (mode 4) kept playing; Ratchet on it ([`hero_on`]):
+/// The ride to the height `z` (states 1 and 3): its sound 0 (mode 4) kept playing; Ratchet on it (crate::moby::ai::stands_on):
 /// its camera tweak of priority 5 (`0x2d8538` = L00 `0x2d7468`) once; its height eased to `z` (`0x320060` = L00
 /// `0x31ed78`, crate::hero::physics::ease: 1/516 up, 1/258 braking, at most 0.5). True within 0.2 of it.
 fn elev_ride(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, z: f32) -> bool {
@@ -395,7 +395,7 @@ fn elev_ride(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, z: f32) -> bool {
         let h = ctx.host.play_sound(&w.mobys[id], 0, 4);
         w.mobys[id].set_pv_i(0xb4, h);
     }
-    if super::floaters::hero_on(ctx, id) && w.mobys[id].pv_i(0xd4) == 0 {
+    if crate::moby::ai::stands_on(ctx, id) && w.mobys[id].pv_i(0xd4) == 0 {
         if let Some(s) = ctx.game.cam_tweaks.request(5) {
             let t = &mut ctx.game.cam_tweaks.slots[s];
             (t.dist, t.pivot_h, t.pitch) = (ELEV_CAM[0], ELEV_CAM[1], ELEV_CAM[2]);
@@ -507,6 +507,6 @@ pub fn update_08a7(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             _ => {}
         }
     }
-    if !super::floaters::hero_on(ctx, id) { elev_release(w, id, ctx); }
+    if !crate::moby::ai::stands_on(ctx, id) { elev_release(w, id, ctx); }
     ride(w, id, ctx, old);
 }

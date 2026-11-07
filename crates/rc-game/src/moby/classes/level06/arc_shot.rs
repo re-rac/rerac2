@@ -14,7 +14,7 @@
 
 use crate::fx::FxQuad;
 use crate::hero::physics::{add, add_rot, atan2, cross, len, len2, scale, set_len, sub, V3};
-use crate::moby::{ai, countdown, mode, Ctx, MobyWorld};
+use crate::moby::{ai, mode, stop_loop, Ctx, MobyWorld};
 
 pub const CLASS: i16 = 0x0fe5;
 
@@ -62,12 +62,6 @@ pub fn fire(w: &mut MobyWorld, ctx: &mut Ctx, damage: f32, owner: usize, vel: V3
     k
 }
 
-fn stop_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let h = w.mobys[id].pv_i(SOUND);
-    if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
-    w.mobys[id].set_pv_i(SOUND, -1);
-}
-
 /// 0xfe5 (`0x459e00`). **0**: its roll on 6° a tick; its hit (its damage, from itself, flags 1, along its velocity,
 /// kind its class · 0x10000); the line to its next place (the hit on what it meets), else a 0.3 sphere, else its life:
 /// none, or its owner met, on it goes. Else (sparks: [`super::brawler::sparks`], 20, a minute): on the world at the
@@ -98,7 +92,7 @@ pub fn update_0fe5(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         if let Some(t) = o.moby { w.deliver_hit_any(t, &hit, [o.point[0], o.point[1], o.point[2], 1.0]); }
     }
     let met = line.or_else(|| coll.and_then(|c| crate::collision::coll_sphere_m(c, scene, pos, 0.3, crate::collision::QueryFlags(0), Some(id)))).map(|o| (o.moby, o.point));
-    let met = met.or_else(|| tick_life(w, id).then_some((None, pos)));
+    let met = met.or_else(|| w.mobys[id].count_i(LIFE).then_some((None, pos)));
     match met {
         Some((Some(t), _)) if Some(t) == owner => w.mobys[id].pos = next,
         Some((t, point)) => {
@@ -113,20 +107,13 @@ pub fn update_0fe5(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 }
             };
             super::brawler::sparks(ctx, &mut at, 0x14, 0x3c);
-            stop_sound(w, id, ctx);
+            stop_loop(w, id, ctx, SOUND);
             w.mobys[id].set_state(1, -1);
             return;
         }
         None => w.mobys[id].pos = next,
     }
     arcs(w, id, ctx);
-}
-
-fn tick_life(w: &mut MobyWorld, id: usize) -> bool {
-    let mut t = w.mobys[id].pv_i(LIFE);
-    let out = countdown(&mut t);
-    w.mobys[id].set_pv_i(LIFE, t);
-    out
 }
 
 /// Its arcs, twinkles, sound and draw (`0x459e00`'s tail): each arc's timer 2 and alpha 0x40; from its place three

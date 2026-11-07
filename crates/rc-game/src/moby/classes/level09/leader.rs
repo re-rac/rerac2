@@ -26,7 +26,7 @@
 
 use crate::hero::physics::{add, add_rot, dist, len, sub_rot};
 use crate::moby::classes::props::{seq, set_seq, wrapped};
-use crate::moby::{countdown, Ctx, MobyWorld};
+use crate::moby::{Ctx, MobyWorld};
 use crate::point_lights::PointLight;
 
 pub const CLASS: i16 = 0x0e1a;
@@ -62,13 +62,6 @@ fn light(w: &MobyWorld, id: usize) -> PointLight {
     PointLight { color: m.pv_v(RGB), intensity: m.pv_f(INTENSITY), pos: m.pos, radius: m.pv_f(RADIUS) }
 }
 
-fn down(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut t = w.mobys[id].pv_i(off);
-    let out = countdown(&mut t);
-    w.mobys[id].set_pv_i(off, t);
-    out
-}
-
 /// 0x0e1a (`0x40a7f8`): see the module.
 pub fn update_0e1a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].pvars.len() < 0x2a0 { w.mobys[id].pvars.resize(0x2a0, 0); }
@@ -94,7 +87,7 @@ pub fn update_0e1a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     w.mobys[id].set_state(1, -1);
                 }
             }
-            if seq(w, id, ctx) == 0 && down(w, id, FIDGET) {
+            if seq(w, id, ctx) == 0 && w.mobys[id].count_i(FIDGET) {
                 let t = ctx.game.rng.randf(1200.0, 2400.0) as i32;
                 w.mobys[id].set_pv_i(FIDGET, t);
                 let s = (ctx.game.rng.rand() & 1) as u8 + 1;
@@ -107,7 +100,7 @@ pub fn update_0e1a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.rot[2] = add_rot(m.rot[2], sub_rot(to, m.rot[2]) * 0.01);
         }
         1 => {
-            if seq(w, id, ctx) == 4 && down(w, id, FIDGET) {
+            if seq(w, id, ctx) == 4 && w.mobys[id].count_i(FIDGET) {
                 let t = ctx.game.rng.randf(1200.0, 2400.0) as i32;
                 w.mobys[id].set_pv_i(FIDGET, t);
                 set_seq(w, id, ctx, 2, 0, 10);
@@ -148,13 +141,13 @@ pub fn update_0e1a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let to = (centre[1] - m.pos[1]).atan2(centre[0] - m.pos[0]);
         let across = (m.pos[0] - ctx.hero.pos[0]).hypot(m.pos[1] - ctx.hero.pos[1]);
         if across < 8.0 && sub_rot(m.rot[2], to).abs() < std::f32::consts::FRAC_PI_2 {
-            if 0.01 < len(ctx.hero.vel) { w.mobys[id].set_pv_i(STARE, 120); } else { down(w, id, STARE); }
+            if 0.01 < len(ctx.hero.vel) { w.mobys[id].set_pv_i(STARE, 120); } else { w.mobys[id].count_i(STARE); }
         } else if w.mobys[id].pv_i(STARE) != 0 {
             let m = &mut w.mobys[id];
             m.set_pv_i(STARE, 0);
             m.set_pv_v(LOOK, centre);
         }
-        if down(w, id, LOOK_WAIT) {
+        if w.mobys[id].count_i(LOOK_WAIT) {
             let g = &mut ctx.game.rng;
             let wait = g.randf(180.0, 300.0) as i32;
             let yaw = add_rot(w.mobys[id].rot[2], g.randf(-90.0, 90.0) * 0.017_453_294);

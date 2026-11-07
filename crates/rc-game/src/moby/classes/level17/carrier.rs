@@ -50,7 +50,7 @@ use crate::fx::FxQuad;
 use crate::hero::physics::{add, add_rot, atan2, cross, dist, dist2, len, set_len, sub, V3};
 use crate::moby::classes::level17::floaters::{flash_glow, rise_fall, rise_start, Motion};
 use crate::moby::classes::props::{bob, sway};
-use crate::moby::{countdown, Ctx, MobyWorld};
+use crate::moby::{stop_loop, Ctx, MobyWorld};
 
 pub const CARRIER: i16 = 0x08b1;
 pub const PLATFORM: i16 = 0x093b;
@@ -88,13 +88,6 @@ fn idx(w: &MobyWorld, k: i32) -> Option<usize> { usize::try_from(k).ok().filter(
 /// The top of its beam: 2.5 down its frame.
 fn top(m: &crate::moby::Moby) -> V3 { add(m.pos, std::array::from_fn(|k| m.rows[2][k] * TOP)) }
 
-/// Its sound at `off` stopped (when playing) and none.
-fn stop(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, off: usize) {
-    let h = w.mobys[id].pv_i(off);
-    if 0 <= h && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
-    w.mobys[id].set_pv_i(off, -1);
-}
-
 /// Its sound `sound` (mode 4) at `off` kept playing.
 fn keep(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, off: usize, sound: i32) {
     let h = w.mobys[id].pv_i(off);
@@ -109,13 +102,6 @@ fn ride(w: &mut MobyWorld, id: usize, src: usize) {
     let at = w.mobys[src].pos;
     w.mobys[id].pos = [at[0], at[1], at[2] + RIDE_UP];
     if let Some(p) = idx(w, w.mobys[id].pv_i(PLATFORM_OFF)) { w.mobys[p].pos = [at[0], at[1], at[2] + RIDE_PLATFORM]; }
-}
-
-fn tick(w: &mut MobyWorld, id: usize) -> bool {
-    let mut t = w.mobys[id].pv_i(TIMER);
-    let out = countdown(&mut t);
-    w.mobys[id].set_pv_i(TIMER, t);
-    out
 }
 
 /// 0x08b1 (module docs).
@@ -184,7 +170,7 @@ pub fn update_08b1(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[plat].pos = [off[0], off[1], hang];
     match w.mobys[id].state {
         1 => {
-            stop(w, id, ctx, SOUND);
+            stop_loop(w, id, ctx, SOUND);
             if w.mobys[pass].timer != 0 {
                 w.mobys[id].set_state(2, -1);
                 w.mobys[id].set_pv_i(TIMER, (LOWER * 60.0) as i32);
@@ -197,7 +183,7 @@ pub fn update_08b1(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             w.mobys[plat].pos[2] = hang - drop * ((1.0 - r) * HALF_PI).sin();
             keep(w, id, ctx, SOUND, 0);
             w.mobys[id].set_pv_i(STOPPED, 0);
-            if tick(w, id) {
+            if w.mobys[id].count_i(TIMER) {
                 w.mobys[id].set_state(3, -1);
                 w.mobys[id].set_pv_i(TIMER, (HOLD * 60.0) as i32);
             }
@@ -206,7 +192,7 @@ pub fn update_08b1(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if w.mobys[id].first() { ctx.host.play_sound(&w.mobys[plat], 0, 0); }
             w.mobys[plat].pos[2] = hang - drop;
             let mut ready = false;
-            if w.mobys[dock_id].pv_i(0xbc) == 2 { stop(w, id, ctx, SOUND); } else { keep(w, id, ctx, SOUND, 1); }
+            if w.mobys[dock_id].pv_i(0xbc) == 2 { stop_loop(w, id, ctx, SOUND); } else { keep(w, id, ctx, SOUND, 1); }
             if dock != 0 && w.mobys[dock_id].o_class == crate::moby::classes::level17::lifts::DOCK {
                 let d = &w.mobys[dock_id];
                 let (leg1, t1, leg2) = (d.pv_i(0xac), d.pv_i(0xa0), d.pv_i(0xbc));
@@ -219,8 +205,8 @@ pub fn update_08b1(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     ready = true;
                 }
             }
-            if !ready && tick(w, id) {
-                stop(w, id, ctx, SOUND);
+            if !ready && w.mobys[id].count_i(TIMER) {
+                stop_loop(w, id, ctx, SOUND);
                 w.mobys[id].set_state(4, -1);
                 ctx.host.play_sound_of(&w.mobys[id], PLATFORM, 1, 0);
                 w.mobys[id].set_pv_i(TIMER, (RAISE * 60.0) as i32);
@@ -231,7 +217,7 @@ pub fn update_08b1(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             w.mobys[plat].pos[2] = hang - drop * (r * HALF_PI).sin();
             w.mobys[pass].timer = 0;
             keep(w, id, ctx, SOUND, 1);
-            if tick(w, id) { w.mobys[id].set_state(1, -1); }
+            if w.mobys[id].count_i(TIMER) { w.mobys[id].set_state(1, -1); }
         }
         _ => {}
     }
@@ -251,7 +237,7 @@ pub fn update_08b1(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         w.mobys[plat].rot[1] = roll;
         let m = &mut w.mobys[id];
         m.rot[1] = add_rot(m.rot[1], roll);
-        stop(w, id, ctx, SOUND);
+        stop_loop(w, id, ctx, SOUND);
     }
 }
 

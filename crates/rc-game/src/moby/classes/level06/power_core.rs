@@ -30,7 +30,7 @@
 //! velocity 0.1167 out and 0.1833 up, the pieces' tick (crate::moby::shards::update, L06 `0x3df1e0`), the scale × 0.75
 //! and the ambient (16, 16, 16).
 
-use crate::hero::physics::{add, add_rot, scale, set_len, V3};
+use crate::hero::physics::{add, add_rot, scale, set_len, wrap_turn, V3};
 use crate::moby::classes::{props::group_alive, ray};
 use crate::moby::{countdown, Ctx, MobyWorld};
 
@@ -46,12 +46,6 @@ const TIMER: usize = 0x130;
 const TABLE: [[f32; 2]; 8] = [[-300.0, -80.0], [-200.0, -60.0], [-100.0, -40.0], [0.0, -20.0], [200.0, 0.0], [300.0, 20.0], [400.0, 40.0], [500.0, 60.0]];
 /// `$gp+0x2890` / `0x1b1884` / `0x1b1888`: the turn's degrees a second.
 const SPIN: [f32; 3] = [37.0, 41.0, 70.0];
-
-/// `0x2efef0`: `a` wrapped to [−π, π) by its fraction of a turn.
-fn wrap(a: f32) -> f32 {
-    let f = a * 0.159_154_94 + 0.5;
-    ((f - f.floor()) - 0.5) * std::f32::consts::TAU
-}
 
 /// 0x0fc2.
 pub fn update_0fc2(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
@@ -111,7 +105,7 @@ pub fn update_0fc2(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 fn rays(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let deg = f32::from_bits(0x3c8e_fa36);
     for (k, [yaw, pitch]) in TABLE.iter().enumerate() {
-        let (yaw, pitch) = (wrap(yaw * deg), wrap(pitch * deg));
+        let (yaw, pitch) = (wrap_turn(yaw * deg), wrap_turn(pitch * deg));
         let way = crate::moby::classes::shot::polar(1.0, yaw, pitch);
         w.mobys[id].set_pv_v(WAYS + 0x10 * k, way);
         let r = ray::spawn(w, ctx.game.level, [0.0; 4], [0.0, 1.0, 0.0, 0.0], 0x3c3c_3c78, Some(id), 0x19, false);

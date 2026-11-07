@@ -37,9 +37,10 @@
 //! pull of the ends (the game's loops run until the line is clear).
 
 use crate::fx::FxQuad;
-use crate::hero::physics::{add, dot, len, scale, set_len, sub, V3};
+use crate::hero::physics::{add, len, set_len, sub, through, V3};
 use crate::moby::attach::rows_of;
 use crate::moby::{Ctx, MobyHost, MobyWorld};
+use crate::gravity::to_local;
 
 pub const CLASS: i16 = 0x0fae;
 /// Its collision walls.
@@ -68,12 +69,6 @@ fn cuboid(ctx: &Ctx, i: i32) -> Option<(V3, V3, V3, V3)> {
     let v = |r: [f32; 4]| [r[0], r[1], r[2]];
     Some((v(c.matrix[1]), v(c.matrix[2]), v(c.matrix[3]), v(c.extra)))
 }
-
-/// `R·d` (`0x2f2a00` with the transpose).
-fn local(r: &[V3; 3], d: V3) -> V3 { [dot(d, r[0]), dot(d, r[1]), dot(d, r[2])] }
-
-/// `v` through the rows (`0x2f2a00`).
-fn world(r: &[V3; 3], v: V3) -> V3 { add(add(scale(r[0], v[0]), scale(r[1], v[1])), scale(r[2], v[2])) }
 
 /// Gone with its uid marked (`0x21f204[uid]` ≠ 0, or its count in `0x19b4a8`).
 fn uid_done(w: &MobyWorld, id: usize, ctx: &Ctx) -> bool {
@@ -121,18 +116,6 @@ fn stretch(w: &mut MobyWorld, id: usize, host: &dyn MobyHost) {
         w.mobys[k].rows[1] = set_len(r, (reaches[i] + half) * f32::from_bits(0x3e2a_aaab));
         w.rebuild(k, host);
     }
-}
-
-/// `0x32ea50(m, owner)` (L00 `0x32a748`): updated and drawn from any distance, drawn, the owner, its place, angles and
-/// light word.
-fn adopt(w: &mut MobyWorld, id: usize, owner: usize) {
-    let (pos, rot, light) = { let o = &w.mobys[owner]; (o.pos, o.rot, o.light) };
-    let m = &mut w.mobys[id];
-    m.update_dist = 0xff;
-    m.draw_dist = 0xff;
-    m.drawn = 1;
-    m.parent = Some(owner);
-    (m.pos, m.rot, m.light) = (pos, rot, light);
 }
 
 /// 0x0fae (module docs).
@@ -184,7 +167,7 @@ fn set_up(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     for i in 0..2 {
         if r2[2] < 2.0 && 0 < i { continue; }
         let k = w.create(WALL);
-        adopt(w, k, id);
+        w.adopt(k, Some(id), &*ctx.host);
         let c = &mut w.mobys[k];
         c.rot = angles;
         c.rows = rows;
@@ -214,7 +197,7 @@ fn tick(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let mut clear = true;
     for j in 0..3 {
         let Some(hit) = w.coll_line(ctx, a, b, 2, None) else { break };
-        let d = local(&r, sub(hit.point, o));
+        let d = to_local(sub(hit.point, o), &r);
         let m = &mut w.mobys[id];
         if 1.5 < m.pv_f(REACH + 4 * j) - d[1] {
             ctx.game.count_uid(uid);
@@ -239,13 +222,13 @@ fn tick(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let feet = ctx.hero.pos;
     let centre = add(feet, [0.0, 0.0, 1.0]);
     if ctx.level.in_cuboid(ci, feet) {
-        let d = local(&r, sub(feet, o));
+        let d = to_local(sub(feet, o), &r);
         if d[1] < reach(feet[2]) {
             walls_on(w, Some(id), &*ctx.host);
             if d[0] <= ACROSS { throw(w, id, ctx, &r, d[0]); }
         }
     } else if ctx.level.in_cuboid(ci, centre) {
-        let d = local(&r, sub(centre, o));
+        let d = to_local(sub(centre, o), &r);
         if d[1] < reach(centre[2]) {
             walls_on(w, Some(id), &*ctx.host);
             throw(w, id, ctx, &r, d[0]);
@@ -258,7 +241,7 @@ fn tick(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// Ratchet thrown back: a hit of 2 (flags 0x10001) toward `R·(3, 0, −3)`, from behind the sheet `R·(−0.5, 0, −1)`.
 fn throw(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, r: &[V3; 3], across: f32) {
     let v = if 0.0 <= across { [3.0, 0.0, -3.0] } else { [-0.5, 0.0, -1.0] };
-    let dir = world(r, v);
+    let dir = through(r, v);
     let Some(h) = ctx.hero_moby else { return };
     let t = crate::moby::hits::HitTemplate::new(2.0, Some(id), 0x1_0001, [dir[0], dir[1], dir[2], 0.0]);
     w.deliver_hit_any(h, &t, [0.0, 0.0, 0.0, 1.0]);
@@ -295,7 +278,7 @@ pub fn draw(w: &MobyWorld, id: usize, out: &mut Vec<FxQuad>) {
     let mut o = m.pv_v(CENTRE);
     o[2] -= height * 0.5 + 0.5;
     let quad = |out: &mut Vec<FxQuad>, p: &[V3; 4], rgba: [u32; 4]| {
-        let corners = p.map(|v| add(world(&r, v), o));
+        let corners = p.map(|v| add(through(&r, v), o));
         out.push(FxQuad { fx: FX, additive: false, corners, st: ST, rgba });
     };
     let mut p: [V3; 4] = std::array::from_fn(|n| {

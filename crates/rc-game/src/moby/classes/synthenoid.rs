@@ -90,7 +90,7 @@ use crate::collision::QueryFlags;
 use crate::hero::items::{row, ItemRow, SYNTHENOID};
 use crate::hero::physics::{add, add_rot, atan2, cross, dist2, dot, len, scale, set_len, sub, turn_spring, V3};
 use crate::moby::hits::HitTemplate;
-use crate::moby::{aim, countdown, Ctx, MobyWorld};
+use crate::moby::{aim, countdown, keep_loop, stop_loop, Ctx, MobyWorld};
 
 /// The drone's class (item 0x1f's row `+0x04`) and its shot's.
 pub const DRONE: i16 = 0xcb2;
@@ -183,25 +183,9 @@ fn make(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, class: i16) -> Option<usize> {
     Some(id)
 }
 
-/// The loop sound let go when still its own and playing (`0x3602f0`).
-fn stop_loop(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let s = w.mobys[id].pv_i(SOUND);
-    if s != -1 && ctx.host.sound_playing(s) { ctx.host.stop_sound(s); }
-    w.mobys[id].set_pv_i(SOUND, -1);
-}
-
-/// The loop sound (class sound 1, looped) started when it is not playing.
-fn keep_loop(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let s = w.mobys[id].pv_i(SOUND);
-    if s == -1 || !ctx.host.sound_playing(s) {
-        let h = ctx.host.play_sound(&w.mobys[id], 1, 4);
-        w.mobys[id].set_pv_i(SOUND, h);
-    }
-}
-
 /// The drone gone: its sound, alpha, velocity, mode 0x200, its slot, deleted (`0x311688`).
 fn vanish(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    stop_loop(w, id, ctx);
+    stop_loop(w, id, ctx, SOUND);
     let m = &mut w.mobys[id];
     m.alpha = 0x80;
     m.set_pv_v(0x10, [0.0; 3]);
@@ -230,7 +214,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 m.set_pv_v(0x10, [0.0; 3]);
                 m.set_pv_i(0x20, 30);
             }
-            stop_loop(w, id, ctx);
+            stop_loop(w, id, ctx, SOUND);
             ctx.host.play_sound(&w.mobys[id], 2, 0);
             w.mobys[id].state = 2;
             return;
@@ -247,7 +231,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if !active(w, id, ctx) { return; }
         }
         2 => {
-            stop_loop(w, id, ctx);
+            stop_loop(w, id, ctx, SOUND);
             let mut n = w.mobys[id].pv_i(0x20);
             let out = countdown(&mut n);
             w.mobys[id].set_pv_i(0x20, n);
@@ -288,7 +272,7 @@ fn start(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_i(0x2c, 5400);
         m.set_pv_v(0x60, hero_pos);
     }
-    keep_loop(w, id, ctx);
+    keep_loop(w, id, ctx, SOUND, 1);
     let g = &mut ctx.game.rng;
     let (a, b, c) = (g.rand_angle(), g.rand_angle(), g.rand_angle());
     let m = &mut w.mobys[id];
@@ -305,7 +289,7 @@ fn active(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     if let Some(a) = ctx.host.anim(&w.mobys[id]) {
         if a.flags & 2 != 0 && a.seq_b != 1 { ctx.host.set_anim(&w.mobys[id], 1, 0, 10); }
     }
-    keep_loop(w, id, ctx);
+    keep_loop(w, id, ctx, SOUND, 1);
     let hero_pos = ctx.hero.pos;
     let last = w.mobys[id].pv_v(0x60);
     let far = {
@@ -341,7 +325,7 @@ fn active(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
         let m = &mut w.mobys[id];
         m.set_pv_v(0x10, [0.0; 3]);
         m.set_pv_i(0x20, 30);
-        stop_loop(w, id, ctx);
+        stop_loop(w, id, ctx, SOUND);
         ctx.host.play_sound(&w.mobys[id], 2, 0);
         w.mobys[id].state = 2;
     }

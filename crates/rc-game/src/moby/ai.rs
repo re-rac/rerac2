@@ -638,6 +638,27 @@ pub fn hold(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> i32 {
     move_step(w, id, ctx, yaw, pos)
 }
 
+/// `0x32ceb8(m, yaw)`: the frame's move in place, facing toward `yaw`.
+pub fn turn_in_place(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, yaw: f32) -> i32 {
+    let pos = w.mobys[id].pos;
+    move_step(w, id, ctx, yaw, pos)
+}
+
+/// `0x325398(m)`: Ratchet stands on moby `id` — hanging or climbing (group 3 or state 0x1b) from its ledge
+/// (`0x18a3a8`), else on the ground (`0x18a16e` 0) on it (`0x18a15c`).
+pub fn stands_on(ctx: &Ctx, id: usize) -> bool {
+    let h = &*ctx.hero;
+    if h.group == 3 || h.state == 0x1b { return h.ledge.moby == Some(id); }
+    h.air_ticks == 0 && h.ground_moby == Some(id)
+}
+
+/// `0x326190(m, out, v)`: the point `v` in moby `id`'s frame, scaled by its scale (its rows, times the scale, plus its
+/// place).
+pub fn frame_point(w: &MobyWorld, id: usize, v: V3) -> V3 {
+    let m = &w.mobys[id];
+    std::array::from_fn(|k| (v[0] * m.rows[0][k] + v[1] * m.rows[1][k] + v[2] * m.rows[2][k]) * m.scale + m.pos[k])
+}
+
 /// `0x32dd60(m, path)`: the walk along a path (the movement block's `+0xc4` the path + 1, `+0xc8` the point it heads
 /// for, `+0xca` the last; a new path starts at its first point, `0x32de68`): each frame toward the point, the goal its
 /// last; within the stop distance of it the next (or back), at the last 1.
@@ -1405,12 +1426,17 @@ pub fn turn_to(m: &mut Moby, yaw: f32, k: f32, d: f32, max: f32, v_off: usize) {
 pub fn face(m: &mut Moby, yaw: f32) -> bool {
     if m.pv_i(0x18) == 0 { return false; }
     let o = mv(m);
+    face_at(m, o, yaw);
+    true
+}
+
+/// [`face`] on the movement block at pvar offset `o` (the classes that keep it at a fixed place, L20's).
+pub fn face_at(m: &mut Moby, o: usize, yaw: f32) {
     let (a, b, most) = (m.pv_f(o + 0x14), m.pv_f(o + 0x18), m.pv_f(o + 0x1c));
     let (mut r, mut v) = (m.rot[2], m.pv_f(o + 0xb4));
     turn_ease(yaw, a, b, most, &mut r, &mut v, 0);
     m.rot[2] = r;
     m.set_pv_f(o + 0xb4, v);
-    true
 }
 
 /// `0x31ec88(k, d, max, &p, target, &v)`: `p` springs toward `target` along the line between them ([`spring_vel`]

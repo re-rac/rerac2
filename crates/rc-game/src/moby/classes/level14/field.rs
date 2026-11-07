@@ -28,7 +28,7 @@
 //! Not ported: the matrix refresh after the rows' scale (`0x31b8e0`, the engine draws from the rows).
 
 use crate::hero::physics::{add, cross, scale, sub, V3};
-use crate::moby::{countdown, Ctx, MobyWorld};
+use crate::moby::{Ctx, MobyWorld};
 
 pub const CLASS: i16 = 0x0afe;
 
@@ -119,7 +119,7 @@ pub fn update_0afe(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 m.set_pv_i(WAIT, MOTE_WAIT);
                 m.set_pv_i(TIMER, m.pv_i(RISE));
             }
-            if timer_out(m, TIMER) { m.set_state(3, -1); }
+            if m.count_i(TIMER) { m.set_state(3, -1); }
             changing(w, id, ctx);
         }
         3 => {
@@ -132,13 +132,13 @@ pub fn update_0afe(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 m.glow = 0x8000_8000;
             }
             let contact = w.mobys[id].pv_i(CONTACT) != 0;
-            let on = if contact { ctx.hero.push_moby == Some(id) } else { crate::moby::classes::level17::floaters::hero_on(ctx, id) };
+            let on = if contact { ctx.hero.push_moby == Some(id) } else { crate::moby::ai::stands_on(ctx, id) };
             if on {
                 if let Some(k) = next_field(w, id) { w.mobys[k].set_pv_i(ASKED, 1); }
             }
             let m = &mut w.mobys[id];
             if m.pv_i(HEAD) != 0 && hero_z < m.pos[2] { m.set_pv_i(TIMER, m.pv_i(HOLD)); }
-            if timer_out(m, TIMER) { m.set_state(4, -1); }
+            if m.count_i(TIMER) { m.set_state(4, -1); }
         }
         4 => {
             let m = &mut w.mobys[id];
@@ -150,24 +150,16 @@ pub fn update_0afe(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 m.set_pv_i(WAIT, MOTE_WAIT);
                 m.set_pv_i(TIMER, m.pv_i(FALL));
             }
-            if timer_out(m, TIMER) { m.set_state(1, -1); }
+            if m.count_i(TIMER) { m.set_state(1, -1); }
             changing(w, id, ctx);
         }
         _ => {}
     }
 }
 
-/// `0x2f6660`: the pvar countdown at `off`.
-fn timer_out(m: &mut crate::moby::Moby, off: usize) -> bool {
-    let mut t = m.pv_i(off);
-    let out = countdown(&mut t);
-    m.set_pv_i(off, t);
-    out
-}
-
 /// States 2 and 4's shared tail (module docs).
 fn changing(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    if timer_out(&mut w.mobys[id], WAIT) {
+    if w.mobys[id].count_i(WAIT) {
         motes(w, id, ctx);
         w.mobys[id].set_pv_i(WAIT, MOTE_WAIT);
     }

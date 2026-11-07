@@ -64,9 +64,10 @@
 //! Not ported: the debug markers on its paths and points (`0x383a40`, `0x379b90`: particle 0x29, no def the port
 //! has); the death's explosion is aimed from its place (the original reads an unset stack word as the point).
 
-use crate::hero::physics::{add, add_rot, atan2, cross, dist, dist2, len, scale, set_len, sub, V3};
+use crate::hero::physics::{add, add_rot, atan2, cross, dist, dist2, len, scale, set_len, sub, through, wrap, V3};
 use crate::moby::classes::props::{set_seq, wrapped};
 use crate::moby::{ai, countdown, Ctx, Moby, MobyWorld};
+use crate::gravity::to_local;
 
 pub const CLASS: i16 = 0x0bc7;
 
@@ -132,12 +133,6 @@ fn path_rows(pts: &[[f32; 4]], k: usize) -> [V3; 3] {
     let d = set_len(d, 1.0);
     [d, cross(d, UP), UP]
 }
-
-/// `0x2ef340` with the rows' transpose: `v` in the frame.
-fn local(r: &[V3; 3], v: V3) -> V3 { std::array::from_fn(|k| r[k][0] * v[0] + r[k][1] * v[1] + r[k][2] * v[2]) }
-
-/// `0x2ef318`: `v` out of the frame.
-fn world(r: &[V3; 3], v: V3) -> V3 { add(add(scale(r[0], v[0]), scale(r[1], v[1])), scale(r[2], v[2])) }
 
 fn live(w: &MobyWorld, id: usize, ctx: &Ctx) -> bool { let h = w.mobys[id].pv_i(SOUND); h != -1 && ctx.host.sound_playing(h) }
 
@@ -280,8 +275,8 @@ fn axis(d: f32, v: f32, speed: f32, accel: f32) -> (f32, bool) {
 fn fly_in(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, r: &[V3; 3], yaw: f32, blend: f32, ahead: [f32; 2], back: [f32; 2], side: [f32; 2], up_k: f32, up_most: f32) -> bool {
     let (sec, sec2) = (f32::from_bits(0x3c88_8889), f32::from_bits(0x3991_a2b4));
     let m = &w.mobys[id];
-    let mut d = local(r, sub(m.pv_v(GOAL), m.pos));
-    let mut v = local(r, m.pv_v(VEL));
+    let mut d = to_local(sub(m.pv_v(GOAL), m.pos), r);
+    let mut v = to_local(m.pv_v(VEL), r);
     let (s, a) = if 0.0 < d[0] { (ahead[0] * sec, ahead[1] * sec2) } else { (back[0] * sec, back[1] * sec2) };
     let (x, sx) = axis(d[0], v[0], s, a);
     d[0] = x * (1.0 - blend);
@@ -289,8 +284,8 @@ fn fly_in(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, r: &[V3; 3], yaw: f32, bl
     let (y, sy) = axis(d[1], v[1], side[0] * sec, side[1] * sec2);
     d[1] = y * (1.0 - blend);
     v[1] = v[1] * blend + d[1];
-    let vel = world(r, v);
-    let dw = world(r, d);
+    let vel = through(r, v);
+    let dw = through(r, d);
     let most = up_most * sec;
     let dz = dw[2].clamp(-most, most);
     let m = &mut w.mobys[id];
@@ -305,12 +300,6 @@ fn fly_in(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, r: &[V3; 3], yaw: f32, bl
     sx && sy
 }
 
-/// `0x2abb18`: an angle wrapped into −π..π.
-fn wrap(x: f32) -> f32 {
-    let t = (x + std::f32::consts::PI) * f32::from_bits(0x3e22_f983);
-    (t - t.trunc()) * std::f32::consts::TAU - std::f32::consts::PI
-}
-
 /// State 3 (module docs).
 fn shadow(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let pts = path(ctx, w.mobys[id].pv_i(SHADOW));
@@ -319,7 +308,7 @@ fn shadow(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let seen = w.mobys[id].pv_v(SEARCH);
     let node = nearest(&pts, seen);
     let rows = path_rows(&pts, node);
-    let off = local(&rows, sub(seen, p3(pts[node])));
+    let off = to_local(sub(seen, p3(pts[node])), &rows);
     // The point 6 back along the path from the search's (the original starts it at Ratchet's place 2 up, which the
     // walk then overwrites).
     let mut k = node;
@@ -370,13 +359,13 @@ fn fight(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let cpos = [c.matrix[3][0], c.matrix[3][1], c.matrix[3][2]];
     let rows = crate::moby::attach::rows_of([c.extra[0], c.extra[1], c.extra[2]]);
     let tp = w.mobys[id].pv_v(T_POINT);
-    let mut l = local(&rows, sub(tp, cpos));
+    let mut l = to_local(sub(tp, cpos), &rows);
     l[0] -= 6.0;
     let (wd, ht) = (len([c.matrix[0][0], c.matrix[0][1], c.matrix[0][2]]), len([c.matrix[1][0], c.matrix[1][1], c.matrix[1][2]]));
     l[0] = l[0].clamp(-wd, wd);
     l[1] = l[1].clamp(-ht, ht);
     l[2] = 0.0;
-    let mut goal = add(cpos, world(&rows, l));
+    let mut goal = add(cpos, through(&rows, l));
     let m = &w.mobys[id];
     if m.pv_i(SEES) == 0 {
         let pts = path(ctx, m.pv_i(WAY_IN));

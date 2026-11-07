@@ -40,7 +40,7 @@
 //! crate::fog's. The shakes are [`Shakes`] (set by the Gravity Bomb's blast; the blast `0x320538` and the
 //! others that ask for one are not ported).
 
-use crate::hero::physics::{add, dot, len, scale, sub, V3};
+use crate::hero::physics::{add, add_rot, dot, len, scale, sub, sub_rot, wrap_turn, V3};
 use crate::hero::Hero;
 use rc_formats::collision::Collision;
 use crate::collision::mobys::MobyScene;
@@ -85,13 +85,13 @@ impl Shakes {
             crate::moby::countdown(&mut s.timer);
             let t = s.timer as f32 / s.max as f32;
             if axis < 2 {
-                s.value = s.amp * wrap(s.timer as f32 * 2.0).cos() * t * t;
+                s.value = s.amp * wrap_turn(s.timer as f32 * 2.0).cos() * t * t;
                 *eye = add(*eye, crate::hero::physics::set_len(if axis == 0 { rows[2] } else { rows[0] }, s.value));
             } else {
                 let k = 2001.0 * 0.017_453_294;
                 let gone = (s.max - s.timer) as f32;
                 let ease = (gone * 0.016_666_668 * 6.0).min(1.0);
-                s.value = s.amp * wrap(gone * 0.016_666_668 * k - k * 10.0).sin() * t * t * t * ease;
+                s.value = s.amp * wrap_turn(gone * 0.016_666_668 * k - k * 10.0).sin() * t * t * t * ease;
                 let q = crate::quat::axis_quat(s.value, rows[0]);
                 *rows = rows.map(|r| crate::quat::rotate(q, r));
             }
@@ -99,11 +99,6 @@ impl Shakes {
     }
 }
 
-/// `0x2efef0`: `a` wrapped to [−π, π) by its fraction of a turn.
-fn wrap(a: f32) -> f32 {
-    let f = a * 0.159_154_94 + 0.5;
-    ((f - f.floor()) - 0.5) * std::f32::consts::TAU
-}
 /// `$gp+0x2474` (40°) and `+0x2470` (1.75°): the stick pitch's range and step.
 const DEG40: f32 = 0.698_131_7;
 const DEG1_75: f32 = 0.030_543_262;
@@ -121,8 +116,6 @@ fn norm(v: V3, l: f32) -> V3 {
 /// `0x2eef88(out, a, b)` = **b × a** (R&C1's `FastVecCross` order).
 fn cross(a: V3, b: V3) -> V3 { [b[1] * a[2] - a[1] * b[2], b[2] * a[0] - a[2] * b[0], b[0] * a[1] - a[0] * b[1]] }
 fn asin(x: f32) -> f32 { x.clamp(-1.0, 1.0).asin() }
-fn add_rot(a: f32, b: f32) -> f32 { crate::hero::physics::add_rot(a, b) }
-fn sub_rot(a: f32, b: f32) -> f32 { crate::hero::physics::sub_rot(a, b) }
 
 /// `0x2d7e98(cur, tgt, k, d, max, &v)`: `v += k·(tgt − cur) − d·v`, clamped to ±max (max ≠ 0) and ±|tgt − cur|;
 /// returns `cur + v`.
@@ -140,7 +133,7 @@ fn interp3(cur: V3, tgt: V3, k: f32, d: f32, v: &mut V3) -> V3 {
 }
 
 /// `0x2d7f80`: [`interp`] on wrapped angles.
-fn ang_interp(cur: f32, tgt: f32, k: f32, d: f32, max: f32, v: &mut f32) -> f32 {
+pub(crate) fn ang_interp(cur: f32, tgt: f32, k: f32, d: f32, max: f32, v: &mut f32) -> f32 {
     let e = sub_rot(tgt, cur);
     *v += k * e - d * *v;
     if max != 0.0 { *v = v.clamp(-max, max); }

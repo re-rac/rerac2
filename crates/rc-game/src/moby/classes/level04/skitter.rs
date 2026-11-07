@@ -86,18 +86,6 @@ fn found(w: &MobyWorld, id: usize) -> bool { w.mobys[id].pv_i(FOUND) == 1 }
 fn link_ok(w: &MobyWorld, k: i32, id: usize) -> Option<usize> {
     usize::try_from(k).ok().filter(|&k| k != id && w.mobys.get(k).is_some_and(|m| m.state != 0xfe && m.state != 0xfd))
 }
-fn tick_i(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut t = w.mobys[id].pv_i(off);
-    let out = crate::moby::countdown(&mut t);
-    w.mobys[id].set_pv_i(off, t);
-    out
-}
-fn tick_s(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut t = w.mobys[id].pv_s(off) as i32;
-    let out = crate::moby::countdown(&mut t);
-    w.mobys[id].set_pv_s(off, t as i16);
-    out
-}
 fn show(w: &mut MobyWorld, id: usize) {
     let has = w.class(CLASS).is_some_and(|c| c.has_collision);
     let m = &mut w.mobys[id];
@@ -218,7 +206,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let m = &w.mobys[id];
             let waiting = m.pv_i(SEAT) != -1 && link_ok(w, m.pv_i(WAIT_FOR), id).is_some();
             if !waiting {
-                tick_i(w, id, WAIT);
+                w.mobys[id].count_i(WAIT);
                 if found(w, id) {
                     let seat = w.mobys[id].pv_i(SEAT);
                     if seat == -1 {
@@ -307,7 +295,7 @@ fn tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 }
 
 fn idle_or_walk(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, idles: (i32, u8)) {
-    let t = { tick_s(w, id, T_WANDER); w.mobys[id].pv_s(T_WANDER) };
+    let t = { w.mobys[id].count_s(T_WANDER); w.mobys[id].pv_s(T_WANDER) };
     let s = seq(w, id, ctx);
     if s == 0 && t != 0 { set_seq(w, id, ctx, 7, 0, 0xe); }
     let t = w.mobys[id].pv_s(T_WANDER);
@@ -362,7 +350,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
                 st(w, id, 5, 2);
                 set_seq(w, id, ctx, 8, 2, 6);
                 w.mobys[id].set_pv_f(OFFSET, 0.0);
-            } else if tick_i(w, id, T_OFFSET) {
+            } else if w.mobys[id].count_i(T_OFFSET) {
                 let f = ctx.game.rng.randf(f32::from_bits(0x3e86_0a93), f32::from_bits(0x3f06_0a93));
                 let f = if ctx.game.rng.randi(2) == 0 { -f } else { f };
                 let t = ctx.game.rng.rand_range(0x2d, 0x3c);
@@ -437,8 +425,8 @@ fn walk(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// `0x44ee50`: the flash, the rest and leap timers down, its ticks in the state.
 fn post(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
     ai::flash(&mut w.mobys[id], FLASH);
-    tick_i(w, id, T_REST);
-    tick_s(w, id, T_LEAP);
+    w.mobys[id].count_i(T_REST);
+    w.mobys[id].count_s(T_LEAP);
     let m = &mut w.mobys[id];
     if m.state_ticks != -1 { m.state_ticks += 1; }
 }

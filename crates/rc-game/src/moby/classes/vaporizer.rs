@@ -84,7 +84,7 @@
 use crate::collision::QueryFlags;
 use crate::first_person::Tune;
 use crate::hero::items::{row, ItemRow, PULSE};
-use crate::hero::physics::{add, add_rot, cross, len, scale, set_len, sub, unit, V3};
+use crate::hero::physics::{add, add_rot, cross, len, scale, set_len, sub, unit, wrap, V3};
 use crate::moby::hits::HitTemplate;
 use crate::moby::{aim, countdown, lock_on, Ctx, MobyWorld};
 use crate::rumble;
@@ -180,19 +180,8 @@ fn cur_row(game: &crate::game::GameState) -> Option<&'static ItemRow> { row(game
 /// The record's `+0x64` by row (the impact's sphere).
 fn blast_damage(r: &ItemRow) -> f32 { if r.item == 0x42 { 20.0 } else { 0.0 } }
 
-/// `0x320440(a)`: `a` wrapped into −π..π (`0x2eff90`: modf, the fraction keeping the sign).
-fn wrap(a: f32) -> f32 { ((a + std::f32::consts::PI) * 0.159_154_94).fract() * 6.283_185_5 - std::f32::consts::PI }
-
 /// `0x2eef88(out, a, b)` = b × a.
 fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
-
-/// `0x2eeae0` on the s16 at `off`.
-fn count_s(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut n = w.mobys[id].pv_s(off) as i32;
-    let done = countdown(&mut n);
-    w.mobys[id].set_pv_s(off, n as i16);
-    done
-}
 
 /// The muzzle light let go (`0x2fdc48`).
 fn free_light(w: &mut MobyWorld, id: usize) {
@@ -228,7 +217,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         0 => start(w, id, ctx),
         1 => ready(w, id, ctx, fp),
         2 => {
-            if count_s(w, id, 2) || w.mobys[id].pv_s(0) != 0 {
+            if w.mobys[id].count_s(2) || w.mobys[id].pv_s(0) != 0 {
                 if let Some(r) = cur_row(ctx.game).copied() {
                     ctx.host.play_sound(&w.mobys[id], 0, 0);
                     fire(w, id, ctx, fp, &r);
@@ -494,7 +483,7 @@ pub fn update_shot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     puff(w, id, ctx, add(start, scale(sub(pos, start), 0.5)));
     let in_box = pos.iter().all(|&c| (2.0..=1021.0).contains(&c));
     if in_box {
-        if !hit(w, id, ctx, start) && !count_i(w, id, 0x10) {
+        if !hit(w, id, ctx, start) && !w.mobys[id].count_i(0x10) {
             tail(w, id, ctx);
             return;
         }
@@ -503,14 +492,6 @@ pub fn update_shot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.pos = m.pos.map(|c| c.clamp(5.0, 1016.0));
     }
     w.mobys[id].state = 2;
-}
-
-/// `0x2eeab0` on the word at `off`.
-fn count_i(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut n = w.mobys[id].pv_i(off);
-    let done = countdown(&mut n);
-    w.mobys[id].set_pv_i(off, n);
-    done
 }
 
 /// `0x3f6bf0(shot, at)`: the trail's next point (module docs), placed.
@@ -574,7 +555,7 @@ fn step_trail(w: &mut MobyWorld, id: usize, ctx: &Ctx) -> bool {
     if 7.0 < *s || *s < -7.0 { *s = 0.0; }
     *s -= 0.075;
     if *s <= -4.0 { *s += 4.0; }
-    !count_s(w, id, 0x22)
+    !w.mobys[id].count_s(0x22)
 }
 
 /// `0x3f7da0(shot, at)`: a puff in the slot's first free record (module docs); none when all 120 are in use.

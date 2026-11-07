@@ -76,14 +76,6 @@ pub fn grav(w: &MobyWorld) -> bool { w.level11.arena_gravity[1] }
 // ---------------------------------------------------------------------------------------------------------------
 // The fighters' shared pieces
 
-/// `0x33d580`: the first tick since the last sub-state change.
-pub(super) fn first_sub(w: &mut MobyWorld, id: usize) -> bool {
-    let m = &mut w.mobys[id];
-    if m.once & 2 != 0 { return false; }
-    m.once |= 2;
-    true
-}
-
 pub(super) fn lim(w: &mut MobyWorld, id: usize, a: f32, b: f32, c: f32, d: f32) { ai::senses(&mut w.mobys[id], a, b, c, d); }
 
 /// `0x338e18(m, v, frame)`: the yaw of `v` in its own frame (signed).
@@ -232,16 +224,6 @@ pub(super) fn face(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, p: V3, ring: boo
     }
 }
 
-/// `0x321c00(angle, out, v, axis)`: `v` turned `angle` about `axis`.
-pub(super) fn rotate(v: V3, angle: f32, axis: V3) -> V3 {
-    if angle.abs() < 1e-5 { return v; }
-    let k = set_len(axis, 1.0);
-    let (s, c) = angle.sin_cos();
-    let d = k[0] * v[0] + k[1] * v[1] + k[2] * v[2];
-    let x = crate::hero::physics::cross(k, v);
-    [0, 1, 2].map(|i| v[i] * c + x[i] * s + k[i] * d * (1.0 - c))
-}
-
 /// `0x438548` (and its copies): in view (`0x3024c8(128, (pos, 2))`), a raised plate of its group `group` within
 /// `near` across and 85° of its facing is gone round 5° a tick (the walk's stop `+0x134` 0.0001 for the move).
 pub(super) fn round_plates(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, group: usize, near: f32) -> bool {
@@ -258,7 +240,7 @@ pub(super) fn round_plates(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, group: u
         if 85f32.to_radians() <= rot_dist(face, yaw) { continue; }
         let mut a = 5f32.to_radians();
         if 0.0 <= sub_rot(face, yaw) { a = -a; }
-        let goal = add(rotate(sub(me, at), a, w.mobys[id].rows[2]), at);
+        let goal = add(crate::camera::rot(sub(me, at), a, w.mobys[id].rows[2]), at);
         let keep = w.mobys[id].pv_f(0x134);
         w.mobys[id].set_pv_f(0x134, 0.0001);
         go(w, id, ctx, goal, false);
@@ -520,7 +502,7 @@ pub fn update_d37(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let t = target_of(w, id, ctx, TARGET);
     let (angle, diff, d) = aim(w, id, t, ring);
     if w.mobys[id].sub_state == 2 {
-        if first_sub(w, id) {
+        if w.mobys[id].first_sub() {
             set_seq(w, id, ctx, 6, 0, 10);
             w.mobys[id].timer = 0;
             lim(w, id, 0.004_444_444_6, 0.133_333_34, 0.006_981_318, 0.209_439_55);
@@ -841,7 +823,7 @@ pub fn update_dcf(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let t = target_of(w, id, ctx, TARGET);
     let (angle, diff, d) = aim(w, id, t, ring);
     if w.mobys[id].sub_state == 2 {
-        if first_sub(w, id) {
+        if w.mobys[id].first_sub() {
             set_seq(w, id, ctx, 10, 0, 10);
             w.mobys[id].timer = 0;
             lim(w, id, 0.002_222_222_3, 0.066_666_67, 0.001_163_553, 0.104_719_77);
@@ -1120,7 +1102,7 @@ pub fn update_df4(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let t = target_of(w, id, ctx, TARGET);
     let (heading, diff, d) = aim(w, id, t, ring);
     if w.mobys[id].sub_state == 2 {
-        if first_sub(w, id) {
+        if w.mobys[id].first_sub() {
             set_seq(w, id, ctx, 9, 0, 10);
             w.mobys[id].timer = 0;
             lim(w, id, 0.004_444_444_6, 0.133_333_34, 0.000_581_776_5, 0.052_359_886);
@@ -1637,7 +1619,7 @@ pub fn update_df7(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         11 => {
-            if first_sub(w, id) {
+            if w.mobys[id].first_sub() {
                 lim(w, id, 0.002_222_222_3, 0.066_666_67, 0.001_163_553, 0.104_719_77);
                 w.mobys[id].state_ticks = 0;
             }

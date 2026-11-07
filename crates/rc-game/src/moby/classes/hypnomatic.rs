@@ -44,7 +44,7 @@
 
 use super::level18::capturable::{GUNNER, PVARS};
 use crate::hero::physics::{add, dist, dist2, scale, set_len, sub, V3};
-use crate::moby::{ai, aim, countdown, lock_on, Ctx, MobyWorld};
+use crate::moby::{ai, aim, countdown, keep_loop, lock_on, Ctx, MobyWorld};
 
 /// The item and its hand's class.
 pub const ITEM: i32 = 0x37;
@@ -209,13 +209,13 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if grounded && it.no_use == 0 && on && 16 <= it.item_ticks {
         if w.mobys[id].pv_i(HELD) == 0 {
             ctx.hero.items.use_start(ctx.hero.group);
-            loop_sound(w, id, ctx);
+            keep_loop(w, id, ctx, SOUND, 0);
             w.mobys[id].set_pv_i(HELD, 1);
         }
         if it.pressed & it.trigger != 0 {
             w.mobys[id].set_pv_f(SCROLL, 0.0);
             w.mobys[id].set_pv_f(LENGTH, 0.0);
-            loop_sound(w, id, ctx);
+            keep_loop(w, id, ctx, SOUND, 0);
         }
     }
     if 0.0 < w.mobys[id].pv_f(SCROLL) || on || !grounded { beam(w, id, ctx); }
@@ -228,14 +228,6 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         ctx.hero.items.use_end(ctx.hero.state, ctx.hero_view.seq_b, idle);
         w.mobys[id].set_pv_i(HELD, 0);
     }
-}
-
-/// Its class sound 0 looped (mode 4) unless it plays it already.
-fn loop_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let h = w.mobys[id].pv_i(SOUND);
-    if h != -1 && ctx.host.sound_playing(h) { return; }
-    let h = ctx.host.play_sound(&w.mobys[id], 0, 4);
-    w.mobys[id].set_pv_i(SOUND, h);
 }
 
 /// `0x3ba2a0` (module docs): the creature the beam would take.

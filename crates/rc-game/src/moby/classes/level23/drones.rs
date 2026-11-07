@@ -73,14 +73,6 @@ const TURN_BACK: i16 = 30;
 fn rider_of(w: &MobyWorld, id: usize) -> Option<usize> { ai::link(&w.mobys[id], 0x2a0).filter(|&r| w.mobys.get(r).is_some_and(|m| m.o_class == RIDER && m.state < 0xfd)) }
 fn seq(w: &MobyWorld, ctx: &Ctx, id: usize) -> u8 { ctx.host.anim(&w.mobys[id]).map_or(0xff, |a| a.seq_b) }
 
-/// `0x2b3890`: the first time since the last state change (its own flag).
-fn first_sub(w: &mut MobyWorld, id: usize) -> bool {
-    let m = &mut w.mobys[id];
-    if m.once & 2 != 0 { return false; }
-    m.once |= 2;
-    true
-}
-
 /// `0x3c1400(m, seq, 0, blend, which)`: the sequence on itself (`which` & 1) and its rider (& 2).
 fn anim(w: &MobyWorld, ctx: &mut Ctx, id: usize, s: u8, blend: u8, which: u8) {
     if which & 1 != 0 { ctx.host.set_anim(&w.mobys[id], s, 0, blend); }
@@ -533,18 +525,18 @@ pub fn update_07e5(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let rider_seq = rider_of(w, id).map(|r| seq(w, ctx, r));
     match st {
         5 => {
-            if first_sub(w, id) {
+            if w.mobys[id].first_sub() {
                 anim(w, ctx, id, 3, 4, 3);
                 stop_sound(w, id, ctx);
             }
             if 8 < t { w.mobys[id].set_state(7, 1); }
         }
         1 => {
-            if first_sub(w, id) { show(w, id, ctx); } else if 6 <= t { w.mobys[id].set_state(3, 0); }
+            if w.mobys[id].first_sub() { show(w, id, ctx); } else if 6 <= t { w.mobys[id].set_state(3, 0); }
         }
         2 => {
             w.mobys[id].has_collision = false;
-            if first_sub(w, id) {
+            if w.mobys[id].first_sub() {
                 show(w, id, ctx);
                 anim(w, ctx, id, 9, 0, 1);
                 anim(w, ctx, id, 1, 0, 2);
@@ -556,7 +548,7 @@ pub fn update_07e5(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         6 => respawn(w, id, ctx),
         3 => {
-            if first_sub(w, id) && seq(w, ctx, id) != 1 { anim(w, ctx, id, 1, 4, 3); }
+            if w.mobys[id].first_sub() && seq(w, ctx, id) != 1 { anim(w, ctx, id, 1, 4, 3); }
             let p = w.mobys[id].pos;
             frames::move_to(w, id, ctx, p);
             if w.mobys[id].pv_s(0x110) != 0 {
@@ -570,7 +562,7 @@ pub fn update_07e5(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         4 => {
-            if first_sub(w, id) && seq(w, ctx, id) != 2 {
+            if w.mobys[id].first_sub() && seq(w, ctx, id) != 2 {
                 anim(w, ctx, id, 2, 6, 3);
             } else if ctx.host.anim(&w.mobys[id]).is_some_and(|a| a.flags & 2 != 0) || 12.0 < ctx.host.frame_time(&w.mobys[id]) {
                 w.mobys[id].set_state(5, 0);
@@ -580,7 +572,7 @@ pub fn update_07e5(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             frames::move_to(w, id, ctx, p);
         }
         7 => {
-            if first_sub(w, id) {
+            if w.mobys[id].first_sub() {
                 let s = SPEED + ctx.game.rng.randf(0.0, SPEED * 0.5);
                 let m = &mut w.mobys[id];
                 m.set_pv_i(0x250, 200);

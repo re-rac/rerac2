@@ -4,36 +4,13 @@
 //! * **0x0849** ([`update_0849`], `0x3fc598`): a lift between its place and `+0x68` under it that comes to Ratchet.
 
 use crate::hero::physics::{dist, ease, sub, V3};
-use crate::moby::{Ctx, MobyWorld};
-
-/// `0x365618(m)`: Ratchet on moby `id` — climbing (0x1b) or in the ledge group 3, on its ledge (`0x18a3a8`); else
-/// grounded (`0x18a16e` = 0) on it (`0x18a15c`).
-fn on(ctx: &Ctx, id: usize) -> bool {
-    let h = &*ctx.hero;
-    if h.group == 3 || h.state == 0x1b { h.ledge.moby == Some(id) } else { h.air_ticks == 0 && h.ground_moby == Some(id) }
-}
-
-/// Its class sound `k` looped into `+0x68`[`at`] unless it plays (`0x3a1950`, `0x3a1c98(k, 4)`).
-fn loop_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, k: i32, at: usize) {
-    let h = w.mobys[id].pv_i(at);
-    if !(h != -1 && ctx.host.sound_playing(h)) {
-        let h = ctx.host.play_sound(&w.mobys[id], k, 4);
-        w.mobys[id].set_pv_i(at, h);
-    }
-}
-
-/// The loop at `+0x68`[`at`] stopped (`0x3a1998`), −1.
-fn stop_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, at: usize) {
-    let h = w.mobys[id].pv_i(at);
-    if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
-    w.mobys[id].set_pv_i(at, -1);
-}
+use crate::moby::{keep_loop, stop_loop, Ctx, MobyWorld};
 
 /// 0x08c9 (`0x402d68`): its pvars `+0x20` its platform block (crate::moby::platform, flags | 1), `[0x60]` its place
 /// (the top), `[0x80]` 1 when it is at the bottom, `[0x84]` its ticks on the way, `[0x88]` its looped sound, `[0x8c]` a
 /// cuboid.
 /// * **0**: flags | 1, its place kept, its sound none, at the top, 1.
-/// * **1**: Ratchet on it ([`on`]): at the top → 3 (sound 0 looped), else → 2 (sound 1). Then: Ratchet
+/// * **1**: Ratchet on it (crate::moby::ai::stands_on): at the top → 3 (sound 0 looped), else → 2 (sound 1). Then: Ratchet
 ///   below 55 with it at the top → 3 (sound 0); above 57 with it at the bottom and him in the cuboid → 2 (sound 1).
 /// * **2** (back up): at its place (within 0.04): its sound stopped, and with Ratchet off it, at the top, at that
 ///   place, 1. Else 0.05 a tick along its yaw + 90°, the first 0x68 ticks rising 0.07.
@@ -59,29 +36,29 @@ pub fn update_08c9(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         1 => {
             let up = w.mobys[id].pv_i(0x80);
-            if on(ctx, id) {
+            if crate::moby::ai::stands_on(ctx, id) {
                 if up == 0 {
                     w.mobys[id].set_state(3, -1);
-                    loop_sound(w, id, ctx, 0, 0x88);
+                    keep_loop(w, id, ctx, 0x88, 0);
                 } else {
                     w.mobys[id].set_state(2, -1);
-                    loop_sound(w, id, ctx, 1, 0x88);
+                    keep_loop(w, id, ctx, 0x88, 1);
                 }
             }
             let c = w.mobys[id].pv_i(0x8c);
             if hz < 55.0 && up == 0 {
-                loop_sound(w, id, ctx, 0, 0x88);
+                keep_loop(w, id, ctx, 0x88, 0);
                 w.mobys[id].set_state(3, -1);
             } else if 57.0 < hz && up == 1 && ctx.level.in_cuboid(c, ctx.hero.pos) {
-                loop_sound(w, id, ctx, 1, 0x88);
+                keep_loop(w, id, ctx, 0x88, 1);
                 w.mobys[id].set_state(2, -1);
             }
         }
         2 => {
             let m = &w.mobys[id];
             if dist(m.pos, m.pv_v(0x60)) <= 0.04 {
-                let off = !on(ctx, id);
-                stop_sound(w, id, ctx, 0x88);
+                let off = !crate::moby::ai::stands_on(ctx, id);
+                stop_loop(w, id, ctx, 0x88);
                 if off {
                     let m = &mut w.mobys[id];
                     m.set_pv_i(0x80, 0);
@@ -100,8 +77,8 @@ pub fn update_08c9(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         3 => {
             let z = w.mobys[id].pos[2];
             if z < 50.75 {
-                let off = !on(ctx, id);
-                stop_sound(w, id, ctx, 0x88);
+                let off = !crate::moby::ai::stands_on(ctx, id);
+                stop_loop(w, id, ctx, 0x88);
                 if off {
                     let m = &mut w.mobys[id];
                     m.set_pv_i(0x80, 1);
@@ -133,7 +110,7 @@ pub fn update_08c9(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// `+0x68` how far it goes down, `+0x74` / `+0x78` (copied into `+0x60` / `+0x7c` and counted down by its rises:
 /// nothing here reads them), its bottom `+0x80` and top (its place) `+0x90`, `+0xb0` its looped sound.
 /// * **0**: flags | 1, its top and bottom, its sound none, its speed 0, 1.
-/// * **1** (still): its sound stopped; Ratchet on it ([`on`]): at the top 2, else 3. Then at the top with Ratchet
+/// * **1** (still): its sound stopped; Ratchet on it (crate::moby::ai::stands_on): at the top 2, else 3. Then at the top with Ratchet
 ///   more than 3 under it 2; at the bottom with him more than 3 over it 3.
 /// * **2** (down): at the bottom its sound stopped, with Ratchet off it 1. Else, unless a 2.1 sphere about it (not the
 ///   world, `0x31f0c0` flags 1) meets something with Ratchet under it (but a moby 0x0ea3), its class sound 0 looped and
@@ -163,9 +140,9 @@ pub fn update_0849(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.set_pv_f(0x64, 0.0);
         }
         1 => {
-            stop_sound(w, id, ctx, 0xb0);
+            stop_loop(w, id, ctx, 0xb0);
             let (z, top, bottom) = (w.mobys[id].pos[2], w.mobys[id].pv_f(0x98), w.mobys[id].pv_f(0x88));
-            if on(ctx, id) { w.mobys[id].set_state(if z == top { 2 } else { 3 }, -1); }
+            if crate::moby::ai::stands_on(ctx, id) { w.mobys[id].set_state(if z == top { 2 } else { 3 }, -1); }
             if 3.0 < z - hz && z == top {
                 w.mobys[id].set_state(2, -1);
             } else if z - hz < -3.0 && z == bottom {
@@ -175,15 +152,15 @@ pub fn update_0849(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         2 => {
             let (pos, bottom) = (w.mobys[id].pos, w.mobys[id].pv_f(0x88));
             if pos[2] <= bottom {
-                stop_sound(w, id, ctx, 0xb0);
-                if !on(ctx, id) { w.mobys[id].state = 1; }
+                stop_loop(w, id, ctx, 0xb0);
+                if !crate::moby::ai::stands_on(ctx, id) { w.mobys[id].state = 1; }
             } else {
                 let met = ctx.coll.and_then(|c| crate::collision::coll_sphere_m(c, ctx.scene, pos, f32::from_bits(0x4006_6666), crate::collision::QueryFlags(1), Some(id)));
                 let blocked = met.is_some_and(|o| hz < pos[2] && !o.moby.and_then(|t| w.mobys.get(t)).is_some_and(|t| t.o_class == 0x0ea3));
                 if blocked {
-                    stop_sound(w, id, ctx, 0xb0);
+                    stop_loop(w, id, ctx, 0xb0);
                 } else {
-                    loop_sound(w, id, ctx, 0, 0xb0);
+                    keep_loop(w, id, ctx, 0xb0, 0);
                     move_to(w, id, bottom);
                 }
             }
@@ -192,8 +169,8 @@ pub fn update_0849(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let top = w.mobys[id].pv_f(0x98);
             move_to(w, id, top);
             if top <= w.mobys[id].pos[2] {
-                stop_sound(w, id, ctx, 0xb0);
-                if !on(ctx, id) {
+                stop_loop(w, id, ctx, 0xb0);
+                if !crate::moby::ai::stands_on(ctx, id) {
                     let m = &mut w.mobys[id];
                     let k = m.pv_i(0x74);
                     m.set_pv_i(0x60, k);
@@ -201,10 +178,10 @@ pub fn update_0849(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     m.state = 1;
                 }
             } else {
-                loop_sound(w, id, ctx, 0, 0xb0);
+                keep_loop(w, id, ctx, 0xb0, 0);
             }
         }
-        4 => stop_sound(w, id, ctx, 0xb0),
+        4 => stop_loop(w, id, ctx, 0xb0),
         _ => {}
     }
     let t = ctx.game.frame as f32 * 0.016_666_668;

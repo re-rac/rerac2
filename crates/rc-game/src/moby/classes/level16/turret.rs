@@ -54,9 +54,10 @@
 
 use crate::hero::physics::{add, add_rot, atan2, dist2, ease, scale, set_len, sub, sub_rot, rot_dist, turn_ease, approach, V3};
 use crate::moby::attach::rows_of;
-use crate::moby::{Ctx, MobyWorld};
+use crate::moby::{keep_loop, stop_loop, Ctx, MobyWorld};
 use crate::pad::button;
 use std::f32::consts::PI;
+use crate::gravity::to_world;
 
 pub const GUN: i16 = 0x10ee;
 
@@ -108,22 +109,6 @@ const PITCH_LIMITS: (f32, f32) = (20.0, -30.0);
 const DEG_TICK2: f32 = 4.848_137_5e-6;
 const DEG_TICK: f32 = 0.000_290_888_25;
 
-/// A point in the frame `r` (`0x2e86c8`).
-fn to_world(l: V3, r: &[V3; 3]) -> V3 { std::array::from_fn(|k| l[0] * r[0][k] + l[1] * r[1][k] + l[2] * r[2][k]) }
-
-fn stop_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let h = w.mobys[id].pv_i(pv::SOUND);
-    if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
-    w.mobys[id].set_pv_i(pv::SOUND, -1);
-}
-
-fn keep_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    if !ctx.host.sound_playing(w.mobys[id].pv_i(pv::SOUND)) {
-        let h = ctx.host.play_sound(&w.mobys[id], 4, 4);
-        w.mobys[id].set_pv_i(pv::SOUND, h);
-    }
-}
-
 pub fn update_10ee(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     match w.mobys[id].state {
         0 => {
@@ -153,7 +138,7 @@ pub fn update_10ee(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             (m.pos[2], m.rot[2]) = (z, yaw);
             m.set_pv_f(pv::Z_V, zv);
             m.set_pv_f(pv::TURN_V, yv);
-            if sub_rot(yaw, angle).abs() < f32::from_bits(0x3e32_b8c4) { stop_sound(w, id, ctx) } else { keep_sound(w, id, ctx) }
+            if sub_rot(yaw, angle).abs() < f32::from_bits(0x3e32_b8c4) { stop_loop(w, id, ctx, pv::SOUND) } else { keep_loop(w, id, ctx, pv::SOUND, 4) }
             if (z - high).abs() <= zv && rot_dist(yaw, angle) <= f32::from_bits(0x3db2_b8c4) { w.mobys[id].set_state(3, -1); }
             help_off(ctx);
             fire(w, id, ctx);
@@ -164,7 +149,7 @@ pub fn update_10ee(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if ctx.hero.items.pressed & button::TRIANGLE != 0 || ctx.hero.state != 0x31 {
                 get_off(ctx);
                 w.mobys[id].set_state(4, -1);
-                stop_sound(w, id, ctx);
+                stop_loop(w, id, ctx, pv::SOUND);
                 ctx.game.prompt.owner = 2;
                 ctx.game.prompt.hold = 30;
             } else {
@@ -329,7 +314,7 @@ fn steer(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     m.set_pv_f(pv::YAW_V, yv);
     m.set_pv_f(pv::PITCH_V, pvv);
-    if 0.0 < yv.abs() || 0.0 < pvv.abs() { keep_sound(w, id, ctx) } else { stop_sound(w, id, ctx) }
+    if 0.0 < yv.abs() || 0.0 < pvv.abs() { keep_loop(w, id, ctx, pv::SOUND, 4) } else { stop_loop(w, id, ctx, pv::SOUND) }
 }
 
 /// Its hits (module docs).

@@ -37,7 +37,7 @@
 //! idles and the blast wait on `+0x338` too), the hidden start's way out (state 0xb: no class here sets it), its parts'
 //! sparks in the hunt (`0x3eb368`, one in six ticks; as 0x0b0b's), the big-head cheat's scale (`0x31dba0`, `+0x230`).
 
-use crate::hero::physics::{add, atan2, dist, dist2, rot_dist, set_len, turn_ease, V3};
+use crate::hero::physics::{add, atan2, dist, dist2, rot_dist, set_len, V3};
 use crate::moby::classes::enemies;
 use crate::moby::classes::props::{group_alive, seq, set_seq, wrapped};
 use crate::moby::{ai, Ctx, MobyWorld};
@@ -55,23 +55,6 @@ const TIMER: usize = 0x344;
 const REACH: f32 = 2.5;
 /// `0x1b0ab8`: its idles.
 const IDLES: [u8; 4] = [6, 7, 12, 13];
-
-/// `0x320c50`: the first tick since the last sub-state change.
-fn first_sub(m: &mut crate::moby::Moby) -> bool {
-    if m.once & 2 != 0 { return false; }
-    m.once |= 2;
-    true
-}
-
-/// `0x323dc8(yaw, m)`: its facing eased toward `yaw` at the movement block's turn limits.
-fn face(w: &mut MobyWorld, id: usize, yaw: f32) {
-    let m = &mut w.mobys[id];
-    let (a, b, c) = (m.pv_f(MV + 0x14), m.pv_f(MV + 0x18), m.pv_f(MV + 0x1c));
-    let (mut r, mut v) = (m.rot[2], m.pv_f(MV + 0xb4));
-    turn_ease(yaw, a, b, c, &mut r, &mut v, 0);
-    m.rot[2] = r;
-    m.set_pv_f(MV + 0xb4, v);
-}
 
 fn yaw_to(w: &MobyWorld, id: usize, p: V3) -> f32 {
     let q = w.mobys[id].pos;
@@ -229,7 +212,7 @@ pub fn update_0d29(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         2 => {
             ctx.game.cam_tweaks.follow_dist = Some((6.0, f32::from_bits(0x3b44_9ba6)));
             ctx.game.cam_tweaks.follow_pivot = Some((3.0, f32::from_bits(0x3b44_9ba6)));
-            if first_sub(&mut w.mobys[id]) {
+            if w.mobys[id].first_sub() {
                 ai::senses(&mut w.mobys[id], 20.0 * 0.000_277_777_78, 6.0 * 0.016_666_668, 720.0 * 4.848_137_5e-6, 1440.0 * 0.000_290_888_25);
             }
             let m = &w.mobys[id];
@@ -294,7 +277,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
             let t = w.mobys[id].pv_v(TARGET);
             let yaw = yaw_to(w, id, t);
-            face(w, id, yaw);
+            crate::moby::ai::face_at(&mut w.mobys[id], MV, yaw);
             let g = w.mobys[id].pv_v(GOAL);
             let yaw = yaw_to(w, id, g);
             let o = MV + 0x38;
@@ -318,7 +301,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let t = w.mobys[id].pv_v(TARGET);
             if f < 19.0 {
                 let yaw = yaw_to(w, id, t);
-                face(w, id, yaw);
+                crate::moby::ai::face_at(&mut w.mobys[id], MV, yaw);
             } else if f <= 22.0 {
                 let damage = w.mobys[id].pv_b(0x34) as f32;
                 for p in enemies::parts(w, id, PARTS).into_iter().flatten() {

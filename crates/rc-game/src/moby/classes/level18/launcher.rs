@@ -26,7 +26,7 @@
 //!
 //! The opening's jitter is added to a vector the original leaves unset (its stack's); here from 0.
 
-use crate::hero::physics::{add, add_rot, set_len, V3};
+use crate::hero::physics::{add, add_rot, set_len, through, V3};
 use crate::moby::blast::{self, Blast};
 use crate::moby::{ai, countdown, Ctx, MobyWorld};
 
@@ -57,9 +57,6 @@ const THROW_AT: V3 = [0.0, 0.0, 0.7];
 const THROW_WAY: V3 = [-1.0, 0.0, 0.5];
 
 const BLAST: Blast = Blast { size: 1.0, bursts: [0x19, 0x14, 0x14], puffs: 0x14, streaks: 0x2d, light: true, shake: true };
-
-/// `0x309b08` (L00 `0x2ef318`): `v` through the rows.
-fn through(rows: &[V3; 3], v: V3) -> V3 { std::array::from_fn(|k| v[0] * rows[0][k] + v[1] * rows[1][k] + v[2] * rows[2][k]) }
 
 pub fn update_1158(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     use crate::moby::classes::level08::tabora_ai::jitter;

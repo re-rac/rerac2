@@ -102,17 +102,6 @@ pub fn update_10fd(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     crate::moby::carry_hero_with(ctx, id, flags, old, old_rot[2], new, rot[2]);
 }
 
-/// `0x2e7ee8` (L00 `0x2eeb40`) on the seconds at `off`: a frame (1/60 s) off; true when out.
-fn wait_out(m: &mut crate::moby::Moby, off: usize) -> bool {
-    let c = m.pv_f(off);
-    if c <= 1.0 / 60.0 {
-        m.set_pv_f(off, 0.0);
-        return true;
-    }
-    m.set_pv_f(off, c - 1.0 / 60.0);
-    false
-}
-
 /// 0x114c (module docs).
 pub fn update_114c(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
     use crate::moby::classes::props::bob;
@@ -132,10 +121,10 @@ pub fn update_114c(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
             if m.timer != 0 { m.set_state(4, -1); }
         }
         2 => {
-            if wait_out(m, 0x14) { m.set_state(3, -1); }
+            if m.count_f(0x14) { m.set_state(3, -1); }
         }
         3 => {
-            if wait_out(m, 0x18) { m.set_state(5, -1); }
+            if m.count_f(0x18) { m.set_state(5, -1); }
             bob(m, 0.1, 120.0 * f32::from_bits(0x3998_825c), -1.0, 4, 0);
         }
         4 => {

@@ -12,7 +12,7 @@
 //!
 //! Not ported: the word `+0x7c` = 0x8100 its break writes (no reader known).
 
-use crate::hero::physics::{add, add_rot, V3};
+use crate::hero::physics::{add, add_rot, through, V3};
 use crate::moby::{ai, Ctx, MobyWorld};
 
 pub const CLASS: i16 = 0x12c4;
@@ -21,7 +21,6 @@ const TOP: V3 = [f32::from_bits(0x3f69_fbe7), 0.0, f32::from_bits(0x410d_1687)];
 /// The splash moby (`0x3e25e0`, class 0x307).
 const SPLASH: i16 = 0x0307;
 
-fn through(r: &[V3; 3], v: V3) -> V3 { std::array::from_fn(|k| v[0] * r[0][k] + v[1] * r[1][k] + v[2] * r[2][k]) }
 fn frame_point(w: &MobyWorld, id: usize, v: V3) -> V3 { add(through(&w.mobys[id].rows, v), w.mobys[id].pos) }
 
 /// 0x12c4 (`0x466008`). **0**: its health 6, its fall (1/15 across its frame, 6..9 a second up), 1. **1**: a hit

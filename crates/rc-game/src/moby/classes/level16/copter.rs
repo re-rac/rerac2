@@ -69,7 +69,7 @@
 
 use crate::hero::physics::{add, add_rot, atan2, dist, dist2, ease, euler_rows, len2, rot_dist, scale, set_len, sub, turn_ease, V3};
 use crate::moby::classes::props::{bob, seq, set_seq, wrapped};
-use crate::moby::{ai, blast, bolts, countdown, mode, shards, Ctx, Moby, MobyWorld};
+use crate::moby::{ai, blast, bolts, mode, shards, Ctx, MobyWorld};
 
 pub const CLASS: i16 = 0x0ebb;
 pub const SHOT: i16 = 0x0ebd;
@@ -125,24 +125,6 @@ const PITCH_A: f32 = f32::from_bits(0x3b64_c38a);
 const PITCH_MAX: f32 = f32::from_bits(0x3e56_7752);
 
 fn st(w: &mut MobyWorld, id: usize, s: u8, sub: i32) { w.mobys[id].set_state(s, sub); }
-fn tick_i(m: &mut Moby, off: usize) -> bool {
-    let mut t = m.pv_i(off);
-    let out = countdown(&mut t);
-    m.set_pv_i(off, t);
-    out
-}
-fn tick_s(m: &mut Moby, off: usize) -> bool {
-    let mut t = m.pv_s(off) as i32;
-    let out = countdown(&mut t);
-    m.set_pv_s(off, t as i16);
-    out
-}
-/// `0x322c80` (L00 `0x32a7f0`): the first time since the last sub-state change.
-fn first_sub(m: &mut Moby) -> bool {
-    if m.once & 2 != 0 { return false; }
-    m.once |= 2;
-    true
-}
 /// `if seq != 0 { set_anim(0, 0, 10) }`.
 fn seq0(w: &MobyWorld, id: usize, ctx: &mut Ctx) { if seq(w, id, ctx) != 0 { ctx.host.set_anim(&w.mobys[id], 0, 0, 10); } }
 fn seq3(w: &MobyWorld, id: usize, ctx: &mut Ctx) { set_seq(w, id, ctx, 3, 0, 10); }
@@ -194,7 +176,7 @@ fn head(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     bob(&mut w.mobys[id], 0.75, 100.0 * DEG_S, -1.0, BOB_PHASE, BOB_LAST);
     ai::flash(&mut w.mobys[id], REACT);
     let mut hit = w.hit_message(id).filter(|h| h.tmpl.flags & 0x10000 != 0);
-    if !tick_s(&mut w.mobys[id], WAIT) { hit = None; }
+    if !w.mobys[id].count_s(WAIT) { hit = None; }
     if let Some(h) = hit.as_mut() {
         let k = w.mobys[id].pv_f(KIND_SCALE);
         if k != 0.0 && h.tmpl.source.and_then(|s| w.mobys.get(s)).is_some_and(|s| s.o_class == CLASS) { h.tmpl.damage *= k; }
@@ -261,7 +243,7 @@ fn setup(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 fn subs(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     match w.mobys[id].sub_state {
         0 => {
-            if first_sub(&mut w.mobys[id]) {
+            if w.mobys[id].first_sub() {
                 let t = ctx.game.rng.rand_range(0, 30);
                 w.mobys[id].set_pv_s(T_ALARM, t as i16);
             }
@@ -276,7 +258,7 @@ fn subs(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
                     st(w, id, 3, 2);
                     if w.mobys[id].pv_i(KEEP_SEQ) == 0 || riser(w, id) { seq0(w, id, ctx); }
                 }
-            } else if w.mobys[id].pv_i(ALARM) != 0 && tick_s(&mut w.mobys[id], T_ALARM) {
+            } else if w.mobys[id].pv_i(ALARM) != 0 && w.mobys[id].count_s(T_ALARM) {
                 st(w, id, 2, 1);
                 w.mobys[id].set_pv_i(ALARM, 0);
                 if w.mobys[id].pv_i(TIMER) < 300 {
@@ -459,7 +441,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// `0x406378` (module docs).
 fn tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &mut w.mobys[id];
-    tick_i(m, TIMER);
+    m.count_i(TIMER);
     if m.state_ticks != -1 { m.state_ticks = m.state_ticks.wrapping_add(1); }
     rider(w, id, ctx);
     let m = &mut w.mobys[id];
@@ -559,14 +541,6 @@ pub fn fire(w: &mut MobyWorld, ctx: &mut Ctx, damage: f32, owner: usize, vel: V3
     k
 }
 
-/// `0x31b208` (L00 `0x321c00`): `v` turned by `a` about the unit axis `n`.
-fn turn(v: V3, n: V3, a: f32) -> V3 {
-    let (c, s) = (a.cos(), a.sin());
-    let d = n[0] * v[0] + n[1] * v[1] + n[2] * v[2];
-    let x = crate::hero::physics::cross(n, v);
-    std::array::from_fn(|k| v[k] * c + x[k] * s + n[k] * d * (1.0 - c))
-}
-
 /// 0x0ebd (`0x4065d0`, module docs).
 pub fn update_0ebd(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &mut w.mobys[id];
@@ -623,8 +597,8 @@ pub fn update_0ebd(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &mut w.mobys[id];
     let a = 40.0 * 0.017_453_294;
     let n = m.rows[1];
-    m.rows[2] = turn(m.rows[2], n, a);
-    m.rows[0] = turn(m.rows[0], n, a);
+    m.rows[2] = crate::camera::rot(m.rows[2], a, n);
+    m.rows[0] = crate::camera::rot(m.rows[0], a, n);
     w.changed = true;
     w.register_draw(id);
 }

@@ -123,6 +123,21 @@ pub fn rot_dist(a: f32, b: f32) -> f32 {
     if PI <= d { 2.0 * PI - d } else { d }
 }
 
+/// `0x2efef0`: `a` wrapped to [−π, π) by its fraction of a turn: `f = a/2π + ½` less its whole part as the game takes
+/// it (the truncation, one less when `f`'s sign bit is set), less ½, times 2π.
+pub fn wrap_turn(a: f32) -> f32 {
+    let f = a * 0.159_154_94 + 0.5;
+    let whole = (f as i32).wrapping_add(f.to_bits() as i32 >> 31);
+    ((f - whole as f32) - 0.5) * std::f32::consts::TAU
+}
+
+/// `0x320440`: `a` wrapped into −π..π by `modf` (`0x2eff90`): the fraction of `(a + π)/2π` keeping its sign, so an
+/// `a` below −π comes back as it is.
+pub fn wrap(a: f32) -> f32 {
+    let t = (a + PI) * 0.159_154_94;
+    (t - t.trunc()) * std::f32::consts::TAU - PI
+}
+
 /// `0x31eb18(t, step, &x)`: x moves toward t by at most `step`; returns |t − x|.
 pub fn approach(t: f32, step: f32, x: &mut f32) -> f32 {
     let d = (t - *x).clamp(-step, step);
@@ -306,6 +321,13 @@ pub fn euler_rows(rot: V3) -> [V3; 3] {
         [cz * sy * cx + sz * sx, sz * sy * cx - cz * sx, cy * cx],
     ]
 }
+
+/// L04 `0x456ca8` (the level library's, on levels 4, 6, 9, 10, 12, 13, 14, 16, 17; L10 `0x42d9b8`): the smooth step
+/// `x²(3 − 2x)`.
+pub fn smooth_step(x: f32) -> f32 { x * x * (x * -2.0 + 3.0) }
+
+/// `0x2ef318(out, v, rows)`: `v` through the rows (`v.x·r0 + v.y·r1 + v.z·r2`: the rows as columns).
+pub fn through(r: &[V3; 3], v: V3) -> V3 { std::array::from_fn(|k| v[0] * r[0][k] + v[1] * r[1][k] + v[2] * r[2][k]) }
 
 // ------------------------------------------------------------------------------------------------
 // The helpers the states call.

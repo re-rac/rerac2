@@ -57,13 +57,6 @@ pub const BIG_CRYSTAL: i16 = 0x10e7;
 /// piece left standing, is −1: none).
 const BIG_RANGE: [f32; 8] = [-4.0, -4.0, 1.0, 0.0, 4.0, 4.0, 7.0, 0.0];
 
-/// A point in the moby's frame, scaled (`0x322558` = L00 `0x326190`).
-fn scaled_point(w: &MobyWorld, id: usize, v: [f32; 3]) -> [f32; 3] {
-    let m = &w.mobys[id];
-    let r = &m.rows;
-    std::array::from_fn(|k| (v[0] * r[0][k] + v[1] * r[1][k] + v[2] * r[2][k]) * m.scale + m.pos[k])
-}
-
 /// 0x10e7 (`0x41eb58`, 25 placed; the decomp's `func_L09_0041D650`): a big crystal.
 ///
 /// * **0**: a glow at (0, 5, 18) times its scale (`0x33c290`: 0x28608020, 1470000 × its scale across, def 0, far
@@ -100,7 +93,7 @@ pub fn update_10e7(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         2 => {
             shards::throw_all(w, id, ctx, BIG_RANGE, SPIN, GRAVITY, 0xffff, 0, -1, 0, 0x87f);
-            let p = scaled_point(w, id, at);
+            let p = crate::moby::ai::frame_point(w, id, at);
             let s = w.mobys[id].scale;
             crate::moby::blast::burst(w, ctx, p, &crate::moby::blast::Blast { size: s, bursts: [12, 12, 12], puffs: 12, streaks: 12, light: true, shake: false });
             let e = crate::moby::blast::Explosion { near: 9.0, size: 0.75, embers: 20, sound: -1, lod: -1, flags: 0x81_0001, ..Default::default() };

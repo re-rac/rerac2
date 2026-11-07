@@ -44,6 +44,7 @@
 use crate::hero::items::{row, GRAVITY_BOMB};
 use crate::hero::physics::{add, add_rot, cross, dot, len, scale, set_len, sub, V3};
 use crate::moby::hits::HitTemplate;
+use crate::moby::slide::{sweep, SweepRec, Swept};
 use crate::moby::{aim, countdown, lock_on, mode, Ctx, MobyWorld};
 use crate::rumble;
 
@@ -279,41 +280,6 @@ fn throw(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, at: V3, vel: V3) {
     w.changed = true;
 }
 
-/// What the sweep found.
-enum Sweep {
-    None,
-    /// Off a wall (the velocity bounced).
-    Bounce,
-    /// Stopped on a floor or a target.
-    Stop,
-}
-
-/// `0x37edb8` for the bomb: the 0.25 sphere at `to` (its pushed-out centre), else the line `from` → `to` (its point),
-/// not the bomb nor Ratchet nor another bomb. The normal under 0.5 up bounces `vel` (reflected, a quarter of the
-/// normal speed kept); else it stops. Returns the place, the surface's normal, the moby touched and the query's own
-/// point (`0x1bf1a0`).
-fn sweep(w: &MobyWorld, ctx: &Ctx, id: usize, from: V3, to: V3, vel: &mut V3) -> (Sweep, V3, V3, Option<usize>, V3) {
-    let Some(c) = ctx.coll else { return (Sweep::None, to, [0.0; 3], None, to) };
-    let q = crate::collision::QueryFlags(0);
-    let hit = crate::collision::coll_sphere_m(c, ctx.scene, to, 0.25, q, Some(id)).map(|h| (h.pushed_centre.unwrap_or(h.point), h))
-        .or_else(|| w.coll_line(ctx, from, to, 0, Some(id)).map(|h| (h.point, h)));
-    let Some((at, h)) = hit else { return (Sweep::None, to, [0.0; 3], None, to) };
-    let own_hand = if w.mobys[id].o_class == MINI_BOMB { MINI_HAND } else { HAND_CLASS };
-    if h.moby.is_some_and(|m| m == id || Some(m) == ctx.hero_moby || w.mobys.get(m).is_some_and(|x| x.o_class == own_hand || x.o_class == 0)) {
-        return (Sweep::None, to, [0.0; 3], None, to);
-    }
-    let n = crate::hero::physics::unit(h.normal);
-    // Against the frames' up at its (new) place (`0x37ecc0`).
-    if dot(crate::gravity::up(ctx.hero, to), n) < FLOOR {
-        // `0x2ef2a8`: reflected; then the normal part a quarter.
-        let r = sub(*vel, scale(n, 2.0 * dot(*vel, n)));
-        let along = scale(n, dot(r, n));
-        *vel = add(sub(r, along), scale(along, RESTITUTION));
-        return (Sweep::Bounce, at, n, h.moby, h.point);
-    }
-    (Sweep::Stop, h.point, n, h.moby, h.point)
-}
-
 /// `0x3efda0`.
 pub fn update_bomb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     match w.mobys[id].state {
@@ -326,16 +292,20 @@ pub fn update_bomb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let vel = crate::gravity::ride_dir(w, w.mobys[id].pv_v(0));
             let vel = crate::gravity::turn(w, ctx.hero, w.mobys[id].pv_i(0x34), vel, Some(to));
             let mut vel = sub(vel, scale(crate::gravity::up(ctx.hero, to), GRAVITY));
-            let (s, at, n, touched, point) = sweep(w, ctx, id, from, to, &mut vel);
+            // `0x37edb8` against the frames' up at its new place: the 0.25 sphere, not the bomb nor Ratchet nor its hand.
+            let own_hand = if w.mobys[id].o_class == MINI_BOMB { MINI_HAND } else { HAND_CLASS };
+            w.mobys[id].pos = to;
+            let rec = SweepRec { from, to, radius: 0.25, lift: None, flags: 0, pass: &[own_hand, 0], floor: FLOOR, bounce: RESTITUTION, creatures: false };
+            let Swept { res, at, normal: n, moby: touched, point, .. } = sweep(w, ctx, id, &rec, &mut vel);
             let m = &mut w.mobys[id];
             m.set_pv_v(0, vel);
-            match s {
-                Sweep::None => m.pos = to,
-                Sweep::Bounce => {
+            match res {
+                0 => m.pos = to,
+                1 => {
                     m.pos = at;
                     m.set_pv_v(0x20, n);
                 }
-                Sweep::Stop => {
+                _ => {
                     m.pos = at;
                     m.set_pv_v(0x20, n);
                     m.state = 2;
@@ -717,10 +687,7 @@ pub fn marker_quads_sized(size: f32, at: V3, n: V3, rgba: [u32; 2], frame: i32, 
     let pitch = add_rot(-crate::hero::physics::atan2((n[0] * n[0] + n[2] * n[2]).sqrt(), n[1]), std::f32::consts::FRAC_PI_2);
     let yaw = crate::hero::physics::atan2(n[2], n[0]);
     let rows = crate::hero::physics::euler_rows([pitch, yaw, 0.0]);
-    let spin0 = {
-        let f = (frame % 180) as f32 * 0.034_906_59 * 0.159_154_94 + 0.5;
-        ((f - f.floor()) - 0.5) * std::f32::consts::TAU
-    };
+    let spin0 = crate::hero::physics::wrap_turn((frame % 180) as f32 * 0.034_906_59);
     for k in 0..2 {
         let s = if k == 0 { spin0 } else { -spin0 };
         let (sn, cs) = s.sin_cos();
@@ -822,7 +789,7 @@ fn effect_start(w: &mut MobyWorld, ctx: &mut Ctx, id: usize, at: V3, n: V3) {
         for kind in [2u8, 0] {
             let alpha = g.rand_range(0x5f, 0x7f);
             g.rand();
-            let dir = rotate(e.axis, a, n);
+            let dir = crate::camera::rot(e.axis, a, n);
             let grey = g.rand_range(0, 3) as u32 * 0x0001_0101;
             let s0 = g.randf(0.15, 1.25) * 0.125;
             let s1 = g.randf(0.5, 1.8) * 0.7;
@@ -899,12 +866,6 @@ fn effect_tick(w: &mut MobyWorld, id: usize) {
         }
         true
     });
-}
-
-/// `0x321c00(angle, out, v, axis)`: `v` turned `angle` about `axis`.
-pub(crate) fn rotate(v: V3, angle: f32, axis: V3) -> V3 {
-    if angle.abs() < 1e-5 { return v; }
-    turn(v, crate::hero::physics::unit(axis), angle)
 }
 
 /// `0x3f0e80`: in view (100, a sphere of 2), the shockwave twice (`0x3f0f18`: the mesh 2·size across and a quarter

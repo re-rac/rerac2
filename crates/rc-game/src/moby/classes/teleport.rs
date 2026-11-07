@@ -11,7 +11,7 @@
 //! ([`burst`] `0x3cb600`), and the growth `+0xc` at 4/60 a tick, over which the mobys are shown, their rows x and y
 //! scaled by it ([`grow`] `0x3cb428`); at 1 their modes and colours come back and the carrier goes.
 
-use crate::hero::physics::{add, add_rot, approach, scale, sub, V3};
+use crate::hero::physics::{add, add_rot, approach, scale, sub, through, V3};
 use crate::hud::lerp_rgba;
 use crate::moby::attach::{angles_of, rows_of, turn};
 use crate::moby::{Ctx, Moby, MobyWorld};
@@ -23,8 +23,6 @@ const FROM: u32 = 0x80ff_8000;
 
 /// `0x3285d0`: the ambient as a colour word.
 fn ambient(m: &Moby) -> u32 { 0x8000_0000 | (m.ambient[2] as u32) << 16 | (m.ambient[1] as u32) << 8 | m.ambient[0] as u32 }
-
-fn to_local(v: V3, r: &[V3; 3]) -> V3 { std::array::from_fn(|k| v[0] * r[0][k] + v[1] * r[1][k] + v[2] * r[2][k]) }
 
 fn hide(m: &mut Moby) {
     m.mode |= 0x103;
@@ -48,7 +46,7 @@ pub fn start(w: &mut MobyWorld, m: usize, pos: V3, rot: V3, linked: &[usize]) ->
     cp.set_pv_i(0x30, amb as i32);
     for (k, &l) in linked.iter().take(3).enumerate() {
         let x = &w.mobys[l];
-        let local = to_local(sub(x.pos, m_pos), &inv);
+        let local = through(&inv, sub(x.pos, m_pos));
         let angles = angles_of(&turn(&inv, &x.rows));
         let (mode, amb) = (x.mode, ambient(x));
         let cp = &mut w.mobys[c];
@@ -169,7 +167,7 @@ fn grow(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         x.mode &= !1;
         x.drawn = 1;
         x.has_collision = coll;
-        x.pos = add(m_pos, to_local(local, &rows));
+        x.pos = add(m_pos, through(&rows, local));
         x.rows = turn(&rows, &rows_of(angles));
         x.set_ambient_word(lerp_rgba(t, FROM, amb));
         w.rebuild(l, ctx.host);

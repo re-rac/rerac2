@@ -41,7 +41,7 @@
 //! Not ported: the eyes' glow on joint 0 (the port's glows take the rows), the spawn spot's world test (`0x2df8d8`: only the mobys there are looked at), state 9
 //! without a spawn cuboid (the game reads before the cuboid table; here straight to the chase).
 
-use crate::hero::physics::{add, add_rot, atan2, dist2, turn_ease, V3};
+use crate::hero::physics::{add, add_rot, atan2, dist2, V3};
 use crate::hud::lerp_rgba;
 use crate::moby::{ai, Ctx, MobyWorld};
 use super::props::seq;
@@ -64,13 +64,6 @@ const GOAL: usize = 0x2c0;
 /// `$gp+0x2b40..`: walk accel (/s²), walk most (/s), turn accel (″), turn most (°/s).
 const WALK: (f32, f32, f32, f32) = (15.0, 5.0, 1440.0, 1440.0);
 
-/// `0x32bec8` / `0x32bef0`: the first tick of the state / sub-state.
-fn first_sub(m: &mut crate::moby::Moby) -> bool {
-    if m.once & 2 != 0 { return false; }
-    m.once |= 2;
-    true
-}
-
 fn size(m: &crate::moby::Moby) -> f32 { if m.pv_i(BIG) != 0 { f32::from_bits(0x3f2a_7efa) } else { 0.75 } }
 
 fn group(w: &MobyWorld, id: usize) -> Vec<usize> {
@@ -80,16 +73,6 @@ fn group(w: &MobyWorld, id: usize) -> Vec<usize> {
 /// `0x31c9b8(m, seq, 0, blend)` unless it shows `seq`.
 fn play(w: &MobyWorld, id: usize, ctx: &mut Ctx, s: u8, blend: u8) {
     if seq(w, id, ctx) != s { ctx.host.set_anim(&w.mobys[id], s, 0, blend); }
-}
-
-/// `0x32f4e8(yaw, m)`: its facing eased toward `yaw` at the movement block's turn limits.
-fn face(w: &mut MobyWorld, id: usize, yaw: f32) {
-    let m = &mut w.mobys[id];
-    let (a, b, c) = (m.pv_f(MV + 0x14), m.pv_f(MV + 0x18), m.pv_f(MV + 0x1c));
-    let (mut r, mut v) = (m.rot[2], m.pv_f(MV + 0xb4));
-    turn_ease(yaw, a, b, c, &mut r, &mut v, 0);
-    m.rot[2] = r;
-    m.set_pv_f(MV + 0xb4, v);
 }
 
 fn yaw_to(w: &MobyWorld, id: usize, p: V3) -> f32 { let q = w.mobys[id].pos; atan2(p[0] - q[0], p[1] - q[1]) }
@@ -112,7 +95,7 @@ fn move_opts(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3, opts: i32, w
 /// pieces thrown 3..6 across and up (mask 0x1f, no velocity).
 fn burst(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &w.mobys[id];
-    let at = add(super::endako_a::to_world([0.0, 0.0, 0.25], &m.rows), m.pos);
+    let at = add(crate::gravity::to_world([0.0, 0.0, 0.25], &m.rows), m.pos);
     ctx.host.play_sound(&w.mobys[id], 2, 0);
     crate::moby::blast::smoke_burst(w, ctx, f32::from_bits(0x3eaa_7efa), 0.0, Some(id), at, -1);
     crate::moby::shards::break_into(w, id, ctx, (3.0, 6.0), (3.0, 6.0), 0x1f, [0.0; 3], 0xff);
@@ -278,7 +261,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         2 => {
-            if first_sub(&mut w.mobys[id]) {
+            if w.mobys[id].first_sub() {
                 let s = ctx.game.rng.randf_signed(30.0, 45.0);
                 w.mobys[id].set_pv_f(0x2e0, s * 0.017_453_294);
             }
@@ -325,7 +308,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         3 => {
             let y = yaw_to(w, id, watched(w, ctx));
-            face(w, id, y);
+            crate::moby::ai::face_at(&mut w.mobys[id], MV, y);
             if 0xb <= w.mobys[id].state_ticks as u16 { w.mobys[id].set_state(4, -1); }
         }
         4 => {
@@ -336,7 +319,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 stroll_goal(w, id, ctx, 1.0);
             }
             let y = yaw_to(w, id, watched(w, ctx));
-            face(w, id, y);
+            crate::moby::ai::face_at(&mut w.mobys[id], MV, y);
             let g = w.mobys[id].pv_v(GOAL);
             let y = yaw_to(w, id, g);
             let r = ai::move_step(w, id, ctx, y, g);
@@ -354,7 +337,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
             let p = w.mobys[id].pv_v(TARGET);
             let y = yaw_to(w, id, p);
-            face(w, id, y);
+            crate::moby::ai::face_at(&mut w.mobys[id], MV, y);
             let off = w.mobys[id].pv_f(0x2e0);
             move_opts(w, id, ctx, p, 0x10, Some(off));
             let m = &w.mobys[id];
@@ -378,7 +361,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
             let p = w.mobys[id].pv_v(TARGET);
             let y = yaw_to(w, id, p);
-            face(w, id, y);
+            crate::moby::ai::face_at(&mut w.mobys[id], MV, y);
             move_opts(w, id, ctx, p, 0x10, None);
         }
         8 => wait(w, id, ctx),

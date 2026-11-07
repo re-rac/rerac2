@@ -189,8 +189,6 @@ fn cuboid(w: &MobyWorld, id: usize, ctx: &Ctx) -> Option<(V3, V3)> {
 /// `0x3168e0(m, j)`.
 fn joint(w: &MobyWorld, id: usize, ctx: &Ctx, j: usize) -> V3 { ctx.host.joint(&w.mobys[id], j).unwrap_or(w.mobys[id].pos) }
 
-fn through(rows: &[V3; 3], v: V3) -> V3 { std::array::from_fn(|k| v[0] * rows[0][k] + v[1] * rows[1][k] + v[2] * rows[2][k]) }
-
 /// `0x3173f8(m, ambient, 0xe, 0xe, 0xe)`: lit by the light set 14 with the ambient `c`.
 fn light(m: &mut crate::moby::Moby, c: u32) {
     m.light = 0x000e_0e0e;

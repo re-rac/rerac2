@@ -378,7 +378,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         // Calm: Ratchet near (2) — its run path (0x1a), its turret (0x19) or the attack; alarmed by its group — its
         // alarm path (6 at the first alarm, 7 after), its turret, and in range the attack.
         0 => {
-            if t::first_sub(w, id) { calm(w, id); }
+            if w.mobys[id].first_sub() { calm(w, id); }
             if w.mobys[id].pv_s(RANGE) == 2 {
                 if w.mobys[id].pv_i(APATH) != -1 {
                     anim(w, id, ctx, 3, 0, 10);
@@ -412,7 +412,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         // Alert: in range its run path from its nearest point, its turret, or the attack.
         1 => {
-            if t::first_sub(w, id) {
+            if w.mobys[id].first_sub() {
                 walk(w, id);
                 w.mobys[id].set_pv_f(WANDER + 0x1c, 6.0);
             }
@@ -440,7 +440,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         // Fighting: out of range now and then the stand (0xe sub 1, its timer 580..600); Ratchet in state 0x31, its
         // alarm path (7 sub 8).
         2 => {
-            if t::first_sub(w, id) { lim(w, id, 0.003_888_889, 0.116_666_675, 0.003_781_547, 0.296_706_02); }
+            if w.mobys[id].first_sub() { lim(w, id, 0.003_888_889, 0.116_666_675, 0.003_781_547, 0.296_706_02); }
             if !t::in_range(w, id) && w.mobys[id].state != 0x19 && ctx.game.rng.randi(4) == 1 {
                 t::speed(w, id, ctx, 1.0);
                 anim(w, id, ctx, 2, 0, 10);
@@ -501,7 +501,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         3 => {
-            if t::first_sub(w, id) { run(w, id); }
+            if w.mobys[id].first_sub() { run(w, id); }
             if w.mobys[id].pv_i(CHARGE) == 1 {
                 anim(w, id, ctx, 3, 0, 10);
                 st(w, id, 0x17, 2);
@@ -522,7 +522,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         5 => riding(w, id, ctx),
         // Off its hover: the weapon made on joint 3, the attack flag, upright.
         6 => {
-            if t::first_sub(w, id) {
+            if w.mobys[id].first_sub() {
                 if !t::arm(w, id, ctx) {
                     w.delete(id);
                     return;

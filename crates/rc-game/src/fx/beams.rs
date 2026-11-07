@@ -66,7 +66,7 @@
 //! unset (stack garbage, `0x3f8590`): the port takes world up there, so only the sparks' directions differ.
 
 use crate::fx::FxQuad;
-use crate::hero::physics::{add, add_rot, cross, dist, len, scale, set_len, sub, sub_rot, V3};
+use crate::hero::physics::{add, add_rot, cross, dist, len, scale, set_len, sub, sub_rot, wrap, V3};
 use crate::moby::{Ctx, MobyWorld};
 use crate::particles::arc;
 
@@ -266,9 +266,6 @@ fn segment(from: V3, to: V3, eye: V3, cam: V3, at: V3) -> Basis {
 pub fn at_most(v: V3, max: f32) -> V3 { if max != 0.0 && max < len(v) { set_len(v, max) } else { v } }
 
 fn playing(mode: i32) -> bool { mode == crate::scene::PLAY }
-
-/// `0x320440`: an angle wrapped to [−π, π).
-pub(crate) fn wrap(a: f32) -> f32 { use std::f32::consts::PI; ((a + PI) * 0.159_154_94).rem_euclid(1.0) * std::f32::consts::TAU - PI }
 
 fn phases(s: &mut Slot) {
     s.phase[0] = add_rot(s.phase[0], 0.174_532_95);

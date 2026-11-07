@@ -81,7 +81,7 @@
 use crate::hero::physics::{add, approach_angle, atan2, dist, dist2, len, rot_dist, scale, set_len, sub, V3};
 use crate::moby::classes::props::{seq, set_seq, wrapped};
 use crate::moby::hits::HitTemplate;
-use crate::moby::{ai, blast, bolts, countdown, mode, Ctx, MobyWorld};
+use crate::moby::{ai, blast, bolts, mode, Ctx, MobyWorld};
 
 pub const CLASS: i16 = 0x0bbf;
 /// Its glob.
@@ -154,18 +154,6 @@ fn st(w: &mut MobyWorld, id: usize, s: u8, sub: i32) { w.mobys[id].set_state(s, 
 fn seq_a(w: &MobyWorld, id: usize, ctx: &Ctx) -> u8 { ctx.host.anim(&w.mobys[id]).map_or(0xff, |a| a.seq_a) }
 fn hurt(w: &MobyWorld, id: usize) -> i32 { w.mobys[id].pv_i(HURT) }
 fn found(w: &MobyWorld, id: usize) -> bool { w.mobys[id].pv_s(FOUND) == 1 }
-fn tick_s(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut t = w.mobys[id].pv_s(off) as i32;
-    let out = countdown(&mut t);
-    w.mobys[id].set_pv_s(off, t as i16);
-    out
-}
-/// `0x32d7e0`: the first time since the last sub-state change.
-fn first_sub(m: &mut crate::moby::Moby) -> bool {
-    if m.once & 2 != 0 { return false; }
-    m.once |= 2;
-    true
-}
 /// Its target's moby's place (`+0x270`; Ratchet's without one).
 fn target_pos(w: &MobyWorld, id: usize, ctx: &Ctx) -> V3 {
     ai::link(&w.mobys[id], TARGET).and_then(|k| w.mobys.get(k)).map_or(ctx.hero.pos, |t| t.pos)
@@ -426,11 +414,11 @@ fn head(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
         m.state = s;
         m.sub_state = sub;
         m.first();
-        first_sub(m);
+        m.first_sub();
         m.set_pv_s(HURT_T, 0x96);
         m.set_pv_s(0x26, 0);
     }
-    if tick_s(w, id, HURT_T) {
+    if w.mobys[id].count_s(HURT_T) {
         let m = &mut w.mobys[id];
         if m.pv_i(HURT) == 1 { m.set_pv_s(HURT_T, 0x32); } else { m.set_pv_i(HURT, 0); }
     }
@@ -514,7 +502,7 @@ fn subs(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         5 => {
-            if first_sub(&mut w.mobys[id]) {
+            if w.mobys[id].first_sub() {
                 walk_senses(w, id);
                 opts(w, id, 0, 0x10);
             }
@@ -523,7 +511,7 @@ fn subs(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 if w.mobys[id].sub_state != 15 { st(w, id, s, 6); }
                 w.mobys[id].first();
             }
-            let out_of_turn = w.mobys[id].pv_i(GROUPED) != 0 && tick_s(w, id, SLOT_T) && hurt(w, id) != 1;
+            let out_of_turn = w.mobys[id].pv_i(GROUPED) != 0 && w.mobys[id].count_s(SLOT_T) && hurt(w, id) != 1;
             if out_of_turn {
                 // `0x3e68e8`.
                 w.mobys[id].sub_state = 9;
@@ -555,12 +543,12 @@ fn subs(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         9 => {
-            first_sub(&mut w.mobys[id]);
+            w.mobys[id].first_sub();
             if w.mobys[id].state == 0x17 && hurt(w, id) != 1 {
                 st(w, id, 4, -1);
                 set_seq(w, id, ctx, 3, 0, 0x14);
             }
-            if tick_s(w, id, RESERVE) {
+            if w.mobys[id].count_s(RESERVE) {
                 free_slot(w, id);
                 st(w, id, 4, 10);
                 set_seq(w, id, ctx, 3, 0, 0x14);
@@ -570,7 +558,7 @@ fn subs(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         10 => {
-            if first_sub(&mut w.mobys[id]) { nearest(w, id, ctx); }
+            if w.mobys[id].first_sub() { nearest(w, id, ctx); }
             if wrapped(w, id, ctx) && seq_a(w, id, ctx) != 2 && seq(w, id, ctx) != 2 { ctx.host.set_anim(&w.mobys[id], 2, 0, 0x14); }
             take_slot(w, id);
             if hurt(w, id) == 1 {
@@ -587,7 +575,7 @@ fn subs(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// Found or hurt keep the calm timer at 250; at its end, neither, calm (5 sub 0, sequence 0): true then.
 fn calm(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     if found(w, id) || hurt(w, id) != 0 { w.mobys[id].set_pv_s(CALM, 0xfa); }
-    if found(w, id) || hurt(w, id) != 0 || !tick_s(w, id, CALM) { return false; }
+    if found(w, id) || hurt(w, id) != 0 || !w.mobys[id].count_s(CALM) { return false; }
     set_seq(w, id, ctx, 0, 0, 0x14);
     st(w, id, 5, 0);
     true
@@ -595,7 +583,7 @@ fn calm(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
 
 /// Sub 6 (module docs).
 fn place(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    if first_sub(&mut w.mobys[id]) {
+    if w.mobys[id].first_sub() {
         w.mobys[id].set_pv_i(DEST, -1);
         nearest(w, id, ctx);
     }
@@ -664,7 +652,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, d: f32) {
                 set_seq(w, id, ctx, 0, 0, 0x14);
                 w.mobys[id].set_pv_s(ATTACK, 0x96);
             }
-            if tick_s(w, id, ATTACK) {
+            if w.mobys[id].count_s(ATTACK) {
                 set_seq(w, id, ctx, 1, 0, 0x14);
                 st(w, id, 0x15, -1);
             }
@@ -676,7 +664,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, d: f32) {
                 senses(w, id, TURN_A * 3.472_222_3e-5, WALK_A * 0.002_083_333_4, TURN_6, TURN_6);
                 w.mobys[id].set_pv_f(MV + 0x28, WALK_MOST * 0.25);
             }
-            let out = tick_s(w, id, ATTACK);
+            let out = w.mobys[id].count_s(ATTACK);
             if !out && (4.0 <= d || 0x13 < w.mobys[id].pv_s(ATTACK)) {
                 let p = mouth(w, id, ctx);
                 return smoke(ctx, p);
@@ -707,7 +695,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, d: f32) {
             }
         }
         0x17 => {
-            if tick_s(w, id, ATTACK) { st(w, id, 15, -1); }
+            if w.mobys[id].count_s(ATTACK) { st(w, id, 15, -1); }
             if w.mobys[id].pv_s(ATTACK) < 0x1e && seq_a(w, id, ctx) != 3 && seq(w, id, ctx) != 3 { ctx.host.set_anim(&w.mobys[id], 3, 0, 0x14); }
             let t = w.mobys[id].pv_v(TGT);
             if 8.0 <= dist2(t, w.mobys[id].pos) || 0x22 < w.mobys[id].pv_s(ATTACK) { return; }

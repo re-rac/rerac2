@@ -71,7 +71,7 @@
 use crate::hero::items::{row, ItemRow, HOVERBOMB};
 use crate::hero::physics::{add, add_rot, dot, len, scale, set_len, sub, unit, V3};
 use crate::moby::hits::HitTemplate;
-use crate::moby::{countdown, lock_on, Ctx, MobyWorld};
+use crate::moby::{countdown, lock_on, stop_loop, Ctx, MobyWorld};
 
 /// The hand's class (item 0x19's row `+0x04`) and the bomb's (`+0x50`).
 pub const HAND_CLASS: i16 = 0xa5b;
@@ -100,14 +100,6 @@ pub struct Mem {
 /// The Hoverbomb Gun's row as `0x139568[0x19]` gives it (crate::upgrades).
 fn cur_row(game: &crate::game::GameState) -> Option<&'static ItemRow> { row(game, HOVERBOMB) }
 
-/// `0x2eeae0` on an s16 pvar: true when it was out or ran out.
-fn count_s(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut n = w.mobys[id].pv_s(off) as i32;
-    let out = countdown(&mut n);
-    w.mobys[id].set_pv_s(off, n as i16);
-    out
-}
-
 /// `0x2ef2a8(out, v, n)`: `v` reflected off the face of normal `n` (made unit) when it goes into it, else kept.
 fn reflect(v: V3, n: V3) -> V3 {
     let n = unit(n);
@@ -131,7 +123,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if let Some(a) = ctx.host.anim(&w.mobys[id]) {
         if a.seq_a == a.seq_b && a.flags & 2 != 0 { ctx.host.set_anim(&w.mobys[id], 1, 0, 10); }
     }
-    if w.mobys[id].pv_s(0xe) != 0 && count_s(w, id, 0xe) {
+    if w.mobys[id].pv_s(0xe) != 0 && w.mobys[id].count_s(0xe) {
         let idle = ctx.hero.idle_seq();
         ctx.hero.items.use_end(ctx.hero.state, ctx.hero_view.seq_b, idle);
     }
@@ -180,7 +172,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         2 => {
-            if count_s(w, id, 0xc) {
+            if w.mobys[id].count_s(0xc) {
                 launch(w, id, ctx, muzzle, &r);
                 w.mobys[id].state = 3;
             }
@@ -223,7 +215,7 @@ pub fn update_tetra(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if let Some(a) = ctx.host.anim(&w.mobys[id]) {
         if a.seq_a == a.seq_b && a.flags & 2 != 0 { ctx.host.set_anim(&w.mobys[id], 1, 0, 6); }
     }
-    if w.mobys[id].pv_s(6) != 0 && count_s(w, id, 6) {
+    if w.mobys[id].pv_s(6) != 0 && w.mobys[id].count_s(6) {
         let idle = ctx.hero.idle_seq();
         ctx.hero.items.use_end(ctx.hero.state, ctx.hero_view.seq_b, idle);
     }
@@ -271,7 +263,7 @@ pub fn update_tetra(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             w.mobys[id].set_pv_f(0, 1.0 / r.rate);
         }
         2 => {
-            if !count_s(w, id, 4) { return; }
+            if !w.mobys[id].count_s(4) { return; }
             let k = w.mobys[id].pv_i(8);
             let dir = tetra_way(w, id, ctx, k, muzzle, &r);
             smoke_tetra(ctx, muzzle, dir);
@@ -429,13 +421,6 @@ fn hit(w: &mut MobyWorld, ctx: &Ctx, id: usize, at: V3) {
     for m in hit { crate::moby::weapon_mods::acid(w, ctx, m, item, owner); }
 }
 
-/// The loop sound let go when still playing (`0x3602f0`).
-fn stop_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let s = w.mobys[id].pv_i(0x40);
-    if s != -1 && ctx.host.sound_playing(s) { ctx.host.stop_sound(s); }
-    w.mobys[id].set_pv_i(0x40, -1);
-}
-
 /// `0x3ab088` (module docs).
 pub fn update_bomb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].pvars.resize(crate::moby::PVAR_BYTES, 0);
@@ -448,7 +433,7 @@ pub fn update_bomb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let start = w.mobys[id].pos;
     let mut pos = add(start, w.mobys[id].pv_v(0));
     w.mobys[id].pos = pos;
-    count_s(w, id, 0x2c);
+    w.mobys[id].count_s(0x2c);
     let smoke = w.mobys[id].pv_s(0x2c);
     if smoke != 0 {
         if let Some(sys) = ctx.parts.as_deref_mut() {
@@ -534,8 +519,8 @@ pub fn update_bomb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if check && 0x14 < w.mobys[id].pv_s(0x14) {
         w.mobys[id].state = 1;
         let fused = w.mobys[id].pv_s(0x16) != 0;
-        if count_s(w, id, 0x16) {
-            stop_sound(w, id, ctx);
+        if w.mobys[id].count_s(0x16) {
+            stop_loop(w, id, ctx, 0x40);
             ctx.host.play_sound(&w.mobys[id], 1, 0);
             let at = w.mobys[id].pos;
             let b = if fused {
@@ -572,7 +557,7 @@ pub fn update_bomb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         w.mobys[id].pos = crate::gravity::ride(w, p);
         if !ctx.hero.gravity.on { crate::shadows::request(w, ctx, 0.5, id); }
     } else {
-        stop_sound(w, id, ctx);
+        stop_loop(w, id, ctx, 0x40);
         crate::gravity::untrack(w, w.mobys[id].pv_i(0x48));
         w.delete(id);
     }

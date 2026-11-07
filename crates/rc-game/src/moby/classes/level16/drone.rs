@@ -56,7 +56,7 @@
 
 use crate::hero::physics::{add, add_rot, atan2, cross, dot, len2, scale, set_len, sub, sub_rot, unit, V3};
 use crate::moby::classes::props::{seq, set_seq};
-use crate::moby::{ai, blast, bolts, countdown, joint_aim, mode, shards, Ctx, Moby, MobyWorld};
+use crate::moby::{ai, blast, bolts, joint_aim, mode, shards, Ctx, MobyWorld};
 
 pub const CLASS: i16 = 0x0f35;
 pub const SHOT: i16 = 0x0f7a;
@@ -90,18 +90,6 @@ const PVARS: usize = 0x360;
 const SHOT_SPEED: f32 = f32::from_bits(0x3ed5_5556);
 
 fn st(w: &mut MobyWorld, id: usize, s: u8, sub: i32) { w.mobys[id].set_state(s, sub); }
-fn tick_i(m: &mut Moby, off: usize) -> bool {
-    let mut t = m.pv_i(off);
-    let out = countdown(&mut t);
-    m.set_pv_i(off, t);
-    out
-}
-fn tick_s(m: &mut Moby, off: usize) -> bool {
-    let mut t = m.pv_s(off) as i32;
-    let out = countdown(&mut t);
-    m.set_pv_s(off, t as i16);
-    out
-}
 fn found(w: &MobyWorld, id: usize) -> bool { w.mobys[id].pv_i(FOUND1) == 1 || w.mobys[id].pv_i(FOUND2) == 1 }
 fn seq0(w: &MobyWorld, id: usize, ctx: &mut Ctx) { if seq(w, id, ctx) != 0 { ctx.host.set_anim(&w.mobys[id], 0, 0, 10); } }
 fn seq1(w: &MobyWorld, id: usize, ctx: &mut Ctx) { set_seq(w, id, ctx, 1, 0, 10); }
@@ -119,7 +107,7 @@ pub fn update_0f35(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let t = ctx.game.rng.randi(30);
             let m = &mut w.mobys[id];
             m.set_pv_s(T_ALARM, t as i16);
-            if m.pv_i(FOUND1) == 1 && tick_s(m, T_ALARM) {
+            if m.pv_i(FOUND1) == 1 && m.count_s(T_ALARM) {
                 seq1(w, id, ctx);
                 st(w, id, 3, 2);
             } else if w.mobys[id].pv_i(ALARM) != 0 {
@@ -187,8 +175,8 @@ pub fn update_0f35(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => {}
     }
     let m = &mut w.mobys[id];
-    tick_i(m, TIMER);
-    tick_s(m, TIMER2);
+    m.count_i(TIMER);
+    m.count_s(TIMER2);
     if m.state_ticks != -1 { m.state_ticks = m.state_ticks.wrapping_add(1); }
     aims(w, id, ctx);
     jets(w, id, ctx);

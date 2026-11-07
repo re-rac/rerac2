@@ -28,6 +28,7 @@
 
 use crate::hud::{Align, Draw, Fader};
 use crate::pad::{button, PadState};
+use crate::hero::physics::{sub_rot, wrap_turn};
 
 /// `0x1a9374`: the frames △ is held before the ring comes up.
 pub const HOLD_TICKS: i32 = 4;
@@ -303,7 +304,7 @@ impl QuickSelect {
                         k = (k + SLOTS as i32) % SLOTS as i32;
                     }
                     s.cursor = k;
-                    side = if 0.0 < wrap(f15 - (k as f32 * 0.785_398_24 + 0.392_699_12)) { 1 } else { -1 };
+                    side = if 0.0 < wrap_turn(f15 - (k as f32 * 0.785_398_24 + 0.392_699_12)) { 1 } else { -1 };
                 }
             } else if !pad.stick_active && dpad != 0 {
                 // Up, down, left, right in turn, each from where the last left it.
@@ -379,22 +380,6 @@ pub fn slots(game: &crate::game::GameState, records: &[rc_formats::disc::menu_ta
         let ammo = game.ammo.get(item as usize).copied().unwrap_or(0);
         Slot { item, icon: r.icon, name: r.name, ammo, uses_ammo: r.uses_ammo, max: r.max_ammo as i32 }
     })
-}
-
-/// `0x2efea8`: `a − b` wrapped to (−π, π].
-fn sub_rot(a: f32, b: f32) -> f32 {
-    use std::f32::consts::PI;
-    let mut s = a - b;
-    let low = s < -PI;
-    if PI <= s { s = s - PI - PI; }
-    if low { s = s + PI + PI; }
-    s
-}
-
-/// `0x2efef0`: `a` wrapped to [−π, π) by its fraction of a turn.
-fn wrap(a: f32) -> f32 {
-    let f = a * 0.159_154_94 + 0.5;
-    ((f - f.floor()) - 0.5) * std::f32::consts::TAU
 }
 
 /// The name's two lines (`0x2f8db8`): at the first '-' after the first character (kept on the first line), else at

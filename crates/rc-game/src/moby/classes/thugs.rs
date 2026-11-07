@@ -492,20 +492,12 @@ fn rps(w: &MobyWorld, id: usize) -> i32 {
     }
 }
 
-/// `+0x248` counted down (`0x2f9190`): true when out.
-fn wait_out(m: &mut Moby) -> bool {
-    let mut t = m.pv_i(WAIT);
-    let d = countdown(&mut t);
-    m.set_pv_i(WAIT, t);
-    d
-}
-
 /// The sub-states (module docs); true when it died.
 fn subs(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     match w.mobys[id].sub_state {
         0 => {
             let m = &mut w.mobys[id];
-            if m.pv_i(FOUND1) == 1 && wait_out(m) {
+            if m.pv_i(FOUND1) == 1 && m.count_i(WAIT) {
                 if w.mobys[id].pv_i(RIDER) == 0 || ctx.hero.surf.boots == 1 { take_cover(w, id, ctx); }
             } else if m.pv_i(FOUND4) == 1 && m.pv_i(ONCE_DONE) == 0 {
                 if m.pv_i(ONCE_PATH) != -1 {
@@ -532,7 +524,7 @@ fn subs(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
                 }
             } else {
                 let m = &mut w.mobys[id];
-                let seen = m.pv_i(FOUND1) == 1 && wait_out(m);
+                let seen = m.pv_i(FOUND1) == 1 && m.count_i(WAIT);
                 if seen || w.mobys[id].timer == 1 {
                     w.mobys[id].set_pv_i(ENGAGED, 1);
                     engage_fire(w, id, ctx, 10, 2);
@@ -1429,7 +1421,7 @@ fn h_subs(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     match w.mobys[id].sub_state {
         0 => {
             let m = &mut w.mobys[id];
-            if m.pv_i(FOUND1) == 1 && wait_out(m) {
+            if m.pv_i(FOUND1) == 1 && m.count_i(WAIT) {
                 if w.mobys[id].pv_i(RIDER) == 0 || ctx.hero.surf.boots == 1 {
                     w.mobys[id].set_pv_i(H_ENGAGED, 1);
                     st(w, id, 0x17, 2);
@@ -1437,7 +1429,7 @@ fn h_subs(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
                     if ctx.game.rng.randi(2) == 1 { set_seq(w, id, ctx, 7, 0, 10); }
                     h_after(w, id, ctx);
                 }
-            } else if m.pv_i(H_FOUND4) == 1 && m.pv_i(H_ONCE_DONE) == 0 && wait_out(m) {
+            } else if m.pv_i(H_FOUND4) == 1 && m.pv_i(H_ONCE_DONE) == 0 && m.count_i(WAIT) {
                 if m.pv_i(H_ONCE_PATH) != -1 {
                     st(w, id, 0xe, -1);
                     set_seq(w, id, ctx, 3, 0, 10);
@@ -1462,7 +1454,7 @@ fn h_subs(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
                 }
             } else {
                 let m = &mut w.mobys[id];
-                let seen = m.pv_i(FOUND1) == 1 && wait_out(m);
+                let seen = m.pv_i(FOUND1) == 1 && m.count_i(WAIT);
                 if seen || w.mobys[id].timer == 1 {
                     w.mobys[id].set_pv_i(H_ENGAGED, 1);
                     h_attack(w, id, ctx, 2);

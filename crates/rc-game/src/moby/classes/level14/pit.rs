@@ -31,7 +31,7 @@
 
 use crate::fx::FxQuad;
 use crate::hero::physics::V3;
-use crate::moby::{countdown, Ctx, MobyWorld};
+use crate::moby::{Ctx, MobyWorld};
 
 pub const CLASS: i16 = 0x135f;
 /// The corners' class (its pvar `+0x14` the corner 0..3; corner 0's height the base).
@@ -118,13 +118,6 @@ impl Globals {
     }
 }
 
-fn timer_out(m: &mut crate::moby::Moby, off: usize) -> bool {
-    let mut t = m.pv_i(off);
-    let out = countdown(&mut t);
-    m.set_pv_i(off, t);
-    out
-}
-
 /// `0x3267b0(&height, &speed, target, 0, 0, top)`.
 fn ease(m: &mut crate::moby::Moby, target: f32) {
     let (mut x, mut v) = (m.pv_f(HEIGHT), m.pv_f(SPEED));
@@ -163,7 +156,7 @@ pub fn update_135f(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 m.set_pv_f(SPEED, 0.0);
                 m.set_pv_i(TIMER, m.pv_i(TICKS));
             }
-            if timer_out(m, TIMER) { m.set_state(s + 1, -1); }
+            if m.count_i(TIMER) { m.set_state(s + 1, -1); }
             let target = if s == 1 { m.pv_f(RISE) } else { 0.0 };
             ease(m, target);
         }
@@ -172,14 +165,14 @@ pub fn update_135f(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 m.set_pv_i(TIMER, m.pv_i(HOLD_UP));
                 m.set_pv_f(HEIGHT, m.pv_f(RISE));
             }
-            if timer_out(m, TIMER) { m.set_state(3, -1); }
+            if m.count_i(TIMER) { m.set_state(3, -1); }
         }
         4 => {
             if m.first() {
                 m.set_pv_f(HEIGHT, 0.0);
                 m.set_pv_i(TIMER, m.pv_i(HOLD_DOWN));
             }
-            if timer_out(m, TIMER) { m.set_state(1, -1); }
+            if m.count_i(TIMER) { m.set_state(1, -1); }
         }
         _ => {}
     }
@@ -360,7 +353,7 @@ fn place(w: &MobyWorld, id: usize, rng: &mut crate::rng::Rng) -> V3 {
 /// timer its wait again.
 fn motes(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].pv_i(FLAGS) & 8 != 0 { return; }
-    if !timer_out(&mut w.mobys[id], MOTE_TIMER) { return; }
+    if !w.mobys[id].count_i(MOTE_TIMER) { return; }
     let p = place(w, id, &mut ctx.game.rng);
     let top = [p[0], p[1], p[2] + 4.0];
     let d = ctx.coll.and_then(|c| crate::collision::coll_line_m(c, ctx.scene, p, top, crate::collision::QueryFlags(0x12), None)).map_or(9999.0, |o| crate::hero::physics::dist(p, o.point));

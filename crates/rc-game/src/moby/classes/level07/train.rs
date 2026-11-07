@@ -46,7 +46,7 @@
 //! 0x6f on the crash's teleport, and the crash's wait for its line to start (`0x1a641a` = 3, `0x1a6414` < 6000; then
 //! `0x325018`). The cars' time slices (`car >> 8 & 7` of its address) are their index's low bits.
 
-use crate::hero::physics::{add, add_rot, approach, atan2, dist, dist2, dot, ease, ease_speed, sub, turn_ease, V3};
+use crate::hero::physics::{add, add_rot, approach, atan2, dist, dist2, dot, ease, ease_speed, sub, through, turn_ease, V3};
 use crate::moby::attach::{angles_of, rows_of, turn};
 use crate::moby::classes::props::group_alive;
 use crate::moby::{ai, platform, Ctx, Moby, MobyWorld};
@@ -244,23 +244,8 @@ fn local(m: &Moby, p: V3) -> V3 {
     [dot(d, m.rows[0]), dot(d, m.rows[1]), dot(d, m.rows[2])]
 }
 
-/// `0x2e53d8(v, rows)`: `v` through the rows.
-fn through(v: V3, r: &[V3; 3]) -> V3 { std::array::from_fn(|k| v[0] * r[0][k] + v[1] * r[1][k] + v[2] * r[2][k]) }
-
 /// The car's time slice: `0x1b1d88 & 7` against the low bits of its address (here its index).
 fn slice(ctx: &Ctx, car: usize) -> bool { ctx.game.frame & 7 == (car & 7) as i32 }
-
-/// `0x320ba8(m, owner)` (L00 `0x32a748`): updated and drawn from any distance, drawn, the owner, its place, angles and
-/// light word.
-fn adopt(w: &mut MobyWorld, id: usize, owner: usize) {
-    let (pos, rot, light) = { let o = &w.mobys[owner]; (o.pos, o.rot, o.light) };
-    let m = &mut w.mobys[id];
-    m.update_dist = 0xff;
-    m.draw_dist = 0xff;
-    m.drawn = 1;
-    m.parent = Some(owner);
-    (m.pos, m.rot, m.light) = (pos, rot, light);
-}
 
 /// `0x40fd30`: the convoy set up from the lead — its speed's target and gain over the path's first span, the lead its
 /// own first car (place 0), its ties taken ([`take_ties`]), hidden; then for each car class 0x11da..0x11dd in its moby
@@ -456,12 +441,12 @@ fn carry_mobys(w: &mut MobyWorld, c: usize, ctx: &mut Ctx) {
 /// at [`LIFT_AT`] (the lead's, the third car's) up by its rise, turned 90° about z.
 fn parts(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let (pos, rows) = (w.mobys[id].pos, w.mobys[id].rows);
-    let at = |v: V3| add(through(v, &rows), pos);
+    let at = |v: V3| add(through(&rows, v), pos);
     for i in 0..2 {
         match ai::link(&w.mobys[id], pv::PARTS + 4 * i).filter(|&p| p < w.mobys.len()) {
             None => {
                 let p = w.create(PART[i]);
-                adopt(w, p, id);
+                w.adopt(p, Some(id), &*ctx.host);
                 let m = &mut w.mobys[p];
                 m.mode |= 0x120;
                 m.set_pv_i(pv::PTR, pv::BLOCK as i32);
@@ -492,7 +477,7 @@ fn parts(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     match ai::link(&w.mobys[id], pv::LIFT).filter(|&l| l < w.mobys.len()) {
         None => {
             let l = w.create(LIFT_CLASS);
-            adopt(w, l, id);
+            w.adopt(l, Some(id), &*ctx.host);
             let base = w.class(LIFT_CLASS).map_or(1.0, |c| c.scale);
             let m = &mut w.mobys[l];
             m.scale = base * 1.1;
@@ -545,7 +530,7 @@ fn launch(w: &mut MobyWorld, ds: usize, car: usize, from: V3, to: V3) {
     m.update_dist = 0xff;
     m.draw_dist = 0xff;
     ai::set_link(m, 0x110, Some(car));
-    m.pos = add(through(from, &cr), cp);
+    m.pos = add(through(&cr, from), cp);
     m.mode &= 0xefff;
     let p = m.pos;
     m.set_pv_v(0xf0, p);
@@ -803,7 +788,7 @@ fn crash(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.pos[2] = 213.0 - g * 3.0;
     } else if fade == 0.0 {
         let m = &mut w.mobys[id];
-        let before = through(PIVOT, &m.rows);
+        let before = through(&m.rows, PIVOT);
         let mut tv = m.pv_f(pv::TIP_V) + m.rot[0] * 7.272_206e-5 + 7.272_206e-5;
         m.rot[0] += tv;
         if 1.570_796_4 < m.rot[0] {
@@ -819,7 +804,7 @@ fn crash(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         m.set_pv_f(pv::TIP_V, tv);
         m.rows = rows_of(m.rot);
-        let after = through(PIVOT, &m.rows);
+        let after = through(&m.rows, PIVOT);
         m.pos = sub(m.pos, sub(after, before));
     } else if 1.0 <= fade {
         crash_end(w, id, ctx);

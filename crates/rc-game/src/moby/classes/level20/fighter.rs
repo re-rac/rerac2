@@ -100,17 +100,6 @@ pub fn stow(w: &mut MobyWorld, id: usize) {
     w.changed = true;
 }
 
-/// `0x32a748(part, owner)`: updated and drawn from any distance, drawn, its owner, its place, angles and light word.
-fn adopt(w: &mut MobyWorld, k: usize, owner: usize) {
-    let (pos, rot, light) = { let o = &w.mobys[owner]; (o.pos, o.rot, o.light) };
-    let m = &mut w.mobys[k];
-    m.update_dist = 0xff;
-    m.draw_dist = 0xff;
-    m.drawn = 1;
-    m.parent = Some(owner);
-    (m.pos, m.rot, m.light) = (pos, rot, light);
-}
-
 /// `0x39f2e0(m, make)`: with `make` its turret (`+0x7c` 0x3ff) and guns made when missing (false when one can not
 /// be); then the turret at its joint 0 turned by the lag `+0x288`, rebuilt, its colour, its sequence followed (at its
 /// frame, blend 10); the guns on the turret's joints 0 / 1 (gun 1 mirrored), its colour.
@@ -119,7 +108,7 @@ fn parts(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, make: bool) -> bool {
         if link(w, id, TURRET_L).is_none() {
             if w.class(TURRET).is_none() { return false; }
             let t = w.create(TURRET);
-            adopt(w, t, id);
+            w.adopt(t, Some(id), &*ctx.host);
             w.mobys[t].bangles = 0x3ff;
             ai::set_link(&mut w.mobys[id], TURRET_L, Some(t));
         }
@@ -127,7 +116,7 @@ fn parts(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, make: bool) -> bool {
             if link(w, id, off).is_some() { continue; }
             if w.class(GUN).is_none() { return false; }
             let g = w.create(GUN);
-            adopt(w, g, id);
+            w.adopt(g, Some(id), &*ctx.host);
             ai::set_link(&mut w.mobys[id], off, Some(g));
         }
     }
@@ -296,16 +285,6 @@ fn goal(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     m.set_pv_f(MV + 0xcc, dist2(m.pos, g));
 }
 
-/// `0x342dd0` (L01 `0x323560`): the facing eased toward `yaw` at the movement block's turn limits.
-fn face(w: &mut MobyWorld, id: usize, yaw: f32) {
-    let m = &mut w.mobys[id];
-    let (a, b, most) = (m.pv_f(MV + 0x14), m.pv_f(MV + 0x18), m.pv_f(MV + 0x1c));
-    let (mut r, mut v) = (m.rot[2], m.pv_f(MV + 0xb4));
-    turn_ease(yaw, a, b, most, &mut r, &mut v, 0);
-    m.rot[2] = r;
-    m.set_pv_f(MV + 0xb4, v);
-}
-
 /// `0x39eb78` (module docs).
 fn tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     parts(w, id, ctx, false);
@@ -372,7 +351,7 @@ pub fn update_12f3(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 let tp = link(w, id, T_MOBY).map_or(ctx.hero.pos, |t| w.mobys[t].pos);
                 let p = w.mobys[id].pos;
                 let yaw = atan2(tp[0] - p[0], tp[1] - p[1]);
-                face(w, id, yaw);
+                crate::moby::ai::face_at(&mut w.mobys[id], MV, yaw);
                 if rot_dist(w.mobys[id].rot[2], yaw) < DEG3 { w.mobys[id].set_state(4, -1); }
             } else {
                 let (p, g) = (w.mobys[id].pos, w.mobys[id].pv_v(GOAL));

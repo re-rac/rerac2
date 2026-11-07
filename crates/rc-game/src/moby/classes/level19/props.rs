@@ -110,7 +110,7 @@ pub fn update_0edc(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     match w.mobys[id].state {
         1 => {
-            if ctx.hero.ground_moby != Some(id) { return; }
+            if !crate::moby::ai::stands_on(ctx, id) { return; }
             let text = match w.mobys[id].pv_i(8) { 0 => 0x134c, 1 => 0x134e, _ => 0x134b };
             let lease = ctx.game.prompt.request(8, text, 1);
             if lease != 0 && ctx.hero.items.pressed & crate::pad::button::TRIANGLE != 0 && ctx.hero.state == 0 {

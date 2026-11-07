@@ -45,7 +45,7 @@
 //! the stats counters.
 
 use super::props::{set_seq, wrapped};
-use crate::hero::physics::{add, cross, dist, len, set_len, sub, V3};
+use crate::hero::physics::{add, cross, dist, len, set_len, sub, wrap_turn, V3};
 use crate::moby::{mode, Ctx, MobyWorld};
 
 /// The hand moby's class (the item record's `+0x04`) and the hook's (`0x3a1c20`).
@@ -72,12 +72,6 @@ const PHASE_STEP: f32 = 0.698_131_8;
 const WAVE_END: f32 = 0.168_000_01;
 /// The markers' FX texture.
 const MARKER: u16 = 0x24;
-
-/// `0x2f0ef0` (L00 `0x2efef0`): `a` wrapped to [−π, π) by its fraction of a turn.
-fn wrap(a: f32) -> f32 {
-    let f = a * 0.159_154_94 + 0.5;
-    ((f - f.floor()) - 0.5) * std::f32::consts::TAU
-}
 
 /// The hand's hook (`+0x14`), while it lives.
 fn hook_of(w: &MobyWorld, id: usize) -> Option<usize> {
@@ -412,7 +406,7 @@ pub fn draw_line(w: &MobyWorld, host: &dyn crate::moby::MobyHost, id: usize, cam
     let along = sub(a, h);
     let l = len(along);
     let bend = cross(along, [along[0], along[1], along[2] - 0.1]);
-    let wave = wrap(m.pv_f(PHASE)).cos();
+    let wave = wrap_turn(m.pv_f(PHASE)).cos();
     let (period, height) = (m.pv_f(PERIOD), m.pv_f(WAVE));
     let (mut p, mut prev) = (h, ([h[0], h[1], h[2] - 0.05], [h[0], h[1], h[2] + 0.05]));
     let st = [[0.0, 0.0], [1.0, 0.0], [0.0, 1.0], [1.0, 1.0]];
@@ -421,7 +415,7 @@ pub fn draw_line(w: &MobyWorld, host: &dyn crate::moby::MobyHost, id: usize, cam
     while 0.0 < rest {
         let step = rest.min(0.2);
         t += step;
-        let k = (t * std::f32::consts::PI / l).sin() * wrap(t * std::f32::consts::PI / period).sin() * wave;
+        let k = (t * std::f32::consts::PI / l).sin() * wrap_turn(t * std::f32::consts::PI / period).sin() * wave;
         p = add(p, set_len(along, step));
         let side = set_len(cross(sub(cam, p), along), 0.05);
         let off = set_len(bend, k * height);

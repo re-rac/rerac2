@@ -225,11 +225,11 @@ fn raise(w: &mut MobyWorld, ctx: &mut Ctx, r: usize, z: f32) {
 }
 
 /// `0x40a998(group)`: every trooper 0x0d0f of the group still there sent away
-/// (crate::moby::classes::level09::trooper::dismiss).
+/// (crate::moby::classes::trooper::dismiss).
 fn dismiss_group(w: &mut MobyWorld, g: i32) {
     for k in members(w, g) {
-        if w.mobys.get(k).is_some_and(|m| m.o_class == super::super::level09::trooper::CLASS) && !gone(w, k) {
-            super::super::level09::trooper::dismiss(w, k);
+        if w.mobys.get(k).is_some_and(|m| m.o_class == super::super::trooper::CLASS) && !gone(w, k) {
+            super::super::trooper::dismiss(w, k);
         }
     }
 }

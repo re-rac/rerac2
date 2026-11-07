@@ -42,20 +42,6 @@ const SURFACE: usize = 0x2e0;
 fn bike_of(w: &MobyWorld, id: usize) -> Option<usize> { ai::link(&w.mobys[id], 0x164).filter(|&b| b < w.mobys.len()) }
 fn rider_of(w: &MobyWorld, id: usize) -> Option<usize> { ai::link(&w.mobys[id], 0x8c).filter(|&b| b < w.mobys.len()) }
 
-/// `0x2eeae0` on a short: 1 down; true when it was 0 or just reached it.
-fn countdown_s(m: &mut Moby, off: usize) -> bool {
-    let mut v = m.pv_s(off) as i32;
-    let r = countdown(&mut v);
-    m.set_pv_s(off, v as i16);
-    r
-}
-fn countdown_i(m: &mut Moby, off: usize) -> bool {
-    let mut v = m.pv_i(off);
-    let r = countdown(&mut v);
-    m.set_pv_i(off, v);
-    r
-}
-
 /// Its offset along its route past the nearest point: 15 on water, else 5.
 fn lead(m: &Moby) -> f32 { if m.pv_i(0x244) != 0 { 15.0 } else { 5.0 } }
 
@@ -591,7 +577,7 @@ fn jets(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_s(0x142, 1);
         approach(0.1, 0.005_555_555_7, &mut b);
         m.set_pv_f(0x13c, b);
-        if m.pv_s(0x140) != 0 { countdown_s(m, 0x140); }
+        if m.pv_s(0x140) != 0 { m.count_s(0x140); }
     } else {
         m.set_pv_s(0x142, 0);
         approach(0.0, 0.002_777_777_8, &mut b);
@@ -788,7 +774,7 @@ fn drive(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
     }
     let m = &mut w.mobys[id];
-    if !countdown_i(m, 0x178) {
+    if !m.count_i(0x178) {
         let v = add(m.pv_v(0xd0), scale(m.pv_v(0x100), m.pv_i(0x178) as f32 * 0.025));
         m.set_pv_v(0xd0, v);
         m.set_pv_i(0x248, 1);
@@ -828,7 +814,7 @@ fn drive(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let roll = m.rot[0];
     if m.pv_b(0xa4) != 0 {
         m.rot[1] += m.pv_f(0x14c);
-        countdown_i(m, 0x148);
+        m.count_i(0x148);
         if m.pv_i(0x148) == 0 { m.set_pv_b(0xa4, 0); }
     } else {
         let n = if m.pv_b(0xa5) == 0 { gn } else { crate::moby::classes::shot::polar(1.0, add_rot(m.rot[2], PI), 0.872_664_7) };

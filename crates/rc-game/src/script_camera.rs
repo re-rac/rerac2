@@ -46,6 +46,7 @@ use crate::hero::physics::*;
 use crate::hero::Hero;
 use crate::moby::attach::angles_of;
 use std::f32::consts::PI;
+use crate::camera::{ang_interp, interp};
 
 pub const CLASS_SCRIPT: i16 = 5;
 
@@ -134,24 +135,6 @@ fn hermite(p1: f32, p2: f32, p3: f32, p4: f32, t: f32) -> f32 {
     f * t * t * t + ((p1 - p2) - f) * t * t + (p3 - p1) * t + p2
 }
 
-/// `0x2d7e98(cur, tgt, k, d, max, &v)`.
-fn spring(cur: f32, tgt: f32, s: Spring, v: &mut f32) -> f32 {
-    let e = tgt - cur;
-    *v += s.k * e - s.d * *v;
-    if s.max != 0.0 { *v = v.clamp(-s.max, s.max); }
-    *v = v.clamp(-e.abs(), e.abs());
-    cur + *v
-}
-
-/// `0x2d7f80`: [`spring`] on wrapped angles.
-fn ang_spring(cur: f32, tgt: f32, s: Spring, v: &mut f32) -> f32 {
-    let e = sub_rot(tgt, cur);
-    *v += s.k * e - s.d * *v;
-    if s.max != 0.0 { *v = v.clamp(-s.max, s.max); }
-    *v = v.clamp(-e.abs(), e.abs());
-    add_rot(cur, *v)
-}
-
 /// `0x2da530(out, p, c)`: (yaw, elevation, distance) of `p − c`.
 fn spherical(p: V3, c: V3) -> V3 {
     let d = sub(p, c);
@@ -219,10 +202,10 @@ impl ScriptCamera {
             }
             _ => {
                 if self.spring_pos.on == 1 {
-                    for k in 0..3 { self.pos[k] = spring(self.pos[k], self.target_pos[k], self.spring_pos, &mut self.vel[k]); }
+                    for k in 0..3 { self.pos[k] = interp(self.pos[k], self.target_pos[k], self.spring_pos.k, self.spring_pos.d, self.spring_pos.max, &mut self.vel[k]); }
                 }
                 if self.spring_rot.on == 1 {
-                    for k in 0..3 { self.euler[k] = ang_spring(self.euler[k], self.target_euler[k], self.spring_rot, &mut self.avel[k]); }
+                    for k in 0..3 { self.euler[k] = ang_interp(self.euler[k], self.target_euler[k], self.spring_rot.k, self.spring_rot.d, self.spring_rot.max, &mut self.avel[k]); }
                 }
             }
         }

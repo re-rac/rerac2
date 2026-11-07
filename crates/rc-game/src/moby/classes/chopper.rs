@@ -85,7 +85,7 @@ use crate::hero::items::{row, ItemRow, CHOPPER};
 use crate::hero::physics::{add, add_rot, cross, dist, dot, len, scale, set_len, sub, sub_rot, unit, V3};
 use crate::moby::afterimage::Record;
 use crate::moby::hits::HitTemplate;
-use crate::moby::{aim, countdown, lock_on, mode, Ctx, MobyWorld};
+use crate::moby::{aim, countdown, lock_on, mode, stop_loop, Ctx, MobyWorld};
 
 /// The hand's class (item 0x16's row `+0x04`) and the blade's (`+0x50`).
 pub const HAND_CLASS: i16 = 0x879;
@@ -154,12 +154,6 @@ fn cur_row(game: &crate::game::GameState) -> Option<&'static ItemRow> { row(game
 /// The upgrade level of the Chopper's row (`0x2624f4 + 0xe0·0x139568[0x16]`: 0 the Chopper, 1 the Mega Chopper, 2 and
 /// 3 the challenge mode's rows).
 pub fn level(game: &crate::game::GameState) -> u8 { game.upgrade_level(CHOPPER) }
-
-/// `0x321c00(a, out, v, axis)`: `v` turned by `a` about `axis` (made unit; under 1e-5 none).
-fn turn(v: V3, axis: V3, a: f32) -> V3 {
-    if a.abs() < 1e-5 || len(axis) == 0.0 { return v; }
-    crate::gravity::rotate(v, unit(axis), a)
-}
 
 /// `0x2eef88(out, a, b)` = b × a.
 fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
@@ -388,7 +382,7 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, at: V3, look: bool, 
             if !ctx.hero.gravity.on {
                 let hidden = ctx.hero_moby.and_then(|h| w.mobys.get(h)).is_some_and(|h| h.mode & 1 != 0);
                 if (!ctx.hero.items.fp.on && !matches!(ctx.hero.state, 0x1d | 1)) || !hidden {
-                    let v = turn(w.mobys[id].pv_v(0), up, -0.436_332_35);
+                    let v = crate::camera::rot(w.mobys[id].pv_v(0), -0.436_332_35, up);
                     w.mobys[id].set_pv_v(0, v);
                 }
                 w.mobys[id].set_pv_s(0x36, 1);
@@ -398,7 +392,7 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, at: V3, look: bool, 
         }
         Some(t) => {
             let f = (dist(pos, w.mobys[t].pos) * 0.033_333_335).min(1.0);
-            let v = turn(w.mobys[id].pv_v(0), up, -(f * 0.436_332_35));
+            let v = crate::camera::rot(w.mobys[id].pv_v(0), -(f * 0.436_332_35), up);
             w.mobys[id].set_pv_v(0, v);
             w.mobys[id].set_pv_s(0x36, 0);
         }
@@ -429,8 +423,8 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, at: V3, look: bool, 
     {
         let m = &mut w.mobys[id];
         let (a, r0) = (m.pv_f(0x58), m.rows[0]);
-        m.rows[1] = turn(m.rows[1], r0, a);
-        m.rows[2] = turn(m.rows[2], r0, a);
+        m.rows[1] = crate::camera::rot(m.rows[1], a, r0);
+        m.rows[2] = crate::camera::rot(m.rows[2], a, r0);
         let p = m.pos;
         m.set_pv_v(0x70, p);
     }
@@ -462,7 +456,7 @@ fn steer(w: &mut MobyWorld, id: usize, point: V3, up: V3) -> f32 {
         let (lv, ld) = (len(vel), l);
         if lv * ld == 0.0 { return 0.0; }
         let a = (std::f32::consts::FRAC_PI_2 - (dot(vel, d) / (lv * ld)).clamp(-1.0, 1.0).asin()) * 0.5;
-        m.set_pv_v(0, turn(vel, cross(vel, d), a));
+        m.set_pv_v(0, crate::camera::rot(vel, a, cross(vel, d)));
         return 0.0;
     }
     let ramp = (m.pv_s(0x12) + 1).min(0x1e);
@@ -479,7 +473,7 @@ fn steer(w: &mut MobyWorld, id: usize, point: V3, up: V3) -> f32 {
     v = v.clamp(-e.abs(), e.abs());
     m.set_pv_f(0x20, v);
     let half = add_rot(0.0, v);
-    m.set_pv_v(0, turn(vel, axis, half * 2.0));
+    m.set_pv_v(0, crate::camera::rot(vel, half * 2.0, axis));
     (v * 57.295_773).min(1.0)
 }
 
@@ -499,7 +493,7 @@ fn sparks(ctx: &mut Ctx, at: V3, n: i32, split: bool) {
         let r = g.randi(2);
         let s = if r == 0 { -1 } else { r };
         let a = g.randf(-1.047_197_7, 1.047_197_7);
-        let mut v = set_len(turn(to_cam, up, a), g.randf(0.05, 3.0) * (1.0 / 60.0));
+        let mut v = set_len(crate::camera::rot(to_cam, a, up), g.randf(0.05, 3.0) * (1.0 / 60.0));
         v[2] = g.randf(1.0, 5.0) * (1.0 / 60.0);
         for k in 0..3 { p[k] += g.randf_signed(0.0, 0.15); }
         let c = if lv == 0 { 0x20_2080 } else if split { 0x80_2080 } else { 0x80_2020 };
@@ -519,13 +513,6 @@ fn drop_trail(w: &mut MobyWorld, id: usize) {
     }
     w.chopper = pool;
     w.mobys[id].set_pv_i(0x30, -1);
-}
-
-/// The loop sound let go when it is still its own and playing (`0x3602f0`).
-fn stop_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let s = w.mobys[id].pv_i(0x38);
-    if s != -1 && ctx.host.sound_playing(s) { ctx.host.stop_sound(s); }
-    w.mobys[id].set_pv_i(0x38, -1);
 }
 
 /// `0x41e080` (module docs).
@@ -549,13 +536,13 @@ pub fn update_blade(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let down = ctx.hero.gravity.down;
         let m = &mut w.mobys[id];
         let h = sub(m.pv_v(0x40), hp);
-        m.set_pv_v(0x40, add(turn(h, down, -ctx.hero.carry_yaw), hp));
+        m.set_pv_v(0x40, add(crate::camera::rot(h, -ctx.hero.carry_yaw, down), hp));
     }
     match w.mobys[id].state {
         0 => {}
         1 => {
             drop_trail(w, id);
-            stop_sound(w, id, ctx);
+            stop_loop(w, id, ctx, 0x38);
             crate::moby::blast::smoke_burst(w, ctx, 0.5, 5.0, Some(id), start, -1);
             blade_gone(w, id);
             return;
@@ -614,7 +601,7 @@ pub fn update_blade(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].pos = to;
     if to.iter().any(|&c| !(2.0..=1021.0).contains(&c)) {
         drop_trail(w, id);
-        stop_sound(w, id, ctx);
+        stop_loop(w, id, ctx, 0x38);
         blade_gone(w, id);
         return;
     }
@@ -656,7 +643,7 @@ pub fn update_blade(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let m = &w.mobys[id];
             let axis = cross_ba(m.pv_v(0), m.rows[2]);
             let a = ctx.game.rng.randf(0.174_532_95, 0.610_865_3);
-            let v = turn(m.pv_v(0), axis, -a);
+            let v = crate::camera::rot(m.pv_v(0), -a, axis);
             w.mobys[id].set_pv_v(0, v);
             w.mobys[id].set_pv_f(0x1c, 2.0);
         } else {
@@ -708,14 +695,14 @@ pub fn update_blade(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let tilt = add_rot(m.pv_f(0x58), sub_rot(t, m.pv_f(0x58)) * 0.05);
         m.set_pv_f(0x58, tilt);
         if 1e-5 < tilt.abs() {
-            rows[1] = turn(rows[1], rows[0], tilt);
-            rows[2] = turn(rows[2], rows[0], tilt);
+            rows[1] = crate::camera::rot(rows[1], tilt, rows[0]);
+            rows[2] = crate::camera::rot(rows[2], tilt, rows[0]);
         }
         let spin = add_rot(m.pv_f(0x28), 0.418_879_06);
         m.set_pv_f(0x28, spin);
         if 1e-5 < spin.abs() {
-            rows[0] = turn(rows[0], rows[2], spin);
-            rows[1] = turn(rows[1], rows[2], spin);
+            rows[0] = crate::camera::rot(rows[0], spin, rows[2]);
+            rows[1] = crate::camera::rot(rows[1], spin, rows[2]);
         }
         m.rows = rows;
         let s = r.speed * (1.0 / 60.0);
@@ -812,7 +799,7 @@ fn split(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let (pos, hand, slot) = (w.mobys[id].pos, w.mobys[id].parent, w.mobys[id].pv_i(0x3c) as usize);
     let up = ctx.hero.gravity.up_at(pos);
     let a = ctx.game.rng.randf_signed(0.785_398_2, 1.396_263_6);
-    let v = turn(w.mobys[id].pv_v(0), up, a);
+    let v = crate::camera::rot(w.mobys[id].pv_v(0), a, up);
     w.mobys[id].set_pv_v(0, v);
     let Some(hand) = hand else { return };
     let Some(c) = spawn(w, ctx, hand, pos, false, slot, None, false) else { return };
@@ -828,7 +815,7 @@ fn split(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let (rows, rot) = (w.mobys[id].rows, w.mobys[id].rot);
     let m = &mut w.mobys[c];
     (m.pos, m.rows, m.rot) = (pos, rows, rot);
-    m.set_pv_v(0, turn(v, up, -a));
+    m.set_pv_v(0, crate::camera::rot(v, -a, up));
     m.parent = Some(hand);
 }
 

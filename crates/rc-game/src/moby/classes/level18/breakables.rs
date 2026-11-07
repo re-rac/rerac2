@@ -70,12 +70,6 @@ fn along_hit(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, h: &crate::moby::hits:
     scale(d, ctx.game.rng.randf(6.0, 8.0))
 }
 
-/// A point in its scaled frame (`0x340e40` = L00 `0x326190`).
-fn frame_point(w: &MobyWorld, id: usize, v: V3) -> V3 {
-    let m = &w.mobys[id];
-    std::array::from_fn(|k| (v[0] * m.rows[0][k] + v[1] * m.rows[1][k] + v[2] * m.rows[2][k]) * m.scale + m.pos[k])
-}
-
 /// 0x122c / 0x122a / 0x122d (module docs).
 pub fn update_122c(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     match w.mobys[id].state {
@@ -117,7 +111,7 @@ pub fn update_1184(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         2 => {
             shards::throw_all(w, id, ctx, GLOW_RANGE, SPIN, GRAVITY, 0xffff, 0, -1, 6, 0xfa7f);
-            let at = frame_point(w, id, [0.0, 0.0, 20.0]);
+            let at = crate::moby::ai::frame_point(w, id, [0.0, 0.0, 20.0]);
             let s = w.mobys[id].scale;
             blast::burst(w, ctx, at, &Blast { size: s * 2.0, bursts: [5; 3], puffs: 5, streaks: 5, light: true, shake: false });
             w.delete(id);

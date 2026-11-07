@@ -96,9 +96,9 @@
 //! * `0x420768`'s and the boxes' moby `+0xa8` (the hit record let go) where nothing reads it after.
 
 use crate::hero::physics::{add, add_rot, atan2, dist, dist2, dot, ease, ease_speed, len, scale, set_len, sub, unit, V3};
-use crate::moby::{ai, mode, Ctx, MobyWorld};
+use crate::moby::{ai, mode, stop_loop, Ctx, MobyWorld};
 use crate::pad::button;
-use super::endako_a::to_world;
+use crate::gravity::to_world;
 use super::endako_c;
 
 pub const PANEL: i16 = 0x0949;
@@ -373,7 +373,7 @@ fn steer(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let mut want = [0.0; 3];
     let k = kind(w, id);
     if w.mobys[id].state != 2 {
-        stop_loop(w, id, ctx);
+        stop_loop(w, id, ctx, cr::LOOP);
     } else {
         let yaw = add_rot(ctx.game.cameras.view_euler().1[2], STICK_TURN * 0.017_453_294);
         let rows = crate::moby::attach::rows_of([0.0, 0.0, yaw]);
@@ -385,7 +385,7 @@ fn steer(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 w.mobys[id].set_pv_i(cr::LOOP, h);
             }
         } else {
-            stop_loop(w, id, ctx);
+            stop_loop(w, id, ctx, cr::LOOP);
         }
         let v = to_world([-s[0], s[1], 0.0], &rows);
         want = scale(v, SPEED[k] * 0.016_666_668);
@@ -406,13 +406,6 @@ fn steer(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if let Some(z) = line_z(ctx, id, [j[0], j[1], j[2] + 0.5], [j[0], j[1], j[2] + 20.0], 2) { w.mobys[id].set_pv_f(cr::RAIL, z); }
     crate::shadow_volumes::probe(w, id, ctx);
     w.mobys[id].shadow_dir = SHADOW_DIR;
-}
-
-/// Its looped sound stopped (`0x361ac8`, `+0x108` = −1).
-fn stop_loop(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let h = w.mobys[id].pv_i(cr::LOOP);
-    if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
-    w.mobys[id].set_pv_i(cr::LOOP, -1);
 }
 
 /// 0x094a (module docs).
@@ -796,14 +789,14 @@ pub fn update_10f6(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if w.mobys[id].first() {
                 w.mobys[id].set_pv_i(4, 0xe6);
                 wall_row(w, id, ctx, 5.0, false);
-            } else if count_i(w, id) {
+            } else if w.mobys[id].count_i(4) {
                 wall_row(w, id, ctx, 15.0, false);
                 w.mobys[id].set_pv_i(4, 10);
                 w.mobys[id].set_state(3, -1);
             }
         }
         3 => {
-            if !count_i(w, id) { return; }
+            if !w.mobys[id].count_i(4) { return; }
             wall_row(w, id, ctx, 25.0, true);
             let uid = w.mobys[id].uid;
             ctx.game.count_uid(uid);
@@ -813,14 +806,6 @@ pub fn update_10f6(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         _ => {}
     }
-}
-
-/// `0x2efa50(+4)`: its 32-bit timer down; true when it is (or runs) out.
-fn count_i(w: &mut MobyWorld, id: usize) -> bool {
-    let mut t = w.mobys[id].pv_i(4);
-    let out = crate::moby::countdown(&mut t);
-    w.mobys[id].set_pv_i(4, t);
-    out
 }
 
 /// Three blasts across the wall at `up` (module docs); `last` the middle one's screen flash (`+0x38`: not ported).

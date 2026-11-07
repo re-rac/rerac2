@@ -18,7 +18,6 @@ pub mod scroll;
 pub mod seller;
 pub mod talker;
 pub mod towers;
-pub mod trooper;
 pub mod waker;
 
 /// This level's draw callbacks (crate::fx): true when the moby's class is one of them. The bolt's is also L16's,
@@ -56,11 +55,9 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         props::MOVER => Some(props::update_094d),
         props::PAD => Some(props::update_0efc),
         props::LAUNCH_PAD => Some(props::update_0e80),
-        trooper::CLASS => Some(trooper::update_0d0f),
-        trooper::TURRET_CLASS => Some(trooper::update_0d0e),
-        // The troopers' guns and shots: the same code as Level 12's (`0x405c58` = L12 `0x400850`, `0x3a1538` = L12
-        // `0x3a7ae0`).
-        trooper::GUN_CLASS => Some(super::level12::debris::update_0d66),
+        // The troopers' (crate::moby::classes::trooper, registered there) guns and shots: the same code as Level
+        // 12's (`0x405c58` = L12 `0x400850`, `0x3a1538` = L12 `0x3a7ae0`).
+        super::trooper::GUN_CLASS => Some(super::level12::debris::update_0d66),
         super::level12::shot::CLASS => Some(super::level12::shot::update_03a6),
         waker::CLASS => Some(waker::update_0de0),
         flyer::CLASS => Some(flyer::update_0d57),

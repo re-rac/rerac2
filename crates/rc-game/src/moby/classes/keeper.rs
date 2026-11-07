@@ -61,12 +61,6 @@ const GUN_SPEED: f32 = 500.0;
 /// The shot's speed (`0x3e6eeef0`).
 const SHOT_SPEED: f32 = 0.466_666_7;
 
-fn first_sub(m: &mut crate::moby::Moby) -> bool {
-    if m.once & 2 != 0 { return false; }
-    m.once |= 2;
-    true
-}
-
 fn gun(w: &MobyWorld, id: usize) -> Option<usize> {
     ai::link(&w.mobys[id], GUN).filter(|&g| w.mobys.get(g).is_some_and(|x| x.state < 0x80 && LAUNCHER.contains(&x.o_class)))
 }
@@ -186,17 +180,7 @@ fn go(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3) -> i32 {
     ai::move_step(w, id, ctx, yaw, goal)
 }
 
-/// `0x333980(yaw, m)`: its facing eased toward `yaw`.
-fn face(w: &mut MobyWorld, id: usize, yaw: f32) {
-    let m = &mut w.mobys[id];
-    let (a, b, c) = (m.pv_f(MV + 0x14), m.pv_f(MV + 0x18), m.pv_f(MV + 0x1c));
-    let (mut r, mut v) = (m.rot[2], m.pv_f(MV + 0xb4));
-    crate::hero::physics::turn_ease(yaw, a, b, c, &mut r, &mut v, 0);
-    m.rot[2] = r;
-    m.set_pv_f(MV + 0xb4, v);
-}
-
-/// `0x3339e0(m, +0x1f0)`: [`face`] toward the target (in the gravity frames crate::moby::frames::face_point).
+/// `0x3339e0(m, +0x1f0)`: the facing (crate::moby::ai::face_at) toward the target (in the gravity frames crate::moby::frames::face_point).
 fn face_target(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
     let t = w.mobys[id].pv_v(TARGET);
     if ctx.hero.gravity.on {
@@ -204,7 +188,7 @@ fn face_target(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
         return;
     }
     let y = yaw_to(w, id, t);
-    face(w, id, y);
+    crate::moby::ai::face_at(&mut w.mobys[id], MV, y);
 }
 
 /// The launcher's muzzle (its joint 0 in the world) and frame.
@@ -410,7 +394,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let (a, b, c) = (f32::from_bits(0x3b64_c38a), f32::from_bits(0x3ed6_7752), f32::from_bits(0x3dcc_ccce));
     match w.mobys[id].sub_state {
         0 => {
-            if first_sub(&mut w.mobys[id]) { ai::senses(&mut w.mobys[id], f32::from_bits(0x3a91_a2b4), f32::from_bits(0x3d4c_ccce), a, b); }
+            if w.mobys[id].first_sub() { ai::senses(&mut w.mobys[id], f32::from_bits(0x3a91_a2b4), f32::from_bits(0x3d4c_ccce), a, b); }
             let m = &mut w.mobys[id];
             if m.pv_i(FOUND) == 1 {
                 if m.pv_i(0x33c) == 0 { m.set_state(10, 2) } else { m.set_pv_i(0x33c, 0); m.set_state(8, 2) }
@@ -422,7 +406,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         1 => {
-            if first_sub(&mut w.mobys[id]) { ai::senses(&mut w.mobys[id], f32::from_bits(0x3b11_a2b4), c, a, b); }
+            if w.mobys[id].first_sub() { ai::senses(&mut w.mobys[id], f32::from_bits(0x3b11_a2b4), c, a, b); }
             let hero = ctx.hero.pos;
             let m = &mut w.mobys[id];
             if m.pv_i(FOUND) == 1 {
@@ -432,7 +416,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         2 => {
-            if first_sub(&mut w.mobys[id]) {
+            if w.mobys[id].first_sub() {
                 hold_others(w, id, ctx);
                 ai::senses(&mut w.mobys[id], f32::from_bits(0x3b11_a2b4), c, a, b);
             }
@@ -474,7 +458,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         4 => {
-            if first_sub(&mut w.mobys[id]) {
+            if w.mobys[id].first_sub() {
                 ai::senses(&mut w.mobys[id], f32::from_bits(0x3b5a_740e), c, a, b);
                 w.mobys[id].set_pv_f(MV + 0x34, 0.25);
             }
@@ -681,7 +665,7 @@ fn state_tick(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> Option<u8> {
             if seq(w, id, ctx) != 2 && 0.349_065_9 < off_target(w, id) { ctx.host.set_anim(&w.mobys[id], 2, 5, 10); }
             let t = w.mobys[id].pv_v(TARGET);
             let y = yaw_to(w, id, t);
-            face(w, id, y);
+            crate::moby::ai::face_at(&mut w.mobys[id], MV, y);
             if off_target(w, id) < 0.087_266_475 && (seq(w, id, ctx) != 2 || wrapped(w, id, ctx)) {
                 let m = &mut w.mobys[id];
                 m.set_pv_i(0x320, -1);

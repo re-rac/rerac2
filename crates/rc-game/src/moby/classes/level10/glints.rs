@@ -15,21 +15,12 @@
 //!   puts a spot (crate::particles::spot, type 0x67, `0x3559e8`) 4 toward the camera, size 2100000, colour 0x33aa00 at
 //!   alpha 32 · the light.
 
-use crate::hero::physics::{add, dot, set_len, sub, unit, V3};
+use crate::hero::physics::{add, dot, set_len, smooth_step, sub, through, unit, wrap, V3};
 use crate::moby::{Ctx, MobyWorld};
 
 pub const CLASS: i16 = 0x11b9;
 /// The buffer's size (`0x26ce20`).
 const POINTS: usize = 1056;
-
-/// `0x42d9b8`: the smooth step `x²(3 − 2x)`.
-fn smooth(x: f32) -> f32 { x * x * (x * -2.0 + 3.0) }
-
-/// `0x320440(a)`: `a` wrapped into −π..π.
-fn wrap(a: f32) -> f32 { ((a + std::f32::consts::PI) * 0.159_154_94).fract() * 6.283_185_5 - std::f32::consts::PI }
-
-/// `0x2ef318`: `v` through the rows.
-fn through(v: V3, r: &[V3; 3]) -> V3 { std::array::from_fn(|k| v[0] * r[0][k] + v[1] * r[1][k] + v[2] * r[2][k]) }
 
 /// The eighteen points (module docs).
 fn points() -> [V3; 18] {
@@ -37,17 +28,17 @@ fn points() -> [V3; 18] {
     let (m0, m1, m2) = (turn(0x3f86_0a93), turn(0x4006_0a93), turn(0xc006_0a93));
     let mut p = [[0.0; 3]; 18];
     p[0] = [0.0, 10.0, -4.0];
-    p[1] = through(p[0], &m1);
-    p[2] = through(p[0], &m2);
+    p[1] = through(&m1, p[0]);
+    p[2] = through(&m2, p[0]);
     p[3] = [0.0, 30.0, -3.5];
-    p[4] = through(p[3], &m1);
-    p[5] = through(p[3], &m2);
+    p[4] = through(&m1, p[3]);
+    p[5] = through(&m2, p[3]);
     p[6] = [3.5, 0.0, -2.0];
-    p[7] = through(p[6], &m1);
-    p[8] = through(p[6], &m2);
-    p[9] = through(p[6], &m0);
-    p[10] = through(p[9], &m1);
-    p[11] = through(p[9], &m2);
+    p[7] = through(&m1, p[6]);
+    p[8] = through(&m2, p[6]);
+    p[9] = through(&m0, p[6]);
+    p[10] = through(&m1, p[9]);
+    p[11] = through(&m2, p[9]);
     p[12] = [15.0, 30.0, 2.0];
     p[13] = [15.0, 15.0, 2.0];
     p[14] = [15.0, 0.0, 2.0];
@@ -85,7 +76,7 @@ fn set_up(w: &mut MobyWorld, id: usize) {
         let at = [mat[3][0], mat[3][1], mat[3][2]];
         let k = match w.tie_classes.get(t).copied() { Some(0xdf6) => 0, Some(0xdf7) => 6, _ => 12 };
         for i in 0..6 {
-            if out.len() < POINTS { out.push(add(at, through(p[i + k], &r))); }
+            if out.len() < POINTS { out.push(add(at, through(&r, p[i + k]))); }
         }
     }
     // The buffer's other points stay as the level load left them (0).
@@ -112,11 +103,11 @@ fn glint(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let mut light = 0.0;
         if lower < ang {
             if ang <= low_end {
-                light = smooth((ang - lower) / f32::from_bits(0x3d8e_fa30));
+                light = smooth_step((ang - lower) / f32::from_bits(0x3d8e_fa30));
             } else if ang <= high_start {
                 light = 1.0;
             } else if ang <= upper {
-                light = 1.0 - smooth((ang - high_start) / f32::from_bits(0x3f1c_61ac));
+                light = 1.0 - smooth_step((ang - high_start) / f32::from_bits(0x3f1c_61ac));
             }
         }
         if light == 0.0 { continue; }

@@ -42,7 +42,7 @@
 /// The upgraded row's id (the weapon mods' item, `0x3f9f70(m, 0x44, hand)`).
 pub const MEGA_ITEM: i32 = 0x44;
 
-use super::blitz::{cooldown, count_s, cross_ba, qturn, quad, ST};
+use super::blitz::{cooldown, cross_ba, qturn, quad, ST};
 use crate::collision::QueryFlags;
 use crate::hero::items::{row, BLITZ};
 use crate::hero::physics::{add, add_rot, len, scale, set_len, sub, unit, V3};
@@ -90,9 +90,6 @@ const SPREAD: f32 = f32::from_bits(0x3f06_0a93);
 fn point(w: &MobyWorld, id: usize, k: usize, i: usize) -> V3 { w.mobys[id].pv_v(pv::ARCS + k * 0x50 + i * 0x10) }
 fn set_point(w: &mut MobyWorld, id: usize, k: usize, i: usize, p: V3) { w.mobys[id].set_pv_v(pv::ARCS + k * 0x50 + i * 0x10, p) }
 
-/// `0x321c00(a, out, v, axis)`: `v` turned `a` about `axis` (under 1e-5 kept).
-fn turn(v: V3, axis: V3, a: f32) -> V3 { if a.abs() < 1e-5 { v } else { qturn(v, unit(axis), a) } }
-
 /// The shot's way (`0x18a550` / `0x18a580`): Ratchet's forward row, or from the muzzle (as it stands) to the lock.
 fn way(w: &MobyWorld, id: usize, ctx: &Ctx) -> V3 {
     let mut fwd = ctx.hero.rows[0];
@@ -115,7 +112,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_i(0x44, 0);
         m.set_pv_i(0x4c, 0);
     }
-    if w.mobys[id].state == 6 && count_s(w, id, 4) { w.mobys[id].state = 1; }
+    if w.mobys[id].state == 6 && w.mobys[id].count_s(4) { w.mobys[id].state = 1; }
     let hero_state = ctx.hero.state;
     if hero_state == 1 { ctx.hero.request_state(0x1d, true); }
     cooldown(w, id);
@@ -173,8 +170,8 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_v(pv::UP, up);
     }
     if w.mobys[id].pv_s(6) == 0 {
-        count_s(w, id, 0xa);
-        count_s(w, id, 8);
+        w.mobys[id].count_s(0xa);
+        w.mobys[id].count_s(8);
         for off in [0x28, 0x44] {
             let mut n = w.mobys[id].pv_i(off);
             countdown(&mut n);
@@ -184,7 +181,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         if m.pv_i(8) != 0 || m.pv_i(0x28) != 0 || m.pv_i(0x44) != 0 { w.register_draw(id); }
         crackle(w, id, ctx);
     }
-    if !matches!(w.mobys[id].state, 2 | 3) || !count_s(w, id, 6) { return; }
+    if !matches!(w.mobys[id].state, 2 | 3) || !w.mobys[id].count_s(6) { return; }
     let fwd = way(w, id, ctx);
     if w.mobys[id].state == 2 {
         let (pos, rows) = (w.mobys[id].pos, w.mobys[id].rows);
@@ -271,9 +268,9 @@ fn arcs(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, muzzle: V3, fwd: V3) {
         let g = &mut ctx.game.rng;
         let mut v = scale(fwd, 32.0);
         let a = g.randf(10.0, 24.0);
-        v = turn(v, left, -(a * deg));
+        v = crate::camera::rot(v, -(a * deg), left);
         let b = g.randf(22.0, 30.0);
-        v = turn(v, up, if k == 5 { -(b * deg) } else { b * deg });
+        v = crate::camera::rot(v, if k == 5 { -(b * deg) } else { b * deg }, up);
         let end = add(muzzle, v);
         set_point(w, id, k, 4, end);
         for i in 1..4 {
@@ -318,8 +315,8 @@ fn crackle(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 let a = g.randf_signed(f32::from_bits(0x3eb2_b8c4), f32::from_bits(0x3fb2_b8c4));
                 let b = g.randf(f32::from_bits(0xbf86_0a93), f32::from_bits(0x3e32_b8c4));
                 let mut v = scale(fwd, ARC_STEP);
-                v = turn(v, left, b);
-                v = turn(v, up, a);
+                v = crate::camera::rot(v, b, left);
+                v = crate::camera::rot(v, a, up);
                 set_point(w, id, k, 0, muzzle);
                 set_point(w, id, k, 1, add(muzzle, v));
                 let mut sign = 1.0;
@@ -328,7 +325,7 @@ fn crackle(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     let e = sub(p, cam);
                     let r = ctx.game.rng.randf(f32::from_bits(0x3e32_b8c4), f32::from_bits(0x3f75_be0d)) * sign;
                     sign = -sign;
-                    v = turn(v, e, r);
+                    v = crate::camera::rot(v, r, e);
                     set_point(w, id, k, i + 1, add(p, v));
                 }
             }

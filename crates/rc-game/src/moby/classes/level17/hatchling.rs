@@ -126,18 +126,6 @@ const MARK: f32 = 12439.4;
 fn st(w: &mut MobyWorld, id: usize, s: u8, sub: i32) { w.mobys[id].set_state(s, sub); }
 fn found(w: &MobyWorld, id: usize) -> bool { w.mobys[id].pv_s(FOUND) == 1 }
 fn cool(w: &MobyWorld, id: usize) -> bool { w.mobys[id].pv_i(COOL) == 0 }
-fn tick_i(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut t = w.mobys[id].pv_i(off);
-    let out = crate::moby::countdown(&mut t);
-    w.mobys[id].set_pv_i(off, t);
-    out
-}
-fn tick_s(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut t = w.mobys[id].pv_s(off) as i32;
-    let out = crate::moby::countdown(&mut t);
-    w.mobys[id].set_pv_s(off, t as i16);
-    out
-}
 fn live(w: &MobyWorld, k: i32) -> Option<usize> {
     usize::try_from(k).ok().filter(|&k| w.mobys.get(k).is_some_and(|m| m.state != 0xfe && m.state != 0xfd))
 }
@@ -147,12 +135,6 @@ fn show(w: &mut MobyWorld, id: usize) {
     let m = &mut w.mobys[id];
     m.mode &= 0xffbe;
     m.has_collision = has;
-}
-/// `0x327928` (L00 `0x32a7f0`): the first time since the last sub-state change.
-fn first_sub(m: &mut crate::moby::Moby) -> bool {
-    if m.once & 2 != 0 { return false; }
-    m.once |= 2;
-    true
 }
 /// Its target's place (`+0x408`): the target block's moby, else Ratchet's.
 fn target_pos(w: &MobyWorld, id: usize, ctx: &Ctx) -> V3 {
@@ -325,7 +307,7 @@ pub fn update_0b88(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_i(SCENE, 0);
     }
     head(w, id, ctx);
-    tick_i(w, id, COOL);
+    w.mobys[id].count_i(COOL);
     if let Some(p) = usize::try_from(w.mobys[id].pv_i(POD_LINK)).ok().filter(|&p| w.mobys.get(p).is_some_and(|q| q.o_class == POD_B)) {
         ai::set_link(&mut w.mobys[p], 0xa4, Some(id));
     }
@@ -348,7 +330,7 @@ pub fn update_0b88(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         3 => {
-            if first_sub(&mut w.mobys[id]) && ctx.host.anim(&w.mobys[id]).is_some_and(|a| a.speed < 0.0) {
+            if w.mobys[id].first_sub() && ctx.host.anim(&w.mobys[id]).is_some_and(|a| a.speed < 0.0) {
                 ctx.host.set_anim_speed(&w.mobys[id], 1.0);
             }
             if w.mobys[id].state != 8 {
@@ -394,7 +376,7 @@ fn calm(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let waiting = seat != -1 && wait_for != -1 && wait_for as usize != id && live(w, wait_for).is_some()
         && usize::try_from(seat).ok().filter(|&s| s < w.mobys.len()).is_some_and(|s| pod_ready(w, ctx, s));
     if waiting { return; }
-    tick_i(w, id, WAIT);
+    w.mobys[id].count_i(WAIT);
     if found(w, id) && cool(w, id) {
         cool_down(w, id);
         match usize::try_from(seat).ok().filter(|&s| s < w.mobys.len()) {
@@ -462,7 +444,7 @@ fn back_to(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, p: V3) {
 fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     match w.mobys[id].state {
         1 => {
-            tick_s(w, id, T_WANDER);
+            w.mobys[id].count_s(T_WANDER);
             let t = w.mobys[id].pv_s(T_WANDER);
             if seq(w, id, ctx) == 0 && t != 0 { set_seq(w, id, ctx, 9, 0, 0xe); }
             wander_speed(w, id, WANDER_1);
@@ -481,7 +463,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
             }
         }
         2 => {
-            tick_s(w, id, T_WANDER);
+            w.mobys[id].count_s(T_WANDER);
             if !matches!(seq(w, id, ctx), 9 | 5 | 4) { set_seq(w, id, ctx, 9, 0, 0xe); }
             wander_speed(w, id, WANDER_2);
             let s = seq(w, id, ctx);
@@ -518,7 +500,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
                 st(w, id, 5, 2);
                 set_seq(w, id, ctx, 6, 2, 6);
                 w.mobys[id].set_pv_f(OFFSET, 0.0);
-            } else if tick_i(w, id, T_OFFSET) {
+            } else if w.mobys[id].count_i(T_OFFSET) {
                 let f = ctx.game.rng.randf(f32::from_bits(0x3e86_0a93), f32::from_bits(0x3f06_0a93));
                 let f = if ctx.game.rng.randi(2) == 0 { -f } else { f };
                 w.mobys[id].set_pv_f(OFFSET, f);
@@ -649,8 +631,8 @@ fn walk(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// `0x327308` on `+0x350`, list 1, 2.5: crate::moby::joint_aim::head).
 fn tail(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
     ai::flash(&mut w.mobys[id], FLASH);
-    tick_i(w, id, T_REST);
-    tick_s(w, id, T_LEAP);
+    w.mobys[id].count_i(T_REST);
+    w.mobys[id].count_s(T_LEAP);
     let m = &mut w.mobys[id];
     if m.state_ticks != -1 { m.state_ticks += 1; }
     crate::moby::joint_aim::head(w, ctx, id, HEAD_AIM, 1, 2.5);
@@ -688,7 +670,7 @@ pub fn update_0920(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 if m.pv_i(0x90) != -1 { m.set_pv_i(0x94, 600); }
             }
         }
-        2 => if w.mobys[id].pv_i(0x90) != -1 && tick_i(w, id, 0x94) {
+        2 => if w.mobys[id].pv_i(0x90) != -1 && w.mobys[id].count_i(0x94) {
             return w.delete(id);
         },
         _ => {}

@@ -10,7 +10,7 @@
 //! The L06 engine functions with the port's: `0x36b678` / `0x36b650` the sub's / state's first tick, `0x36e6c8`
 //! senses, `0x3682a0` take_damage, `0x368fe8` flight, `0x36bbc0` find_target, `0x36d588` / `0x36d5e0` the move toward
 //! a point (with an offset: move_toward), `0x36e660` = L02 `0x333980` the turn toward a heading
-//! (crate::moby::classes::critter::face), `0x3649f8` reached,
+//! (crate::moby::ai::face_at), `0x3649f8` reached,
 //! `0x35d4e0` attack_joint, `0x35adb8` the bolts, `0x367668` = L00 `0x327498` (crate::moby::shards::break_into),
 //! `0x43b580` = L00 `0x3f8348` (crate::moby::blast::burst), `0x361b20` = L00 `0x3210a8` (smoke_burst), `0x366ec0`
 //! the glow sprite (crate::fx::sprite, FX 0xb), `0x3516d0` delete.
@@ -47,12 +47,6 @@ const CALM_SPEED: f32 = 4.0;
 /// The limits of `0x36e6c8` (each sub's first tick).
 const LIMITS: [u32; 4] = [0x3ba3_d70a, 0x3d88_8889, 0x3b64_c38a, 0x3ed6_7752];
 
-fn first_sub(w: &mut MobyWorld, id: usize) -> bool {
-    let m = &mut w.mobys[id];
-    if m.once & 2 != 0 { return false; }
-    m.once |= 2;
-    true
-}
 fn st(w: &mut MobyWorld, id: usize, s: u8, sub: i32) { w.mobys[id].set_state(s, sub); }
 fn anim(w: &MobyWorld, id: usize, ctx: &mut Ctx, s: u8, frame: u8, blend: u8) {
     if seq(w, id, ctx) != s { ctx.host.set_anim(&w.mobys[id], s, frame, blend); }
@@ -186,7 +180,7 @@ pub fn update_0db0(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if senses(w, id, ctx) { return; }
     match w.mobys[id].sub_state {
         0 => {
-            if first_sub(w, id) {
+            if w.mobys[id].first_sub() {
                 limits(w, id);
                 let m = &mut w.mobys[id];
                 m.set_pv_f(MV + 0x24, f32::from_bits(0x3bda_740e));
@@ -205,7 +199,7 @@ pub fn update_0db0(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         1 => {
-            if first_sub(w, id) {
+            if w.mobys[id].first_sub() {
                 limits(w, id);
                 w.mobys[id].set_pv_f(MV + 0x34, 0.05);
             }
@@ -217,7 +211,7 @@ pub fn update_0db0(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         2 => {
-            if first_sub(w, id) {
+            if w.mobys[id].first_sub() {
                 limits(w, id);
                 let m = &mut w.mobys[id];
                 m.set_pv_f(MV + 0x24, f32::from_bits(0x3bda_740e));
@@ -312,7 +306,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 anim(w, id, ctx, 8, 3, 6);
             }
             let y = w.mobys[id].pv_f(BITE_YAW);
-            crate::moby::classes::critter::face(w, id, y);
+            crate::moby::ai::face_at(&mut w.mobys[id], MV, y);
             if ai::reached(w, id, ctx, 13.0) {
                 let d = w.mobys[id].pv_b(0x34) as f32;
                 ai::attack_joint(w, id, ctx, 0.75, d, 1.0, 1, 0x400_0001, 0, 1, 0);

@@ -30,10 +30,8 @@
 //! mode 1's segments on joints.
 
 use super::{mode, Ctx, MobyWorld};
-use crate::hero::physics::{add, dot, len, scale, set_len, sub, V3};
+use crate::hero::physics::{add, cross, dot, len, scale, set_len, sub, through, V3};
 use crate::quat::{axis_quat, mul as qmul, rotate, Q};
-
-fn cross(a: V3, b: V3) -> V3 { [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]] }
 
 pub(crate) const VEL: usize = 0x00;
 pub(crate) const SPIN: usize = 0x10;
@@ -53,9 +51,6 @@ pub(crate) const COUNT: usize = 0x5c;
 const MODE: usize = 0x5d;
 const SOUND: usize = 0x5e;
 const BLOCK: usize = 0x80;
-
-/// `0x2ef318`: a frame vector through the rows.
-fn through(rows: &[V3; 3], v: V3) -> V3 { std::array::from_fn(|k| v[0] * rows[0][k] + v[1] * rows[1][k] + v[2] * rows[2][k]) }
 
 /// `0x327498(h₀, h₁, v₀, v₁, moby, mask, velocity, sound)` (module doc).
 #[allow(clippy::too_many_arguments)]

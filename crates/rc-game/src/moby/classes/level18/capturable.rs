@@ -94,7 +94,7 @@
 //! (`0x2c27f0`); the paths' lengths into their points' `w` (`0x35ea60`, read by nothing here); a taken-over 0x0ed4's
 //! attack (no level places one).
 
-use crate::hero::physics::{add, atan2, dist, dist2, rot_dist, set_len, sub, turn_ease, V3};
+use crate::hero::physics::{add, atan2, dist, dist2, rot_dist, set_len, sub, turn_ease, wrap, V3};
 use crate::moby::classes::props::{seq, set_seq, wrapped};
 use crate::moby::{ai, bolts, countdown, mode, Ctx, MobyWorld};
 
@@ -639,20 +639,10 @@ fn hooked(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].set_state(0, 7);
 }
 
-/// `0x33b560` = L00 `0x320440`: an angle wrapped to [−π, π).
-fn wrap(a: f32) -> f32 { use std::f32::consts::PI; ((a + PI) * 0.159_154_94).rem_euclid(1.0) * std::f32::consts::TAU - PI }
-
-/// `0x32a7f0`: the first time since the last sub-state change.
-fn first_sub(m: &mut crate::moby::Moby) -> bool {
-    if m.once & 2 != 0 { return false; }
-    m.once |= 2;
-    true
-}
-
 /// Sub-state 7, the swirl (module docs).
 fn swirl(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     ctx.game.prompt.request(LEASE, 0, 20);
-    if first_sub(&mut w.mobys[id]) { ctx.host.play_sound_of(&w.mobys[id], GUNNER, 6, 0); }
+    if w.mobys[id].first_sub() { ctx.host.play_sound_of(&w.mobys[id], GUNNER, 6, 0); }
     let h = w.mobys[id].pv_i(SOUND);
     if h == -1 || !ctx.host.sound_playing(h) {
         let h = ctx.host.play_sound_of(&w.mobys[id], GUNNER, 9, 4);
@@ -885,8 +875,7 @@ fn attack(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         GUNNER_B | GUNNER => {
             if w.mobys[id].timer != 1 {
                 let yaw = yaw_to(w, id, target_pos(w, id));
-                let pos = w.mobys[id].pos;
-                ai::move_step(w, id, ctx, yaw, pos);
+                ai::turn_in_place(w, id, ctx, yaw);
             }
             match seq_a(w, id, ctx) {
                 10 => if wrapped(w, id, ctx) {
@@ -1175,8 +1164,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     match w.mobys[id].state {
         1 => {
             let yaw = yaw_to(w, id, w.mobys[id].pv_v(T));
-            let pos = w.mobys[id].pos;
-            ai::move_step(w, id, ctx, yaw, pos);
+            ai::turn_in_place(w, id, ctx, yaw);
         }
         2 => {
             ai::hold(w, id, ctx);

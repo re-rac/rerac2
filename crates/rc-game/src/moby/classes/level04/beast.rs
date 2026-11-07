@@ -144,13 +144,6 @@ fn limits(w: &mut MobyWorld, id: usize, l: [u32; 4]) {
     ai::senses(&mut w.mobys[id], a, b, c, d);
 }
 
-fn first_sub(w: &mut MobyWorld, id: usize) -> bool {
-    let m = &mut w.mobys[id];
-    if m.once & 2 != 0 { return false; }
-    m.once |= 2;
-    true
-}
-
 fn st(w: &mut MobyWorld, id: usize, state: u8, sub: i32) { w.mobys[id].set_state(state, sub); }
 fn rider(w: &MobyWorld, id: usize) -> Option<usize> { ai::link(&w.mobys[id], RIDER).filter(|&r| w.mobys.get(r).is_some_and(|m| m.state < 0x80)) }
 
@@ -178,14 +171,6 @@ fn tdist(w: &MobyWorld, id: usize, ctx: &Ctx) -> f32 { dist2(w.mobys[id].pos, tp
 fn off_aim(w: &MobyWorld, id: usize) -> f32 { let tp = w.mobys[id].pv_v(TARGET); rot_dist(w.mobys[id].rot[2], yaw_to(w, id, tp)) }
 fn seen(w: &MobyWorld, id: usize) -> bool { w.mobys[id].pv_i(SEEN_NEAR) == 1 || w.mobys[id].pv_i(SEEN_FAR) == 1 }
 fn young(w: &MobyWorld, id: usize) -> bool { w.mobys[id].pv_i(CUBOIDS) != -1 }
-
-fn tick_s(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let m = &mut w.mobys[id];
-    let mut t = m.pv_s(off) as i32;
-    let r = crate::moby::countdown(&mut t);
-    m.set_pv_s(off, t as i16);
-    r
-}
 
 fn path(ctx: &Ctx, i: i32) -> Option<Vec<V3>> {
     usize::try_from(i).ok().and_then(|p| ctx.level.paths.get(p)).filter(|p| !p.is_empty()).map(|p| p.iter().map(|q| [q[0], q[1], q[2]]).collect())
@@ -543,7 +528,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     match w.mobys[id].sub_state {
         0 => if !young(w, id) {
-            if first_sub(w, id) {
+            if w.mobys[id].first_sub() {
                 limits(w, id, WALK);
                 if w.mobys[id].pv_f(W_RANGE) < 0.2 { anim2(w, id, ctx, 4, 3, 0, 0xc); }
                 if w.mobys[id].pv_i(PATROL) != -1 && w.mobys[id].pv_i(RUN_PATH) == -1 {
@@ -574,7 +559,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         },
         1 => {
-            if first_sub(w, id) { limits(w, id, TROT); }
+            if w.mobys[id].first_sub() { limits(w, id, TROT); }
             if seen(w, id) {
                 spot(w, id, ctx);
             } else if w.mobys[id].pv_s(T2A0) == 0 && w.mobys[id].pv_i(0x30c) == 0 {
@@ -583,7 +568,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         2 => {
-            if first_sub(w, id) { limits(w, id, TROT); }
+            if w.mobys[id].first_sub() { limits(w, id, TROT); }
             let state = w.mobys[id].state;
             if in_territory(w, id, ctx) || seen(w, id) || matches!(state, 0xd | 0x10 | 0xc) {
             } else if state == 0xf {
@@ -644,8 +629,8 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].state >= 0x80 { return; }
     let m = &mut w.mobys[id];
     ai::flash(m, FLASH);
-    tick_s(w, id, T2A0);
-    tick_s(w, id, T2A2);
+    w.mobys[id].count_s(T2A0);
+    w.mobys[id].count_s(T2A2);
     let m = &mut w.mobys[id];
     if m.state_ticks != -1 { m.state_ticks += 1; }
     if m.pos[2] < 40.0 {
@@ -708,7 +693,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             anim2(w, id, ctx, 0xf, 0x17, 0, 7);
             st(w, id, 0x15, -1);
         },
-        5 => if tick_s(w, id, WAIT) {
+        5 => if w.mobys[id].count_s(WAIT) {
             anim2(w, id, ctx, 5, 4, 0, 10);
             pick_cuboid(w, id, ctx);
             st(w, id, 6, 0);

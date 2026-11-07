@@ -115,13 +115,6 @@ fn senses(w: &mut MobyWorld, id: usize, s: [u32; 4]) {
     ai::senses(&mut w.mobys[id], f32::from_bits(s[0]), f32::from_bits(s[1]), f32::from_bits(s[2]), f32::from_bits(s[3]));
 }
 
-/// `0x327928` (L00 `0x32a7f0`): the first time since the last sub-state change.
-fn first_sub(m: &mut crate::moby::Moby) -> bool {
-    if m.once & 2 != 0 { return false; }
-    m.once |= 2;
-    true
-}
-
 fn solid_of(w: &MobyWorld) -> bool { w.class(CLASS).is_some_and(|c| c.has_collision) }
 
 /// Drawn, shown, its class's collision, targeted.
@@ -205,7 +198,7 @@ pub fn update_10d0(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         2 => {
-            if first_sub(&mut w.mobys[id]) {
+            if w.mobys[id].first_sub() {
                 show(w, id);
                 solid(w, id);
             }

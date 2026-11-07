@@ -27,7 +27,7 @@
 //! ground, or less than 0.5 over the ground, and within the same square, likewise into the state 0x44 (his hop,
 //! crate::hero::clank) with the velocity that takes him there over a top 1.5 over it.
 
-use crate::hero::physics::{add, euler_rows, scale, sub, V3};
+use crate::hero::physics::{add, euler_rows, scale, sub, through, V3};
 use crate::moby::classes::endako_d;
 use crate::moby::{Ctx, MobyWorld};
 
@@ -52,8 +52,6 @@ const REST: f32 = 3.0 * 0.000_290_888_25;
 const G: f32 = 0.005_555_555_7;
 /// The help slot the swing turns off.
 const HELP: usize = 0x60;
-
-fn through(r: &[V3; 3], v: V3) -> V3 { std::array::from_fn(|k| v[0] * r[0][k] + v[1] * r[1][k] + v[2] * r[2][k]) }
 
 fn live(w: &MobyWorld, i: usize) -> bool { w.mobys.get(i).is_some_and(|m| m.state != 0xfe && m.state != 0xfd) }
 

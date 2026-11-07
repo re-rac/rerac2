@@ -143,21 +143,6 @@ fn senses(m: &mut Moby, s: [u32; 4]) {
     ai::senses(m, f32::from_bits(s[0]), f32::from_bits(s[1]), f32::from_bits(s[2]), f32::from_bits(s[3]));
 }
 
-/// `0x32a7f0`: the first time since the last sub-state change.
-fn first_sub(m: &mut Moby) -> bool {
-    if m.once & 2 != 0 { return false; }
-    m.once |= 2;
-    true
-}
-
-/// `0x2eeab0` on an int pvar.
-fn count_i(m: &mut Moby, o: usize) -> bool {
-    let mut t = m.pv_i(o);
-    let d = countdown(&mut t);
-    m.set_pv_i(o, t);
-    d
-}
-
 /// `0x2eeae0` on a short pvar.
 fn count_s(m: &mut Moby, o: usize) {
     let mut t = m.pv_s(o) as i32;
@@ -212,9 +197,9 @@ fn subs(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
         0 => {
             let m = &mut w.mobys[id];
             if m.pv_i(HOOK) != 0 && m.once & 4 == 0 { return false; }
-            if first_sub(m) { senses(m, SLOW); }
+            if m.first_sub() { senses(m, SLOW); }
             if found(m) && m.pv_i(ENGAGED) != 0 {
-                if count_i(m, WAKE) { climb(w, id, ctx); }
+                if m.count_i(WAKE) { climb(w, id, ctx); }
             } else if m.pv_s(ALARM) != 0 {
                 m.set_state(8, 2);
                 m.set_pv_s(ALARM, 0);
@@ -225,7 +210,7 @@ fn subs(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
             }
         }
         2 => {
-            if first_sub(&mut w.mobys[id]) {
+            if w.mobys[id].first_sub() {
                 senses(&mut w.mobys[id], SLOW);
                 ctx.host.set_anim_speed(&w.mobys[id], 1.0);
             }
@@ -239,9 +224,9 @@ fn subs(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
         }
         1 => {
             let m = &mut w.mobys[id];
-            if first_sub(m) { senses(m, SLOW); }
+            if m.first_sub() { senses(m, SLOW); }
             let go = if found(m) && m.pv_i(ENGAGED) != 0 {
-                count_i(m, WAKE)
+                m.count_i(WAKE)
             } else if m.pv_s(ALARM) != 0 && m.pv_i(ENGAGED) != 0 {
                 m.set_pv_s(ALARM, 0);
                 true
@@ -254,7 +239,7 @@ fn subs(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
             }
         }
         3 => {
-            if first_sub(&mut w.mobys[id]) {
+            if w.mobys[id].first_sub() {
                 senses(&mut w.mobys[id], FAST);
                 ctx.host.set_anim_speed(&w.mobys[id], 1.0);
             }

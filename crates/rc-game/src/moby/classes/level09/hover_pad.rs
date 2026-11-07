@@ -20,18 +20,10 @@
 
 use crate::hero::physics::{add, dist, scale, sub, V3};
 use crate::moby::classes::props::{bob, sway};
-use crate::moby::{platform, Ctx, MobyWorld};
+use crate::moby::{keep_loop, platform, Ctx, MobyWorld};
 
 pub const CLASS: i16 = 0x0e84;
 const DEG_S: f32 = 0.000_290_888_25;
-
-/// The loop sound `n` kept playing (`0x35d9a8(n, 4, m)` unless its handle still plays).
-fn keep_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, n: i32) {
-    let h = w.mobys[id].pv_i(0x6c);
-    if 0 <= h && ctx.host.sound_playing(h) { return; }
-    let h = ctx.host.play_sound(&w.mobys[id], n, 4);
-    w.mobys[id].set_pv_i(0x6c, h);
-}
 
 /// The first tick of a state: the loop sound stopped.
 fn first(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
@@ -109,19 +101,19 @@ pub fn update_0e84(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         1 => {
             first(w, id, ctx);
-            keep_sound(w, id, ctx, 1);
+            keep_loop(w, id, ctx, 0x6c, 1);
             if cuboid != -1 && on && ctx.hero.grounded_ticks != 0 { w.mobys[id].set_state(2, -1); }
         }
         2 => {
             first(w, id, ctx);
-            keep_sound(w, id, ctx, 0);
+            keep_loop(w, id, ctx, 0x6c, 0);
             if let Some((to, _)) = ctx.level.cuboid_place(cuboid) {
                 if glide(w, id, to) { w.mobys[id].set_state(3, -1); }
             }
         }
         3 => {
             first(w, id, ctx);
-            keep_sound(w, id, ctx, 1);
+            keep_loop(w, id, ctx, 0x6c, 1);
             if !on { w.mobys[id].set_state(4, -1); }
         }
         4 => {
@@ -129,7 +121,7 @@ pub fn update_0e84(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let p = w.mobys[id].pos;
             let blocked = ctx.coll.and_then(|c| crate::collision::coll_sphere_m(c, ctx.scene, p, 1.5, crate::collision::QueryFlags(0x10), Some(id))).is_some_and(|h| h.moby.is_some());
             if !blocked {
-                keep_sound(w, id, ctx, 0);
+                keep_loop(w, id, ctx, 0x6c, 0);
                 let home = w.mobys[id].pv_v(0x80);
                 if glide(w, id, home) { w.mobys[id].set_state(1, -1); }
             }

@@ -313,20 +313,9 @@ fn target_pos(w: &MobyWorld, id: usize, ctx: &Ctx) -> V3 {
     ai::link(&w.mobys[id], pv::T_MOBY).and_then(|t| w.mobys.get(t)).map_or(ctx.hero.pos, |t| t.pos)
 }
 
-/// `0x323560(yaw, m)`: the facing eased toward `yaw` at the movement block's turn limits (`0x3152d0`).
-fn face(w: &mut MobyWorld, id: usize, yaw: f32) {
-    let m = &mut w.mobys[id];
-    let o = pv::MV;
-    let (a, b, most) = (m.pv_f(o + 0x14), m.pv_f(o + 0x18), m.pv_f(o + 0x1c));
-    let (mut r, mut v) = (m.rot[2], m.pv_f(o + 0xb4));
-    turn_ease(yaw, a, b, most, &mut r, &mut v, 0);
-    m.rot[2] = r;
-    m.set_pv_f(o + 0xb4, v);
-}
-
 fn face_hero(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
     let (p, h) = (w.mobys[id].pos, ctx.hero.pos);
-    face(w, id, atan2(h[0] - p[0], h[1] - p[1]));
+    crate::moby::ai::face_at(&mut w.mobys[id], pv::MV, atan2(h[0] - p[0], h[1] - p[1]));
 }
 
 /// `0x2ccc78`: its camera tweak let go.
@@ -859,7 +848,7 @@ fn throw(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let half = f32::from_bits(0x3fc9_0fdc);
     let (y1, y2) = (add_rot(a, half), sub_rot(a, half));
     let yaw = if rot_dist(m.rot[2], y2) <= rot_dist(m.rot[2], y1) { y2 } else { y1 };
-    face(w, id, yaw);
+    crate::moby::ai::face_at(&mut w.mobys[id], pv::MV, yaw);
     if seq_a(w, id, ctx) != 0xb { return; }
     let Some(j) = ctx.host.joint(&w.mobys[id], 0xe) else { return };
     let dj = dist(j, ctx.hero.pos);

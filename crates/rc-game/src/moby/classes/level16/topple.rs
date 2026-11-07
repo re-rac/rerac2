@@ -27,19 +27,6 @@ pub const TARGET: i16 = 0x099d;
 const CHILD: usize = 0x00;
 const VEL: usize = 0x04;
 
-/// `0x322bd8(m, owner)` (L00 `0x32a748`): updated and drawn from any distance, drawn, the owner, its place, angles,
-/// light word and ambient; mode & 0xfff8.
-fn adopt(w: &mut MobyWorld, id: usize, owner: usize) {
-    let (pos, rot, light, ambient) = { let o = &w.mobys[owner]; (o.pos, o.rot, o.light, o.ambient) };
-    let m = &mut w.mobys[id];
-    m.update_dist = 0xff;
-    m.draw_dist = 0xff;
-    m.drawn = 1;
-    m.parent = Some(owner);
-    (m.pos, m.rot, m.light, m.ambient) = (pos, rot, light, ambient);
-    m.mode &= 0xfff8;
-}
-
 /// The fall and the bounces: `0x31ed78` on the pitch toward `to`, its speed `+0x04`; true once it has reached it
 /// (rising: at or past it; falling: at or below 0), the speed then 0.
 fn swing(m: &mut crate::moby::Moby, to: f32) -> bool {
@@ -61,7 +48,7 @@ fn swing(m: &mut crate::moby::Moby, to: f32) -> bool {
 pub fn update_0e7f(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].pvars.is_empty() {
         let k = w.create(CLASS);
-        adopt(w, k, id);
+        w.adopt(k, Some(id), &*ctx.host);
         w.delete(id);
         return;
     }
@@ -72,7 +59,7 @@ pub fn update_0e7f(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.rot[0] = sub_rot(m.rot[2], f32::from_bits(0x3fc9_0fdc));
             let k = w.create(TARGET);
             w.mobys[id].set_pv_i(CHILD, k as i32);
-            adopt(w, k, id);
+            w.adopt(k, Some(id), &*ctx.host);
             let scale = w.class(TARGET).map_or(1.0, |c| c.scale);
             w.mobys[k].scale = scale + scale;
             w.mobys[id].set_state(1, -1);

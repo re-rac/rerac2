@@ -934,8 +934,8 @@ fn hurt(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 fn face_or_hold(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &w.mobys[id];
     if m.pv_s(FACING) != 0 {
-        let (yaw, pos) = (m.pv_f(FACE), m.pos);
-        ai::move_step(w, id, ctx, yaw, pos);
+        let yaw = m.pv_f(FACE);
+        ai::turn_in_place(w, id, ctx, yaw);
     } else {
         ai::hold(w, id, ctx);
     }

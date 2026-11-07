@@ -178,7 +178,7 @@ pub fn draw(w: &mut MobyWorld, id: usize, frame: i32, out: &mut Vec<FxQuad>) {
             .iter()
             .map(|v| {
                 let r = (v[0] * v[0] + v[1] * v[1]).sqrt();
-                let a = crate::fx::beams::wrap(fmod(r, wl) * f32::from_bits(0x40c9_0fdc) / wl);
+                let a = crate::hero::physics::wrap(fmod(r, wl) * f32::from_bits(0x40c9_0fdc) / wl);
                 let h = mesh.height * sin(crate::hero::physics::add_rot(a, phase));
                 [v[0] + p[0], v[1] + p[1], v[2] + p[2] + h]
             })

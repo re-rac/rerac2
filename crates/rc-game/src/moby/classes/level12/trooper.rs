@@ -1,29 +1,19 @@
 //! Level 12's trooper 0x0f31 (`0x416580`, 50 placed; its set-up `0x414a00`, senses `0x415600`): legs that ride the
-//! level's paths carrying a turret 0x114b (`0x425478`, only its shadow) with two guns 0x0d66 on it
-//! (crate::moby::classes::level12::debris, thrown off as it breaks), on the framework ([`crate::moby::ai`]): health
-//! `+0x20` (its damage byte `+0x34`, `+0x2e` = 2 a kill asked by another), reaction `+0x50`, movement `+0x100`
-//! (its rail speed `+0x128`, path points `+0x1c8` / `+0x1ca`), target `+0x1f0` (its moby `+0x200`, found `+0x204`).
-//!
-//! Its words: the turret's aim block `+0x210` (list 3), its own break pieces `+0x290`; paths `+0x2b0` (the way in,
-//! −1 none), `+0x2b4` (patrol), `+0x2b8` (the second), `+0x2bc` (after the way in), `+0x2c0` (where a replacement
-//! comes in); `+0x2cc` the most of its group shooting at once, `+0x2d0` / `+0x2d4` its target areas (`+0x2d8` the
-//! one searched), `+0x2dc` the path it is on; timers `+0x2e0` (alert), `+0x2e2`, `+0x2e4` (between shots), `+0x2e6`
-//! (between bursts), `+0x2e8` (calm), `+0x300`; `+0x2ea` alarmed, `+0x2eb` shooting (counted in its group's shared
-//! word `+0x304`), `+0x2ec` the turret's heading, the guns `+0x2f0` / `+0x2f4` and turret `+0x2f8` (links), the
-//! turret's turn speed `+0x2fc`; `+0x302` 1 a reserve (hidden until one of its group dies), 2 taking over;
-//! `+0x303` taking over a stand; `+0x308` a second group alarmed with it; `+0x30c` / `+0x30d` the shot's height
-//! picks, `+0x30e` patrol after the way in, `+0x30f` its turret's head lost; `+0x310` the reaction's `+0x40`;
-//! `+0x314` the area that shows it (−1 none), `+0x31c` show (1) / hide (−1) asked, `+0x31d` hidden, `+0x31e` its
-//! update distance, `+0x31f` a reserve's first tick; the guns' aim blocks `+0x320` / `+0x3a0` (lists 7 / 8).
+//! level's paths carrying a turret 0x114b (`0x425478`, only its shadow: crate::moby::classes::trooper::update_turret)
+//! with two guns 0x0d66 on it (crate::moby::classes::level12::debris, thrown off as it breaks), on the framework
+//! ([`crate::moby::ai`]). One of the trooper family (crate::moby::classes::trooper: its words, and the functions it
+//! shares with Dobbo's and Yeedil's 0x0d0f — `0x414178` release, `0x4141c0` take_slot, `0x4144a8` colour, `0x4144f0`
+//! drop_parts, `0x4147a8` walk_done, `0x414848` rail, `0x414970` set_path, `0x415380` alarm, `0x4162c8` reverse,
+//! with `0x414560` thrusters, `0x415480` aim_point and `0x415e10` guns_update, the same code for its turret's class).
+//! Its own update, set-up, senses, waking, shots and states are this level's code.
 //!
 //! The L12 engine functions with the port's: `0x32b628` take_damage, `0x32c370` flight, `0x32f040` find_target,
 //! `0x331d30` senses, `0x331ee8` / `0x331d98` the path walk's start and step (crate::moby::ai::follow_path, its
-//! words `+0x1c4..`), `0x330c28` / `0x330dc0` move_step / hold, `0x322c48` turn_ease, `0x327a50` the joint aim
-//! (crate::moby::classes::level12::head's), `0x328018` = L00 `0x3253f0` (a part at a joint), `0x32eb50` = L00
-//! `0x32a848` (crate::level::LevelData::in_area), `0x2efc98` the teleport-in (crate::moby::classes::teleport),
-//! `0x32dad0` = L00 `0x32a2e0` the break pieces ([`part_break`]; `0x2df358` = L00 `0x2dbdb0`, crate::moby::shards),
-//! `0x337df0` = L00 `0x332c10` (crate::particles::trail), `0x3a7fb8` the shot (crate::moby::classes::level12::shot),
-//! `0x323f50` = L00 `0x320538` (crate::moby::blast::explode), `0x31e7c8` = L00 `0x31adc0` (crate::moby::bolts).
+//! words `+0x1c4..`), `0x330c28` / `0x330dc0` move_step / hold, `0x322c48` turn_ease, `0x328018` = L00 `0x3253f0` (a
+//! part at a joint), `0x32eb50` = L00 `0x32a848` (crate::level::LevelData::in_area), `0x2efc98` the teleport-in
+//! (crate::moby::classes::teleport), `0x32dad0` = L00 `0x32a2e0` the break pieces (crate::moby::classes::trooper::
+//! part_break), `0x3a7fb8` the shot (crate::moby::classes::level12::shot), `0x323f50` = L00 `0x320538`
+//! (crate::moby::blast::explode), `0x31e7c8` = L00 `0x31adc0` (crate::moby::bolts).
 //!
 //! Not ported: the level's floor gate (`0x1ca300` / `0x1ca30c` / `0x1ca328` / `0x1ca338`: updates kept to one floor by
 //! z, set by no class the port has), the colour put back when it is shown (`0x316d58` with `0x1b3d18..`) and the
@@ -34,78 +24,26 @@
 //! `0x324208`, 0.02 / 0.3, on the turret's lists 3 and 7 / 8); in [`timers`] the head aim on `+0x420` (`0x32a7b0` =
 //! L00 `0x327308`, the turret's list 3, `$gp+0x2818` = 2.5).
 
-use crate::hero::physics::{add, add_rot, atan2, dist, dist2, dot, len2, scale, set_len, sub, sub_rot, turn_ease, V3};
+use crate::hero::physics::{add_rot, atan2, dist2, len2, scale, set_len, sub, sub_rot, turn_ease, V3};
 use crate::moby::classes::props::{seq, wrapped};
-use crate::moby::{ai, countdown, mode, Ctx, MobyWorld};
+use crate::moby::classes::trooper::{
+    aim, aim_point, alarm, colour, drop_parts, found, gun, guns_update, part_break, path_pts, pt, rail, release, reverse, rr, seq_a,
+    set_path, st, t_pos, take_slot, thrusters, tick_s, turret_of, walk_done, wrap, yaw_to, AIM_GUNS, AIM_TURRET, ALARMED, AREA, AREA_A,
+    AREA_B, ASK as SHOW, FIRST, FLAGS, GUNS, GUN_CLASS, H, HEADING, HEADLESS, HIDDEN, LAST, MOST, MV, P_AFTER, P_IN, P_PATROL, P_RESPAWN,
+    P_SECOND, PARTS, PATH, PATROL_AFTER, PICK_C, PICK_D, PVARS, REACT, SHARED, STAND, T300, T_2E2, T_ALERT, T_BURST, T_CALM, T_MOBY,
+    T_POINT, T_SHOT, TODANO, TURRET, TURRET_V, UPD, WAKE_AREA as SHOW_AREA,
+};
+use crate::moby::{ai, mode, Ctx, MobyWorld};
 
-const H: usize = 0x20;
-const REACT: usize = 0x50;
-const MV: usize = 0x100;
-const SPEED: usize = MV + 0x28;
-const AT: usize = MV + 0xc8;
-const LAST: usize = MV + 0xca;
-const T_POINT: usize = 0x1f0;
-const T_MOBY: usize = 0x200;
-const FOUND: usize = 0x204;
-const AIM_TURRET: usize = 0x210;
-const PARTS: usize = 0x290;
-const P_IN: usize = 0x2b0;
-const P_PATROL: usize = 0x2b4;
-const P_SECOND: usize = 0x2b8;
-const P_AFTER: usize = 0x2bc;
-const P_RESPAWN: usize = 0x2c0;
-const MOST: usize = 0x2cc;
-const AREA_A: usize = 0x2d0;
-const AREA_B: usize = 0x2d4;
-const AREA: usize = 0x2d8;
-const PATH: usize = 0x2dc;
-const T_ALERT: usize = 0x2e0;
-const T_2E2: usize = 0x2e2;
-const T_SHOT: usize = 0x2e4;
-const T_BURST: usize = 0x2e6;
-const T_CALM: usize = 0x2e8;
-const ALARMED: usize = 0x2ea;
-const SHOOTING: usize = 0x2eb;
-const HEADING: usize = 0x2ec;
-const GUNS: [usize; 2] = [0x2f0, 0x2f4];
-const TURRET: usize = 0x2f8;
-const TURRET_V: usize = 0x2fc;
-const T300: usize = 0x300;
-const FLAGS: usize = 0x302;
-const STAND: usize = 0x303;
-const SHARED: usize = 0x304;
-const GROUP2: usize = 0x308;
-const PICK_C: usize = 0x30c;
-const PICK_D: usize = 0x30d;
-const PATROL_AFTER: usize = 0x30e;
-const HEADLESS: usize = 0x30f;
-const SHOW_AREA: usize = 0x314;
-const SHOW: usize = 0x31c;
-const HIDDEN: usize = 0x31d;
-const UPD: usize = 0x31e;
-const FIRST: usize = 0x31f;
-const AIM_GUNS: [usize; 2] = [0x320, 0x3a0];
 /// The head aim's record (crate::moby::joint_aim), hung on the turret.
 const HEAD_AIM: usize = 0x420;
-const PVARS: usize = 0x500;
 
-pub const CLASS: i16 = 0x0f31;
-pub const TURRET_CLASS: i16 = 0x114b;
-pub const GUN_CLASS: i16 = 0x0d66;
+pub const CLASS: i16 = TODANO.legs;
+pub const TURRET_CLASS: i16 = TODANO.turret;
 /// `$gp+0x2808`: the turret's break thresholds (by piece, of 255 health).
 const THRESHOLDS: [u8; 10] = [0xe9, 0xd4, 0xaa, 0x7f, 1, 1, 0x55, 1, 1, 1];
 
-fn link(w: &MobyWorld, id: usize, off: usize, class: i16) -> Option<usize> {
-    ai::link(&w.mobys[id], off).filter(|&k| w.mobys.get(k).is_some_and(|m| m.o_class == class && m.state < 0xfd))
-}
-fn turret(w: &MobyWorld, id: usize) -> Option<usize> { link(w, id, TURRET, TURRET_CLASS) }
-fn gun(w: &MobyWorld, id: usize, k: usize) -> Option<usize> { link(w, id, GUNS[k], GUN_CLASS) }
-fn st(w: &mut MobyWorld, id: usize, s: u8, sub: i32) { w.mobys[id].set_state(s, sub); }
-fn rr(ctx: &mut Ctx, a: i32, b: i32) -> i32 { ctx.game.rng.rand_range(a, b) }
-fn seq_a(w: &MobyWorld, id: usize, ctx: &Ctx) -> u8 { ctx.host.anim(&w.mobys[id]).map_or(0xff, |a| a.seq_a) }
-fn t_pos(w: &MobyWorld, id: usize, ctx: &Ctx) -> V3 {
-    ai::link(&w.mobys[id], T_MOBY).and_then(|t| w.mobys.get(t)).map_or(ctx.hero.pos, |t| t.pos)
-}
+fn turret(w: &MobyWorld, id: usize) -> Option<usize> { turret_of(w, id, TODANO) }
 /// `0x32eaf8`: the first tick since the last sub-state change.
 fn first_sub(w: &mut MobyWorld, id: usize) -> bool {
     let m = &mut w.mobys[id];
@@ -113,17 +51,6 @@ fn first_sub(w: &mut MobyWorld, id: usize) -> bool {
     m.once |= 2;
     true
 }
-/// `0x323e58`: an angle wrapped into −π..π.
-fn wrap(a: f32) -> f32 { ((a + std::f32::consts::PI) * 0.159_154_94).fract().rem_euclid(1.0) * std::f32::consts::TAU - std::f32::consts::PI }
-fn found(w: &MobyWorld, id: usize) -> bool { w.mobys[id].pv_i(FOUND) == 1 }
-fn tick_s(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut t = w.mobys[id].pv_s(off) as i32;
-    let out = countdown(&mut t);
-    w.mobys[id].set_pv_s(off, t as i16);
-    out
-}
-fn path_pts<'a>(ctx: &'a Ctx, path: i32) -> Option<&'a Vec<[f32; 4]>> { usize::try_from(path).ok().and_then(|p| ctx.level.paths.get(p)).filter(|p| !p.is_empty()) }
-fn pt(p: &[[f32; 4]], i: i32) -> V3 { let q = p[(i.max(0) as usize).min(p.len() - 1)]; [q[0], q[1], q[2]] }
 
 /// `0x4142a8(m, seq, frame, blend)`: the limits (sequence 0xc: 10 / 2, else 16 / 6; the turn 1440 / 720), the brake
 /// doubled; the reaction's sequences and speeds for the falls 0xd..0xf and the jump 0x10; the sequence on the legs and
@@ -151,99 +78,6 @@ fn anim(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, s: u8, frame: u8, blend: i3
     }
 }
 fn anim_r(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, s: u8) { let b = rr(ctx, 7, 0xc); anim(w, id, ctx, s, 0, b); }
-
-/// `0x414178`: out of its group's shooters (the shared count down, when it was in).
-fn release(w: &mut MobyWorld, id: usize) {
-    let m = &w.mobys[id];
-    if m.group >= 0 && m.pv_b(SHOOTING) != 0 {
-        let off = m.pv_i(SHARED);
-        let mut v = w.shared_i(off);
-        countdown(&mut v);
-        w.set_shared_i(off, v);
-    }
-    w.mobys[id].set_pv_b(SHOOTING, 0);
-}
-/// `0x4141c0`: one of its group's shooters.
-fn take_slot(w: &mut MobyWorld, id: usize) {
-    let m = &w.mobys[id];
-    if m.group >= 0 && m.pv_b(SHOOTING) == 0 {
-        let off = m.pv_i(SHARED);
-        let v = w.shared_i(off) + 1;
-        w.set_shared_i(off, v);
-        w.mobys[id].set_pv_b(SHOOTING, 1);
-    }
-}
-
-/// `0x414970(m, path, last)`: onto `path` (−1: off any, its point −1) from its nearest point (`0x347dd0`), to `last`
-/// (−1 its end); the walk's words (`0x331ee8`).
-fn set_path(w: &mut MobyWorld, id: usize, ctx: &Ctx, path: i32, last: i32) {
-    let m = &mut w.mobys[id];
-    m.set_pv_i(PATH, path);
-    if path == -1 { m.set_pv_s(AT, -1); return; }
-    let Some(p) = path_pts(ctx, path) else { m.set_pv_s(AT, 0); return };
-    let pos = m.pos;
-    let near = (0..p.len()).fold((0usize, 1e11f32), |(bi, bd), i| { let d = dist(pt(p, i as i32), pos).abs(); if bd <= d { (bi, bd) } else { (i, d) } }).0;
-    m.set_pv_i(MV + 0xc4, path + 1);
-    m.set_pv_s(LAST, if last == -1 { p.len() as i16 - 1 } else { last as i16 });
-    m.set_pv_s(AT, near as i16);
-}
-
-/// `0x347fa0(d, m, path, &pos, i, dir)`: its place moved along the path: onto the line from point `i` toward the
-/// next one in `dir` (the ends wrapping round), `d` past its foot on it; past that segment, onto the next. Returns
-/// the point it is now from.
-fn slide(w: &mut MobyWorld, id: usize, p: &[[f32; 4]], d: f32, i: i32, dir: i32) -> i32 {
-    let n = p.len() as i32;
-    let next = |i: i32| if i == n - 1 { if dir < 1 { n - 2 } else { 0 } } else if i == 0 { if dir < 1 { n - 1 } else { 1 } } else { i + dir };
-    let mut i = i;
-    let j = next(i);
-    let seg = sub(pt(p, j), pt(p, i));
-    let l = crate::hero::physics::len(seg);
-    let mut u = set_len(seg, 1.0);
-    let mut t = dot(sub(w.mobys[id].pos, pt(p, i)), u) + d;
-    if l < t {
-        let k = next(j);
-        u = set_len(sub(pt(p, k), pt(p, j)), 1.0);
-        t -= l;
-        i = j;
-    }
-    w.mobys[id].pos = add(pt(p, i), scale(u, t));
-    i
-}
-
-/// `0x414848(m, path)`: along the path at its rail speed toward its last point; facing its next point (at the end the
-/// target's point), eased (`0x322c48` with its limits). True at the last point (or off any path).
-fn rail(w: &mut MobyWorld, id: usize, ctx: &Ctx, path: i32) -> bool {
-    let Some(p) = path_pts(ctx, path).cloned() else { w.mobys[id].set_pv_s(AT, -1); return true };
-    let m = &w.mobys[id];
-    let (at, last) = (m.pv_s(AT) as i32, m.pv_s(LAST) as i32);
-    let dir = if at < last { 1 } else { -1 };
-    let speed = m.pv_f(SPEED);
-    let i = slide(w, id, &p, speed, at, dir);
-    let m = &mut w.mobys[id];
-    m.set_pv_s(AT, i as i16);
-    let done = i == last;
-    let to = if i + 1 <= p.len() as i32 - 1 { pt(&p, i + 1) } else { m.pv_v(T_POINT) };
-    let yaw = atan2(to[0] - m.pos[0], to[1] - m.pos[1]);
-    let (a, b, c) = (m.pv_f(MV + 0x14), m.pv_f(MV + 0x18), m.pv_f(MV + 0x1c));
-    let (mut r, mut v) = (m.rot[2], m.pv_f(MV + 0xb4));
-    turn_ease(yaw, a, b, c, &mut r, &mut v, 0);
-    m.rot[2] = r;
-    m.set_pv_f(MV + 0xb4, v);
-    done
-}
-
-/// `0x4162c8`: its walk turned back: toward its path's end from the start (true), else toward the start.
-fn reverse(w: &mut MobyWorld, id: usize, ctx: &Ctx) -> bool {
-    let m = &mut w.mobys[id];
-    if m.pv_s(LAST) == 0 {
-        let n = path_pts(ctx, m.pv_i(PATH)).map_or(-1, |p| p.len() as i32 - 1);
-        m.set_pv_s(LAST, n as i16);
-        true
-    } else {
-        m.set_pv_s(LAST, 0);
-        false
-    }
-}
 
 /// `0x415f10(m, aim, from_end, low)`: a clear shot — its head lost, always; else the line from 1.76 above it (`low`:
 /// 1.0; `from_end`: above its path's last point) to 1.18 above its target (flags 0) meets nothing or the target; with
@@ -299,16 +133,6 @@ fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     super::shot::fire(w, ctx, dmg, id, v, p);
 }
 
-/// `0x415300` / `0x415380`: every live trooper of its group and of its second group alarmed (`+0x2ea`).
-fn alarm(w: &mut MobyWorld, id: usize) {
-    for g in [w.mobys[id].group as i32, w.mobys[id].pv_i(GROUP2)] {
-        let Some(list) = usize::try_from(g).ok().and_then(|g| w.groups.get(g)).cloned() else { continue };
-        for k in list {
-            if let Some(m) = w.mobys.get_mut(k).filter(|m| m.state < 0x80 && m.o_class == CLASS) { m.set_pv_b(ALARMED, 1); }
-        }
-    }
-}
-
 /// `0x415138`: its replacement — the reserve (`+0x302` & 1) of its group nearest the first point of its
 /// replacement path takes its paths and areas, alarmed, the alert timer 1000, onto that path, taking over (2).
 fn hand_off(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
@@ -331,55 +155,6 @@ fn hand_off(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
     o.set_pv_i(PATH, o.pv_i(P_RESPAWN));
     o.set_pv_b(FLAGS, 2);
     o.set_pv_b(STAND, stand);
-}
-
-/// `0x32dad0(m, b, health)`: the break pieces of `b` (`+0..` a threshold of 255 health by piece, `+0x10` the health
-/// last seen): the first time with health, the pieces with a threshold below it shown (`+0x7c`); a piece shown
-/// whose threshold the health falls under breaks off (`0x2df358` mode 1: 90 a second spin, 15 gravity, 2..4 a second
-/// 90..120° either way of the camera's heading and 5..8 up), with the level's sound 7 for the first.
-fn part_break(w: &mut MobyWorld, ctx: &mut Ctx, id: usize, b: usize, h: usize) -> bool {
-    let m = &w.mobys[id];
-    let hp = m.pv_f(h);
-    let most = m.pv_s(h + 4).max(1) as f32;
-    let byte = |hp: f32| (hp.max(0.0) / most * 255.0) as i32 as u8;
-    if m.pv_f(b + 0x10) == 0.0 && hp != 0.0 {
-        let n = w.class(m.o_class).map_or(0, |c| c.pieces.len()).min(15);
-        let mut bits = m.bangles;
-        for k in 0..n {
-            let t = m.pv_b(b + k);
-            if t != 0 && t < byte(hp) { bits |= 1 << k; }
-        }
-        w.mobys[id].bangles = bits;
-    }
-    let mut broke = false;
-    if hp < w.mobys[id].pv_f(b + 0x10) {
-        for k in 0..15u8 {
-            let m = &w.mobys[id];
-            if m.bangles & (1 << k) == 0 || m.pv_b(b + k as usize) <= byte(hp) { continue; }
-            let cam = ctx.host.camera_rows()[0];
-            let rng = &mut ctx.game.rng;
-            let a = add_rot(rng.randf_signed(90.0, 120.0) * 0.017_453_294, atan2(cam[0], cam[1]));
-            let s = rng.randf(2.0, 4.0) * 0.016_666_668;
-            let up = rng.randf(5.0, 8.0) * 0.016_666_668;
-            let (class, pos, rot) = (m.o_class, m.pos, m.rot);
-            crate::moby::shards::spawn(w, ctx, class, Some(id), pos, rot, None, 90.0, 15.0, k, [a.cos() * s, a.sin() * s, up], 0xff, 1);
-            w.mobys[id].bangles &= !(1 << k);
-            if !broke { ctx.host.play_level_sound(None, 7, 0); }
-            broke = true;
-        }
-    }
-    w.mobys[id].set_pv_f(b + 0x10, hp);
-    broke
-}
-
-/// `0x4144f0`: the turret and guns gone.
-fn drop_parts(w: &mut MobyWorld, id: usize) {
-    for off in [TURRET, GUNS[0], GUNS[1]] {
-        if let Some(k) = ai::link(&w.mobys[id], off) {
-            if w.mobys.get(k).is_some_and(|m| m.state < 0xfd) { w.delete(k); }
-            ai::set_link(&mut w.mobys[id], off, None);
-        }
-    }
 }
 
 fn blast(w: &mut MobyWorld, ctx: &mut Ctx, id: usize) {
@@ -506,7 +281,7 @@ fn senses(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     let kind = ai::take_damage(w, id, ctx, false);
     if kind != 0 {
-        alarm(w, id);
+        alarm(w, id, CLASS);
         if let Some(t) = turret(w, id) {
             let health: Vec<u8> = w.mobys[id].pvars[H..H + 0x30].to_vec();
             if kind == 4 {
@@ -565,37 +340,7 @@ fn senses(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].drawn != 0 { crate::shadow_volumes::probe_near(w, id, ctx, 24.0, 0x16); }
     let area = w.mobys[id].pv_i(AREA);
     ai::find_target(w, id, ctx, 0.0, 0.0, area, None, false);
-    aim_point(w, id, ctx);
-}
-
-/// `0x415480`: the point it aims at: at Ratchet his aim point (within 5 of him his centre), 0.4 up (0.2 in his state
-/// 0xc); at another its place 0.8 up; its head lost, 4 along the turret's facing from 0..1 above itself.
-fn aim_point(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let headless = w.mobys[id].pv_b(HEADLESS) != 0;
-    let p = match turret(w, id).filter(|_| headless) {
-        None => {
-            let t = ai::link(&w.mobys[id], T_MOBY);
-            if t.is_none() || t == ctx.hero_moby {
-                let mut p = if dist2(w.mobys[id].pos, ctx.hero.pos) <= 5.0 { add(ctx.hero.pos, [0.0, 0.0, 1.0]) } else { ctx.hero.aim_point };
-                p[2] += if ctx.hero.state == 0xc { 0.2 } else { 0.4 };
-                p
-            } else {
-                add(t_pos(w, id, ctx), [0.0, 0.0, 0.8])
-            }
-        }
-        Some(t) => {
-            let mut p = w.mobys[id].pos;
-            p[2] += ctx.game.rng.randf(0.0, 1.0);
-            add(p, scale(w.mobys[t].rows[0], 4.0))
-        }
-    };
-    w.mobys[id].set_pv_v(T_POINT, p);
-}
-
-/// `0x327a50` = L00 `0x324208`: the aim record at `b` of `id`'s pvars sprung (`k`, 0.3) and hung on `dst`'s joint list
-/// `list` (crate::moby::joint_aim::aim).
-fn aim(w: &mut MobyWorld, id: usize, b: usize, dst: usize, list: u8, k: f32) {
-    crate::moby::joint_aim::aim(w, id, b, dst, list, k, f32::from_bits(0x3e99_999a));
+    aim_point(w, id, ctx, TODANO);
 }
 
 /// `0x415ac8`: the turret at its joint 0 with its colour, turned toward `+0x2ec` (its limits), playing at its speed;
@@ -604,14 +349,13 @@ fn aim(w: &mut MobyWorld, id: usize, b: usize, dst: usize, list: u8, k: f32) {
 /// left; its head lost, at random within ±45°).
 fn turret_update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let Some(t) = turret(w, id) else { return };
-    let amb = w.mobys[id].ambient;
+    colour(w, id, t);
     let at = ctx.host.joint(&w.mobys[id], 0).unwrap_or(w.mobys[id].pos);
     let (a, b, c, want) = { let m = &w.mobys[id]; (m.pv_f(MV + 0x14), m.pv_f(MV + 0x18), m.pv_f(MV + 0x1c), m.pv_f(HEADING)) };
     let (mut r, mut v) = (w.mobys[t].rot[2], w.mobys[id].pv_f(TURRET_V));
     turn_ease(want, a, b, c, &mut r, &mut v, 0);
     w.mobys[id].set_pv_f(TURRET_V, v);
     let tm = &mut w.mobys[t];
-    tm.ambient = amb;
     tm.pos = at;
     tm.rot[2] = r;
     let speed = ctx.host.anim(&w.mobys[id]).map_or(1.0, |a| a.speed);
@@ -657,54 +401,6 @@ fn turret_update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     for k in 0..2 { aim(w, id, AIM_GUNS[k], t, 7 + k as u8, 0.02); }
 }
 
-/// `0x414560`: the turret's thrusters (its joints 5 and 6), down 1.7..3 a second with the legs' velocity: on even
-/// frames blue (`0x6000ffff` to `0x80`, 20..24 ticks, 0x50 shrinking), odd ones red (`0xcf0000ff` to `0xcf`, 18..22,
-/// 0x28); then a flame at each (`0xefff7f4f` to `0xff0000`, 10..15 ticks, 10..25 shrinking to 0).
-fn thrusters(w: &mut MobyWorld, id: usize, t: usize, ctx: &mut Ctx) {
-    let down = -(ctx.game.rng.randf(1.7, 3.0) * 0.016_666_668);
-    let v = add([0.0, 0.0, down], w.mobys[id].pv_v(MV + 0xa0));
-    let (Some(a), Some(b)) = (ctx.host.joint(&w.mobys[t], 5), ctx.host.joint(&w.mobys[t], 6)) else { return };
-    let Some(sys) = ctx.parts.as_deref_mut() else { return };
-    let rng = &mut ctx.game.rng;
-    for p in [a, b] {
-        if ctx.game.frame & 1 == 0 {
-            let life = rng.rand_range(0x14, 0x18);
-            crate::particles::trail(sys, rng, p, v, 0x6000_ffff, 0x80, life, 0x50, -10, true);
-        } else {
-            let life = rng.rand_range(0x12, 0x16);
-            crate::particles::trail(sys, rng, p, v, 0xcf00_00ff, 0xcf, life, 0x28, -10, true);
-        }
-    }
-    for p in [a, b] {
-        let base = rng.rand_range(10, 0x19);
-        let life = rng.rand_range(10, 0xf);
-        crate::particles::trail(sys, rng, p, v, 0xefff_7f4f, 0xff_0000, life, base as i16, -(base as i16), true);
-    }
-}
-
-/// `0x415e10`: each gun on its turret's joint (gun 1 mirrored: rows 1 and 2 turned round), shown as the legs are,
-/// their colour.
-fn guns_update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let Some(t) = turret(w, id) else { return };
-    let amb = w.mobys[id].ambient;
-    let drawn = w.mobys[id].drawn != 0;
-    for k in 0..2 {
-        let Some(g) = ai::link(&w.mobys[id], GUNS[k]).filter(|&g| g < w.mobys.len()) else { continue };
-        if let Some((r, p)) = ctx.host.joint_matrix(&w.mobys[t], k) {
-            let mut r = r.map(|row| set_len(row, 1.0));
-            if k == 1 { r[1] = scale(r[1], -1.0); r[2] = scale(r[2], -1.0); }
-            ctx.host.advance(&w.mobys[g]);
-            let gm = &mut w.mobys[g];
-            gm.pos = p;
-            gm.rows = r;
-            gm.mode |= mode::NO_UPDATE | mode::NO_MATRIX;
-        }
-        let gm = &mut w.mobys[g];
-        if drawn { gm.mode &= !1; gm.drawn = 1; } else { gm.mode |= 1; gm.drawn = 0; }
-        gm.ambient = amb;
-    }
-}
-
 /// `0x4153c0`: alarmed, the alert timer at least 600..1000 when under 300; the calm timer held at 600 while the alert
 /// one runs; the timers down; its ticks in the state; the head aim.
 fn timers(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
@@ -722,8 +418,6 @@ fn timers(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     // The head aim on the turret's list 3 (`$gp+0x2818` = 2.5): crate::moby::joint_aim::head_on.
     if let Some(t) = turret(w, id) { crate::moby::joint_aim::head_on(w, ctx, id, HEAD_AIM, t, 3, f32::from_bits(0x4020_0000)); }
 }
-
-fn yaw_to(w: &MobyWorld, id: usize, p: V3) -> f32 { let q = w.mobys[id].pos; atan2(p[0] - q[0], p[1] - q[1]) }
 
 /// 0x0f31 (module docs).
 pub fn update_0f31(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
@@ -803,7 +497,7 @@ pub fn update_0f31(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if subs(w, id, ctx) { return; }
     if states(w, id, ctx) { return; }
     turret_update(w, id, ctx);
-    guns_update(w, id, ctx);
+    guns_update(w, id, ctx, TODANO);
     timers(w, id, ctx);
     let has = w.class(CLASS).is_some_and(|c| c.has_collision);
     if w.mobys[id].state < 0xfd { w.mobys[id].has_collision = has; }
@@ -1115,13 +809,7 @@ fn low_shot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, c: bool) {
 /// over a stand in sub 5: its turret's sequence 10, firing in it.
 fn path_end(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let path = w.mobys[id].pv_i(PATH);
-    let done = path == -1 || {
-        let r = ai::follow_path(w, id, ctx, path);
-        r || path_pts(ctx, path).is_some_and(|p| {
-            let m = &w.mobys[id];
-            dist2(m.pos, pt(p, m.pv_s(LAST) as i32)) < m.pv_f(MV + 0x34)
-        })
-    };
+    let done = path == -1 || walk_done(w, id, ctx, path);
     if done {
         match w.mobys[id].sub_state {
             1 | 6 => {
@@ -1171,9 +859,4 @@ fn path_end(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     } else if seq(w, t, ctx) != 10 {
         ctx.host.set_anim(&w.mobys[t], 10, 0, 10);
     }
-}
-
-/// 0x114b (`0x425478`): the turret's own update, its shadow within 24 of the camera (range 0x16).
-pub fn update_114b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    if w.mobys[id].drawn != 0 { crate::shadow_volumes::probe_near(w, id, ctx, 24.0, 0x16); }
 }

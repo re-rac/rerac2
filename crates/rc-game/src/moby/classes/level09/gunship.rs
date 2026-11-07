@@ -47,7 +47,7 @@
 //! The port takes the level's load (`0x1b230c` / `0x1b2310`) as light: the jets always smoke when it is drawn.
 //!
 //! Not ported: in the game mode 9 (`$gp−0x75f8`) its kill clearing `$gp−0x5fb0` by the record `+0x1f0` (as
-//! crate::moby::classes::level09::trooper's); the path lengths written into the points' `w` at the set-up (L09
+//! crate::moby::classes::trooper's); the path lengths written into the points' `w` at the set-up (L09
 //! `0x33fa00`, read by nothing here); the debug prints of sub and state 0.
 
 use crate::hero::physics::{add, add_rot, atan2, dist, dist2, ease_speed, len, len2, rot_dist, scale, set_len, sub, sub_rot, turn_ease, V3};
@@ -471,8 +471,9 @@ fn smoke(ctx: &mut Ctx, p: V3, v: V3, odd: bool, red: i16, blue: i16, orange: (i
     if let Some(sys) = ctx.parts.as_deref_mut() { crate::particles::trail(sys, rng, p, v, 0xefff_7f4f, 0x00ff_0000, life, n as i16, -n as i16, true); }
 }
 
-/// `0x3ec3d0` (module docs).
-fn die(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+/// `0x3ec3d0` (`func_L09_003EAF60`, L20 `0x4130f8`; module docs): its class sound 2, its bolts, the blast, deleted.
+/// Also L20's bridge 0x11e8 crushing a gunship (crate::moby::classes::level20::misc).
+pub fn die(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     ctx.host.play_sound(&w.mobys[id], 2, 0);
     bolts::drop(w, id, 0, 3, ctx);
     let pos = w.mobys[id].pos;

@@ -49,7 +49,7 @@
 //! Not ported: the upgraded hit's shock moby 0x0f6d (`0x40f108` / `0x40f458`), the GS test register the strips set
 //! (`0x37c948`), the zap's unused aim (`+0x50`, the target's lead).
 
-use crate::hero::physics::{add, cross, len, rot_dist, scale, set_len, sub, unit, V3};
+use crate::hero::physics::{add, cross, len, rot_dist, scale, set_len, sub, V3};
 use crate::moby::hits::HitTemplate;
 use crate::moby::{countdown, mode, Ctx, MobyWorld};
 use crate::point_lights::PointLight;
@@ -265,7 +265,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let most = if world_yaw < 1.570_796_5 { -f32::from_bits(0x3f49_0fdc) } else { f32::from_bits(0x3f49_0fdc) };
     let a = ctx.game.rng.randf(0.0, most);
     let below = [head[0], head[1], head[2] - DROP];
-    let bend = add(head, turn(sub(below, head), axis, a));
+    let bend = add(head, crate::camera::rot(sub(below, head), a, axis));
     w.mobys[id].set_pv_v(pv::BEND, bend);
     if let Some(t) = w.mobys[id].pv_link(pv::TARGET) {
         let gone = w.mobys.get(t).is_none_or(|m| m.state == 0xfe || m.state == 0xfd || len(sub(m.pos, w.mobys[id].pos)) == 0.0);
@@ -331,12 +331,6 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     let p = w.mobys[id].pos;
     if p.iter().any(|&c| !(LOW..=HIGH).contains(&c)) { w.delete(id); }
-}
-
-/// `0x321c00(a, out, v, axis)`: `v` turned by `a` about `axis`.
-fn turn(v: V3, axis: V3, a: f32) -> V3 {
-    if a.abs() < 1e-5 || len(axis) == 0.0 { return v; }
-    crate::gravity::rotate(v, unit(axis), a)
 }
 
 /// The point `t` of the way from `a` to `b` (`a + set_len(b − a, t·|b − a|)`).

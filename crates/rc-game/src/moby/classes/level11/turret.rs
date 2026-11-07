@@ -40,11 +40,12 @@
 //! moby context, so the stick's y is taken as the default (reversed).
 
 use crate::hero::physics::{add, add_rot, atan2, dist, dist2, sub_rot, V3};
-use crate::moby::{countdown, Ctx, MobyWorld};
+use crate::moby::{Ctx, MobyWorld};
 use crate::pad::button;
 use crate::point_lights::PointLight;
 use super::super::props::wrapped;
 use super::super::leaper::seq_a;
+use crate::gravity::to_world;
 
 pub const CLASS: i16 = 0x0c20;
 
@@ -67,18 +68,6 @@ const LIGHT_AT: V3 = [0.0, -0.3, -0.1];
 const CAM_REACH: f32 = 0.5;
 const CAM_LIFT: f32 = 0.2;
 
-/// `0x300e80` on an s16 word: down to 0; true when it is (or just got) 0.
-fn wait_out(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let m = &mut w.mobys[id];
-    let mut v = m.pv_s(off) as i32;
-    let r = countdown(&mut v);
-    m.set_pv_s(off, v as i16);
-    r
-}
-
-/// A point in the frame `r` (`0x3016d8`).
-fn to_world(l: V3, r: &[V3; 3]) -> V3 { std::array::from_fn(|k| l[0] * r[0][k] + l[1] * r[1][k] + l[2] * r[2][k]) }
-
 /// `0x337298(&out, len, yaw, pitch)`.
 fn along(len: f32, yaw: f32, pitch: f32) -> V3 { [yaw.cos() * len * pitch.cos(), yaw.sin() * len * pitch.cos(), pitch.sin() * len] }
 
@@ -98,7 +87,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let on = ctx.hero.ground_moby == Some(id);
     if w.mobys[id].state >= 4 {
         let cmd = w.mobys[id].timer;
-        if wait_out(w, id, MOUNT_WAIT) && cmd == 1 && hero_free(ctx) {
+        if w.mobys[id].count_s(MOUNT_WAIT) && cmd == 1 && hero_free(ctx) {
             let rot = w.mobys[id].rot;
             let y = rot[2];
             let at = add(seat, [y.cos() * -0.4, y.sin() * -0.4, 0.0]);
@@ -268,7 +257,7 @@ fn ridden(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     } else if super::super::props::seq(w, id, ctx) != 4 && wrapped(w, id, ctx) {
         ctx.host.set_anim(&w.mobys[id], 4, 0, 1);
     }
-    if wait_out(w, id, CAM_WAIT) {
+    if w.mobys[id].count_s(CAM_WAIT) {
         w.rebuild(id, &*ctx.host);
         w.mobys[id].mode |= 4;
         if ctx.game.cameras.script_current() { ctx.game.cameras.script.mode = crate::script_camera::MODE_SNAP; }

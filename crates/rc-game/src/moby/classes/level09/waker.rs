@@ -1,7 +1,7 @@
 //! Dobbo's waker **0x0de0** (`0x409760`, 3 placed; the decomp's `func_L09_004082D0`): while Ratchet (or, with its
 //! `+0xbe` set, the camera `0x1b9980`) is in one of its four areas, it hands its bytes `+0xbc` / `+0xbd` / `+0xbf`
 //! (switched off: their negations) to the mobys of up to 29 moby groups and 14 single mobys, the troopers 0x0d0f
-//! (crate::moby::classes::level09::trooper) among them.
+//! (crate::moby::classes::trooper) among them.
 //!
 //! Its pvars: `[0..4]` the areas (−1 none), `[4..0x21]` the moby groups, `+0x84..+0xbc` the mobys (−1 none), `+0xbc`
 //! the update ask, `+0xbd` the draw ask, `+0xbf` the collision ask, `+0xbe` the camera instead of Ratchet. Its moby
@@ -52,10 +52,10 @@ pub fn update_0de0(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 fn hand(w: &mut MobyWorld, id: usize, e: usize, a: i8, b: i8, c: i8) {
     let Some(m) = w.mobys.get(e).filter(|m| m.state < 0xfd) else { return };
     match m.o_class {
-        super::trooper::CLASS => {
+        crate::moby::classes::trooper::CLASS => {
             let m = &mut w.mobys[e];
-            m.set_pv_b(super::trooper::ASK, a as u8);
-            if m.update_dist != 0xff { let d = m.update_dist; m.set_pv_b(super::trooper::UPD, d); }
+            m.set_pv_b(crate::moby::classes::trooper::ASK, a as u8);
+            if m.update_dist != 0xff { let d = m.update_dist; m.set_pv_b(crate::moby::classes::trooper::UPD, d); }
             if a != 0 { m.update_dist = 0xff; }
         }
         0x0d09 | 0x0cea => apply(w, e, 0, b, c),

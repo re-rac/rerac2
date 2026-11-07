@@ -99,12 +99,7 @@ const PELLET_LEN: f32 = 32.0;
 fn cur_row(game: &crate::game::GameState) -> Option<&'static ItemRow> { row(game, BLITZ) }
 
 /// `0x321b28(out, v, 0x31fe98(a, axis))`: `v` turned by the quaternion of `a` about `axis` (`q·v·q*`).
-pub(crate) fn qturn(v: V3, axis: V3, a: f32) -> V3 {
-    use crate::quat::{axis_angle, mul};
-    let q = axis_angle(a, axis);
-    let t = mul(mul(q, [v[0], v[1], v[2], 0.0]), [-q[0], -q[1], -q[2], q[3]]);
-    [t[0], t[1], t[2]]
-}
+pub(crate) fn qturn(v: V3, axis: V3, a: f32) -> V3 { crate::quat::qrot(crate::quat::axis_angle(a, axis), v) }
 
 /// `0x2eef88(out, a, b)` = b × a.
 pub(crate) fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
@@ -123,14 +118,6 @@ pub(crate) fn cooldown(w: &mut MobyWorld, id: usize) {
     w.mobys[id].set_pv_f(0, if 1.0 / 60.0 < c { c - 1.0 / 60.0 } else { 0.0 });
 }
 
-/// `0x2eeae0` on the s16 at `off`: true when it was 0 or just reached it.
-pub(crate) fn count_s(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut n = w.mobys[id].pv_s(off) as i32;
-    let done = countdown(&mut n);
-    w.mobys[id].set_pv_s(off, n as i16);
-    done
-}
-
 /// `0x3a6818` (module docs).
 pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].pvars.resize(crate::moby::PVAR_BYTES, 0);
@@ -141,7 +128,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_s(8, 0);
         m.set_pv_s(0xa, 0);
     }
-    if w.mobys[id].state == 6 && count_s(w, id, 4) {
+    if w.mobys[id].state == 6 && w.mobys[id].count_s(4) {
         ctx.host.play_sound(&w.mobys[id], 2, 0);
         w.mobys[id].state = 1;
     }
@@ -195,14 +182,14 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     rumble::weapon_stop(w, id, ctx, 0x4c, true);
     // The delay out: the flashes count down, the draw while they run.
     if w.mobys[id].pv_s(6) == 0 {
-        count_s(w, id, 0xa);
-        count_s(w, id, 8);
+        w.mobys[id].count_s(0xa);
+        w.mobys[id].count_s(8);
         let mut n = w.mobys[id].pv_i(0x40);
         countdown(&mut n);
         w.mobys[id].set_pv_i(0x40, n);
         if w.mobys[id].pv_s(8) != 0 || w.mobys[id].pv_s(0xa) != 0 { register(w, id, ctx); }
     }
-    if !matches!(w.mobys[id].state, 2 | 3) || !count_s(w, id, 6) { return; }
+    if !matches!(w.mobys[id].state, 2 | 3) || !w.mobys[id].count_s(6) { return; }
     // `0x18a550` / `0x18a580`: Ratchet's forward row, or the way from the muzzle (as it stands) to the lock.
     let mut fwd = ctx.hero.rows[0];
     if let Some((t, _)) = ctx.hero.items.aim_target.filter(|&(t, _)| w.mobys.get(t).is_some()) {

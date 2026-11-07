@@ -25,7 +25,7 @@
 //!
 //! Not ported (set B's other classes): **0x0cfc / 0x094c** (`0x3c9430`: Ghidra has no function there).
 
-use crate::hero::physics::{add, add_rot, dist, dist2, len, len2, scale, sub, turn_ease, ease, ease_speed, V3};
+use crate::hero::physics::{add, add_rot, dist, dist2, ease, ease_speed, len, len2, scale, sub, turn_ease, wrap_turn, V3};
 use crate::moby::{countdown, Ctx, Moby, MobyWorld};
 
 /// The Swingshot (item 0xd) and the Grind Boots (item 0x14).
@@ -47,12 +47,6 @@ fn inside(ctx: &Ctx, z: i32) -> bool { ctx.level.in_cuboid(z, ctx.hero.pos) }
 fn have(ctx: &Ctx, item: i32) -> bool { ctx.game.items.get(item.max(0) as usize).is_some_and(|&b| b != 0) }
 fn alive(w: &MobyWorld, i: i32) -> bool { usize::try_from(i).ok().and_then(|i| w.mobys.get(i)).is_some_and(|m| m.state != 0xfe && m.state != 0xfd) }
 fn hooked(m: &Moby) -> bool { m.once & 4 != 0 }
-
-/// `0x2f0ef0` (L00 `0x2efef0`): `a` wrapped to [−π, π) by its fraction of a turn.
-fn wrap(a: f32) -> f32 {
-    let f = a * 0.159_154_94 + 0.5;
-    ((f - f.floor()) - 0.5) * std::f32::consts::TAU
-}
 
 /// The members of the moby group `g` (`0x1fb5a0[g]`; none for −1 or past the groups).
 fn group(w: &MobyWorld, g: i32) -> Vec<usize> {
@@ -552,7 +546,7 @@ pub fn update_11e7(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
                 t.mode |= 0x10;
                 t.set_pv_i(8, 0x8000_0000u32 as i32);
                 t.set_pv_i(4, 0x80a0_a0a0u32 as i32);
-                let a = wrap((t.pv_i(0) * 0x1e) as f32 * 0.017_453_294);
+                let a = wrap_turn((t.pv_i(0) * 0x1e) as f32 * 0.017_453_294);
                 t.set_pv_f(0xc, a);
                 t.update_dist = 0xff;
                 t.draw_dist = 0x1ff;

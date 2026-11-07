@@ -4,14 +4,14 @@
 //! from Ratchet's chest along his yaw and pitch) must pick the same moby 5 ticks running to lock it, a lock then holds 5
 //! ticks before the next search, and a lock that dies, is hidden or deleted is dropped. Ready, ○ held fires once the
 //! cooldown (1 / 7 s) is out: one ammo, the use stance on the first shot (crate::hero::items::ItemBlock::use_start),
-//! its sequence 2, its class sound 0, a shot (class 0xbfe, crate::moby::classes::shot) toward the lock, and the mobys
-//! within 0.5 of the muzzle hit outright. Out of ammo, a press plays its class sound 1 instead. Fired from the look
-//! stance 1, Ratchet goes to its scripted twin 0x1d, where the first shot waits 0x28 ticks. The use ends when ○ is let
-//! go (or the ammo is out) and it has been in use 10 ticks.
+//! its sequence 2, its class sound 0, a shot (class 0xbfe, crate::moby::classes::shot; the Heavy Lancer's 0x0c89,
+//! crate::moby::classes::heavy_shot) toward the lock, and the mobys within 0.5 of the muzzle hit outright. Out of ammo,
+//! a press plays its class sound 1 instead. Fired from the look stance 1, Ratchet goes to its scripted twin 0x1d, where
+//! the first shot waits 0x28 ticks. The use ends when ○ is let go (or the ammo is out) and it has been in use 10 ticks.
 //!
 //! **pvars**: +0x00 the lock, +0x04 its class (s16, −1 none), +0x06 the lock's hold (s16), +0x08 its aim height,
-//! +0x0c the cooldown (seconds), +0x10 a use started (s16), +0x14 the muzzle, +0x28 the flash ticks, +0x30 the last
-//! search's pick, +0x34 the ticks it must stay picked.
+//! +0x0c the cooldown (seconds), +0x10 a use started (s16), +0x12 the trail slot (s16), +0x14 the muzzle, +0x28 the
+//! flash ticks, +0x30 the last search's pick, +0x34 the ticks it must stay picked.
 //!
 //! The muzzle flash (`0x3a8ce0`, [`muzzle_flash`]) and a point-blank hit's smoke and sparks (`0x3e46d8`) are particles.
 //!
@@ -24,7 +24,7 @@
 //! The markers (`0x2db498`): the lock's green reticle and, in the look stance's twin, the crosshair.
 //!
 //! The Heavy Lancer (row 0x3c, hand class 0x0c05, both hands: stance 2, Ratchet's sequence 0x33) runs this update
-//! (`0x3e5dc8`) with its row's speed, rate and damage (crate::upgrades).
+//! (`0x3e5dc8`) with its row's speed, rate and damage (crate::upgrades), a range of 30 and a lock delay and hold of 2.
 //!
 //! The search takes the Lock On mod's lock first (`0x325f90`, crate::moby::aim::search_lock). A shot starts the
 //! pad's rumble (crate::rumble: the Lancer's short one each shot; the Heavy Lancer's held one, `+0x3c`, stopped when
@@ -41,26 +41,38 @@ use crate::point_lights::PointLight;
 
 /// The Heavy Lancer's hand class (rows 0x3c / 0x4f / 0x50, crate::upgrades): its update `0x3e5dc8` is this one's.
 pub const HEAVY_CLASS: i16 = 0xc05;
-/// `$gp+0x37fc` for the Lancer: the shots' range; the lock delay `$gp+0x684` and hold `$gp+0x680`.
+/// `$gp+0x37fc` (`0x1b27ec`, written each tick): the search's and the shots' range, 20 for the Lancer, 30 for the
+/// Heavy Lancer; the lock delay `$gp+0x684` / `$gp+0x68c` and hold `$gp+0x680` / `$gp+0x688` (Lancer / Heavy Lancer).
 pub const RANGE: f32 = 20.0;
+const HEAVY_RANGE: f32 = 30.0;
 const LOCK_DELAY: i32 = 5;
 const LOCK_HOLD: i16 = 5;
+const HEAVY_LOCK_DELAY: i32 = 2;
+const HEAVY_LOCK_HOLD: i16 = 2;
 /// `0x1b27e8` / `0x1b27f0`: the search's limits at the range (6°); 45° / 35° near Ratchet.
 const CONE: aim::Cone = aim::Cone { yaw: 0.104_719_76, pitch: 0.104_719_76, range: RANGE, near_pitch: 0.785_398_2, near_yaw: 0.610_865_2 };
+
+/// The range, the lock delay and the lock hold of the hand's class (the Lancer 0x5d2, else the Heavy Lancer).
+fn tuning(class: i16) -> (f32, i32, i16) {
+    if class == 0x5d2 { (RANGE, LOCK_DELAY, LOCK_HOLD) } else { (HEAVY_RANGE, HEAVY_LOCK_DELAY, HEAVY_LOCK_HOLD) }
+}
 /// The reticle's FX texture.
 const RETICLE: u16 = 0x26;
 /// `t[3]` of a shot's template.
 pub const NO_KNOCK_LIMIT: f32 = 5627.987;
 
-/// `0x3a8f20`: the lock cleared, the cooldown 0.1 s (the equip before the first shot), the glow word 0xff0020ff.
+/// `0x3a8f20`: the lock cleared, the cooldown 0.1 s (the equip before the first shot), the glow word 0xff0020ff, the
+/// class's trail slot (`0x32b1b8`, crate::moby::classes::chopper::Pool) at `+0x12`: the Heavy Lancer's shots keep
+/// their trails there (crate::moby::classes::heavy_shot).
 fn start(w: &mut MobyWorld, id: usize) {
+    let (_, delay, _) = tuning(w.mobys[id].o_class);
     let m = &mut w.mobys[id];
     m.pvars.resize(crate::moby::PVAR_BYTES, 0);
     m.set_pv_s(4, -1);
     m.set_pv_i(0, 0);
     m.set_pv_s(6, 0);
     m.set_pv_s(0x10, 0);
-    m.set_pv_i(0x34, LOCK_DELAY);
+    m.set_pv_i(0x34, delay);
     // The first shot waits 0.1 s (the equip: its sequence 0 plays meanwhile); no flash light or rumble yet.
     m.set_pv_f(0xc, 0.1);
     m.set_pv_i(0x24, -1);
@@ -70,6 +82,11 @@ fn start(w: &mut MobyWorld, id: usize) {
     m.set_pv_i(0x30, 0);
     // Its glow word, which the hand item's glow (crate::hero::items::hand_glow) then pulses.
     m.glow = 0xff00_20ff;
+    let class = m.o_class;
+    let mut pool = std::mem::take(&mut w.chopper);
+    let (slot, _) = pool.slot(w, class);
+    w.chopper = pool;
+    w.mobys[id].set_pv_s(0x12, slot as i16);
 }
 
 /// `0x3a8060`.
@@ -79,6 +96,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         start(w, id);
     }
     let Some(r) = row(ctx.game, LANCER) else { return };
+    let (range, delay, hold_ticks) = tuning(w.mobys[id].o_class);
     let muzzle = ctx.host.joint(&w.mobys[id], 0).unwrap_or(w.mobys[id].pos);
     w.mobys[id].set_pv_v(0x14, muzzle);
     let (hero_pos, hero_rows, hero_rot, hero_state) = (ctx.hero.pos, ctx.hero.rows, ctx.hero.rot, ctx.hero.state);
@@ -106,7 +124,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].state == 1 && w.mobys[id].pv_s(6) == 0 {
         let (sp, cp) = hero_rot[1].sin_cos();
         let (sy, cy) = hero_rot[2].sin_cos();
-        let found = aim::search_lock(w, ctx, CONE, chest, [cy * cp, sy * cp, sp], true);
+        let found = aim::search_lock(w, ctx, aim::Cone { range, ..CONE }, chest, [cy * cp, sy * cp, sp], true);
         let last = w.mobys[id].pv_link(0x30);
         match found {
             None => {
@@ -114,9 +132,9 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 m.set_pv_i(0, 0);
                 m.set_pv_s(4, -1);
                 m.set_pv_f(8, 0.0);
-                m.set_pv_i(0x34, LOCK_DELAY);
+                m.set_pv_i(0x34, delay);
             }
-            Some(f) if Some(f) != last => w.mobys[id].set_pv_i(0x34, LOCK_DELAY),
+            Some(f) if Some(f) != last => w.mobys[id].set_pv_i(0x34, delay),
             Some(f) => {
                 let mut d = w.mobys[id].pv_i(0x34);
                 let done = countdown(&mut d);
@@ -127,7 +145,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     m.set_pv_i(0, f as i32);
                     m.set_pv_s(4, class);
                     m.set_pv_f(8, up);
-                    m.set_pv_s(6, LOCK_HOLD);
+                    m.set_pv_s(6, hold_ticks);
                 }
             }
         }
@@ -255,8 +273,13 @@ fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, muzzle: V3, damage: f32, sp
         let h = ctx.game.rumble.start(&rumble::pattern::HEAVY_LANCER);
         w.mobys[id].set_pv_i(0x3c, h);
     }
+    // `0x3a87f8`: the Lancer's shot 0xbfe (`0x3e3600`), else the Heavy Lancer's 0x0c89 (`0x420038`).
     let target = w.mobys[id].pv_link(0);
-    crate::moby::classes::shot::spawn(w, ctx, RANGE, muzzle, id, target);
+    if w.mobys[id].o_class == 0x5d2 {
+        crate::moby::classes::shot::spawn(w, ctx, RANGE, muzzle, id, target);
+    } else {
+        crate::moby::classes::heavy_shot::spawn(w, ctx, muzzle, id, target);
+    }
     // `0x2e14b0(0.5, muzzle)`: the mobys at the muzzle, each hit along muzzle → it.
     let Some(sc) = ctx.scene else { return };
     for m in crate::collision::coll_sphere_mobys(sc, muzzle, 0.5, crate::collision::QueryFlags(0), Some(id)) {

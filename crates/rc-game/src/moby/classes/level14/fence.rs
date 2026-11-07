@@ -23,7 +23,7 @@
 //!
 //! Not ported: the point light its first tick takes (`0x3053a0(0, 0, place, 0)`, never set again).
 
-use crate::hero::physics::{add, add_rot, atan2, set_len, sub, V3};
+use crate::hero::physics::{add, add_rot, atan2, set_len, sub, wrap, V3};
 use crate::moby::classes::level11::beams::Strands;
 use crate::moby::{Ctx, MobyWorld};
 
@@ -48,9 +48,6 @@ pub struct Globals {
 impl Default for Globals {
     fn default() -> Self { Globals { lay: true, phase_a: 0.0, phase_b: 0.0, phase_c: 0.0, scroll: 0.0, strands: Default::default() } }
 }
-
-/// `0x327e78` (L00 `0x320440`): an angle wrapped to [−π, π).
-fn wrap(a: f32) -> f32 { ((a + std::f32::consts::PI) * 0.159_154_94).rem_euclid(1.0) * std::f32::consts::TAU - std::f32::consts::PI }
 
 /// 0x0f80 (module docs).
 pub fn update_0f80(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {

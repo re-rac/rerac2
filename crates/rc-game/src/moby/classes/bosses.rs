@@ -49,7 +49,7 @@
 //! its spark streak (`0x424888`) and its impact flashes and lights (`0x423a48`), the moby word `+0x9c` 0x0a44 sets while
 //! it spins.
 
-use crate::hero::physics::{add, add_rot, approach, atan2, cross, dist, dist2, dot, ease, len, rot_dist, scale, set_len, sub, sub_rot, turn_ease, V3};
+use crate::hero::physics::{add, add_rot, approach, atan2, cross, dist, dist2, dot, ease, len, rot_dist, scale, set_len, sub, sub_rot, through, turn_ease, V3};
 use crate::moby::{ai, mode, Ctx, MobyHost, MobyWorld};
 use super::enemies::place_part;
 use super::props::{seq, wrapped};
@@ -91,14 +91,6 @@ fn frame(w: &MobyWorld, id: usize, ctx: &Ctx) -> f32 { ctx.host.frame_time(&w.mo
 
 fn yaw_to(from: V3, to: V3) -> f32 { atan2(to[0] - from[0], to[1] - from[1]) }
 
-/// `0x2eeab0` on an s16 pvar.
-fn countdown_s(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut t = w.mobys[id].pv_s(off) as i32;
-    let over = crate::moby::countdown(&mut t);
-    w.mobys[id].set_pv_s(off, t as i16);
-    over
-}
-
 /// `0x321390(out, a, b, p)`: the point of the segment `a`..`b` nearest `p`.
 fn closest(a: V3, b: V3, p: V3) -> V3 {
     let ab = sub(b, a);
@@ -114,9 +106,6 @@ fn turn_about(v: V3, n: V3, a: f32) -> V3 {
     let x = cross(n, v);
     std::array::from_fn(|k| v[k] * c + x[k] * s + n[k] * d * (1.0 - c))
 }
-
-/// `0x2f3260(out, v, m)`: `v` in a joint's frame.
-fn in_frame(r: &[V3; 3], v: V3) -> V3 { add(add(scale(r[0], v[0]), scale(r[1], v[1])), scale(r[2], v[2])) }
 
 /// The master (`+0xb8`).
 fn master_of(w: &MobyWorld, id: usize) -> Option<usize> { super::fighters::master(w, id) }
@@ -928,7 +917,7 @@ pub fn update_09f8(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let g = w.mobys[id].pv_v(GOAL);
             hover(w, id, yaw_t, 0.0, g);
             if ctx.game.rng.randi(400) == 0 { dodge(w, id, ctx, 0); }
-            if d < 40.0 && 5.0 < d && countdown_s(w, id, 0x31c) {
+            if d < 40.0 && 5.0 < d && w.mobys[id].count_s(0x31c) {
                 let s = if ctx.game.rng.randi(2) == 0 { 0xf } else { 0xc };
                 w.mobys[id].set_state(s, 2);
                 if ctx.game.rng.randi(6) == 0 { dodge(w, id, ctx, 0); }
@@ -1010,7 +999,7 @@ pub fn draw_09f8(w: &MobyWorld, host: &dyn MobyHost, id: usize, cam: V3, out: &m
     if m.sub_state != 2 { return; }
     for (j, mirror) in [(2, false), (3, true)] {
         let (Some(p0), Some((r, _))) = (host.joint(m, j), host.joint_matrix(m, j)) else { continue };
-        let p1 = add(p0, in_frame(&r, [-1.0, if mirror { -0.05 } else { 0.05 }, -0.1]));
+        let p1 = add(p0, through(&r, [-1.0, if mirror { -0.05 } else { 0.05 }, -0.1]));
         let f = dot(set_len(sub(cam, p0), 1.0), set_len(r[2], -1.0));
         if 0.0 < f {
             let c = faded(0x88ff_8020, f);
@@ -1418,7 +1407,7 @@ fn turret_a44(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         w.mobys[t].rot = [0.0, 0.0, a];
     }
     if st == 5 || (st == 6 && h < 0.2) {
-        if countdown_s(w, id, 0x286) && d < 45.0 && 0.0 < d && off < 3.141_593 {
+        if w.mobys[id].count_s(0x286) && d < 45.0 && 0.0 < d && off < 3.141_593 {
             set_seq(w, t, ctx, 5, 3);
             w.mobys[t].timer = 0;
             let n = if st == 5 { (h * 40.0 + 20.0) as i16 } else { 0x3c };
@@ -1638,7 +1627,7 @@ pub fn update_0a44(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 set_seq(w, id, ctx, 1, 10);
             }
             if ctx.hero.damage.hit_by.is_some() { w.mobys[id].set_state(7, -1); }
-            if countdown_s(w, id, 0x288) {
+            if w.mobys[id].count_s(0x288) {
                 let n = ctx.game.rng.randf(600.0, 1200.0) as i16;
                 w.mobys[id].set_pv_s(0x288, n);
                 w.mobys[id].set_state(6, -1);
@@ -1674,7 +1663,7 @@ pub fn update_0a44(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     w.mobys[id].set_pv_i(SPIN_SOUND, h);
                 }
             } else if w.mobys[id].timer == 1 {
-                let over = countdown_s(w, id, 0x288);
+                let over = w.mobys[id].count_s(0x288);
                 if over || hand_over_due(w, id, PARTNER_A44, 0x282) {
                     set_seq(w, id, ctx, 8, 0);
                     tset(w, t, ctx, 0xb, 10);
@@ -1806,7 +1795,7 @@ pub fn draw_0a44(w: &MobyWorld, host: &dyn MobyHost, id: usize, cam: V3, out: &m
     let tm = &w.mobys[t];
     let at = |j: usize, o: V3| -> Option<(V3, [V3; 3])> {
         let (p, (r, _)) = (host.joint(tm, j)?, host.joint_matrix(tm, j)?);
-        Some((add(p, in_frame(&r, o)), r))
+        Some((add(p, through(&r, o)), r))
     };
     let mut faced = |j: usize, o: V3, size: f32, push: f32| {
         let Some((p, r)) = at(j, o) else { return };

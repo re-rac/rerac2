@@ -141,14 +141,6 @@ const PUSH: u32 = 0x3da3_d70a;
 
 fn seq_a(w: &MobyWorld, id: usize, ctx: &Ctx) -> u8 { ctx.host.anim(&w.mobys[id]).map_or(0xff, |a| a.seq_a) }
 
-/// `0x2ec100` (L00 `0x2eeae0`) on an s16 pvar.
-fn countdown_s(m: &mut Moby, off: usize) -> bool {
-    let mut t = m.pv_s(off) as i32;
-    let out = countdown(&mut t);
-    m.set_pv_s(off, t as i16);
-    out
-}
-
 /// `0x319538` (L00 `0x31bb48(a, b)`): a vector of length `randf(a, b)` a random way (yaw, then pitch).
 fn shell(rng: &mut crate::rng::Rng, a: f32, b: f32) -> V3 {
     let yaw = rng.rand_angle();
@@ -196,23 +188,11 @@ fn release_tweak(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     m.set_pv_i(TWEAK, 0);
 }
 
-/// `0x327880` (L00 `0x32a748(n, owner)`): distances 0xff, drawn, its owner, the owner's place, angles and light,
-/// rebuilt, its mode's low three bits cleared.
-fn place_on(w: &mut MobyWorld, n: usize, owner: usize, ctx: &mut Ctx) {
-    let o = &w.mobys[owner];
-    let (pos, rot, light, ambient) = (o.pos, o.rot, o.light, o.ambient);
-    let m = &mut w.mobys[n];
-    (m.update_dist, m.draw_dist, m.drawn, m.parent) = (0xff, 0xff, 1, Some(owner));
-    (m.pos, m.rot, m.light, m.ambient) = (pos, rot, light, ambient);
-    w.rebuild(n, ctx.host);
-    w.mobys[n].mode &= 0xfff8;
-}
-
 /// The ice turned to the broken 0x1208 (at it, its rows and angles, this one's distances); the old ice goes.
 fn break_ice(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let Some(old) = ice(w, id) else { return };
     let n = w.create(ICE_BROKEN);
-    place_on(w, n, old, ctx);
+    w.adopt(n, Some(old), &*ctx.host);
     let (ud, dd) = (w.mobys[id].update_dist, w.mobys[id].draw_dist);
     let (rows, rot) = (w.mobys[old].rows, w.mobys[old].rot);
     let m = &mut w.mobys[n];
@@ -277,7 +257,7 @@ pub fn update_0f57(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 if w.mobys[id].pv_i(FOUND1) == 1 {
                     w.mobys[id].set_state(4, 2);
                     set_seq(w, id, ctx, 0, 0, 10);
-                } else if w.mobys[id].pv_i(ALARM) != 0 && countdown_s(&mut w.mobys[id], ALARM_T) {
+                } else if w.mobys[id].pv_i(ALARM) != 0 && w.mobys[id].count_s(ALARM_T) {
                     let m = &mut w.mobys[id];
                     m.set_state(2, 1);
                     m.set_pv_i(ALARM, 0);
@@ -341,7 +321,7 @@ pub fn update_0f57(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let mut t = m.pv_i(TIMER);
     countdown(&mut t);
     m.set_pv_i(TIMER, t);
-    countdown_s(m, TIMER2);
+    m.count_s(TIMER2);
     if (m.state_ticks as u16) < 0xffff { m.state_ticks = m.state_ticks.wrapping_add(1); }
     w.changed = true;
 }
@@ -366,7 +346,7 @@ fn head(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
         w.clear_hit(id);
         hit = None;
     }
-    if !countdown_s(&mut w.mobys[id], PAUSE) { hit = None; }
+    if !w.mobys[id].count_s(PAUSE) { hit = None; }
     if let Some(mut h) = hit {
         let k = w.mobys[id].pv_f(SAME_CLASS);
         if k != 0.0 && h.tmpl.source.and_then(|s| w.mobys.get(s)).is_some_and(|s| s.o_class == CLASS) { h.tmpl.damage *= k; }
@@ -449,7 +429,7 @@ fn setup(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let placed = m.pv_i(PLACED_ICE);
     if placed == -1 {
         let n = w.create(ICE);
-        place_on(w, n, id, ctx);
+        w.adopt(n, Some(id), &*ctx.host);
         let (ud, dd) = (w.mobys[id].update_dist, w.mobys[id].draw_dist);
         let c = &mut w.mobys[n];
         (c.draw_dist, c.update_dist) = (dd, ud);

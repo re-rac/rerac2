@@ -57,7 +57,7 @@
 
 use crate::hero::items::{row, MINIROCKET};
 use crate::hero::physics::{add, add_rot, scale, sub, V3};
-use crate::moby::{countdown, lock_on, Ctx, MobyWorld};
+use crate::moby::{countdown, lock_on, stop_loop, Ctx, MobyWorld};
 use crate::rumble;
 use crate::point_lights::PointLight;
 use super::minirocket::{self, LockPv};
@@ -110,30 +110,9 @@ fn in_hand(w: &MobyWorld, id: usize, p: V3) -> V3 {
     add(m.pos, crate::gravity::to_world(p, &m.rows))
 }
 
-/// `0x321c00(a, out, v, axis)`: `v` turned by `a` about `axis` (under 1e-5 kept).
-fn turn(v: V3, axis: V3, a: f32) -> V3 {
-    if a.abs() < 1e-5 || crate::hero::physics::len(axis) == 0.0 { return v; }
-    crate::gravity::rotate(v, crate::hero::physics::unit(axis), a)
-}
-
-/// `0x2eeab0` on the word at `off`.
-fn count_i(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut n = w.mobys[id].pv_i(off);
-    let done = countdown(&mut n);
-    w.mobys[id].set_pv_i(off, n);
-    done
-}
-
 /// `0x411d40`: the rockets a charge of `ticks` fires.
 pub fn volley_size(ticks: i16) -> i32 {
     if 0x5a <= ticks { 4 } else if 0x3d <= ticks { 3 } else if 0x1e < ticks { 2 } else { 1 }
-}
-
-/// The loop sound let go when still its (`0x3602f0`).
-fn stop_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let s = w.mobys[id].pv_i(hv::SOUND);
-    if s != -1 && ctx.host.sound_playing(s) { ctx.host.stop_sound(s); }
-    w.mobys[id].set_pv_i(hv::SOUND, -1);
 }
 
 /// `0x410ba0` (module docs).
@@ -201,7 +180,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let can = ctx.game.ammo.get(MINIROCKET as usize).copied().unwrap_or(0).min(4);
         if ((can * 0x16) as i64) < n as i64 { charge_spark(w, id, ctx, muzzle); }
     } else {
-        stop_sound(w, id, ctx);
+        stop_loop(w, id, ctx, hv::SOUND);
         if it.pressed & it.trigger != 0 && !it.has_ammo(ctx.game) { ctx.host.play_sound(&w.mobys[id], 1, 0); }
         let n = w.mobys[id].pv_s(hv::CHARGE);
         released = n != 0;
@@ -227,7 +206,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         w.mobys[id].set_pv_f(hv::COOL, 1.0 / rate);
     }
     rumble::weapon_stop(w, id, ctx, hv::RUMBLE, true);
-    if 0 <= w.mobys[id].pv_i(hv::LEFT) && count_i(w, id, hv::WAIT) { next_rocket(w, id, ctx); }
+    if 0 <= w.mobys[id].pv_i(hv::LEFT) && w.mobys[id].count_i(hv::WAIT) { next_rocket(w, id, ctx); }
     light(w, id, ctx, muzzle);
 }
 
@@ -237,7 +216,7 @@ fn charge_spark(w: &MobyWorld, id: usize, ctx: &mut Ctx, muzzle: V3) {
     let Some(sys) = ctx.parts.as_deref_mut() else { return };
     let g = &mut ctx.game.rng;
     let a = g.rand_angle();
-    let v = turn(rows[2], rows[1], a);
+    let v = crate::camera::rot(rows[2], a, rows[1]);
     let v = scale(v, g.randf(1.5, 2.0) * 0.016_666_668);
     let spin = g.randf_signed(1.0, 3.0) as i32;
     let size = g.randf(f32::from_bits(0x3ee6_6666), 0.75);
@@ -287,7 +266,7 @@ fn burst(w: &MobyWorld, id: usize, ctx: &mut Ctx, n: i32) {
     let disp = ctx.hero.disp;
     let Some(sys) = ctx.parts.as_deref_mut() else { return };
     let g = &mut ctx.game.rng;
-    let start = turn(fwd, side, f32::from_bits(0x3eb2_b8c4));
+    let start = crate::camera::rot(fwd, f32::from_bits(0x3eb2_b8c4), side);
     let (mut d, mut acc) = (start, 0.0f32);
     let mut last = [0.0; 3];
     for _ in 0..(n * 0x14 + 0x14) {
@@ -296,10 +275,10 @@ fn burst(w: &MobyWorld, id: usize, ctx: &mut Ctx, n: i32) {
         let life = g.rand_range(10, 0x1e) as i16;
         let p: V3 = std::array::from_fn(|k| at[k] + g.randf_signed(0.0, f32::from_bits(0x3e4c_cccd)));
         crate::particles::streak(sys, f32::from_bits(0x3b11_a2b4), p, last, life);
-        if 1e-5 < acc.abs() { d = turn(start, fwd, acc); }
+        if 1e-5 < acc.abs() { d = crate::camera::rot(start, acc, fwd); }
     }
     let carry = if grounded { scale(disp, f32::from_bits(0x3fd9_999a)) } else { last };
-    let start = turn(fwd, side, 12.0 * 0.017_453_294);
+    let start = crate::camera::rot(fwd, 12.0 * 0.017_453_294, side);
     let (mut d, mut acc) = (start, 0.0f32);
     let (hi, grow, jitter) = if n != 0 { (2.0, 10_000.0, f32::from_bits(0x3f4c_cccd)) } else { (1.0, 2000.0, f32::from_bits(0x3ecc_cccd)) };
     for _ in 0..20 {
@@ -309,7 +288,7 @@ fn burst(w: &MobyWorld, id: usize, ctx: &mut Ctx, n: i32) {
         let p: V3 = std::array::from_fn(|k| at[k] + g.randf_signed(0.0, jitter));
         let size = g.randf(f32::from_bits(0x3ecc_cccd), hi);
         crate::particles::spark(sys, g, size * 210_000.0, grow, f32::from_bits(0x3f73_3333), 0.0, 0.0, sub(p, v), v, 10, 0x7f, 0x40_4040, spin);
-        if 1e-5 < acc.abs() { d = turn(start, fwd, acc); }
+        if 1e-5 < acc.abs() { d = crate::camera::rot(start, acc, fwd); }
     }
 }
 

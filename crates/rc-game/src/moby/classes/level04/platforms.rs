@@ -6,23 +6,7 @@
 //! * **0x09bd** ([`update_09bd`], `0x3ecd90`, 3 placed): a boat that ferries between two points.
 
 use crate::hero::physics::{add_rot, dist2, euler_rows, set_len, sub, sub_rot, turn_ease, V3};
-use crate::moby::{countdown, Ctx, MobyWorld};
-
-/// Its looped sound 0 (`0x383ff0(0, 4, m)`) kept going (a handle no longer playing is restarted); the handle at `off`.
-fn keep_loop(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, off: usize) {
-    let h = w.mobys[id].pv_i(off);
-    if h == -1 || !ctx.host.sound_playing(h) {
-        let h = ctx.host.play_sound(&w.mobys[id], 0, 4);
-        w.mobys[id].set_pv_i(off, h);
-    }
-}
-
-/// The looped sound at `off` stopped (`0x383cf0`) while it plays; the handle −1.
-fn stop_loop(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, off: usize) {
-    let h = w.mobys[id].pv_i(off);
-    if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
-    w.mobys[id].set_pv_i(off, -1);
-}
+use crate::moby::{countdown, keep_loop, stop_loop, Ctx, MobyWorld};
 
 /// 0x0968's platform `p` moved to `to` (and, with `yaw`, turned to it): its platform block `+0x20` written
 /// (`0x3445f0` = L00 `0x322668`, crate::moby::platform: the turn reported only when `turned`), Ratchet carried
@@ -94,7 +78,7 @@ pub fn update_0968(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         1 => {
             let t = ctx.host.frame_time(&w.mobys[id]);
-            keep_loop(w, id, ctx, 0x28);
+            keep_loop(w, id, ctx, 0x28, 0);
             let m = &mut w.mobys[id];
             let (mut a, mut v) = (m.rot[2], m.pv_f(0x2c));
             turn_ease(m.pv_f(0x30), f32::from_bits(0x394b_587b), f32::from_bits(0x394b_587b), f32::from_bits(0x3d8e_fa37), &mut a, &mut v, 0);
@@ -149,7 +133,7 @@ fn slide(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, to: V3, near: f32, snap: b
     m.pos = crate::hero::physics::add(p, set_len(sub(to, p), 0.07));
     w.changed = true;
     let sound = w.mobys[id].pv_i(0x38) == 1;
-    if sound { keep_loop(w, id, ctx, 0x34); }
+    if sound { keep_loop(w, id, ctx, 0x34, 0); }
     if near <= dist2(w.mobys[id].pos, to) { return; }
     if snap { w.mobys[id].pos = to; }
     w.mobys[id].state = next;
@@ -216,13 +200,6 @@ pub fn update_09eb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
 }
 
-/// `0x3476d8(m)`: Ratchet on moby `id` — climbing (0x1b) or in the ledge group 3 with the ledge on it, else on the
-/// ground on it.
-pub(super) fn hero_on(ctx: &Ctx, id: usize) -> bool {
-    let h = &*ctx.hero;
-    if h.group == 3 || h.state == 0x1b { h.ledge.moby == Some(id) } else { h.air_ticks == 0 && h.ground_moby == Some(id) }
-}
-
 /// 0x09ea's call to come to Ratchet: unless (its mission not done, its uid not gone since the checkpoint and its
 /// save count 0) and it was never ridden here (`+0x9c`).
 fn lift_comes(w: &MobyWorld, id: usize, ctx: &Ctx) -> bool {
@@ -250,7 +227,7 @@ fn lift_ease(w: &mut MobyWorld, id: usize, to: f32) {
 /// first, `+0x94`; 1 the second, `+0x98`), its ride ticks `+0x84`, its looped sound `+0x88`, ridden `+0x9c`, its speed
 /// `+0xa0`, a cuboid `+0xa4`.
 /// * **0**: the ends set (`+0x94` its own height and `+0x98` `+0x8c`, or swapped with `+0x90`), no sound; 1.
-/// * **1**: Ratchet on it ([`hero_on`]): ridden, its uid's save count up (`0x19b4a8`'s nibble, at most 7), off to the
+/// * **1**: Ratchet on it (crate::moby::ai::stands_on): ridden, its uid's save count up (`0x19b4a8`'s nibble, at most 7), off to the
 ///   other end (3 from the first, 2 from the second), its looped sound 0. Ratchet more than 3 below the first end's
 ///   lift (or above the second's) and it comes ([`lift_comes`]): its sound, to him (3 / 2).
 /// * **2**: toward `+0x94` ([`lift_ease`]); within 0.04 and Ratchet off it: at the first end (0), the sound stopped, 1.
@@ -282,23 +259,23 @@ pub fn update_09ea(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.set_pv_i(0x88, -1);
         }
         1 => {
-            if hero_on(ctx, id) {
+            if crate::moby::ai::stands_on(ctx, id) {
                 let uid = w.mobys[id].uid;
                 ctx.game.bump_uid(uid);
                 let m = &mut w.mobys[id];
                 m.set_pv_i(0x9c, 1);
                 let s = if m.pv_i(0x80) == 0 { 3 } else { 2 };
                 m.set_state(s, -1);
-                keep_loop(w, id, ctx, 0x88);
+                keep_loop(w, id, ctx, 0x88, 0);
             }
             let m = &w.mobys[id];
             let z = m.pos[2];
             let far = 3.0 < (z - hz).abs();
             if far && m.pv_i(0x80) == 0 && hz < z && lift_comes(w, id, ctx) {
-                keep_loop(w, id, ctx, 0x88);
+                keep_loop(w, id, ctx, 0x88, 0);
                 w.mobys[id].set_state(3, -1);
             } else if far && w.mobys[id].pv_i(0x80) == 1 && z < hz && lift_comes(w, id, ctx) {
-                keep_loop(w, id, ctx, 0x88);
+                keep_loop(w, id, ctx, 0x88, 0);
                 w.mobys[id].set_state(2, -1);
             }
         }
@@ -306,7 +283,7 @@ pub fn update_09ea(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let m = &w.mobys[id];
             let to = [m.pos[0], m.pos[1], m.pv_f(0x94)];
             if crate::hero::physics::dist(m.pos, to) <= 0.04 {
-                if !hero_on(ctx, id) {
+                if !crate::moby::ai::stands_on(ctx, id) {
                     w.mobys[id].set_pv_i(0x80, 0);
                     stop_loop(w, id, ctx, 0x88);
                     let m = &mut w.mobys[id];
@@ -325,7 +302,7 @@ pub fn update_09ea(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if m.once & 1 == 0 { m.once |= 1; }
             let (z, other) = (m.pos[2], m.pv_f(0x98));
             if z <= other {
-                if !hero_on(ctx, id) && z <= other {
+                if !crate::moby::ai::stands_on(ctx, id) && z <= other {
                     w.mobys[id].set_pv_i(0x80, 1);
                     stop_loop(w, id, ctx, 0x88);
                     let m = &mut w.mobys[id];
@@ -511,7 +488,7 @@ pub fn update_09bd(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => {}
     }
     sway(w, id, ctx);
-    keep_loop(w, id, ctx, 0x1dc);
+    keep_loop(w, id, ctx, 0x1dc, 0);
     let m = &mut w.mobys[id];
     m.rows = euler_rows(m.rot);
     let (pos, rot, rows) = (m.pos, m.rot, m.rows);

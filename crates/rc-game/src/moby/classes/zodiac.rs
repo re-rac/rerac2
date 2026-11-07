@@ -197,14 +197,6 @@ impl Arcs {
 /// The Zodiac's row as `0x139568[0x2b]` gives it.
 fn cur_row(game: &crate::game::GameState) -> Option<&'static ItemRow> { row(game, ITEM) }
 
-/// `0x2eeab0` on the word at `off`.
-fn count(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut n = w.mobys[id].pv_i(off);
-    let done = countdown(&mut n);
-    w.mobys[id].set_pv_i(off, n);
-    done
-}
-
 /// `0x40a358` (module docs).
 pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].pvars.resize(crate::moby::PVAR_BYTES, 0);
@@ -250,7 +242,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         2 => {
-            if count(w, id, pv::STEP) {
+            if w.mobys[id].count_i(pv::STEP) {
                 let m = &mut w.mobys[id];
                 m.state = 4;
                 m.set_pv_i(pv::STEP, 0x1e);
@@ -262,7 +254,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         4 => {
-            if !count(w, id, pv::STEP) {
+            if !w.mobys[id].count_i(pv::STEP) {
                 if w.mobys[id].pv_i(pv::MADE) != 0 { return; }
                 let ahead = ctx.hero_moby.and_then(|h| w.mobys.get(h)).map_or(ctx.hero.rows[0], |h| h.rows[0]);
                 make_effect(w, ctx, add(gun, set_len(ahead, 1.0)), 1, Some(id));
@@ -276,7 +268,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             ctx.host.set_anim(&w.mobys[id], 3, 0, 3);
         }
         5 => {
-            if !count(w, id, pv::WHITE) {
+            if !w.mobys[id].count_i(pv::WHITE) {
                 // `0x2e7920(0x40a980, hand)`: the white-out.
                 w.register_draw(id);
                 return;
@@ -338,7 +330,7 @@ fn hits(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, gun: V3) {
             }
         }
     }
-    if !count(w, id, pv::HITS) { return; }
+    if !w.mobys[id].count_i(pv::HITS) { return; }
     let sound = if w.mobys[id].pv_i(pv::KILLS) == 0 { 3 } else { 2 };
     ctx.host.play_sound(&w.mobys[id], sound, 0);
     w.mobys[id].set_pv_i(pv::KILLS, 0);
@@ -374,7 +366,7 @@ pub fn make_effect(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, kind: i32, hand: Op
 /// `0x4185a8` (module docs).
 pub fn update_effect(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].pvars.resize(crate::moby::PVAR_BYTES, 0);
-    if count(w, id, pv::TICKS) {
+    if w.mobys[id].count_i(pv::TICKS) {
         for a in w.zodiac.0.iter_mut() { a.owner = None; }
         if w.mobys[id].pv_i(pv::KIND) == 0 { ash(w, id, ctx); }
         w.delete(id);

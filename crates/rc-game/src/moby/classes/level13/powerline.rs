@@ -18,7 +18,7 @@
 //! (crate::moby::countdown), `0x36a308` the level sound after the split, `0x369e10` its stop.
 
 use crate::hero::physics::{add, cross, dot, euler_rows, scale, set_len, sub, V3};
-use crate::moby::{Ctx, MobyWorld};
+use crate::moby::{stop_loop, Ctx, MobyWorld};
 
 /// 0x0ee7's pvars (level 16's 0x07fb's too).
 pub mod pv {
@@ -325,13 +325,6 @@ fn switch_bolts(w: &mut MobyWorld, g: i32, on: bool) {
     }
 }
 
-/// Its loop stopped, −1 (`0x369e10` while it plays for it).
-fn loop_off(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let h = w.mobys[id].pv_i(tp::LOOP);
-    if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
-    w.mobys[id].set_pv_i(tp::LOOP, -1);
-}
-
 /// 0x1150 (`0x424190`).
 /// * **0**: its loop −1; without its group's list (`0x1fb3a0`) or its effect moby (−1): deleted ("Moby 4432 Needs a
 ///   Transponder Group" / "… a Powerline Effect"); else both off, the countdowns `[0xc]` / `[8]`, 1.
@@ -374,7 +367,7 @@ pub fn update_1150(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         1 => {
             if ctx.level.in_cuboid(w.mobys[id].pv_i(tp::CUBOID), ctx.hero.pos) { w.mobys[id].set_state(3, -1); }
-            loop_off(w, id, ctx);
+            stop_loop(w, id, ctx, tp::LOOP);
         }
         3 => {
             w.mobys[id].first();

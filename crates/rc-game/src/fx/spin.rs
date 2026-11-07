@@ -14,7 +14,7 @@
 //! `0x39d290`.
 
 use crate::fx::FxQuad;
-use crate::hero::physics::V3;
+use crate::hero::physics::{through, V3};
 
 /// One quad packet (0x90 bytes): its FX texture, colour, ST and corners (GS strip order) in the frame it is drawn by.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -30,23 +30,20 @@ impl Packet {
     pub fn new(fx: usize, rgba: u32, st: [[f32; 2]; 4], v: [V3; 4]) -> Self { Packet { fx, rgba, st, v } }
 }
 
-/// `v` times the rows `r` (`0x283098`).
-fn times(v: V3, r: &[V3; 3]) -> V3 { std::array::from_fn(|k| v[0] * r[0][k] + v[1] * r[1][k] + v[2] * r[2][k]) }
-
 /// `0x2e1510` (module docs): `turn` the rows of the turn (`0x2833f0` of its angles), `rows` / `pos` the frame.
 pub fn spin(out: &mut Vec<FxQuad>, packets: &mut [Packet], turn: &[V3; 3], steps: usize, rows: &[V3; 3], pos: V3) {
     for p in packets.iter_mut() {
-        p.v[2] = times(p.v[2], turn);
-        p.v[3] = times(p.v[3], turn);
+        p.v[2] = through(turn, p.v[2]);
+        p.v[3] = through(turn, p.v[3]);
     }
     // `0x283738(twice, turn, turn)`.
-    let twice = turn.map(|row| times(row, turn));
+    let twice = turn.map(|row| through(turn, row));
     for i in 0..steps {
         let k = if i & 1 != 0 { 2 } else { 0 };
         for p in packets.iter_mut() {
-            p.v[k] = times(p.v[k], &twice);
-            p.v[k + 1] = times(p.v[k + 1], &twice);
-            let corners = p.v.map(|c| { let w = times(c, rows); [w[0] + pos[0], w[1] + pos[1], w[2] + pos[2]] });
+            p.v[k] = through(&twice, p.v[k]);
+            p.v[k + 1] = through(&twice, p.v[k + 1]);
+            let corners = p.v.map(|c| { let w = through(rows, c); [w[0] + pos[0], w[1] + pos[1], w[2] + pos[2]] });
             out.push(FxQuad { fx: p.fx, additive: true, corners, st: p.st, rgba: [p.rgba; 4] });
         }
     }

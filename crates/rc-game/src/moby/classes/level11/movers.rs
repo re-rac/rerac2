@@ -13,12 +13,12 @@
 //!
 //! Each eases by a half cosine: a phase from π on by the step its progress takes, the offset `(cos(phase) + 1)·k`
 //! along one of its rows from its place (kept at set-up). Their moving sounds are their class sound 0 looped
-//! (`0x374eb0(0, 4, m)` started while it does not play, `0x374bb0` stopped), [`loop_on`] / [`loop_off`]. Ratchet on
+//! (`0x374eb0(0, 4, m)` started while it does not play, `0x374bb0` stopped), (crate::moby::keep_loop / crate::moby::stop_loop). Ratchet on
 //! one rides it (crate::moby::carry_hero: it stands in for his own read of the moving collision), but for the
 //! sinking floor, whose platform block says it never moves.
 
 use crate::hero::physics::{add, add_rot, dist, dist2, scale, sub, V3};
-use crate::moby::{carry_hero, countdown, Ctx, MobyWorld};
+use crate::moby::{carry_hero, countdown, keep_loop, stop_loop, Ctx, MobyWorld};
 use std::f32::consts::PI;
 
 /// The moby linked at `off` (an index), when live.
@@ -28,28 +28,6 @@ fn linked(w: &MobyWorld, id: usize, off: usize) -> Option<usize> {
 
 /// The linked moby's state is 2 (a Dynamo target on).
 fn on(w: &MobyWorld, id: usize, off: usize) -> bool { linked(w, id, off).is_some_and(|p| w.mobys[p].state == 2) }
-
-/// Its class sound 0 looped into `off` unless that one plays.
-pub fn loop_on(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, off: usize) {
-    let h = w.mobys[id].pv_i(off);
-    if h != -1 && ctx.host.sound_playing(h) { return; }
-    let h = ctx.host.play_sound(&w.mobys[id], 0, 4);
-    w.mobys[id].set_pv_i(off, h);
-}
-
-/// The loop at `off` stopped, −1.
-pub fn loop_off(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, off: usize) {
-    let h = w.mobys[id].pv_i(off);
-    if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
-    w.mobys[id].set_pv_i(off, -1);
-}
-
-/// Ratchet standing on moby `id` (`0x337468`): hanging or climbing (group 3, state 0x1b) on its ledge (`0x18a3a8`),
-/// else on the ground (`0x18a16e` = 0) with it under his feet (`0x18a15c`).
-pub fn stands_on(ctx: &Ctx, id: usize) -> bool {
-    let h = &*ctx.hero;
-    if h.group == 3 || h.state == 0x1b { h.ledge.moby == Some(id) } else { h.air_ticks == 0 && h.ground_moby == Some(id) }
-}
 
 /// The half-cosine step: `progress += step`, `phase = add_rot(phase, step)`; the new progress and phase.
 fn step(w: &mut MobyWorld, id: usize, progress: usize, phase: usize, k: f32) -> (f32, f32) {
@@ -103,13 +81,13 @@ pub fn update_0b6b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         2 => {
             let (p, a) = step(w, id, 0x10, 0xc, PI / 60.0);
-            loop_on(w, id, ctx, 0x30);
+            keep_loop(w, id, ctx, 0x30, 0);
             if p < 2.0 * PI {
                 place(w, id, 0x20, 1, -(a.cos() + 1.0) * 2.2);
             } else {
                 if !target_on {
                     w.mobys[id].state = 1;
-                    loop_off(w, id, ctx, 0x30);
+                    stop_loop(w, id, ctx, 0x30);
                 }
                 let m = &mut w.mobys[id];
                 m.set_pv_f(0x10, 0.0);
@@ -170,13 +148,13 @@ pub fn update_0d32(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     match w.mobys[id].state {
         1 => {
             if target_on {
-                loop_on(w, id, ctx, 0x14);
+                keep_loop(w, id, ctx, 0x14, 0);
                 let m = &mut w.mobys[id];
                 m.state = 2;
                 m.set_pv_f(0xc, PI);
                 m.set_pv_f(0x10, 0.0);
             } else {
-                loop_off(w, id, ctx, 0x14);
+                stop_loop(w, id, ctx, 0x14);
             }
         }
         2 => {
@@ -184,23 +162,23 @@ pub fn update_0d32(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if p < PI {
                 place(w, id, 0x20, 2, (a.cos() + 1.0) * 5.0);
             } else {
-                loop_off(w, id, ctx, 0x14);
+                stop_loop(w, id, ctx, 0x14);
                 w.mobys[id].state = 3;
             }
         }
         3 => {
             if !target_on {
-                loop_on(w, id, ctx, 0x14);
+                keep_loop(w, id, ctx, 0x14, 0);
                 w.mobys[id].state = 4;
             } else {
-                loop_off(w, id, ctx, 0x14);
+                stop_loop(w, id, ctx, 0x14);
             }
         }
         4 => {
             if 6.0 < dist2(w.mobys[id].pos, ctx.hero.pos) {
                 let (p, a) = step(w, id, 0x10, 0xc, k);
                 if 2.0 * PI <= p {
-                    loop_off(w, id, ctx, 0x14);
+                    stop_loop(w, id, ctx, 0x14);
                     let m = &mut w.mobys[id];
                     m.state = 1;
                     m.set_pv_f(0xc, PI);
@@ -240,7 +218,7 @@ pub fn update_0c7b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     match w.mobys[id].state {
         1 => {
             if w.mobys[id].pv_i(0x60) != 0 && target_on {
-                loop_on(w, id, ctx, 0x74);
+                keep_loop(w, id, ctx, 0x74, 0);
                 let m = &mut w.mobys[id];
                 m.state = 2;
                 m.set_pv_f(0x6c, PI);
@@ -252,20 +230,20 @@ pub fn update_0c7b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if p < PI {
                 down(w, a);
             } else {
-                loop_off(w, id, ctx, 0x74);
+                stop_loop(w, id, ctx, 0x74);
                 w.mobys[id].state = 3;
             }
         }
         3 => {
             if !target_on {
-                loop_on(w, id, ctx, 0x74);
+                keep_loop(w, id, ctx, 0x74, 0);
                 w.mobys[id].state = 4;
             }
         }
         4 => {
             let (p, a) = step(w, id, 0x70, 0x6c, k);
             if 2.0 * PI <= p {
-                loop_off(w, id, ctx, 0x74);
+                stop_loop(w, id, ctx, 0x74);
                 let m = &mut w.mobys[id];
                 m.state = 1;
                 m.set_pv_f(0x6c, PI);
@@ -316,7 +294,7 @@ pub fn update_0b6f(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// `+0x68` its camera tweak, `+0x6c` the cuboid that sends it home, `+0x70` its loop, `+0x74` its glow's phase, its
 /// platform block `+0x20`. Solid only while poked (its timer byte `+0xbc`, the Dynamo's targets); sub-state 0 → 1 with
 /// mode | 0x2000 once.
-/// * **0** (home): Ratchet off it, its loop stopped; on it ([`stands_on`]) its loop, a camera tweak of priority 5
+/// * **0** (home): Ratchet off it, its loop stopped; on it (crate::moby::ai::stands_on) its loop, a camera tweak of priority 5
 ///   (`0x2d7468`: distance 10, the stick off, `+0x3c` and the firm springs on, facing back along its first row once),
 ///   **1** — its mission (`+0xb0`) done: the tweak let go, **6** at its path's last point.
 /// * **1**: a thirtieth of the way to its point a tick, the next within 0.05 across; past the last, Ratchet off it:
@@ -354,7 +332,7 @@ pub fn update_0c7a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.pos = point(0);
         m.state = 0;
         m.set_pv_i(0x64, 0);
-        loop_off(w, id, ctx, 0x70);
+        stop_loop(w, id, ctx, 0x70);
         release(w, ctx);
     };
     let toward = |w: &mut MobyWorld, k: f32| {
@@ -363,11 +341,11 @@ pub fn update_0c7a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.pos = add(m.pos, scale(sub(to, m.pos), k));
         to
     };
-    let riding = stands_on(ctx, id);
+    let riding = crate::moby::ai::stands_on(ctx, id);
     if !riding {
-        if w.mobys[id].state == 0 { loop_off(w, id, ctx, 0x70); }
+        if w.mobys[id].state == 0 { stop_loop(w, id, ctx, 0x70); }
     } else if w.mobys[id].state == 0 {
-        loop_on(w, id, ctx, 0x70);
+        keep_loop(w, id, ctx, 0x70, 0);
         if let Some(s) = ctx.game.cam_tweaks.request(5) {
             let t = &mut ctx.game.cam_tweaks.slots[s];
             t.dist = 10.0;
@@ -400,7 +378,7 @@ pub fn update_0c7a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     let g = w.mobys[id].group as i32;
                     w.poke_group(g, 0);
                 }
-                loop_off(w, id, ctx, 0x70);
+                stop_loop(w, id, ctx, 0x70);
             }
             if ctx.level.in_cuboid(w.mobys[id].pv_i(0x6c), ctx.hero.pos) { home(w, ctx); }
         }
@@ -414,7 +392,7 @@ pub fn update_0c7a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 let m = &mut w.mobys[id];
                 m.state = 0;
                 m.set_pv_i(0x64, 0);
-                if was == 5 { loop_off(w, id, ctx, 0x70); }
+                if was == 5 { stop_loop(w, id, ctx, 0x70); }
             } else {
                 let to = toward(w, 1.0 / 15.0);
                 let p = w.mobys[id].pos;
@@ -433,7 +411,7 @@ pub fn update_0c7a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 m.set_pv_i(0x64, 0);
                 let g = m.group as i32;
                 w.poke_group(g, 0);
-                loop_off(w, id, ctx, 0x70);
+                stop_loop(w, id, ctx, 0x70);
             }
         }
         _ => {}
@@ -490,18 +468,18 @@ pub fn update_slider(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let done = countdown(&mut t);
         m.set_pv_i(0x64, t);
         if done {
-            loop_off(w, id, ctx, 0x70);
+            stop_loop(w, id, ctx, 0x70);
             w.mobys[id].state = next;
         }
     };
     if w.mobys[id].state == 1 && inside(w) {
-        loop_on(w, id, ctx, 0x70);
+        keep_loop(w, id, ctx, 0x70, 0);
         w.mobys[id].state = 2;
         w.mobys[id].set_pv_i(0x64, 0x2d);
     }
     if w.mobys[id].state == 2 { slide(w, ctx, 1.0, 3); }
     if w.mobys[id].state == 3 && !inside(w) {
-        loop_on(w, id, ctx, 0x70);
+        keep_loop(w, id, ctx, 0x70, 0);
         w.mobys[id].state = 4;
         w.mobys[id].set_pv_i(0x64, 0x2d);
     }

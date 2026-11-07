@@ -68,18 +68,6 @@ fn left(w: &MobyWorld) -> i32 {
     (live(crystal::CRYSTAL) + live(0x1002) + live(crystal::LEFT)) as i32
 }
 
-/// L08 `0x370240` / `0x3702a8`: Ratchet's parked ship and its parts hidden (mode | 3, no collision) or shown (mode
-/// bits 1 and 2 off, their class's collision).
-fn ship(w: &mut MobyWorld, ctx: &Ctx, on: bool) {
-    let ids: Vec<usize> = ctx.game.travel.ship.into_iter().chain(ctx.game.ship_parts.iter().copied()).collect();
-    for i in ids {
-        let Some(c) = w.mobys.get(i).map(|m| m.o_class) else { continue };
-        let coll = w.class(c).is_some_and(|k| k.has_collision);
-        let m = &mut w.mobys[i];
-        if on { m.mode &= !3; m.has_collision = coll; } else { m.mode |= 3; m.has_collision = false; }
-    }
-}
-
 /// The bolts' sound: sound 0 of one of the bolt classes 13..17 (`0x36ebe0(0, 0, m, 0x328a10(13, 17))`).
 fn bolt_sound(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
     let class = ctx.game.rng.rand_range(13, 17) as i16;
@@ -98,7 +86,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     match w.mobys[id].state {
         0 => {
             if !flag(ctx, PAID) {
-                ship(w, ctx, false);
+                crate::travel::show_ship(w, ctx, false);
             } else if let Some(p) = link(w, id, PROP) {
                 w.delete(p);
                 w.mobys[id].set_pv_i(PROP, -1);
@@ -163,7 +151,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let group = w.mobys[id].group;
             if group != -1 { w.poke_group(group as i32, 1); }
             set_flag(ctx, PAID);
-            ship(w, ctx, true);
+            crate::travel::show_ship(w, ctx, true);
             if let Some(p) = link(w, id, PROP) {
                 w.delete(p);
                 w.mobys[id].set_pv_i(PROP, -1);

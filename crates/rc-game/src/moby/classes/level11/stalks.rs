@@ -28,7 +28,7 @@
 //! The draw (`0x471c58`, the second list): each spark two FX 0x31 sprites facing the camera, pushed 0.08 toward it,
 //! at random rolls, additive: 0.2 across in 0x106060 at alpha 63 × brightness, 0.08 across in 0x808080 at 128 ×.
 
-use crate::hero::physics::{add, atan2, dist, dist2, scale, set_len, sub, sub_rot, V3};
+use crate::hero::physics::{add, atan2, dist, dist2, scale, set_len, sub, sub_rot, through, V3};
 use crate::moby::{countdown, Ctx, MobyWorld};
 
 const GLOW_A: usize = 0x04;
@@ -42,13 +42,10 @@ const SPARKS: usize = 0x20;
 /// `0x337298(r, yaw, pitch, out)`.
 fn polar(r: f32, yaw: f32, pitch: f32) -> V3 { [yaw.cos() * r * pitch.cos(), yaw.sin() * r * pitch.cos(), pitch.sin() * r] }
 
-/// `v` through the rows.
-fn through(v: V3, r: &[V3; 3]) -> V3 { std::array::from_fn(|k| v[0] * r[0][k] + v[1] * r[1][k] + v[2] * r[2][k]) }
-
 /// `0x338260(x, y, z, m, out)`: `(x, y, z)` in its frame (its rows × its scale, at its place).
 fn local(w: &MobyWorld, id: usize, v: V3) -> V3 {
     let m = &w.mobys[id];
-    add(scale(through(v, &m.rows), m.scale), m.pos)
+    add(scale(through(&m.rows, v), m.scale), m.pos)
 }
 
 fn count(w: &MobyWorld, id: usize) -> usize { w.mobys[id].pv_i(COUNT).clamp(0, 8) as usize }
@@ -151,7 +148,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     let rng = &mut ctx.game.rng;
                     for (kind, v) in [(0u8, [k, 0.0, k]), (1, [-k, 0.0, f32::from_bits(0x3d23_d70b)])] {
                         let n = rng.rand_range(3, 6);
-                        crate::particles::staged_burst(sys, rng, 0.0, k, 0.5, 15.0, 1.0, &rows, pos, s, [0.0, 0.0, smoke_up], through(v, &rows), n, kind);
+                        crate::particles::staged_burst(sys, rng, 0.0, k, 0.5, 15.0, 1.0, &rows, pos, s, [0.0, 0.0, smoke_up], through(&rows, v), n, kind);
                     }
                 }
                 let n = ctx.game.rng.rand_range(0x2d, 0x5a);

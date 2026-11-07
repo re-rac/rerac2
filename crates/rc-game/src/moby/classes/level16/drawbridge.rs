@@ -7,7 +7,7 @@
 //!   the angle held there and the speed bounced back a third (`$gp+0x2f80`, −0.333, into `$gp+0x4a3c` = the speed);
 //!   below 1′ a tick (`0x2e8158` the absolute value) it rests (2). Then the group swung ([`swing`], `0x420130`).
 
-use crate::hero::physics::{add, sub, V3};
+use crate::hero::physics::{add, sub, through, V3};
 use crate::moby::{Ctx, MobyWorld};
 
 pub const BRIDGE: i16 = 0x125d;
@@ -23,8 +23,6 @@ pub struct Globals {
 
 /// `$gp+0x2f90`: the pivot in its frame.
 const PIVOT: V3 = [-6.25, 0.0, 0.0];
-
-fn through(v: V3, r: &[V3; 3]) -> V3 { std::array::from_fn(|k| v[0] * r[0][k] + v[1] * r[1][k] + v[2] * r[2][k]) }
 
 /// 0x125d (module docs).
 pub fn update_125d(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
@@ -60,7 +58,7 @@ pub fn update_125d(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
 /// old frame, back out through the new).
 pub fn swing(w: &mut MobyWorld, id: usize, angle: f32) {
     let m = &w.mobys[id];
-    let pivot = add(through(PIVOT, &m.rows), m.pos);
+    let pivot = add(through(&m.rows, PIVOT), m.pos);
     let Some(list) = usize::try_from(m.group).ok().and_then(|g| w.groups.get(g)).cloned() else { return };
     for k in list {
         let Some(e) = w.mobys.get_mut(k) else { break };
@@ -68,7 +66,7 @@ pub fn swing(w: &mut MobyWorld, id: usize, angle: f32) {
         let local = [0, 1, 2].map(|i| e.rows[i][0] * d[0] + e.rows[i][1] * d[1] + e.rows[i][2] * d[2]);
         e.rot[1] = if e.o_class == BRIDGE { -angle } else { angle };
         e.rows = crate::moby::attach::rows_of(e.rot);
-        let moved = sub(through(local, &e.rows), d);
+        let moved = sub(through(&e.rows, local), d);
         e.pos = sub(e.pos, moved);
     }
 }

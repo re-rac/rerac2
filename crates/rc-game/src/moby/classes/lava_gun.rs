@@ -57,6 +57,7 @@ use crate::hero::items::{row, ItemRow, LAVA};
 use crate::hero::physics::{add, cross, dist2, scale, set_len, spring, sub, unit, V3};
 use crate::moby::hits::HitTemplate;
 use crate::moby::{countdown, lock_on, Ctx, MobyWorld};
+use crate::moby::{keep_loop, stop_loop};
 
 /// The hand's class (item 0x1d's row `+0x04`).
 pub const HAND_CLASS: i16 = 0x5c9;
@@ -133,13 +134,6 @@ fn cur_row(game: &crate::game::GameState) -> Option<&'static ItemRow> { row(game
 /// `0x2eef88(out, a, b)` = b × a.
 fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
 
-/// The loop sound let go when still playing (`0x3602f0`).
-fn stop_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let s = w.mobys[id].pv_i(0x38);
-    if s != -1 && ctx.host.sound_playing(s) { ctx.host.stop_sound(s); }
-    w.mobys[id].set_pv_i(0x38, -1);
-}
-
 /// A hit on `target` from the hand (`0x31d158` + `0x31d378`): along the hand to it, flags 0x910000, its kind the
 /// target's class `<< 16 | 0x0109`; Acid (`0x3f9f70(target, 0x1d, hand)`, crate::moby::weapon_mods); then the hand's
 /// class sound 1.
@@ -178,7 +172,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if 0 <= t { crate::gravity::untrack(w, t); }
             w.lava.points[k].tracker = -1;
         }
-        stop_sound(w, id, ctx);
+        stop_loop(w, id, ctx, 0x38);
         return;
     }
     let muzzle = ctx.host.joint(&w.mobys[id], 0).unwrap_or(w.mobys[id].pos);
@@ -197,7 +191,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if firing {
         fire(w, id, ctx, muzzle);
     } else {
-        stop_sound(w, id, ctx);
+        stop_loop(w, id, ctx, 0x38);
         let it = ctx.hero.items;
         if it.pressed & it.trigger != 0 && !it.has_ammo(ctx.game) && it.no_use == 0 { ctx.host.play_sound(&w.mobys[id], 2, 0); }
         let m = &mut w.mobys[id];
@@ -256,11 +250,7 @@ fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, muzzle: V3) {
     let n = w.mobys[id].pv_i(0x60);
     if n % 10 == 0 { ctx.hero.items.take_ammo(ctx.game, 1); }
     w.mobys[id].set_pv_i(0x60, n + 1);
-    let s = w.mobys[id].pv_i(0x38);
-    if s == -1 || !ctx.host.sound_playing(s) {
-        let h = ctx.host.play_sound(&w.mobys[id], 0, 4);
-        w.mobys[id].set_pv_i(0x38, h);
-    }
+    keep_loop(w, id, ctx, 0x38, 0);
     if ctx.host.anim(&w.mobys[id]).is_none_or(|a| a.seq_b != 2) { ctx.host.set_anim(&w.mobys[id], 2, 0, 0); }
     let near = ctx.scene.map(|sc| crate::collision::coll_sphere_mobys(sc, muzzle, 0.5, crate::collision::QueryFlags(0x10), Some(id))).unwrap_or_default();
     for t in near {

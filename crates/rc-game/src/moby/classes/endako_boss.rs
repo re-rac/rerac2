@@ -78,7 +78,7 @@
 //!   dialogue starts at once; the pilot's sequence 1 starts with the line).
 //! * A laser carried by a moby (`+0x40`: the boss gives none).
 
-use crate::hero::physics::{add, add_rot, approach, approach_angle, atan2, cross, dist, ease_speed, euler_rows, len, len2, scale, set_len, sub, sub_rot, turn_ease, unit, V3};
+use crate::hero::physics::{add, add_rot, approach, approach_angle, atan2, cross, dist, ease_speed, euler_rows, len, len2, scale, set_len, sub, sub_rot, through, turn_ease, unit, V3};
 use crate::moby::{ai, countdown, mode, Ctx, Moby, MobyWorld};
 use super::props::{seq, wrapped};
 
@@ -221,8 +221,6 @@ fn path_len(ctx: &Ctx, path: i32) -> i32 { usize::try_from(path).ok().and_then(|
 fn v3(p: [f32; 4]) -> V3 { [p[0], p[1], p[2]] }
 fn anim(w: &MobyWorld, id: usize, ctx: &mut Ctx, s: u8, blend: u8) { ctx.host.set_anim(&w.mobys[id], s, 0, blend); }
 fn anim_unless(w: &MobyWorld, id: usize, ctx: &mut Ctx, s: u8, blend: u8) { if seq(w, id, ctx) != s { anim(w, id, ctx, s, blend); } }
-/// `0x2f02d8`: a local vector through the rows.
-fn through(rows: &[V3; 3], v: V3) -> V3 { std::array::from_fn(|k| v[0] * rows[0][k] + v[1] * rows[1][k] + v[2] * rows[2][k]) }
 
 /// Shown, a target, its class's collision (`& 0xffbe | 0x1000`, `+0x98` the class's).
 fn show(w: &mut MobyWorld, id: usize) {

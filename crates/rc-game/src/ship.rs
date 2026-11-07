@@ -40,7 +40,7 @@
 //! counts down, and at 0 with □ up the fuel comes back by 1 every third frame. With `+0x34` the move (`0x435a18`)
 //! springs the speed to 50 a second (`$gp+0x25d4`; 30 with `0x375168`) at 0.005 (`+0x2700`) instead of the cruise.
 
-use crate::hero::physics::{add, cross, dot, scale, set_len, sub, unit, V3};
+use crate::hero::physics::{add, cross, dot, scale, set_len, sub, through, unit, V3};
 use crate::moby::hits::HitTemplate;
 use crate::moby::{countdown, mode, Ctx, MobyHost, MobyWorld};
 use crate::pad::{button, PadState};
@@ -69,9 +69,6 @@ fn turn(v: V3, axis: V3, a: f32) -> V3 {
     let kxv = cross(axis, v);
     add(add(scale(v, c), scale(kxv, s)), scale(axis, dot(axis, v) * (1.0 - c)))
 }
-
-/// `0x2ef318`: `v` through the rows (the rows as columns).
-fn through(r: &[V3; 3], v: V3) -> V3 { add(add(scale(r[0], v[0]), scale(r[1], v[1])), scale(r[2], v[2])) }
 
 /// `0x301608` (s16): 1 already 0, 2 just ran out, else 0.
 fn dec_timer(t: &mut i16) -> i32 {

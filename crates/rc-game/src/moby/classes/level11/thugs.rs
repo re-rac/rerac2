@@ -140,14 +140,6 @@ pub(super) fn limits(w: &mut MobyWorld, id: usize, l: [u32; 4]) {
     ai::senses(&mut w.mobys[id], a, b, c, d);
 }
 
-/// `0x33d580`: the first tick since the last sub-state change.
-pub(super) fn first_sub(w: &mut MobyWorld, id: usize) -> bool {
-    let m = &mut w.mobys[id];
-    if m.once & 2 != 0 { return false; }
-    m.once |= 2;
-    true
-}
-
 pub(super) fn anim(w: &MobyWorld, id: usize, ctx: &mut Ctx, s: u8, frame: u8, blend: u8) { set_seq(w, id, ctx, s, frame, blend); }
 /// [`anim`] with its blend drawn from `lo..=hi` only when the sequence is to change.
 pub(super) fn anim_r(w: &MobyWorld, id: usize, ctx: &mut Ctx, s: u8, frame: u8, lo: i32, hi: i32) {
@@ -629,7 +621,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         0 => calm(w, id, ctx),
         1 => {
-            if first_sub(w, id) { w.mobys[id].set_pv_f(WANDER + 0x1c, 6.0); }
+            if w.mobys[id].first_sub() { w.mobys[id].set_pv_f(WANDER + 0x1c, 6.0); }
             if let Some(t) = turret(w, id) {
                 if turret_free(w, t) {
                     clear_walk_flag(w, id);
@@ -660,7 +652,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         2 => {
-            if first_sub(w, id) { limits(w, id, RUN_PATH); }
+            if w.mobys[id].first_sub() { limits(w, id, RUN_PATH); }
             let s = w.mobys[id].state;
             if !in_range(w, id) && !matches!(s, 0x1d | 0x22 | 0x20) && ctx.game.rng.randi(4) == 1 {
                 speed(w, id, ctx, 1.0);
@@ -678,7 +670,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             hide(w, id, ctx, 9, true);
         }
         3 => {
-            if first_sub(w, id) { limits(w, id, RUN); }
+            if w.mobys[id].first_sub() { limits(w, id, RUN); }
             if w.mobys[id].pv_i(CHARGE) == 1 {
                 anim(w, id, ctx, 0xf, 0, 10);
                 st(w, id, 0x1c, 2);
@@ -725,7 +717,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         5 => riding(w, id, ctx),
         6 => {
-            if first_sub(w, id) && part(w, id, WEAPON).is_none() {
+            if w.mobys[id].first_sub() && part(w, id, WEAPON).is_none() {
                 if !arm(w, id, ctx) {
                     w.delete(id);
                     return;
@@ -791,7 +783,7 @@ fn lunge(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, frame: u8, blend: u8, sub:
 /// charge, the swing first, or the attack — then off to its hover `+0x270`, 0x1f, when it has one); alarmed by its
 /// group (`+0x266`): its alarm path (6 for the first alarm, 7 after) or alert (sub 1), then the same picks in range.
 fn calm(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    if first_sub(w, id) { limits(w, id, CALM); }
+    if w.mobys[id].first_sub() { limits(w, id, CALM); }
     if w.mobys[id].pv_s(RANGE) == 2 {
         if w.mobys[id].pv_i(APATH) != -1 {
             anim(w, id, ctx, 0xf, 0, 10);
@@ -1562,7 +1554,7 @@ fn wake_group(w: &mut MobyWorld, id: usize, k: usize, alive: bool) -> bool {
 /// `+0x04` / `+0x08` its two groups (255 none), `+0x14` its looped sound's handle.
 /// * **0**: 1, mode | 0x800, the parent hidden (mode | 0x41); the thugs, 0x0cf6 and hovers 0x0d07 of both groups
 ///   hidden (mode | 0x43 without TARGET, no collision).
-/// * **1**: Ratchet on the parent (crate::moby::classes::level17::floaters::hero_on, `0x325398`), the parent hooked or
+/// * **1**: Ratchet on the parent (crate::moby::ai::stands_on, `0x325398`), the parent hooked or
 ///   its mission done: 2 (its ticks 0), its sound 1 and the loop 2 (unless already playing), both groups' squads woken
 ///   (sub-state 1, shown, solid). Hit by a turret shot 0x0dd9 (flags 0x10000): its sound 0, both squads woken, a smoke
 ///   burst (1, 13), its pieces thrown 0.42 along its facing (`0x2b0a68`, crate::moby::shards::break_into, 3..6), gone;
@@ -1589,7 +1581,7 @@ pub fn update_trigger(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     if w.mobys[id].state == 1 {
         let mission = w.mobys[id].mission as i32;
-        let set_off = parent.is_some_and(|p| super::super::level17::floaters::hero_on(ctx, p) || w.mobys[p].once & 4 != 0) || super::mission_done(ctx, mission);
+        let set_off = parent.is_some_and(|p| crate::moby::ai::stands_on(ctx, p) || w.mobys[p].once & 4 != 0) || super::mission_done(ctx, mission);
         if set_off {
             let m = &mut w.mobys[id];
             m.state_ticks = 0;

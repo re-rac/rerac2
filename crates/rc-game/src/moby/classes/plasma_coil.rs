@@ -90,7 +90,7 @@
 use crate::hero::items::{row, ItemRow, PLASMA_COIL};
 use crate::hero::physics::{add, add_rot, atan2, cross, dist, dist2, scale, set_len, sub, sub_rot, unit, V3};
 use crate::moby::hits::HitTemplate;
-use crate::moby::{aim, countdown, lock_on, mode, Ctx, MobyWorld};
+use crate::moby::{aim, countdown, lock_on, mode, stop_loop, Ctx, MobyWorld};
 use rc_formats::moby_anim::JointModifier;
 
 /// The hand's class (item 0x1c's row `+0x04`) and the ball's.
@@ -227,12 +227,6 @@ const ARC_DAMAGE: f32 = 12.0;
 
 /// `0x2eef88(out, a, b)` = b × a.
 fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
-
-/// `0x321c00(a, out, v, axis)`: `v` turned by `a` about `axis` (under 1e-5 none).
-fn turn(v: V3, axis: V3, a: f32) -> V3 {
-    if a.abs() < 1e-5 { return v; }
-    crate::gravity::rotate(v, unit(axis), a)
-}
 
 /// A moby's aim point (`0x31fa20` + `0x326520(m, out, 1)`): its place raised along the up there by its aim height
 /// when the enemy framework runs it.
@@ -576,16 +570,9 @@ fn ride(w: &mut MobyWorld, ctx: &Ctx, id: usize) {
     if aim::health(w, t).is_some() { w.mobys[id].pos = aim_at(w, ctx, t); }
 }
 
-/// The loop sound let go when still playing (`0x3602f0`).
-fn stop_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let s = w.mobys[id].pv_i(0x20);
-    if s != -1 && ctx.host.sound_playing(s) { ctx.host.stop_sound(s); }
-    w.mobys[id].set_pv_i(0x20, -1);
-}
-
 /// `0x3cd060(ball)`: gone — the count down, its table entry and its rays freed.
 fn gone(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    stop_sound(w, id, ctx);
+    stop_loop(w, id, ctx, 0x20);
     w.coil.count -= 1;
     let index = w.mobys[id].pv_i(0x14);
     if let Some(b) = usize::try_from(index).ok().and_then(|i| w.coil.balls.get_mut(i)) { *b = None; }
@@ -695,7 +682,7 @@ pub fn update_ball(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => {}
     }
     if w.mobys[id].state == 4 {
-        stop_sound(w, id, ctx);
+        stop_loop(w, id, ctx, 0x20);
     } else {
         let s = w.mobys[id].pv_i(0x20);
         if s == -1 || !ctx.host.sound_playing(s) {
@@ -709,7 +696,7 @@ pub fn update_ball(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.chopper.holds(class, slot) {
         w.register_draw(id);
     } else {
-        stop_sound(w, id, ctx);
+        stop_loop(w, id, ctx, 0x20);
         for r in w.coil.rays.iter_mut().filter(|r| r.owner == Some(id)) { r.owner = None; }
         crate::gravity::untrack(w, w.mobys[id].pv_i(0x44));
         w.delete(id);
@@ -734,7 +721,7 @@ pub(crate) fn sparks(ctx: &mut Ctx, at: V3, n: i32, kind: i32) {
         let s = if r == 0 { -1 } else { r };
         let a = g.randf(f32::from_bits(0xbf86_0a93), f32::from_bits(0x3f86_0a93));
         let f = g.randf(f32::from_bits(0x3d4c_cccd), 3.0) * 0.016_666_668;
-        let mut v = set_len(turn(v0, up, a), f);
+        let mut v = set_len(crate::camera::rot(v0, a, up), f);
         v[2] = g.randf(1.0, 5.0) * 0.016_666_668;
         let p: V3 = std::array::from_fn(|k| at[k] + g.randf_signed(0.0, f32::from_bits(0x3e19_999a)));
         let odd = g.rand() & 1 != 0;

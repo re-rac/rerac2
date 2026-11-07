@@ -15,6 +15,7 @@
 
 use super::{mode, MobyHost, MobyWorld};
 use crate::hero::physics::V3;
+use crate::gravity::{to_local, to_world};
 
 /// What a member is.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -41,8 +42,6 @@ pub struct Member {
     /// Its own turn (`+0x40`'s angles), none by default.
     pub turn: Option<V3>,
 }
-
-fn dot(a: V3, b: V3) -> f32 { a[0] * b[0] + a[1] * b[1] + a[2] * b[2] }
 
 /// `0x2ef6b8`: the rows from Euler angles.
 pub fn rows_of(rot: V3) -> [V3; 3] {
@@ -72,10 +71,6 @@ pub fn pivot_turn(m: &mut super::Moby, angles: V3, pivot: V3) {
     m.pos = std::array::from_fn(|k| m.pos[k] + a[k] - b[k]);
     m.rot = angles_of(&m1);
 }
-
-/// World rows / point into the frame `c` (rows, orthonormal) and back.
-fn to_local(v: V3, c: &[V3; 3]) -> V3 { [dot(v, c[0]), dot(v, c[1]), dot(v, c[2])] }
-fn to_world(l: V3, c: &[V3; 3]) -> V3 { std::array::from_fn(|k| l[0] * c[0][k] + l[1] * c[1][k] + l[2] * c[2][k]) }
 
 fn rows3(m: &[[f32; 4]; 4]) -> [V3; 3] { std::array::from_fn(|r| [m[r][0], m[r][1], m[r][2]]) }
 

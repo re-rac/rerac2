@@ -81,13 +81,6 @@ const IDLES: [u8; 4] = [6, 7, 2, 0x11];
 /// The robot its swipe stops at (crate::moby::classes::endako_d::ROBOT_964).
 const ROBOT: i16 = 0x0964;
 
-/// `0x32a7f0`: the first tick since the last sub-state change.
-fn first_sub(m: &mut crate::moby::Moby) -> bool {
-    if m.once & 2 != 0 { return false; }
-    m.once |= 2;
-    true
-}
-
 fn yaw_to(w: &MobyWorld, id: usize, p: V3) -> f32 {
     let q = w.mobys[id].pos;
     atan2(p[0] - q[0], p[1] - q[1])
@@ -196,7 +189,7 @@ pub fn update_112c(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if m.pv_i(SEEN) == 1 && m.state == 1 { m.set_state(5, 1); }
         }
         1 => {
-            if first_sub(&mut w.mobys[id]) {
+            if w.mobys[id].first_sub() {
                 ai::senses(&mut w.mobys[id], 20.0 * 0.000_277_777_78, 6.0 * 0.016_666_668, 720.0 * 4.848_137_5e-6, 1440.0 * 0.000_290_888_25);
             }
             if w.mobys[id].pv_i(SEEN) != 1 { idle(w, id, ctx); }

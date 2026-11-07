@@ -34,7 +34,7 @@
 //! damaged engine's smoke and arcs (`0x436ae8`: `0x436d50` at its joints `0x1b1780`, `0x3a24d8`), the stage's
 //! piece by the class's byte table (`+0x2e`'s: taken as the stage itself here), `0x3804b8(m, 1)`.
 
-use crate::hero::physics::{add, cross, dist, scale, sub, unit, V3};
+use crate::hero::physics::{add, cross, dist, scale, sub, through, unit, V3};
 use crate::moby::attach::{angles_of, rows_of};
 use crate::moby::classes::space::{self, a};
 use crate::moby::{countdown, mode, Ctx, MobyWorld};
@@ -79,8 +79,6 @@ const STAGE_JOINTS: [usize; 8] = [0, 2, 0x13, 1, 3, 0x11, 0x14, 0];
 fn path(w: &MobyWorld, id: usize, ctx: &Ctx) -> Vec<[f32; 4]> {
     usize::try_from(w.mobys[id].pv_i(pv::PATH)).ok().and_then(|p| ctx.level.paths.get(p)).cloned().unwrap_or_default()
 }
-
-fn in_frame(rows: [V3; 3], v: V3) -> V3 { add(add(scale(rows[0], v[0]), scale(rows[1], v[1])), scale(rows[2], v[2])) }
 
 fn out_of_box(p: V3) -> bool { p.iter().any(|&c| !(2.0..=1021.0).contains(&c)) }
 
@@ -157,7 +155,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         1 => fly(w, id, ctx, false),
         2 => {
             fly(w, id, ctx, true);
-            if timer_out(w, id) {
+            if w.mobys[id].count_i(pv::TIMER) {
                 w.mobys[id].state = 3;
                 w.mobys[id].set_pv_i(pv::TIMER, 180);
             }
@@ -166,7 +164,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             fly(w, id, ctx, true);
             let t = w.mobys[id].pv_i(pv::TIMER) as f32 / 180.0;
             w.mobys[id].alpha = ((1.0 - t) * 95.0) as u8 + 32;
-            if timer_out(w, id) {
+            if w.mobys[id].count_i(pv::TIMER) {
                 let m = &mut w.mobys[id];
                 m.has_collision = true;
                 m.state = 4;
@@ -177,7 +175,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         4 => {
             fly(w, id, ctx, false);
-            if timer_out(w, id) {
+            if w.mobys[id].count_i(pv::TIMER) {
                 let m = &mut w.mobys[id];
                 m.has_collision = false;
                 m.state = 5;
@@ -189,7 +187,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             fly(w, id, ctx, true);
             let t = w.mobys[id].pv_i(pv::TIMER) as f32 / 180.0;
             w.mobys[id].alpha = (t * 95.0) as u8 + 32;
-            if timer_out(w, id) {
+            if w.mobys[id].count_i(pv::TIMER) {
                 let m = &mut w.mobys[id];
                 m.has_collision = true;
                 m.state = 2;
@@ -217,13 +215,6 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.rebuild(id, &*ctx.host);
 }
 
-fn timer_out(w: &mut MobyWorld, id: usize) -> bool {
-    let mut t = w.mobys[id].pv_i(pv::TIMER);
-    let out = countdown(&mut t);
-    w.mobys[id].set_pv_i(pv::TIMER, t);
-    out
-}
-
 /// `0x4363d0(m, cloaked)` (module docs).
 fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, cloaked: bool) {
     space::take_own_target(w, id);
@@ -236,7 +227,7 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, cloaked: bool) {
         let side = w.mobys[id].pv_i(pv::SIDE);
         let (rows, at) = (w.mobys[id].rows, w.mobys[id].pos);
         for k in 0..3 {
-            let p = add(in_frame(rows, SPAWNS[side as usize * 3 + k]), at);
+            let p = add(through(&rows, SPAWNS[side as usize * 3 + k]), at);
             let Some(f) = space::activate_one(w, FIGHTER, ctx) else { continue };
             let fwd = scale(rows[1], if side != 0 { -1.0 } else { 1.0 });
             let left = unit(cross(fwd, [0.0, 0.0, 1.0]));
@@ -341,7 +332,7 @@ fn turrets(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 fn piece_off(w: &mut MobyWorld, id: usize, ctx: &Ctx, k: i32) {
     let Some(centre) = w.class(CLASS).and_then(|c| c.pieces.get(k as usize).cloned().flatten()).map(|(c, _)| c) else { return };
     let (pos, rows, sc) = (w.mobys[id].pos, w.mobys[id].rows, w.mobys[id].scale);
-    let at = add(in_frame(rows, scale(centre, sc)), pos);
+    let at = add(through(&rows, scale(centre, sc)), pos);
     let p = w.create(CLASS);
     let m = &mut w.mobys[p];
     m.update_dist = 0xff;

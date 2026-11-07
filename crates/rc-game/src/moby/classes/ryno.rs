@@ -97,7 +97,7 @@ use crate::collision::QueryFlags;
 use crate::hero::items::{row, ItemRow, MINIROCKET};
 use crate::hero::physics::{add, add_rot, cross, dist, len, scale, set_len, sub, unit, V3};
 use crate::moby::hits::HitTemplate;
-use crate::moby::{aim, countdown, lock_on, Ctx, MobyWorld};
+use crate::moby::{aim, countdown, lock_on, stop_loop, Ctx, MobyWorld};
 use crate::rumble;
 use crate::point_lights::PointLight;
 
@@ -204,14 +204,6 @@ fn way(w: &MobyWorld, id: usize, ctx: &Ctx) -> V3 { if ctx.hero.items.raised { s
 fn cooldown(w: &mut MobyWorld, id: usize) {
     let c = w.mobys[id].pv_f(hv::COOL);
     w.mobys[id].set_pv_f(hv::COOL, if SIXTIETH < c { c - SIXTIETH } else { 0.0 });
-}
-
-/// `0x2eeae0` on the s16 at `off`: true when it was 0 or just reached it.
-fn count_s(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut n = w.mobys[id].pv_s(off) as i32;
-    let done = countdown(&mut n);
-    w.mobys[id].set_pv_s(off, n as i16);
-    done
 }
 
 /// The muzzle light let go (`0x2fdc48`) and its ticks cleared.
@@ -357,7 +349,7 @@ fn light(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     } else if 0 <= s {
         w.point_lights.set(s as usize, l);
     }
-    count_s(w, id, hv::TICKS);
+    w.mobys[id].count_s(hv::TICKS);
 }
 
 /// `0x3ca920` (module docs).
@@ -500,13 +492,6 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, muzzle: V3, aimh: f3
 /// `0x40c7c0`: the exhaust point, `$gp+0x1f8c` along row 0.
 fn exhaust_point(m: &crate::moby::Moby) -> V3 { add(m.pos, scale(m.rows[0], EXHAUST)) }
 
-/// The loop sound let go (`0x3602f0`).
-fn stop_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let s = w.mobys[id].pv_i(pv::SOUND);
-    if s != -1 && ctx.host.sound_playing(s) { ctx.host.stop_sound(s); }
-    w.mobys[id].set_pv_i(pv::SOUND, -1);
-}
-
 /// `0x40b9b0` (module docs).
 pub fn update_missile(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].pvars.resize(crate::moby::PVAR_BYTES, 0);
@@ -591,7 +576,7 @@ pub fn update_missile(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
     }
     if w.mobys[id].timer != 0 {
-        stop_sound(w, id, ctx);
+        stop_loop(w, id, ctx, pv::SOUND);
         ctx.host.play_sound(&w.mobys[id], 0, 0);
         // At the collision's last hit (`0x1bf1a0`): this tick's line's or the ground's; a missile the make's line
         // already blew up whose tick met nothing stays where that line left it.
@@ -610,8 +595,8 @@ pub fn update_missile(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         w.delete(id);
         return;
     }
-    if count_s(w, id, pv::LIFE) || 60.0 < dist(w.mobys[id].pos, ctx.hero.pos) {
-        stop_sound(w, id, ctx);
+    if w.mobys[id].count_s(pv::LIFE) || 60.0 < dist(w.mobys[id].pos, ctx.hero.pos) {
+        stop_loop(w, id, ctx, pv::SOUND);
         crate::gravity::untrack(w, w.mobys[id].pv_i(pv::TRACKER));
         w.delete(id);
     }

@@ -86,7 +86,7 @@
 //! of the table `0x2bd9b0`, their waves) and its three draws (`0x301f28(0x43ff80)`, `(0x43fe28)`, `(0x43fea0)`),
 //! which are a render path of their own.
 
-use crate::hero::physics::{add, add_rot, dot, set_len, sub, V3};
+use crate::hero::physics::{add, add_rot, dot, set_len, sub, wrap_turn, V3};
 use crate::moby::blast::{self, Blast};
 use crate::moby::{shards, Ctx, MobyWorld};
 
@@ -597,7 +597,7 @@ pub fn update_0f06(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let m = &mut w.mobys[id];
             let amp = m.pv_f(0x28);
             if 0.1 <= amp {
-                let a = wrap(m.state_ticks as u16 as f32 * std::f32::consts::TAU / m.pv_f(0x24));
+                let a = wrap_turn(m.state_ticks as u16 as f32 * std::f32::consts::TAU / m.pv_f(0x24));
                 m.rot[0] = amp * a.sin();
                 m.rot[1] = amp * a.cos();
                 m.set_pv_f(0x28, amp * NEST_DECAY);
@@ -611,10 +611,4 @@ pub fn update_0f06(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     let m = &mut w.mobys[id];
     if (m.state_ticks as u16) <= 0xfffe { m.state_ticks = m.state_ticks.wrapping_add(1); }
-}
-
-/// `0x2efef0` (L18 `0x30a6e0`): `a` wrapped to [−π, π) by its fraction of a turn.
-fn wrap(a: f32) -> f32 {
-    let f = a * 0.159_154_94 + 0.5;
-    ((f - f.floor()) - 0.5) * std::f32::consts::TAU
 }

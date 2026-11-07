@@ -42,7 +42,7 @@
 //! screen test uses the game's 512×448 screen and view tangents (0.63, 0.63·0.775) for `0x2e7c70`'s projection.
 
 use crate::hero::physics::{add, add_rot, atan2, cross, dist, dot, len, scale, set_len, sub, unit, V3};
-use crate::moby::{countdown, Ctx, MobyWorld};
+use crate::moby::{Ctx, MobyWorld};
 use crate::particles::{self, rec};
 
 pub const CLASS: i16 = 0x0d4e;
@@ -253,25 +253,17 @@ pub fn blasts(w: &mut MobyWorld, ctx: &mut Ctx, id: usize) {
     }
 }
 
-/// `0x2f29c8` on a short pvar: one down; true when it was or reaches 0.
-fn count_s(m: &mut crate::moby::Moby, o: usize) -> bool {
-    let mut t = m.pv_s(o) as i32;
-    let done = countdown(&mut t);
-    m.set_pv_s(o, t as i16);
-    done
-}
-
 /// `0x4255e8` (module docs).
 pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let level = ctx.game.fog;
     ctx.game.fog_flash.tick(&level);
     let m = &mut w.mobys[id];
     for (k, t) in turns().iter().enumerate() { m.set_pv_f(4 * k, add_rot(m.pv_f(4 * k), *t)); }
-    count_s(m, B);
-    count_s(m, SCREEN_FLASH);
+    m.count_s(B);
+    m.count_s(SCREEN_FLASH);
     let s = m.pv_i(SHIMMER);
     if 0 < s { m.set_pv_i(SHIMMER, s - 1); }
-    let a_done = count_s(m, A);
+    let a_done = m.count_s(A);
     let b = m.pv_s(B) as i32;
     if a_done && b == 0 {
         if ctx.game.fog_flash.timer == 0 { w.delete(id); }
@@ -428,7 +420,7 @@ pub fn draw(w: &mut MobyWorld, id: usize, cam: V3, cam_rows: [V3; 3], out: &mut 
     disc(out, 0x39, fwd, across, over, ang[4], s, at, c);
     disc(out, 0x39, fwd, across, over, ang[5], s * 0.75, at, c);
     disc(out, 0x38, fwd, across, over, ang[1], s * 1.5, at, fifth(full & 0xff));
-    if !count_s(m, GLARE) {
+    if !m.count_s(GLARE) {
         let k = m.pv_s(GLARE) as f32 * m.pv_f(INV_GLARE);
         glare(out, pos, u, cam, cam_rows, (64.0 * k) as i32 as u32);
     }

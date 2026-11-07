@@ -16,7 +16,7 @@
 //!   (`$gp+0x1378`) by its change (2 s, `$gp+0x1374`; `+0xa0` / `+0xa4`) and sways 0.03 (`$gp+0x137c`; 5 s, 6 s;
 //!   `+0xa8` / `+0xac`).
 //!   * **0**: its home `+0x90` is where it is; 1.
-//!   * **1**: Ratchet on it ([`hero_on`], `0x327488`): 2, the shake timer `+0xb0` 2 s (`$gp+0x1388`).
+//!   * **1**: Ratchet on it (crate::moby::ai::stands_on, `0x327488`): 2, the shake timer `+0xb0` 2 s (`$gp+0x1388`).
 //!   * **2** the shake: its sound 0 on its first tick and at 60 left; its pitch and roll wobble (sin / cos of the time
 //!     left × 0.75 / 0.89, wrapped, as degrees), eased in from the sway while the fall timer `+0xb4` (from the last
 //!     fall) is over 2 s less 30 ticks; at the end the fall timer 1 s (`$gp+0x138c`) and 3.
@@ -27,9 +27,9 @@
 //!
 //!   Below 3 its move into its platform block `+0x50` (crate::moby::platform, `0x324660` = L00 `0x322668`).
 
-use crate::hero::physics::{add_rot, dist2, sub};
+use crate::hero::physics::{add_rot, dist2, sub, wrap, wrap_turn};
 use crate::moby::classes::props::{bob, sway};
-use crate::moby::{blast, bolts, countdown, platform, shards, Ctx, MobyWorld};
+use crate::moby::{blast, bolts, platform, shards, Ctx, MobyWorld};
 
 pub const BUOY: i16 = 0x08af;
 pub const TIPPER: i16 = 0x0937;
@@ -37,28 +37,6 @@ pub const TIPPER: i16 = 0x0937;
 /// °/s as radians a tick.
 const DEG_S: f32 = 0.000_290_888_25;
 const HALF_PI: f32 = std::f32::consts::FRAC_PI_2;
-/// `0x2f04e8` (L00 `0x2efef0`): `a` wrapped to [−π, π) by its fraction of a turn.
-fn wrap(a: f32) -> f32 {
-    let f = a * 0.159_154_94 + 0.5;
-    ((f - f.floor()) - 0.5) * std::f32::consts::TAU
-}
-/// `0x3220a0` (L00 `0x320440`): `a` wrapped into −π..π (modf, the fraction keeping the sign).
-fn wrap_f(a: f32) -> f32 { ((a + std::f32::consts::PI) * 0.159_154_94).fract() * 6.283_185_5 - std::f32::consts::PI }
-
-fn tick_i(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut t = w.mobys[id].pv_i(off);
-    let out = countdown(&mut t);
-    w.mobys[id].set_pv_i(off, t);
-    out
-}
-
-/// `0x327488` (L00 `0x325398`): Ratchet stands on moby `id` — hanging or climbing (group 3 or state 0x1b) from its
-/// ledge (`0x18a3a8`), else on the ground (`0x18a16e` 0) on it (`0x18a15c`).
-pub fn hero_on(ctx: &Ctx, id: usize) -> bool {
-    let h = &*ctx.hero;
-    if h.group == 3 || h.state == 0x1b { return h.ledge.moby == Some(id); }
-    h.air_ticks == 0 && h.ground_moby == Some(id)
-}
 
 /// The offsets of a rise-and-fall motion's words.
 pub struct Motion {
@@ -105,7 +83,7 @@ pub fn rise_fall(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, k: &Motion) {
     let wave = |t: f32| base + rise * (t * f32::from_bits(0x4049_0fdc)).cos() * 0.5 + rise * 0.5;
     match s {
         1 => {
-            if tick_i(w, id, k.timer) {
+            if w.mobys[id].count_i(k.timer) {
                 let m = &mut w.mobys[id];
                 m.set_pv_i(k.timer, (m.pv_f(k.rise_t) * 60.0) as i32);
                 m.set_pv_i(k.state, 2);
@@ -113,7 +91,7 @@ pub fn rise_fall(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, k: &Motion) {
             w.mobys[id].pos[2] = base;
         }
         2 => {
-            if tick_i(w, id, k.timer) {
+            if w.mobys[id].count_i(k.timer) {
                 w.mobys[id].pos[2] = base + rise;
                 w.mobys[id].set_pv_i(k.state, 3);
                 let t = wait(&w.mobys[id], ctx, k);
@@ -125,7 +103,7 @@ pub fn rise_fall(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, k: &Motion) {
             }
         }
         3 => {
-            if tick_i(w, id, k.timer) {
+            if w.mobys[id].count_i(k.timer) {
                 let m = &mut w.mobys[id];
                 m.set_pv_i(k.timer, (m.pv_f(k.fall_t) * 60.0) as i32);
                 m.set_pv_i(k.state, 4);
@@ -133,7 +111,7 @@ pub fn rise_fall(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, k: &Motion) {
             w.mobys[id].pos[2] = base + rise;
         }
         4 => {
-            if tick_i(w, id, k.timer) {
+            if w.mobys[id].count_i(k.timer) {
                 w.mobys[id].pos[2] = base;
                 w.mobys[id].set_pv_i(k.state, 1);
                 let t = wait(&w.mobys[id], ctx, k);
@@ -232,7 +210,7 @@ pub fn update_0937(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.set_pv_v(0x90, old);
             m.state = 1;
         }
-        1 => if hero_on(ctx, id) {
+        1 => if crate::moby::ai::stands_on(ctx, id) {
             let m = &mut w.mobys[id];
             m.set_state(2, -1);
             m.set_pv_i(0xb0, (SHAKE * 60.0) as i32);
@@ -240,7 +218,7 @@ pub fn update_0937(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         2 => {
             if w.mobys[id].first() { ctx.host.play_sound(&w.mobys[id], 0, 0); }
             if w.mobys[id].pv_i(0xb0) == 60 { ctx.host.play_sound(&w.mobys[id], 0, 0); }
-            if tick_i(w, id, 0xb0) {
+            if w.mobys[id].count_i(0xb0) {
                 let m = &mut w.mobys[id];
                 m.set_pv_i(0xb4, (FALL * 60.0) as i32);
                 m.state = 3;
@@ -248,8 +226,8 @@ pub fn update_0937(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 let m = &mut w.mobys[id];
                 let b0 = m.pv_i(0xb0) as f32;
                 let deg = f32::from_bits(0x3c8e_fa36);
-                let r0 = wrap_f(b0 * 0.75).sin() * deg;
-                let r1 = wrap_f(b0 * f32::from_bits(0x3f63_d70a)).cos() * deg;
+                let r0 = wrap(b0 * 0.75).sin() * deg;
+                let r1 = wrap(b0 * f32::from_bits(0x3f63_d70a)).cos() * deg;
                 let span = SHAKE * 60.0 - 30.0;
                 if span < m.pv_i(0xb4) as f32 {
                     let t = b0 / span;
@@ -267,7 +245,7 @@ pub fn update_0937(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.rot[1] = 0.0;
             m.rot[0] = (1.0 - t) * HALF_PI;
             tip(w, id, (1.0 - t) * REACH, t);
-            if tick_i(w, id, 0xb4) {
+            if w.mobys[id].count_i(0xb4) {
                 let m = &mut w.mobys[id];
                 m.state = 4;
                 m.set_pv_i(0xb8, (RISE * 60.0) as i32);
@@ -278,10 +256,10 @@ pub fn update_0937(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let t = m.pv_i(0xb8) as f32 / (RISE * 60.0);
             let rot = m.rot;
             let c = 1.0 - t;
-            m.rot[0] = wrap((rot[0] * c + c * f32::from_bits(0x4096_cbe4)) + HALF_PI);
+            m.rot[0] = wrap_turn((rot[0] * c + c * f32::from_bits(0x4096_cbe4)) + HALF_PI);
             m.rot[1] = rot[1] * c;
             tip(w, id, (1.0 - c) * REACH, c);
-            if tick_i(w, id, 0xb8) {
+            if w.mobys[id].count_i(0xb8) {
                 let m = &mut w.mobys[id];
                 m.state = 1;
                 m.rot = rot;

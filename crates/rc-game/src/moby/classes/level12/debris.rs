@@ -7,7 +7,7 @@
 //!
 //! Not ported: the smoke `0x324d88(0.3, 10, m, at, −1)` a piece with its flag 2 goes off in (no spawn here sets it).
 
-use crate::hero::physics::{add, cross, dot, euler_rows, len, scale, set_len, sub, V3};
+use crate::hero::physics::{add, cross, dot, euler_rows, len, scale, set_len, sub, through, V3};
 use crate::moby::{countdown, Ctx, MobyWorld};
 
 /// The piece's pvars: `+0x00` its velocity, `+0x10` its spin (Euler a tick), `+0x20` its sphere (centre in its frame,
@@ -18,8 +18,6 @@ const SPHERE: usize = 0x20;
 const LIFE: usize = 0x30;
 const FLAGS: usize = 0x34;
 const GRAVITY: usize = 0x38;
-
-fn local(rows: &[V3; 3], v: V3) -> V3 { add(add(scale(rows[0], v[0]), scale(rows[1], v[1])), scale(rows[2], v[2])) }
 
 /// `0x32ad40(gravity, src, class, pos, rot, life, flags, vel, spin, sphere)`: a piece of `class` at `pos` with the
 /// angles `rot`, its scale `src`'s scaled by the classes' (`+0x24` of each), drawn, rows kept, state 1, its colour words
@@ -91,7 +89,7 @@ pub fn update_0d66(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         0 => fly(w, id, ctx),
         2 => {
             let m = &w.mobys[id];
-            let at = add(local(&m.rows, m.pv_v(SPHERE)), m.pos);
+            let at = add(through(&m.rows, m.pv_v(SPHERE)), m.pos);
             if (m.pv_f(FLAGS) as i32) & 2 == 0 {
                 let e = crate::moby::blast::Explosion {
                     flash: 1.0, flash2: 0.5, near: 9.0, size: f32::from_bits(0x3eaa_7efa), embers: 5, billows: 3, flares: 5,
@@ -122,15 +120,15 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &mut w.mobys[id];
     let c = m.pv_v(SPHERE);
     let turn = euler_rows(m.pv_v(SPIN));
-    let a = local(&m.rows, c);
-    m.rows = m.rows.map(|r| local(&turn, r));
+    let a = through(&m.rows, c);
+    m.rows = m.rows.map(|r| through(&turn, r));
     m.rot = crate::moby::attach::angles_of(&m.rows);
-    let b = local(&m.rows, c);
+    let b = through(&m.rows, c);
     let mut v = m.pv_v(VEL);
     m.pos = add(sub(m.pos, sub(b, a)), v);
     v[2] -= m.pv_f(GRAVITY);
     m.set_pv_v(VEL, v);
-    let at = add(local(&m.rows, c), m.pos);
+    let at = add(through(&m.rows, c), m.pos);
     let r = m.pv_f(SPHERE + 0xc);
     let Some(coll) = ctx.coll else { return };
     let Some(o) = crate::collision::coll_sphere_m(coll, ctx.scene, at, r, crate::collision::QueryFlags(0), Some(id)) else { return };

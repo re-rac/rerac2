@@ -42,7 +42,7 @@
 //! = the decomp's `func_L06_0036F728`, crate::moby::talk::set_word, as crate::moby::classes::ferry).
 //!
 //! Not ported: the debug lines of its first route's paths (`$gp+0x1300` 0); with Ratchet on it in 5
-//! and 10 (`0x3c73a8`, crate::moby::classes::level17::floaters::hero_on) the hero words `0x18a032` / `0x18a034` (4
+//! and 10 (`0x3c73a8`, crate::moby::ai::stands_on) the hero words `0x18a032` / `0x18a034` (4
 //! each) and in 5 its camera path (`0x3c7400`: the path `+0x128` of 7 points rebuilt from the table `0x297070`
 //! through its frame, its index into `0x18c31e`), as crate::moby::classes::level17::lifts; the class sound table's
 //! test (`0x1dbf82` ≠ 0xff) before a loop sound starts; the animation word `+0x98` (the class's first, or none
@@ -50,7 +50,7 @@
 
 use crate::hero::physics::{add, approach, atan2, dist, dist2, len, len2, set_len, sub, turn_ease, V3};
 use crate::moby::classes::props::{bob, sway};
-use crate::moby::{Ctx, MobyWorld};
+use crate::moby::{stop_loop, Ctx, MobyWorld};
 
 pub const CLASS: i16 = 0x0922;
 
@@ -117,13 +117,6 @@ fn place(w: &mut MobyWorld, id: usize, p: &[[f32; 4]]) {
     m.rot[2] = atan2(q[0] - m.pos[0], q[1] - m.pos[1]);
 }
 
-/// Its loop sound stopped (when playing) and none.
-fn stop_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let h = w.mobys[id].pv_i(SOUND);
-    if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
-    w.mobys[id].set_pv_i(SOUND, -1);
-}
-
 /// Its loop sound `index` started when its handle is not playing.
 fn keep_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, index: i32) {
     if ctx.host.sound_playing(w.mobys[id].pv_i(SOUND)) { return; }
@@ -178,7 +171,7 @@ fn follow_dir(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, k: i32, back: bool) -
     turn_ease(roll, ROLL_ACCEL * DEG2, ROLL_ACCEL * DEG2, TILT_MAX, &mut a, &mut av, 0);
     m.rot[0] = a;
     m.set_pv_f(ROLL_V, av);
-    if done { stop_sound(w, id, ctx) } else { keep_sound(w, id, ctx, 0) }
+    if done { stop_loop(w, id, ctx, SOUND) } else { keep_sound(w, id, ctx, 0) }
     done
 }
 
@@ -296,7 +289,7 @@ pub fn update_0922(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         4 => {
             w.mobys[id].state = 5;
-            stop_sound(w, id, ctx);
+            stop_loop(w, id, ctx, SOUND);
         }
         5 => {
             let mp = w.mobys[id].pv_i(MIDDLE + 4 * route);
@@ -335,7 +328,7 @@ pub fn update_0922(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         9 => {
             w.mobys[id].state = 10;
-            stop_sound(w, id, ctx);
+            stop_loop(w, id, ctx, SOUND);
         }
         10 => {
             let mp = w.mobys[id].pv_i(MIDDLE + 4 * route);

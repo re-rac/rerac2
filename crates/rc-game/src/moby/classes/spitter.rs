@@ -30,8 +30,8 @@
 //! `0x3dd030`), the spray's particles. Its death's fade: crate::moby::classes::death_fade (`0x3eb1d0`).
 
 use crate::hero::physics::*;
-use crate::moby::{ai, countdown, Ctx, MobyWorld};
-use super::leaper::{cuboid_at, play, seq_a, seq_b, tick_down, tilt_to_floor, wander};
+use crate::moby::{ai, Ctx, MobyWorld};
+use super::leaper::{cuboid_at, play, seq_a, seq_b, tilt_to_floor, wander};
 use super::props::wrapped;
 
 /// The class.
@@ -45,15 +45,6 @@ const T_FOUND: usize = 0x2f4;
 /// The target moby and its place.
 fn target(w: &MobyWorld, id: usize) -> Option<(usize, V3)> {
     ai::link(&w.mobys[id], T_MOBY).and_then(|t| w.mobys.get(t).map(|m| (t, m.pos)))
-}
-
-/// A 16-bit countdown on a pvar word (`0x2e3e18`).
-fn tick_down16(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let m = &mut w.mobys[id];
-    let mut t = m.pv_s(off) as i32;
-    let r = countdown(&mut t);
-    m.set_pv_s(off, t as i16);
-    r
 }
 
 /// `0x3ddce0`: its group's spitters are alarmed (`+0x3da`).
@@ -291,9 +282,9 @@ fn tail(w: &mut MobyWorld, id: usize) {
     let m = &mut w.mobys[id];
     ai::flash(m, 0x100);
     if m.state_ticks != -1 { m.state_ticks = m.state_ticks.wrapping_add(1); }
-    tick_down16(w, id, 0x3d8);
-    tick_down(w, id, 0x404);
-    tick_down16(w, id, 0x3d6);
+    w.mobys[id].count_s(0x3d8);
+    w.mobys[id].count_i(0x404);
+    w.mobys[id].count_s(0x3d6);
     let m = &mut w.mobys[id];
     if m.pv_s(0x3da) != 0 {
         m.set_pv_s(0x3da, 0);
@@ -434,7 +425,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 fn waiting(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let under = w.mobys[id].pv_b(0x3d0) != 0;
     if under { hide(w, id, true); }
-    if w.mobys[id].pv_i(T_FOUND) != 1 || !tick_down16(w, id, 0x3d4) { return; }
+    if w.mobys[id].pv_i(T_FOUND) != 1 || !w.mobys[id].count_s(0x3d4) { return; }
     if !under {
         let m = &mut w.mobys[id];
         if m.pv_i(0x41c) != -1 { m.set_pv_i(0x3f8, m.pv_i(0x41c)); }

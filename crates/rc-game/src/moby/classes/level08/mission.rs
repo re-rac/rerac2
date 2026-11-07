@@ -33,7 +33,7 @@
 //!   ported).
 //! * **1**: out of a scene (`0x3800c0`, crate::scene::Scenes::in_scene) and 6 ticks in: flag `0x1c` + 0x19 = 1;
 //!   scene 0x55 queued — when it goes in: started, the checkpoint's chunk 0, the cut in, `0x1b2514` = 1, the fade
-//!   1.2 (`0x1b2420`), the parked ship hidden ([`hide_ship`]), chunk 0; 2.
+//!   1.2 (`0x1b2420`), the parked ship and its parts hidden (crate::travel::show_ship), chunk 0; 2.
 //! * **2**: out of a scene and 6 ticks in: flag 0x1a = 1, the autosave (`0x319bc8(0, −1)`,
 //!   crate::game::GameState::autosave); 3.
 //! * **3**: Ratchet in the area `+0x00` (`0x339420`): scene 0x56 queued — when it goes in, started; 4.
@@ -48,7 +48,7 @@
 //!
 //! Not ported: the checkpoint's chunk word (`0x21f788` = the checkpoint record `0x21eb20 + 0xc68`, which the
 //! checkpoint restore `0x3682a0` switches back to: the port's checkpoint keeps no chunk), the ship byte `0x152c26`
-//! (`0x376b00`), `0x1b2514`, the list `0x221b10` [`hide_ship`] walks after the ship, the wrench's model
+//! (`0x376b00`), `0x1b2514`, the wrench's model
 //! (`0x30b480`), the HUD call `0x300e40(round(−65·0x1b3244), 2)` on the hovership, the sun's flare (`0x3f8bf0` /
 //! the draw callback `0x3f8f78` in chunk 1, the colours `0x3f8cf0`).
 
@@ -136,13 +136,6 @@ fn sun(w: &mut MobyWorld, id: usize) {
     for (k, v) in [7_000_000.0f32, 5_500_000.0, 9_000_000.0, 1.0].into_iter().enumerate() { m.set_pv_f(pv::SUN + 4 * k, v); }
 }
 
-/// `0x370240`: the parked ship (`0x152c00`) hidden (mode | 3) with no collision (`+0x98` 0).
-fn hide_ship(w: &mut MobyWorld, ctx: &mut Ctx) {
-    let Some(s) = ctx.game.travel.ship.filter(|&s| s < w.mobys.len()) else { return };
-    w.mobys[s].mode |= 3;
-    w.mobys[s].has_collision = false;
-}
-
 /// The spot `k` done (module docs, state 0).
 fn spot_done(w: &MobyWorld, ctx: &Ctx, k: usize) -> bool {
     let p = &w.mobys[k];
@@ -218,7 +211,7 @@ pub fn update_0c2a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 if play(ctx, &[0x55]) {
                     crate::moby::talk::cut_in(ctx.game);
                     ctx.game.scenes.fade = 1.2;
-                    hide_ship(w, ctx);
+                    crate::travel::show_ship(w, ctx, false);
                     ctx.switch_chunk(0, 0);
                     w.mobys[id].set_state(2, -1);
                 }

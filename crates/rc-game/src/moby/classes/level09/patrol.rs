@@ -479,8 +479,8 @@ fn chase(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let m = &w.mobys[id];
         let previous = m.pv_v(LIGHT);
         let phase = ctx.game.frame as f32 + (m.uid as i32 * 36) as f32;
-        let a1 = crate::fx::beams::wrap(phase * 0.025);
-        let a2 = crate::fx::beams::wrap(phase * 0.016_666_668);
+        let a1 = crate::hero::physics::wrap(phase * 0.025);
+        let a2 = crate::hero::physics::wrap(phase * 0.016_666_668);
         let s1 = a1.sin() + 1.5;
         let s2 = a2.sin() + 1.5;
         a[0] += a2.sin();
@@ -560,7 +560,7 @@ fn shot_down(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let a = set_len(a, l);
     let _b = cross(down, a);
     let turn = ctx.game.rng.randf_signed(0.698_131_8, 1.221_730_6);
-    let v = crate::moby::classes::gravity_bomb::rotate(a, turn, down);
+    let v = crate::camera::rot(a, turn, down);
     let up = ctx.game.rng.randf(0.1, 0.2);
     let m = &mut w.mobys[id];
     m.set_pv_v(FALL_VEL, v);

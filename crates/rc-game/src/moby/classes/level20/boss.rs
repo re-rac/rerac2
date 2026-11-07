@@ -78,7 +78,7 @@
 //! debug switches `$gp+0x3084..+0x30ac` (all 0). A prey is any moby here (the original asks for one of the level's).
 
 use super::{biter, fighter, shooter};
-use crate::hero::physics::{add, add_rot, approach, approach_angle, atan2, dist2, euler_rows, rot_dist, scale, sub, sub_rot, V3};
+use crate::hero::physics::{add, add_rot, approach, approach_angle, atan2, dist2, euler_rows, rot_dist, scale, sub, sub_rot, through, V3};
 use crate::moby::classes::props::{set_seq, wrapped};
 use crate::moby::{ai, bolts, countdown, mode, Ctx, Moby, MobyWorld};
 
@@ -182,7 +182,6 @@ const WALK: (f32, f32, f32, f32) = (10.0, 30.0, 720.0, 720.0);
 const ATTACKS: [(i32, i32); 4] = [(1, 7), (2, 10), (4, 9), (8, 8)];
 const STAGE_BITS: [i32; 3] = [1, 6, 15];
 
-fn through(r: &[V3; 3], v: V3) -> V3 { std::array::from_fn(|k| v[0] * r[0][k] + v[1] * r[1][k] + v[2] * r[2][k]) }
 fn seqs(w: &MobyWorld, id: usize, ctx: &Ctx) -> (u8, u8) { ctx.host.anim(&w.mobys[id]).map_or((0xff, 0xff), |a| (a.seq_a, a.seq_b)) }
 fn settled(w: &MobyWorld, id: usize, ctx: &Ctx) -> bool { let (a, b) = seqs(w, id, ctx); a == b }
 fn yaw_to(w: &MobyWorld, id: usize, p: V3) -> f32 { let q = w.mobys[id].pos; atan2(p[0] - q[0], p[1] - q[1]) }
@@ -210,17 +209,7 @@ fn by_attempts(w: &MobyWorld, a: i32, b: i32, f0: f32, f1: f32) -> f32 {
     f0 + (f1 - f0) * ((n - a as f32) / (b - a) as f32)
 }
 
-/// `0x342dd0` (L01 `0x323560`): the facing eased toward `yaw` at the movement block's turn limits.
-fn face(w: &mut MobyWorld, id: usize, yaw: f32) {
-    let m = &mut w.mobys[id];
-    let (a, b, most) = (m.pv_f(MV + 0x14), m.pv_f(MV + 0x18), m.pv_f(MV + 0x1c));
-    let (mut r, mut v) = (m.rot[2], m.pv_f(MV + 0xb4));
-    crate::hero::physics::turn_ease(yaw, a, b, most, &mut r, &mut v, 0);
-    m.rot[2] = r;
-    m.set_pv_f(MV + 0xb4, v);
-}
-
-fn face_hero(w: &mut MobyWorld, id: usize, ctx: &Ctx) { let y = yaw_to(w, id, ctx.hero.pos); face(w, id, y); }
+fn face_hero(w: &mut MobyWorld, id: usize, ctx: &Ctx) { let y = yaw_to(w, id, ctx.hero.pos); crate::moby::ai::face_at(&mut w.mobys[id], MV, y); }
 
 /// Facing Ratchet to within 5°.
 fn facing_hero(w: &MobyWorld, id: usize, ctx: &Ctx) -> bool { rot_dist(w.mobys[id].rot[2], yaw_to(w, id, ctx.hero.pos)) < DEG5 }
@@ -250,7 +239,7 @@ fn walk(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3, yaw: f32) {
 /// flags 0x10000); kept inside its fence path — true once it meets it.
 fn roll(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     let yh = yaw_to(w, id, ctx.hero.pos);
-    if rot_dist(w.mobys[id].rot[2], yh) < std::f32::consts::FRAC_PI_2 { face(w, id, yh); }
+    if rot_dist(w.mobys[id].rot[2], yh) < std::f32::consts::FRAC_PI_2 { crate::moby::ai::face_at(&mut w.mobys[id], MV, yh); }
     let hm = ctx.hero_moby.filter(|&h| h < w.mobys.len());
     let hc = hm.map(|h| w.mobys[h].has_collision);
     if let Some(h) = hm { w.mobys[h].has_collision = false; }
@@ -781,7 +770,7 @@ pub fn update_11e0(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 match prey {
                     Some(p) => {
                         let y = yaw_to(w, id, w.mobys[p].pos);
-                        face(w, id, y);
+                        crate::moby::ai::face_at(&mut w.mobys[id], MV, y);
                         if !prey_ok(w, id, ctx, p) { w.mobys[id].set_state(1, -1); }
                     }
                     None => w.mobys[id].set_state(1, -1),

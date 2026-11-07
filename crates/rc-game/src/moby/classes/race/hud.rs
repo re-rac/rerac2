@@ -48,10 +48,11 @@
 //! voice (the dialogue player `0x1a63cc` / `0x1a641a`, `0x351998`: the voice `+0x760` + 3000), the GS test register
 //! the draws set (`0x3a0390(0x47, 0x5360b)`), the wide screen's 0.9 and its light places (`0x1a7b98`), the PAL sizes.
 
-use crate::hero::physics::{approach, atan2, dot, ease, sub, sub_rot, turn_ease, V3};
+use crate::hero::physics::{approach, atan2, dot, ease, sub, sub_rot, turn_ease};
 use crate::hud::{lerp_rgba, text_of, Align, Draw, ScreenDraw, ScreenIn};
 use crate::moby::MobyWorld;
 use std::f32::consts::FRAC_PI_2;
+use crate::gravity::to_local;
 
 /// The HUD icon of the race's weapons (frames 0..2: shots, missiles, mines).
 pub const WEAPON_ICON: u16 = 0x7568;
@@ -144,9 +145,6 @@ fn turned(a: f32) -> [[f32; 2]; 2] {
     [[c, -s], [s, c]]
 }
 
-/// `v` in the race's frame (`0x2ef340` through its rows' transpose).
-fn local(rows: &[V3; 3], v: V3) -> V3 { [dot(v, rows[0]), dot(v, rows[1]), dot(v, rows[2])] }
-
 /// `0x4188b8` (module docs).
 pub fn draw(w: &mut MobyWorld, id: usize, inp: &ScreenIn, out: &mut Vec<ScreenDraw>) -> bool {
     if w.mobys.get(id).is_none_or(|m| m.pvars.len() < 0x770) { return true; }
@@ -221,7 +219,7 @@ fn strip(w: &mut MobyWorld, id: usize, level: i32, out: &mut Vec<ScreenDraw>) {
     let rows = frame.rows;
     let b = &w.mobys[id];
     let v = crate::hero::physics::scale(b.rows[0], b.pv_f(0x30c) + b.pv_f(0x27c));
-    let mut l = local(&rows, v);
+    let mut l = to_local(v, &rows);
     let s = dot(l, rows[0]);
     l = crate::hero::physics::add(l, crate::hero::physics::scale(rows[0], s));
     let words = &mut w.race.hud;
@@ -247,7 +245,7 @@ fn strip(w: &mut MobyWorld, id: usize, level: i32, out: &mut Vec<ScreenDraw>) {
         i = next;
         if 9 <= i { break; }
     }
-    let ll = local(&rows, sub(w.mobys[id].pos, frame.origin));
+    let ll = to_local(sub(w.mobys[id].pos, frame.origin), &rows);
     let bike_y = ((ll[1] * 0.2).clamp(-1.0, 1.0) * 13.0) as i32 + 0x24;
     let way = atan2(rows[0][0], rows[0][1]);
     let sub_state = w.mobys[id].timer;
@@ -256,7 +254,7 @@ fn strip(w: &mut MobyWorld, id: usize, level: i32, out: &mut Vec<ScreenDraw>) {
         let Some(r) = usize::try_from(w.mobys[id].pv_i(0x1e4 + 4 * k)).ok().filter(|&r| r < w.mobys.len()) else { continue };
         if !(w.mobys[r].state == 2 || sub_state == 1 || sub_state == 3) { continue; }
         if w.mobys[r].pvars.len() < 0x2e4 { w.mobys[r].pvars.resize(0x2e4, 0); }
-        let rl = local(&rows, sub(w.mobys[r].pos, frame.origin));
+        let rl = to_local(sub(w.mobys[r].pos, frame.origin), &rows);
         let x = (rl[0] + rl[0]) as i32 + 0x183;
         let y4 = (rl[1] * 4.0) as i32;
         let y = y4 + 0x24;

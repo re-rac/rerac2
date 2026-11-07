@@ -56,6 +56,7 @@ pub mod hoverbomb;
 pub mod hypnomatic;
 pub mod keeper;
 pub mod lancer;
+pub mod heavy_shot;
 pub mod lava_gun;
 pub mod meteor;
 pub mod pulse_rifle;
@@ -83,6 +84,7 @@ pub mod swimmer;
 pub mod swingshot;
 pub mod synthenoid;
 pub mod teleport;
+pub mod trooper;
 pub mod thermanator;
 pub mod tie_lights;
 pub mod telepad;
@@ -158,6 +160,11 @@ pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS, e
 pub fn update_for(o_class: i16) -> Option<UpdateFn> {
     match o_class {
         0x47 => Some(wrench::update),
+        // The trooper family (crate::moby::classes::trooper): Dobbo's and Yeedil's trooper (L09 `0x3fb510` = L20
+        // `0x420938`) and the turrets' own update `func_L09_003F7158` — 0x0d0e (L09, L20), 0x114b (L12; in L22's and
+        // L23's class tables too) and L18's stalker body 0x0f0b.
+        trooper::CLASS => Some(trooper::update_0d0f),
+        trooper::TURRET_CLASS | level12::trooper::TURRET_CLASS | level18::stalker::BODY => Some(trooper::update_turret),
         // The floor button (L00 `0x3b8de0`; placed on levels 6, 13 and 17).
         button::CLASS => Some(button::update_08a1),
         // The strand curtains (L06 `0x401b40` / `0x3e7268`; placed on levels 6, 13 and 17).
@@ -252,6 +259,8 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         swingshot::HAND_CLASS => Some(swingshot::update),
         swingshot::HOOK_CLASS => Some(swingshot::update_hook),
         0xbfe => Some(shot::update),
+        // The Heavy Lancer's shot (`0x420358`).
+        heavy_shot::CLASS => Some(heavy_shot::update),
         flash::CLASS | flash::BOMB_CLASS => Some(flash::update),
         // The crates: bolt 500, nanotech 501 (0x1f5) and 512 (0x200), TNT 505, ammo 511 (one update, L00 `0x39c870`).
         500 | 501 | 505 | 511 | 512 => Some(crate_::update),

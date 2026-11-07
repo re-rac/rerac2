@@ -78,9 +78,10 @@ use crate::collision::QueryFlags;
 use crate::hero::items::{row, BOUNCER};
 use crate::hero::physics::{add, cross, dist, dot, len, scale, set_len, sub, unit, V3};
 use crate::moby::hits::HitTemplate;
+use crate::moby::slide::{sweep, SweepRec};
 use crate::moby::{aim, countdown, lock_on, mode, Ctx, MobyWorld};
 use crate::rumble;
-use crate::quat::{axis_angle, mul, Q};
+use crate::quat::{axis_angle, qrot, Q};
 
 /// The hand's class (item 0x25's row `+0x04`), the upgraded hand's (rows 0x4c / 0x61 / 0x62), the bomb's and the bomblet's.
 pub const HAND_CLASS: i16 = 0x0e14;
@@ -169,12 +170,6 @@ mod pv {
 #[derive(Clone, Debug, Default)]
 pub struct Mem {
     pub cooldown: f32,
-}
-
-/// `0x321b28(out, v, q)`: `v` turned by `q` (`q·v·q*`).
-fn qrot(q: Q, v: V3) -> V3 {
-    let t = mul(mul(q, [v[0], v[1], v[2], 0.0]), [-q[0], -q[1], -q[2], q[3]]);
-    [t[0], t[1], t[2]]
 }
 
 /// The rows turned by the spin at `+0x10` (`0x321b28` on `+0xc0` / `+0xd0` / `+0xe0`).
@@ -356,40 +351,6 @@ fn throw(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, at: V3, vel: V3) -> Opti
     Some(id)
 }
 
-/// What [`sweep`] found: 0 nothing, 1 a bounce (the velocity reflected), 2 a stop; the place (the sphere's pushed
-/// centre or the line's point; a stop: the hit's point), the velocity, the surface, the sphere's centre.
-struct Swept {
-    res: i32,
-    at: V3,
-    vel: V3,
-    surface: i32,
-    centre: V3,
-}
-
-/// `0x37edb8` with a record of `radius` (no lift), the bounce's share of the normal speed `keep` and the least up of a
-/// floor `floor`, flags 0, the moby `id` left out, the classes `pass` (a hit on one is none): the sphere at `to` (its
-/// pushed-out centre), else the line from `from` (its point). The unit normal less than `floor` along the up at the
-/// moby bounces `vel` (reflected, `keep` of the normal speed kept); else it stops at the hit's point.
-fn sweep(w: &MobyWorld, ctx: &Ctx, id: usize, from: V3, to: V3, vel: V3, radius: f32, keep: f32, floor: f32, pass: &[i16]) -> Swept {
-    let none = Swept { res: 0, at: to, vel, surface: -1, centre: to };
-    let Some(c) = ctx.coll else { return none };
-    let up = crate::gravity::up(ctx.hero, w.mobys[id].pos);
-    let hit = crate::collision::coll_sphere_m(c, ctx.scene, to, radius, QueryFlags(0), Some(id)).map(|h| (h.pushed_centre.unwrap_or(h.point), h))
-        .or_else(|| w.coll_line(ctx, from, to, 0, Some(id)).map(|h| (h.point, h)));
-    let Some((at, h)) = hit else { return none };
-    if h.moby.is_some_and(|t| w.mobys.get(t).is_some_and(|x| pass.contains(&x.o_class))) { return none; }
-    let surface = h.surface_id();
-    let n = unit(h.normal);
-    if dot(up, n) < floor {
-        // `0x2ef2a8`: reflected; then the normal part `keep`.
-        let r = sub(vel, scale(n, 2.0 * dot(vel, n)));
-        let along = scale(n, dot(r, n));
-        let v = add(sub(r, along), scale(along, keep));
-        return Swept { res: 1, at, vel: v, surface, centre: at };
-    }
-    Swept { res: 2, at: h.point, vel, surface, centre: at }
-}
-
 /// The blob shadow outside the gravity frames (`0x1a8ff0` / `0x1a8ff4`, `0x31d930`).
 fn shadow(w: &mut MobyWorld, ctx: &Ctx, size: f32, id: usize) {
     if !ctx.hero.gravity.on { crate::shadows::request(w, ctx, size, id); }
@@ -436,17 +397,19 @@ pub fn update_bomb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 }
             }
             let floor = if w.mobys[id].pv_i(pv::BOUNCES) == 3 { 0.0 } else { NEVER_FLOOR };
-            let s = sweep(w, ctx, id, old, to, vel, BOMB_RADIUS[up], BOMB_BOUNCE, floor, &[0, HAND_CLASS]);
+            let mut vel = vel;
+            let rec = SweepRec { from: old, to, radius: BOMB_RADIUS[up], lift: None, flags: 0, pass: &[0, HAND_CLASS], floor, bounce: BOMB_BOUNCE, creatures: false };
+            let s = sweep(w, ctx, id, &rec, &mut vel);
             if 0 < s.res && matches!(surface_kind(s.surface), 1 | 2) {
                 burst(w, id, ctx);
                 return;
             }
             w.mobys[id].pos = s.at;
-            w.mobys[id].set_pv_v(pv::VEL, s.vel);
+            w.mobys[id].set_pv_v(pv::VEL, vel);
             let q = w.mobys[id].pv_q(pv::SPIN);
             spin_rows(w, id, q);
             let pos = w.mobys[id].pos;
-            let d = unit(s.vel);
+            let d = unit(vel);
             let mut t = HitTemplate::new(r.damage, Some(id), 0x83_0000, [d[0], d[1], d[2], NO_KNOCK_LIMIT]);
             t.kind = (BOMB as u16 as u32) << 16 | 0x0103;
             let hit = w.sphere_hit_list(ctx.scene, pos, BOMB_RADIUS[up] + 0.1, 1, ctx.hero_moby, Some(&t));
@@ -577,11 +540,12 @@ pub fn update_bomblet(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         w.mobys[id].pos = to;
         // The tracker's turn (`0x37f618(+0x28, vel, 0)`) and the fall along the frames' up, as the bomb's.
         let vel = crate::gravity::turn(w, ctx.hero, w.mobys[id].pv_i(pv::LET_TRACKER), w.mobys[id].pv_v(pv::VEL), None);
-        let vel = sub(vel, scale(crate::gravity::up(ctx.hero, to), GRAVITY));
-        let s = sweep(w, ctx, id, old, to, vel, BOMBLET_RADIUS[up], BOMBLET_BOUNCE, NEVER_FLOOR, &[0, HAND_CLASS, BOMB]);
+        let mut vel = sub(vel, scale(crate::gravity::up(ctx.hero, to), GRAVITY));
+        let rec = SweepRec { from: old, to, radius: BOMBLET_RADIUS[up], lift: None, flags: 0, pass: &[0, HAND_CLASS, BOMB], floor: NEVER_FLOOR, bounce: BOMBLET_BOUNCE, creatures: false };
+        let s = sweep(w, ctx, id, &rec, &mut vel);
         let kind = surface_kind(s.surface);
         w.mobys[id].pos = s.at;
-        w.mobys[id].set_pv_v(pv::VEL, s.vel);
+        w.mobys[id].set_pv_v(pv::VEL, vel);
         let q = w.mobys[id].pv_q(pv::SPIN);
         spin_rows(w, id, q);
         if 0 < s.res { hop(w, id, ctx, world_up); }
@@ -590,9 +554,7 @@ pub fn update_bomblet(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let d = unit(v);
         let mut t = HitTemplate::new(bomblet_damage(ctx.game), Some(id), 0x83_0000, [d[0], d[1], d[2], NO_KNOCK_LIMIT]);
         t.kind = (BOMBLET as u16 as u32) << 16 | 0x0103;
-        let mut life = w.mobys[id].pv_s(pv::LIFE) as i32;
-        let out = countdown(&mut life);
-        w.mobys[id].set_pv_s(pv::LIFE, life as i16);
+        let out = w.mobys[id].count_s(pv::LIFE);
         let mut blow = out || (0 < s.res && matches!(kind, 1 | 2));
         if !blow {
             let arming = w.mobys[id].pv_s(pv::ARMING);

@@ -12,7 +12,7 @@
 //!
 //! The L14 engine functions with the port's: `0x323250` = L00 `0x31b8d0` (crate::moby::Moby::set_state), `0x333648`
 //! = L00 `0x32a7c8` (the first tick of the state), `0x333698` = L00 `0x32a818` (hooked), `0x32cea8` = L00 `0x325398`
-//! (crate::moby::classes::level17::floaters::hero_on), `0x329290` = L00 `0x321858` (the cuboid test), `0x329638` =
+//! (crate::moby::ai::stands_on), `0x329290` = L00 `0x321858` (the cuboid test), `0x329638` =
 //! L00 `0x321c00` (crate::camera::rot), `0x326270` = L00 `0x31e8d8` (the lerp), `0x3267b0` = L00 `0x31ed78`
 //! (crate::hero::physics::ease), `0x2e61f8` = L00 `0x2de878` (the line), `0x2f6660` (an int countdown,
 //! crate::moby::countdown), `0x36ada0` / `0x36aaa0` / `0x36aa58` = L00 `0x3605f0` / `0x3602f0` / `0x3602a8` (the
@@ -21,20 +21,13 @@
 use std::f32::consts::FRAC_PI_2;
 
 use crate::hero::physics::{add, cross, dist, len, set_len, sub, V3};
-use crate::moby::classes::level17::floaters::hero_on;
-use crate::moby::{ai, countdown, mode, Ctx, MobyWorld};
+use crate::moby::{ai, countdown, mode, stop_loop, Ctx, MobyWorld};
 
 pub const BRIDGE: i16 = 0x0ae4;
 pub const RISER: i16 = 0x0ae5;
 
 const BLOCK: usize = 0x20;
 const BLOCK_FLAGS: usize = BLOCK + 0x3c;
-
-fn stop(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, o: usize) {
-    let h = w.mobys[id].pv_i(o);
-    if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
-    w.mobys[id].set_pv_i(o, -1);
-}
 
 fn start(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, o: usize) {
     let h = ctx.host.play_sound(&w.mobys[id], 0, 4);
@@ -106,7 +99,7 @@ pub fn update_0ae4(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let mut t = m.pv_i(B_WAIT);
             countdown(&mut t);
             m.set_pv_i(B_WAIT, t);
-            let go = hero_on(ctx, id) || {
+            let go = crate::moby::ai::stands_on(ctx, id) || {
                 let (h, p) = (ctx.hero.pos, m.pos);
                 let (a, b) = (m.pv_v(B_A), m.pv_v(B_B));
                 dist(h, p) < 30.0 && if dist(p, a) < dist(p, b) { dist(h, b) <= dist(h, a) } else { dist(h, a) < dist(h, b) }
@@ -120,15 +113,15 @@ pub fn update_0ae4(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 let s = -w.mobys[id].pv_f(B_STEP);
                 swing(&mut w.mobys[id], s);
             } else {
-                if 0 <= w.mobys[id].pv_i(B_SOUND) { stop(w, id, ctx, B_SOUND); }
-                if !hero_on(ctx, id) { w.mobys[id].set_state(3, -1); }
+                if 0 <= w.mobys[id].pv_i(B_SOUND) { stop_loop(w, id, ctx, B_SOUND); }
+                if !crate::moby::ai::stands_on(ctx, id) { w.mobys[id].set_state(3, -1); }
             }
         }
         6 => {
             if w.mobys[id].first() { start(w, id, ctx, B_SOUND); }
             if FRAC_PI_2 <= w.mobys[id].pv_f(B_ANGLE) {
-                if 0 <= w.mobys[id].pv_i(B_SOUND) { stop(w, id, ctx, B_SOUND); }
-                if !hero_on(ctx, id) { w.mobys[id].set_state(4, -1); }
+                if 0 <= w.mobys[id].pv_i(B_SOUND) { stop_loop(w, id, ctx, B_SOUND); }
+                if !crate::moby::ai::stands_on(ctx, id) { w.mobys[id].set_state(4, -1); }
             } else {
                 let s = w.mobys[id].pv_f(B_STEP);
                 swing(&mut w.mobys[id], s);
@@ -264,7 +257,7 @@ pub fn update_0ae5(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 }
             } else {
                 let mid = m.pv_f(R_MIDDLE);
-                let go = hero_on(ctx, id) || ((m.pos[2] - mid) * (ctx.hero.pos[2] - mid) < 0.0 && m.pv_i(R_TRIPS) != 0);
+                let go = crate::moby::ai::stands_on(ctx, id) || ((m.pos[2] - mid) * (ctx.hero.pos[2] - mid) < 0.0 && m.pv_i(R_TRIPS) != 0);
                 if go {
                     let s = if m.pv_i(R_UP_NEXT) == 0 { 3 } else { 2 };
                     w.mobys[id].set_state(s, -1);
@@ -284,7 +277,7 @@ pub fn update_0ae5(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let (t, z) = (m.pv_f(if up { R_TOP } else { R_BOTTOM }), m.pos[2]);
             let left = if up { t - z } else { z - t };
             if 0.03 <= left {
-                let ease = up || hero_on(ctx, id) || !ctx.level.in_cuboid(m.pv_i(R_CUBOID), ctx.hero.pos);
+                let ease = up || crate::moby::ai::stands_on(ctx, id) || !ctx.level.in_cuboid(m.pv_i(R_CUBOID), ctx.hero.pos);
                 if ease {
                     let m = &mut w.mobys[id];
                     let (a, mut z, mut v) = (m.pv_f(R_ACCEL), m.pos[2], m.pv_f(R_SPEED));
@@ -293,7 +286,7 @@ pub fn update_0ae5(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     m.set_pv_f(R_SPEED, v);
                 }
             } else {
-                stop(w, id, ctx, R_SOUND);
+                stop_loop(w, id, ctx, R_SOUND);
                 if !over(id, ctx) {
                     let m = &mut w.mobys[id];
                     m.set_pv_i(R_UP_NEXT, (!up) as i32);
@@ -309,7 +302,7 @@ pub fn update_0ae5(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// `0x3dfde0`: Ratchet on it, or the line from him 3 down (flags 0x10) meeting it first.
 pub(crate) fn over(id: usize, ctx: &Ctx) -> bool {
-    if hero_on(ctx, id) { return true; }
+    if crate::moby::ai::stands_on(ctx, id) { return true; }
     let a = ctx.hero.pos;
     let b = [a[0], a[1], a[2] - 3.0];
     ctx.coll.and_then(|c| crate::collision::coll_line_m(c, ctx.scene, a, b, crate::collision::QueryFlags(0x10), None)).is_some_and(|h| h.moby == Some(id))

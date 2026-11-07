@@ -66,7 +66,7 @@ use super::tabora_ai::{self, find_target, Volumes};
 use crate::hero::physics::{add, add_rot, atan2, dist2, dot, len, rot_dist, scale, set_len, sub, turn_ease, V3};
 use crate::moby::blast::{self, Explosion};
 use crate::moby::classes::props::{seq, set_seq, wrapped};
-use crate::moby::{ai, bolts, countdown, Ctx, MobyWorld};
+use crate::moby::{ai, bolts, Ctx, MobyWorld};
 use std::f32::consts::{FRAC_PI_2, PI};
 
 pub const CLASS: i16 = 0x09c6;
@@ -94,14 +94,6 @@ const MOUNT: usize = 0x468;
 const STUCK: usize = 0x480;
 const CHASE: usize = 0x48c;
 const LAUNCH: usize = 0xd0;
-
-fn i_down(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let m = &mut w.mobys[id];
-    let mut t = m.pv_i(off);
-    let r = countdown(&mut t);
-    m.set_pv_i(off, t);
-    r
-}
 
 /// `if seq ≠ rand & 1 { sequence rand & 1 }`: the game draws twice.
 fn idle_seq(w: &MobyWorld, id: usize, ctx: &mut Ctx, add_: u8, blend: u8) {
@@ -216,12 +208,12 @@ fn tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.set_pv_s(NEAR, 12);
         }
     }
-    if w.mobys[id].pv_i(T_RESULT) == 2 && i_down(w, id, ALARM) { w.mobys[id].set_pv_s(NEAR, 3); }
+    if w.mobys[id].pv_i(T_RESULT) == 2 && w.mobys[id].count_i(ALARM) { w.mobys[id].set_pv_s(NEAR, 3); }
     let m = &mut w.mobys[id];
     if (m.state_ticks as u16) <= 0xfffd { m.state_ticks = m.state_ticks.wrapping_add(1); }
-    if m.state == 8 && m.sub_state == 0 { i_down(w, id, CHASE); }
-    i_down(w, id, TIMER);
-    i_down(w, id, WAIT);
+    if m.state == 8 && m.sub_state == 0 { w.mobys[id].count_i(CHASE); }
+    w.mobys[id].count_i(TIMER);
+    w.mobys[id].count_i(WAIT);
 }
 
 /// `0x3d8ab0`: the goal kept in its path (`+0x428`): outside, half the time (or while nothing is targeted, or
@@ -294,7 +286,7 @@ fn walk(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, turn_a: f32, turn_most: f32
     let m = &mut w.mobys[id];
     ai::senses(m, accel * 0.000_277_777_8, top * 0.016_666_668, turn_a * 4.848_137_5e-6, turn_most * 0.000_290_888_25);
     m.set_pv_f(MV + 0x34, stop);
-    if i_down(w, id, 0x474) {
+    if w.mobys[id].count_i(0x474) {
         let k = ctx.game.rng.randf(30.0, 90.0) as i32;
         let m = &mut w.mobys[id];
         let deg = -m.pv_f(0x46c);
@@ -311,19 +303,13 @@ fn walk(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, turn_a: f32, turn_most: f32
     let turn = m.pv_f(MV + 0xb4).abs();
     let mut speed = len(m.pv_v(MV + 0xa0)) + turn;
     if flags & 0xf != 0 {
-        i_down(w, id, ALARM);
+        w.mobys[id].count_i(ALARM);
         speed = turn + 0.010_000_001;
     }
     let s = speed * 29.999_998;
     let s = if 1.5 < s { 1.5 } else if s < 0.0 { 0.0 } else { s };
     ctx.host.set_anim_speed(&w.mobys[id], s);
     flags
-}
-
-/// The move in place to a yaw (`0x33b100` = L00 `0x32ceb8`).
-fn turn_in_place(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, yaw: f32) {
-    let pos = w.mobys[id].pos;
-    ai::move_step(w, id, ctx, yaw, pos);
 }
 
 /// The volumes' reach (+2) as an update distance.
@@ -500,7 +486,7 @@ pub fn update_09c6(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         1 => wake(w, id, ctx),
         3 => {
-            if i_down(w, id, TIMER) {
+            if w.mobys[id].count_i(TIMER) {
                 set_seq(w, id, ctx, 4, 0, 10);
                 let m = &mut w.mobys[id];
                 m.drawn = 1;
@@ -824,7 +810,7 @@ fn attack(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let m = &w.mobys[id];
             let at = ai::link(m, T_MOBY).and_then(|t| w.mobys.get(t)).map_or(m.pv_v(T_BLOCK), |t| t.pos);
             let yaw = atan2(at[0] - m.pos[0], at[1] - m.pos[1]);
-            turn_in_place(w, id, ctx, yaw);
+            ai::turn_in_place(w, id, ctx, yaw);
             if ctx.host.anim(&w.mobys[id]).is_some_and(|a| a.seq_a == 7) && 24.0 < ctx.host.frame_time(&w.mobys[id]) {
                 breathe(w, id, ctx);
                 if wrapped(w, id, ctx) {

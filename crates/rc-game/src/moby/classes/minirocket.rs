@@ -205,32 +205,10 @@ fn blast_damage(r: &ItemRow) -> f32 {
 /// `0x2eef88(out, a, b)` = b × a.
 fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
 
-/// `0x321c00(a, out, v, axis)`: `v` turned by `a` about `axis` (under 1e-5 kept).
-fn turn(v: V3, axis: V3, a: f32) -> V3 {
-    if a.abs() < 1e-5 || len(axis) == 0.0 { return v; }
-    crate::gravity::rotate(v, unit(axis), a)
-}
-
 /// `0x2eeb40(+0x00)`: the cooldown down a frame (1/60 s).
 fn cooldown(w: &mut MobyWorld, id: usize) {
     let c = w.mobys[id].pv_f(hv::COOL);
     w.mobys[id].set_pv_f(hv::COOL, if 1.0 / 60.0 < c { c - 1.0 / 60.0 } else { 0.0 });
-}
-
-/// `0x2eeae0` on the s16 at `off`: true when it was 0 or just reached it.
-fn count_s(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut n = w.mobys[id].pv_s(off) as i32;
-    let done = countdown(&mut n);
-    w.mobys[id].set_pv_s(off, n as i16);
-    done
-}
-
-/// `0x2eeab0` on the word at `off`.
-fn count_i(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut n = w.mobys[id].pv_i(off);
-    let done = countdown(&mut n);
-    w.mobys[id].set_pv_i(off, n);
-    done
 }
 
 /// The muzzle light let go (`0x2fdc48`).
@@ -312,7 +290,7 @@ pub(super) fn aim(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, yaw: f32, pitch: 
         None => {
             if found != w.mobys[id].pv_link(o.last) {
                 w.mobys[id].set_pv_i(o.count, 5);
-            } else if count_i(w, id, o.count) {
+            } else if w.mobys[id].count_i(o.count) {
                 let a = found.map_or(0.1, |f| aimh(w, f));
                 let m = &mut w.mobys[id];
                 m.set_pv_i(o.lock, found.map_or(0, |f| f as i32));
@@ -336,7 +314,7 @@ pub(super) fn aim(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, yaw: f32, pitch: 
                 let d = dist(ctx.host.camera_pos(), t.pos);
                 crate::hud::marker(&mut ctx.game.markers, (0.9 - d * 0.006_666_667 * 0.65).abs(), id, 0xff0f_ff0f, Some(at), 0x26);
                 ctx.hero.items.aim_target = Some((lock, a));
-            } else if count_i(w, id, o.hold) {
+            } else if w.mobys[id].count_i(o.hold) {
                 w.mobys[id].set_pv_i(o.lock, 0);
                 w.mobys[id].set_pv_i(o.count, 5);
             }
@@ -408,7 +386,7 @@ fn light(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         } else {
             w.point_lights.set(s as usize, l);
         }
-        count_s(w, id, hv::TICKS);
+        w.mobys[id].count_s(hv::TICKS);
     } else if w.mobys[id].pv_s(hv::LIGHT) != -1 {
         free_light(w, id);
         w.mobys[id].set_pv_s(hv::TICKS, 0);
@@ -468,7 +446,7 @@ fn burst(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let carry = if ctx.hero.grounded_ticks != 0 { scale(ctx.hero.disp, 1.7) } else { [0.0; 3] };
     let Some(sys) = ctx.parts.as_deref_mut() else { return };
     let g = &mut ctx.game.rng;
-    let start = turn(fwd, side, f32::from_bits(0x3eb2_b8c4));
+    let start = crate::camera::rot(fwd, f32::from_bits(0x3eb2_b8c4), side);
     let (mut d, mut acc) = (start, 0.0f32);
     for _ in 0..20 {
         acc = add_rot(acc, g.randf(0.0, f32::from_bits(0x3f20_d97d)));
@@ -483,9 +461,9 @@ fn burst(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             crate::particles::rec::set_ff(rec, 0x2c, 0.5);
             crate::particles::rec::set_u32(rec, 4, 0x307f_7f7f);
         }
-        if 1e-5 < acc.abs() { d = turn(start, fwd, acc); }
+        if 1e-5 < acc.abs() { d = crate::camera::rot(start, acc, fwd); }
     }
-    let start = turn(fwd, side, 12.0 * 0.017_453_294);
+    let start = crate::camera::rot(fwd, 12.0 * 0.017_453_294, side);
     let (mut d, mut acc) = (start, 0.0f32);
     for _ in 0..20 {
         acc = add_rot(acc, g.randf(0.0, f32::from_bits(0x3f20_d97d)));
@@ -495,7 +473,7 @@ fn burst(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let p: V3 = std::array::from_fn(|k| at[k] + g.randf_signed(0.0, 0.4));
         let size = g.randf(0.4, 0.75);
         crate::particles::spark(sys, g, size * 210_000.0, 500.0, 0.95, 0.0, 0.0, sub(p, v), v, 10, 0x7f, 0x40_4040, spin);
-        if 1e-5 < acc.abs() { d = turn(start, fwd, acc); }
+        if 1e-5 < acc.abs() { d = crate::camera::rot(start, acc, fwd); }
     }
 }
 
@@ -738,7 +716,7 @@ pub fn update_rocket(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         gone(w, id);
         return;
     }
-    if count_s(w, id, pv::LIFE) || 75.0 < dist(w.mobys[id].pos, ctx.hero.pos) { gone(w, id); }
+    if w.mobys[id].count_s(pv::LIFE) || 75.0 < dist(w.mobys[id].pos, ctx.hero.pos) { gone(w, id); }
 }
 
 /// `0x31ce20(h, at, 0)`: the ground under `at` — the line from `h` above it down to 0.01 (flags 2) meeting it, its

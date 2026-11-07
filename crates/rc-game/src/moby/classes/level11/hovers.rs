@@ -257,7 +257,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         // Calm: Ratchet near (not in 0x6f, not mounting) — down its path (0x11), or the chase (0xe sub 2); alarmed —
         // the stand (0xb sub 1; with a patrol 0xb sub 12), its timer 480..600 under 300; Ratchet in its area, down.
         0 => {
-            if t::first_sub(w, id) {
+            if w.mobys[id].first_sub() {
                 lim(w, id, 0.002_222_222_3, 0.066_666_67, 0.001_163_553, 0.104_719_77);
                 if w.mobys[id].pv_f(ROAM) < 0.2 { anim2(w, id, ctx, 0, 0, 0, 0xc); }
                 if w.mobys[id].pv_i(PATROL) != -1 {
@@ -292,7 +292,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         // Alert: in range the chase or down its path; its timer out, standing again (1 sub 0).
         1 => {
-            if t::first_sub(w, id) { slow(w, id); }
+            if w.mobys[id].first_sub() { slow(w, id); }
             if in_range(w, id) {
                 if rider(w, id).is_some() {
                     st(w, id, 0xe, 2);
@@ -311,7 +311,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         // stand (0xb sub 1, back to its cuboid, its timer 1200..1300); Ratchet in state 0x31, its hiding path (0xd sub
         // 4); its moby to wait on not in state 2 (and not near, ridden): waiting (2 sub 0).
         2 => {
-            if t::first_sub(w, id) { slow(w, id); }
+            if w.mobys[id].first_sub() { slow(w, id); }
             if !in_area(w, id, ctx) {
                 if !in_range(w, id) {
                     let s = w.mobys[id].state;

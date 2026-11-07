@@ -27,7 +27,7 @@
 //! Else its class sound 0 looped while not playing.
 
 use crate::fx::FxQuad;
-use crate::hero::physics::{add, add_rot, atan2, cross, len, scale, set_len, sub, V3};
+use crate::hero::physics::{add, add_rot, atan2, cross, len, scale, set_len, sub, wrap, V3};
 use crate::moby::classes::endako_d;
 use crate::moby::{countdown, Ctx, MobyWorld};
 
@@ -75,9 +75,6 @@ const LINES: [V3; 4] = [
     [0.639_534_9, -0.639_534_9, -0.639_534_9],
     [0.0, 0.785_714_3, -0.639_534_9],
 ];
-
-/// `0x327e78`: an angle wrapped to [−π, π).
-fn wrap(a: f32) -> f32 { ((a + std::f32::consts::PI) * 0.159_154_94).rem_euclid(1.0) * std::f32::consts::TAU - std::f32::consts::PI }
 
 fn count(m: &crate::moby::Moby) -> usize { (m.pv_i(COUNT).max(0) as usize).min(MOST) }
 

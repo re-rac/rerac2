@@ -54,7 +54,7 @@
 //! Not ported: the rest of the gravity frames' set-up (the drop onto the sphere `0x32aba0`, L26 `0x325d80`; the moby
 //! word `+0x9c` 3; the down `+0x300`) and its upright test (`+0x338`), the moby word `+0x9c` (3 / 0xc).
 
-use crate::hero::physics::{add, add_rot, atan2, dist, dist2, len2, sub, turn_ease, V3};
+use crate::hero::physics::{add, add_rot, atan2, dist, dist2, len2, sub, V3};
 use crate::hud::lerp_rgba;
 use crate::moby::{ai, Ctx, MobyWorld};
 use super::props::{seq, set_seq, wrapped};
@@ -74,13 +74,6 @@ const TARGET: usize = 0x1f0;
 /// `0x1b00b8` / `0x1b00bc`: Ratchet's distance that makes it retreat, and its retreat's reach (+ 0.5).
 const NEAR: f32 = 8.0;
 const FAR: f32 = 14.0;
-
-/// `0x32a7f0`: the first time since the last sub-state change.
-fn first_sub(m: &mut crate::moby::Moby) -> bool {
-    if m.once & 2 != 0 { return false; }
-    m.once |= 2;
-    true
-}
 
 fn group(w: &MobyWorld, id: usize) -> Vec<usize> {
     usize::try_from(w.mobys[id].group).ok().and_then(|g| w.groups.get(g)).cloned().unwrap_or_default()
@@ -223,24 +216,14 @@ fn go(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3, toward: bool) -> i3
     }
 }
 
-/// `0x333980(yaw, m)`: its facing eased toward `yaw` at the movement block's turn limits.
-pub(crate) fn face(w: &mut MobyWorld, id: usize, yaw: f32) {
-    let m = &mut w.mobys[id];
-    let (a, b, c) = (m.pv_f(MV + 0x14), m.pv_f(MV + 0x18), m.pv_f(MV + 0x1c));
-    let (mut r, mut v) = (m.rot[2], m.pv_f(MV + 0xb4));
-    turn_ease(yaw, a, b, c, &mut r, &mut v, 0);
-    m.rot[2] = r;
-    m.set_pv_f(MV + 0xb4, v);
-}
-
-/// `0x3339e0(m, point)`: [`face`] toward a point (in the gravity frames crate::moby::frames::face_point).
+/// `0x3339e0(m, point)`: the facing (crate::moby::ai::face_at) toward a point (in the gravity frames crate::moby::frames::face_point).
 pub(crate) fn face_point(w: &mut MobyWorld, id: usize, ctx: &Ctx, p: V3) {
     if ctx.hero.gravity.on {
         crate::moby::frames::face_point(w, id, p);
         return;
     }
     let q = w.mobys[id].pos;
-    face(w, id, atan2(p[0] - q[0], p[1] - q[1]));
+    crate::moby::ai::face_at(&mut w.mobys[id], MV, atan2(p[0] - q[0], p[1] - q[1]));
 }
 
 /// `0x3302b8(r, from, to, &out, path)`: a point toward `to` kept inside the path (crate::path_network::keep_in).
@@ -334,7 +317,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     match w.mobys[id].sub_state {
         0 => {
             let rng = &mut ctx.game.rng;
-            if first_sub(&mut w.mobys[id]) {
+            if w.mobys[id].first_sub() {
                 ai::senses(&mut w.mobys[id], 0.005, f32::from_bits(0x3d88_8889), f32::from_bits(0x3be4_c38a), 0.418_879);
                 let t = rng.rand_range(0, 0x1e);
                 let m = &mut w.mobys[id];
@@ -363,7 +346,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         1 => {
-            if first_sub(&mut w.mobys[id]) {
+            if w.mobys[id].first_sub() {
                 ai::senses(&mut w.mobys[id], 0.005, f32::from_bits(0x3d88_8889), f32::from_bits(0x3c8e_fa36), f32::from_bits(0x3f86_0a93));
                 let m = &mut w.mobys[id];
                 m.set_pv_f(MV + 0xd0, f32::from_bits(0x3d88_8889));
@@ -373,7 +356,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if m.pv_s(o + 0x314) == 1 { m.set_state(9, 2) } else if m.pv_s(o + 0x310) == 0 { m.set_state(1, 0) }
         }
         2 => {
-            if first_sub(&mut w.mobys[id]) {
+            if w.mobys[id].first_sub() {
                 ai::senses(&mut w.mobys[id], 0.005, f32::from_bits(0x3d88_8889), f32::from_bits(0x3c8e_fa36), f32::from_bits(0x3f86_0a93));
                 let t = ctx.game.rng.rand_range(0, 0x1e);
                 let m = &mut w.mobys[id];
@@ -523,7 +506,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 if seq(w, id, ctx) != 8 { ctx.host.set_anim(&w.mobys[id], 8, 2, 10); }
             }
             let yaw = w.mobys[id].pv_f(o + 0x320);
-            face(w, id, yaw);
+            crate::moby::ai::face_at(&mut w.mobys[id], MV, yaw);
             let prison = w.mobys[id].o_class == PRISON;
             if ai::reached(w, id, ctx, 13.0) {
                 let m = &w.mobys[id];

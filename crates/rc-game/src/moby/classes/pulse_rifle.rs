@@ -97,7 +97,7 @@ use crate::first_person::Tune;
 use crate::hero::items::{row, ItemRow, PULSE};
 use crate::hero::physics::{add, add_rot, cross, dot, len, scale, set_len, sub, unit, V3};
 use crate::moby::hits::HitTemplate;
-use crate::moby::{aim, countdown, lock_on, Ctx, MobyWorld};
+use crate::moby::{aim, countdown, lock_on, stop_loop, Ctx, MobyWorld};
 use crate::rumble;
 use crate::point_lights::PointLight;
 
@@ -198,26 +198,11 @@ fn cooldown(w: &mut MobyWorld, id: usize) -> bool {
     }
 }
 
-/// `0x2eeae0` on the s16 at `off`: true when it was 0 or just reached it.
-fn count_s(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut n = w.mobys[id].pv_s(off) as i32;
-    let done = countdown(&mut n);
-    w.mobys[id].set_pv_s(off, n as i16);
-    done
-}
-
 /// The muzzle light let go (`0x2fdc48`).
 fn free_light(w: &mut MobyWorld, id: usize) {
     let s = w.mobys[id].pv_i(0x10);
     if 0 <= s { w.point_lights.free(s as usize); }
     w.mobys[id].set_pv_i(0x10, -1);
-}
-
-/// The zoom's loop sound let go when still playing (`0x3602f0`).
-fn stop_zoom_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let s = w.mobys[id].pv_i(0x20);
-    if s != -1 && ctx.host.sound_playing(s) { ctx.host.stop_sound(s); }
-    w.mobys[id].set_pv_i(0x20, -1);
 }
 
 /// The way out (put away, the state 0x6f): the view turn's globals back (when they were saved), the play's field of
@@ -256,7 +241,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         0 => start(w, id, ctx),
         1 => ready(w, id, ctx, fp),
         2 => {
-            if count_s(w, id, 2) || w.mobys[id].pv_s(0) != 0 { shoot(w, id, ctx, fp); }
+            if w.mobys[id].count_s(2) || w.mobys[id].pv_s(0) != 0 { shoot(w, id, ctx, fp); }
         }
         3 => {
             if cooldown(w, id) { w.mobys[id].state = 1; }
@@ -364,7 +349,7 @@ fn ready(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, fp: bool) {
                 }
                 a += step;
             }
-            None => stop_zoom_sound(w, id, ctx),
+            None => stop_loop(w, id, ctx, 0x20),
         }
         if begin < a {
             a = begin;
@@ -374,7 +359,7 @@ fn ready(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, fp: bool) {
         w.mobys[id].set_pv_f(0xc, a);
         ctx.game.cam_tweaks.set_fov(a, 0.02, 0.2, 0.0, 3);
     } else {
-        stop_zoom_sound(w, id, ctx);
+        stop_loop(w, id, ctx, 0x20);
         if w.mobys[id].pv_s(0) != 0 {
             w.mobys[id].set_pv_f(0xc, begin + (NARROW - begin) * 0.25);
             ctx.game.cam_tweaks.set_fov(begin, 0.005, 0.2, 0.0, 3);
@@ -412,7 +397,7 @@ fn ready(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, fp: bool) {
 /// State 2's shot (module docs).
 fn shoot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, fp: bool) {
     let Some(r) = cur_row(ctx.game).copied() else { return };
-    stop_zoom_sound(w, id, ctx);
+    stop_loop(w, id, ctx, 0x20);
     ctx.host.play_sound(&w.mobys[id], 0, 0);
     fire(w, id, ctx, fp, r.speed);
     let m = &mut w.mobys[id];
@@ -594,7 +579,7 @@ pub fn update_shot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         w.mobys[id].state = 2;
         return;
     }
-    if !hit(w, id, ctx, start) && !count_s(w, id, 0x10) {
+    if !hit(w, id, ctx, start) && !w.mobys[id].count_s(0x10) {
         tail(w, id, ctx);
         return;
     }

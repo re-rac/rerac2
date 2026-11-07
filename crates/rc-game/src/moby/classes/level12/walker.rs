@@ -72,13 +72,6 @@ const MINE: i16 = 0x0fab;
 /// `$gp+0x19f0`: its hand in its frame.
 const HAND: V3 = [f32::from_bits(0x4030_8312), f32::from_bits(0xbea9_78d5), f32::from_bits(0x3f14_bc6a)];
 
-fn first_sub(w: &mut MobyWorld, id: usize) -> bool {
-    let m = &mut w.mobys[id];
-    if m.once & 2 != 0 { return false; }
-    m.once |= 2;
-    true
-}
-
 fn limits(w: &mut MobyWorld, id: usize, l: [u32; 4]) {
     let [a, b, c, d] = l.map(f32::from_bits);
     ai::senses(&mut w.mobys[id], a, b, c, d);
@@ -205,7 +198,7 @@ pub fn update_0fb4(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     senses(w, id, ctx);
     match w.mobys[id].sub_state {
         0 => {
-            if first_sub(w, id) { limits(w, id, CALM); }
+            if w.mobys[id].first_sub() { limits(w, id, CALM); }
             if seeing(w, id) {
                 st(w, id, 5, 2);
                 set_seq(w, id, ctx, 2, 0, 10);
@@ -220,7 +213,7 @@ pub fn update_0fb4(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         1 => {
-            if first_sub(w, id) { limits(w, id, ALERT); }
+            if w.mobys[id].first_sub() { limits(w, id, ALERT); }
             if seeing(w, id) {
                 st(w, id, 6, 2);
                 set_seq(w, id, ctx, 7, 0, 10);
@@ -230,7 +223,7 @@ pub fn update_0fb4(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         2 => {
-            if first_sub(w, id) { limits(w, id, ALERT); }
+            if w.mobys[id].first_sub() { limits(w, id, ALERT); }
             if !seeing(w, id) { lose(w, id, ctx); }
         }
         3 => {
@@ -258,10 +251,10 @@ pub fn update_0fb4(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         4 => {
-            if first_sub(w, id) { limits(w, id, SUB4); }
+            if w.mobys[id].first_sub() { limits(w, id, SUB4); }
         }
         5 => {
-            if first_sub(w, id) {
+            if w.mobys[id].first_sub() {
                 let m = &mut w.mobys[id];
                 m.has_collision = false;
                 m.drawn = 0;

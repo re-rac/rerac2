@@ -71,13 +71,6 @@ fn racers(w: &MobyWorld, id: usize) -> Vec<usize> {
     (0..21).filter_map(|k| idx(&w.mobys[id], 0x1e4 + 4 * k)).filter(|&r| r < w.mobys.len()).collect()
 }
 
-fn cd_i(m: &mut Moby, off: usize) -> bool {
-    let mut v = m.pv_i(off);
-    let r = countdown(&mut v);
-    m.set_pv_i(off, v);
-    r
-}
-
 /// The race's wins (`0x40b6c0`: the flag byte `0x1395b8 + 0x4d + k`, Joba's `+0x57`) and losses (`0x40b758`: `+0x52`,
 /// Joba's `+0x5c`) of race `k`.
 fn wins(ctx: &Ctx, k: i32) -> i32 { wins_in(ctx.game, k) }
@@ -363,7 +356,7 @@ fn racing(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 ctx.host.play_sound(&w.mobys[id], 0xd, 0);
                 w.race.count += 1;
             }
-            cd_i(&mut w.mobys[id], 0x394);
+            w.mobys[id].count_i(0x394);
             if w.mobys[id].pv_i(0x394) == 0 {
                 ctx.host.play_sound(&w.mobys[id], 0xe, 0);
                 w.mobys[id].timer = 5;
@@ -499,7 +492,7 @@ fn finished(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     // `0x32e338(0, 0x4127a8)` each tick: the standings (crate::moby::classes::race::hud::standings).
     ctx.game.screen_callback = Some(crate::hud::ScreenCallback::RaceStandings { moby: id });
-    cd_i(&mut w.mobys[id], 0x398);
+    w.mobys[id].count_i(0x398);
     if 0 < w.mobys[id].pv_i(0x398) || ctx.hero.items.pressed & button::TRIANGLE == 0 { return; }
     stop(w, id, ctx);
     w.mobys[id].state = 4;
@@ -931,12 +924,12 @@ fn weapons(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &mut w.mobys[id];
     if m.pv_i(0x4d8) != 0 {
         m.set_pv_i(0x768, 0);
-        if cd_i(m, 0x4dc) {
+        if m.count_i(0x4dc) {
             m.set_pv_i(0x4d8, 0);
             m.set_pv_i(0x768, 1);
         }
     }
-    if m.pv_i(0x768) != 0 && cd_i(m, 0x764) {
+    if m.pv_i(0x768) != 0 && m.count_i(0x764) {
         m.set_pv_i(0x768, 0);
         m.set_pv_i(0x764, 40);
     }
@@ -949,11 +942,11 @@ fn weapons(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         3 => (30, None, pressed),
         _ => return,
     };
-    if !cd_i(m, 0x368) || input & fire == 0 { return; }
+    if !m.count_i(0x368) || input & fire == 0 { return; }
     m.set_pv_i(0x368, rest);
     if let Some(k) = sound { ctx.host.play_sound(&w.mobys[id], k, 0); }
     let m = &mut w.mobys[id];
-    if cd_i(m, 0x364) { m.set_pv_i(0x360, 0); }
+    if m.count_i(0x364) { m.set_pv_i(0x360, 0); }
 }
 
 /// `0x40f4a0(m, s)` (`func_L04_0040DF90`): the engine's two loops — `+0x330` the sound 0 (finished 20) and `+0x334` 1
@@ -964,7 +957,7 @@ fn weapons(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 fn engine_sounds(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let finished = w.mobys[id].state == 3;
     let m = &mut w.mobys[id];
-    if m.pv_i(0x32c) != 0 && cd_i(m, 0x324) {
+    if m.pv_i(0x32c) != 0 && m.count_i(0x324) {
         let h = m.pv_i(0x328);
         if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
         m.set_pv_i(0x32c, 0);
@@ -1026,7 +1019,7 @@ fn boosts(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         if m.pv_i(0x278) != 0 {
             approach(0.166_666_69, 0.005_555_555_7, &mut b);
             approach(97.0, 0.566_666_7, &mut fov);
-            cd_i(m, 0x278);
+            m.count_i(0x278);
         } else {
             if (finished || ctx.hero.items.held & 10 != 0) && m.pv_i(0x338) < 30 && 0 < m.pv_i(0x33c) {
                 m.set_pv_i(0x338, 240);
@@ -1041,7 +1034,7 @@ fn boosts(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 }
             }
             let m = &mut w.mobys[id];
-            let active = if cd_i(m, 0x338) { m.set_pv_i(0x640, 0); 0.0 } else { 1.0 };
+            let active = if m.count_i(0x338) { m.set_pv_i(0x640, 0); 0.0 } else { 1.0 };
             approach(active * 0.100_000_01, 0.001_388_888_9, &mut b);
             b = b.max(0.0);
             if 0.5 < active { approach(97.0, 0.566_666_7, &mut fov); } else { approach(80.0, 0.141_666_68, &mut fov); }
@@ -1240,7 +1233,7 @@ fn drive(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let d = scale(crate::moby::classes::shot::polar(fv17, yaw, 0.0), 0.025);
         vel = super::cap(add(vel, d), fv17);
     }
-    if !cd_i(m, 0x64c) {
+    if !m.count_i(0x64c) {
         vel = add(vel, scale(m.pv_v(0x2f0), m.pv_i(0x64c) as f32 * 0.025));
         m.set_pv_i(0x71c, 1);
     }
@@ -1272,7 +1265,7 @@ fn drive(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.set_pv_f(0x304, v);
     } else {
         m.rot[1] += m.pv_f(0x354);
-        cd_i(m, 0x34c);
+        m.count_i(0x34c);
         if m.pv_i(0x34c) == 0 { m.set_pv_b(0x349, 0); }
     }
     m.rot[0] = roll;
@@ -1443,7 +1436,7 @@ fn pilot_pose(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         if air && (seq == 0 || seq == 2) { ctx.host.set_anim(&w.mobys[p], 1, 0, 12); }
         if !air && seq == 1 { ctx.host.set_anim(&w.mobys[p], if long { 2 } else { 0 }, 0, if long { 3 } else { 6 }); }
     } else {
-        cd_i(&mut w.mobys[id], 0x36c);
+        w.mobys[id].count_i(0x36c);
     }
     if seq < 2 {
         let s = w.mobys[id].pv_f(0x30c);
@@ -1481,7 +1474,7 @@ fn finish(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
         m.set_pv_i(0x318, point);
         if p < prev || (451 <= point && old_point < 3) { m.set_pv_i(0x3a4, m.pv_i(0x3a4) + 1); } else { m.set_pv_i(0x3a4, 0); }
         if old_link != link { m.set_pv_i(0x3a8, 10); }
-        if 0 < m.pv_i(0x3a8) { cd_i(m, 0x3a8); } else { ranks(w, id, ctx); }
+        if 0 < m.pv_i(0x3a8) { m.count_i(0x3a8); } else { ranks(w, id, ctx); }
     }
     w.race.g1918 += 1;
     w.race.clock += 1;

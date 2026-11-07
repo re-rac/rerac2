@@ -161,14 +161,6 @@ fn cooldown(w: &mut MobyWorld, id: usize) -> bool {
     }
 }
 
-/// `0x2eeae0` on the s16 at `off`: true when it was 0 or just reached it.
-fn count_s(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut n = w.mobys[id].pv_s(off) as i32;
-    let done = countdown(&mut n);
-    w.mobys[id].set_pv_s(off, n as i16);
-    done
-}
-
 /// A moby id kept in a pvar (−1 none), when it still exists.
 fn moby_at(w: &MobyWorld, id: usize, off: usize) -> Option<usize> {
     usize::try_from(w.mobys[id].pv_i(off)).ok().filter(|&t| w.mobys.get(t).is_some())
@@ -433,13 +425,13 @@ pub fn update_missile(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 let h = ctx.host.play_sound(&w.mobys[id], 0, 4);
                 w.mobys[id].set_pv_i(pv::SOUND, h);
             }
-            if count_s(w, id, pv::LIFE) {
+            if w.mobys[id].count_s(pv::LIFE) {
                 blow(w, id, ctx, None);
                 return;
             }
         }
         1 => {
-            if count_s(w, id, pv::T1) {
+            if w.mobys[id].count_s(pv::T1) {
                 w.mobys[id].state = 2;
                 w.mobys[id].set_pv_s(pv::T2, 10);
             }
@@ -463,7 +455,7 @@ pub fn update_missile(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 let m = &mut w.mobys[id];
                 m.pos = add(m.pos, away);
             }
-            if count_s(w, id, pv::T2) {
+            if w.mobys[id].count_s(pv::T2) {
                 let v = unit(w.mobys[id].pv_v(pv::VEL));
                 w.mobys[id].state = 3;
                 w.mobys[id].set_pv_v(pv::VEL, v);
@@ -479,7 +471,7 @@ pub fn update_missile(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         3 => {
-            if count_s(w, id, pv::T1) {
+            if w.mobys[id].count_s(pv::T1) {
                 blow(w, id, ctx, None);
                 return;
             }

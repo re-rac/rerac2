@@ -21,7 +21,7 @@
 //! Not ported: the animation word `+0x98` cleared with the hiding (the engine's animation stands in).
 
 use crate::hero::physics::approach;
-use crate::moby::{Ctx, MobyWorld};
+use crate::moby::{stop_loop, Ctx, MobyWorld};
 
 pub const CLASS: i16 = 0x1100;
 
@@ -41,12 +41,6 @@ const CLEAR: u32 = 0x40;
 const DARK: u32 = 0x8000_0000;
 
 fn clank(ctx: &Ctx) -> bool { ctx.hero.mode == 1 }
-
-fn stop_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let h = w.mobys[id].pv_i(SOUND);
-    if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
-    w.mobys[id].set_pv_i(SOUND, -1);
-}
 
 /// 0x1100's update (module docs).
 pub fn update_1100(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
@@ -82,7 +76,7 @@ pub fn update_1100(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let before = m.state_ticks as u16;
             m.state_ticks = before.wrapping_add(1) as i16;
             if 181 <= before { m.set_pv_i(DONE, 1); }
-            stop_sound(w, id, ctx);
+            stop_loop(w, id, ctx, SOUND);
             if ctx.hero.mode == 0 {
                 ctx.game.prompt.announce(0x2f54, 240);
                 let m = &mut w.mobys[id];

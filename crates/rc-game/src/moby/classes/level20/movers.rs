@@ -15,7 +15,7 @@
 //!     `0x2eeab0`, crate::moby::countdown) its yaw turns by the speed (`0x303fd0` = L00 `0x2efe60`) and its class
 //!     sound 1 loops (`0x3766c0` = L00 `0x3605f0`); out, its timer byte back to the kept one, 1, the sound stopped
 //!     (`0x3763c0` = L00 `0x3602f0`).
-//!   * **Each tick**: Ratchet on it (`0x339a48` = L00 `0x325398`, crate::moby::classes::level17::floaters::hero_on)
+//!   * **Each tick**: Ratchet on it (`0x339a48` = L00 `0x325398`, crate::moby::ai::stands_on)
 //!     asks once for a camera tweak of priority 5 (`0x2eb400` = L00 `0x2d7468`; `0x43ea08`: distance 8, pivot height
 //!     2.5, the firm springs, the stick left on, facing the facing once, not again after a rest); off it, the tweak
 //!     let go (`0x2eb4a0` = L00 `0x2d7508`). Its projection, while it has one, looks as Oozla's (`0x3413a8` = L01
@@ -48,7 +48,7 @@
 
 use super::misc::{mission_done, ride};
 use crate::hero::physics::{add, add_rot, scale, sub};
-use crate::moby::{ai, countdown, Ctx, MobyWorld};
+use crate::moby::{ai, countdown, keep_loop, stop_loop, Ctx, MobyWorld};
 
 /// `0x2eb400(5)` (L00 `0x2d7468`) then `0x43ea08`: a camera tweak facing `dir` once.
 fn ask_tweak(ctx: &mut Ctx, dir: [f32; 3]) -> i32 {
@@ -61,22 +61,6 @@ fn ask_tweak(ctx: &mut Ctx, dir: [f32; 3]) -> i32 {
     t.face_rest = false;
     t.dir = dir;
     s as i32
-}
-
-/// The loop sound in `+off` kept going (`0x376378`, then `0x3766c0(index, 4, m)`).
-fn keep_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, off: usize, index: i32) {
-    let h = w.mobys[id].pv_i(off);
-    if h < 0 || !ctx.host.sound_playing(h) {
-        let h = ctx.host.play_sound(&w.mobys[id], index, 4);
-        w.mobys[id].set_pv_i(off, h);
-    }
-}
-
-/// The loop sound in `+off` stopped (`0x3763c0` when it still plays), none.
-fn stop_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, off: usize) {
-    let h = w.mobys[id].pv_i(off);
-    if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
-    w.mobys[id].set_pv_i(off, -1);
 }
 
 pub const TURNTABLE: i16 = 0x1170;
@@ -132,17 +116,17 @@ pub fn update_1170(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.set_pv_i(0x78, t);
             if !out {
                 m.rot[2] = add_rot(m.rot[2], m.pv_f(0x74));
-                keep_sound(w, id, ctx, 0x90, 1);
+                keep_loop(w, id, ctx, 0x90, 1);
             } else {
                 let m = &mut w.mobys[id];
                 m.timer = m.pv_i(0x7c) as u8;
                 m.set_state(1, -1);
-                stop_sound(w, id, ctx, 0x90);
+                stop_loop(w, id, ctx, 0x90);
             }
         }
         _ => {}
     }
-    let on = crate::moby::classes::level17::floaters::hero_on(ctx, id);
+    let on = crate::moby::ai::stands_on(ctx, id);
     let held = w.mobys[id].pv_i(0x80) != 0;
     if on && !held {
         let dir = w.mobys[id].pv_v(0x60);
@@ -226,10 +210,10 @@ pub fn update_1243(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if m.once & 4 != 0 {
                 let mid = m.pv_f(0x70);
                 let across = (m.pos[1] - mid) * (ctx.hero.pos[1] - mid) < 0.0;
-                if crate::moby::classes::level17::floaters::hero_on(ctx, id) || across {
+                if crate::moby::ai::stands_on(ctx, id) || across {
                     let to = if w.mobys[id].pv_i(0x74) == 0 { 2 } else { 3 };
                     w.mobys[id].set_state(to, -1);
-                    keep_sound(w, id, ctx, 0x7c, 0);
+                    keep_loop(w, id, ctx, 0x7c, 0);
                 }
             }
         }
@@ -238,7 +222,7 @@ pub fn update_1243(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if w.mobys[id].first() { w.mobys[id].set_pv_i(0x68, 0); }
             let to = w.mobys[id].pv_f(end);
             if (to - w.mobys[id].pos[1]).abs() < f32::from_bits(0x3cf5_c28f) {
-                stop_sound(w, id, ctx, 0x7c);
+                stop_loop(w, id, ctx, 0x7c);
                 if !crate::moby::classes::level14::movers::over(id, ctx) {
                     let m = &mut w.mobys[id];
                     m.set_pv_i(0x74, at_far);

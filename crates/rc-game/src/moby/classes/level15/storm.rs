@@ -21,7 +21,7 @@
 //! hit's sparks (`0x43a8c0`: 40 of the particle `0x2c2210`), the storm's sky layer `0x439928` (asm, from the first
 //! two callbacks).
 
-use crate::hero::physics::{add, cross, dot, scale, sub, V3};
+use crate::hero::physics::{add, scale, sub, V3};
 use crate::moby::{countdown, Ctx, MobyWorld};
 
 pub const CLASS: i16 = 0x1274;
@@ -34,12 +34,6 @@ const SCROLL: [usize; 4] = [0x4, 0x10, 0x14, 0x18];
 fn ship(w: &MobyWorld, id: usize) -> Option<usize> {
     let i = w.mobys[id].pv_i(0);
     w.mobys.iter().position(|m| m.index as i32 == i && m.state < 0x80).or_else(|| w.mobys.iter().position(|m| m.o_class == crate::ship::SHIP_CLASS && m.state < 0x80))
-}
-
-/// `0x2acec0(out, v, axis, angle)`: `v` turned about the unit `axis`.
-fn turn(v: V3, k: V3, a: f32) -> V3 {
-    let (s, c) = a.sin_cos();
-    add(add(scale(v, c), scale(cross(k, v), s)), scale(k, dot(k, v) * (1.0 - c)))
 }
 
 /// `0x433e70(a, b)`: a bolt from `a` to `b` (updated from 0xff, drawn from 0xff, state 1).
@@ -79,7 +73,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let rows = w.mobys[s].rows;
     let sp = w.mobys[s].pos;
     let turn_by = ctx.game.rng.randf(-20.0, 20.0) * 0.017_453_294;
-    let mut a = add(scale(turn(rows[0], rows[2], turn_by), 800.0), sp);
+    let mut a = add(scale(crate::camera::rot(rows[0], turn_by, rows[2]), 800.0), sp);
     a[2] = 800.0;
     let mut b = a;
     b[2] = 400.0;

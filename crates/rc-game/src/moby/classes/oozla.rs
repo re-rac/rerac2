@@ -23,11 +23,10 @@
 //! * 0x02e1 (`0x395620`): the camera cutaways, as the flower's first sight ([`update_02e1`]).
 //!
 
-use crate::hero::physics::{add, add_rot, approach, dist2, scale, set_len, sub, sub_rot, V3};
-use crate::moby::ai;
+use crate::hero::physics::{add, add_rot, approach, dist2, scale, set_len, sub, sub_rot, through, V3};
 use crate::moby::attach::rows_of;
 use crate::moby::hits::HitTemplate;
-use crate::moby::{carry_hero, mode, Ctx, MobyWorld};
+use crate::moby::{ai, carry_hero, mode, Ctx, MobyWorld};
 use std::f32::consts::PI;
 
 /// 0x08fb.
@@ -143,9 +142,6 @@ fn lerp_rot(a: f32, b: f32, t: f32) -> f32 { add_rot(a, sub_rot(b, a) * t) }
 
 /// `(1 − cos(p·π)) / 2`: the movers' ease of their progress `p` (0..1).
 fn ease(p: f32) -> f32 { (1.0 - (p * PI).cos()) * 0.5 }
-
-/// `0x2ef318`: a frame vector through the rows.
-fn through(rows: &[V3; 3], v: V3) -> V3 { std::array::from_fn(|k| v[0] * rows[0][k] + v[1] * rows[1][k] + v[2] * rows[2][k]) }
 
 /// The movers' other moby `+0xb0` (`$gp+0x356c` + index · 0x100): `None` for −1, a free slot (state 0xfe) or 0xfd.
 fn other(w: &MobyWorld, i: i32) -> Option<usize> {
@@ -1205,8 +1201,7 @@ pub fn update_dynamo_platform(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// to 0 off. So a platform spawned at 0x80 fades out at the start and shows only while it is out.
 pub(crate) fn hologram(m: &mut crate::moby::Moby, phase: usize, on: bool, rng: &mut crate::rng::Rng) {
     if m.alpha == 0 && !on { return; }
-    let mut p = m.pv_f(phase) + 0.145_444_1;
-    if PI <= p { p = p - PI - PI; } else if p < -PI { p = p + PI + PI; }
+    let p = add_rot(m.pv_f(phase), 0.145_444_1);
     m.set_pv_f(phase, p);
     let lerp = |t: f32, a: [u8; 3], b: [u8; 3]| -> [u8; 3] { std::array::from_fn(|k| (a[k] as f32 * (1.0 - t) + b[k] as f32 * t) as u8) };
     let mut c = lerp((p.sin() + 0.5) * 0.5, [0x20, 0xc0, 0x00], [0x00, 0x80, 0x00]);

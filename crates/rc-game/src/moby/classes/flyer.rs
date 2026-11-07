@@ -30,7 +30,7 @@
 
 use crate::hero::physics::*;
 use crate::moby::{ai, countdown, Ctx, MobyWorld};
-use super::leaper::{play, seq_a, seq_b, tick_down};
+use super::leaper::{play, seq_a, seq_b};
 use super::props::wrapped;
 
 /// The class.
@@ -354,7 +354,7 @@ fn checks(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         alarm(w, id);
     }
     let state = w.mobys[id].state;
-    if 6 <= state && tick_down(w, id, 600) {
+    if 6 <= state && w.mobys[id].count_i(600) {
         let hi = 0.5 < w.mobys[id].pv_f(0x24c);
         let off = if hi { ctx.game.rng.randf(0.0, 0.4) } else { ctx.game.rng.randf(0.6, 1.0) };
         let t = ctx.game.rng.rand_range(0x2d, 0x96);
@@ -364,7 +364,7 @@ fn checks(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     if state == 8 {
         w.mobys[id].set_pv_f(0x28c, 1.0);
-    } else if 5 < state && tick_down(w, id, 0x25c) {
+    } else if 5 < state && w.mobys[id].count_i(0x25c) {
         let k = if -1.75 < w.mobys[id].pv_f(0x28c) { ctx.game.rng.randf(0.5, 1.1) } else { ctx.game.rng.randf(1.65, 5.0) };
         let t = ctx.game.rng.rand_range(0x6e, 0x3c);
         let m = &mut w.mobys[id];
@@ -382,11 +382,11 @@ fn tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             w.mobys[id].set_pv_i(0x238, t);
         }
     }
-    if w.mobys[id].pv_i(T_FOUND) != 1 { tick_down(w, id, 0x238); }
+    if w.mobys[id].pv_i(T_FOUND) != 1 { w.mobys[id].count_i(0x238); }
     let m = &mut w.mobys[id];
     if (m.state_ticks as u16) < 0xfffe { m.state_ticks = m.state_ticks.wrapping_add(1); }
-    tick_down(w, id, 0x230);
-    tick_down(w, id, 0x23c);
+    w.mobys[id].count_i(0x230);
+    w.mobys[id].count_i(0x23c);
 }
 
 /// A state with the range and area its hunt or rest uses.
@@ -427,7 +427,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         2 => rise(w, id, ctx),
         3 => {
-            if tick_down(w, id, 0x230) {
+            if w.mobys[id].count_i(0x230) {
                 if seq_b(w, id, ctx) != 0 { play(w, id, ctx, 0, 0, 10); }
                 w.mobys[id].set_state(2, 0);
             }
@@ -528,7 +528,7 @@ fn launched(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// State 5: hovering on its three wobbles.
 fn hover(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     for (timer, rate, lo, hi, tlo, thi) in [(600, 0x260, 10.0, 180.0, 0x1e, 0xb4), (0x25c, 0x264, 60.0, 170.0, 0x3c, 200), (0x278, 0x268, 30.0, 160.0, 0x2d, 0x5a)] {
-        if tick_down(w, id, timer) {
+        if w.mobys[id].count_i(timer) {
             let r = ctx.game.rng.randf(lo, hi) * 0.000_290_888_25;
             let t = ctx.game.rng.rand_range(tlo, thi);
             let m = &mut w.mobys[id];
@@ -695,7 +695,7 @@ fn dive(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 }
             }
         }
-        3 if tick_down(w, id, 0x230) => {
+        3 if w.mobys[id].count_i(0x230) => {
             if near(w) {
                 if seq_b(w, id, ctx) != 4 { play(w, id, ctx, 4, 0, 3); }
                 go(w, id, 8, 1, false);

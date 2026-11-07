@@ -15,7 +15,7 @@
 //! older value; here the step is taken all the same.
 
 use crate::hero::physics::{add, scale, V3};
-use crate::moby::{countdown, Ctx, MobyWorld};
+use crate::moby::{Ctx, MobyWorld};
 
 pub const CLASS: i16 = 0x02be;
 
@@ -30,13 +30,6 @@ const FIRST_REST: usize = 0x14;
 const SPEED_K: f32 = 3.0;
 const JITTER_K: f32 = 0.05;
 
-fn timer_out(m: &mut crate::moby::Moby) -> bool {
-    let mut t = m.pv_i(TIMER);
-    let out = countdown(&mut t);
-    m.set_pv_i(TIMER, t);
-    out
-}
-
 /// `0x3a2950` (module docs).
 pub fn update_02be(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &mut w.mobys[id];
@@ -49,7 +42,7 @@ pub fn update_02be(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         1 => {
             m.set_pv_i(SOUND, -1);
-            if timer_out(m) {
+            if m.count_i(TIMER) {
                 m.set_pv_i(TIMER, m.pv_i(BLOW));
                 m.state = 2;
             }
@@ -75,7 +68,7 @@ pub fn update_02be(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 }
             }
             let m = &mut w.mobys[id];
-            if timer_out(m) {
+            if m.count_i(TIMER) {
                 m.set_pv_i(TIMER, m.pv_i(REST));
                 m.state = 1;
                 let h = m.pv_i(SOUND);

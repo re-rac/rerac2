@@ -118,6 +118,7 @@ use crate::collision::QueryFlags;
 use crate::hero::items::{row, MINI_TURRET};
 use crate::hero::physics::{add, add_rot, cross, dist, dot, len, scale, set_len, sub, unit, V3};
 use crate::moby::hits::HitTemplate;
+use crate::moby::slide::{sweep, SweepRec, Swept};
 use crate::moby::{aim, countdown, mode, Ctx, MobyWorld};
 use rc_formats::moby_anim::JointModifier;
 
@@ -442,43 +443,6 @@ fn make(w: &mut MobyWorld, ctx: &mut Ctx, pos: V3, vel: V3, up: bool) -> Option<
     Some(id)
 }
 
-/// What [`sweep`] found.
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Swept {
-    None,
-    /// Off a wall or a moby of class type 5 (the velocity bounced).
-    Bounce,
-    /// Stopped.
-    Stop,
-}
-
-/// `0x37edb8` with the turret's record: the 0.1 sphere at `to` lifted 0.074 along its up row (its pushed-out centre),
-/// else the line from `from` (its point), flags 0, the turret left out; a hit on Ratchet or the glove is none. The
-/// normal (unit) less than 0.5556 along the up at the turret, or a moby of class type 5, bounces `vel` (reflected,
-/// 0.45 of the normal speed kept); else it stops at the query's point. Returns the place, the moby met and the surface.
-fn sweep(w: &MobyWorld, ctx: &Ctx, id: usize, from: V3, to: V3, vel: &mut V3) -> (Swept, V3, Option<usize>, i32) {
-    let none = (Swept::None, to, None, -1);
-    let Some(c) = ctx.coll else { return none };
-    let up = crate::gravity::up(ctx.hero, w.mobys[id].pos);
-    let (radius, lift) = if is_up(w, id) { (UP_RADIUS, UP_LIFT) } else { (RADIUS, LIFT) };
-    let centre = add(to, set_len(w.mobys[id].rows[2], lift));
-    let hit = crate::collision::coll_sphere_m(c, ctx.scene, centre, radius, QueryFlags(0), Some(id)).map(|h| (h.pushed_centre.unwrap_or(h.point), h))
-        .or_else(|| w.coll_line(ctx, from, to, 0, Some(id)).map(|h| (h.point, h)));
-    let Some((at, h)) = hit else { return none };
-    let surface = h.surface_id();
-    if h.moby.is_some_and(|t| w.mobys.get(t).is_some_and(|x| PASS.contains(&x.o_class))) { return none; }
-    let n = unit(h.normal);
-    let kind5 = h.moby.and_then(|t| w.mobys.get(t)).and_then(|x| w.class(x.o_class)).is_some_and(|c| c.kind == 5);
-    if dot(up, n) < FLOOR || kind5 {
-        // `0x2ef2a8`: reflected; then the normal part 0.45.
-        let r = sub(*vel, scale(n, 2.0 * dot(*vel, n)));
-        let along = scale(n, dot(r, n));
-        *vel = add(sub(r, along), scale(along, RESTITUTION));
-        return (Swept::Bounce, at, h.moby, surface);
-    }
-    (Swept::Stop, h.point, h.moby, surface)
-}
-
 /// `0x3813b0(surface)`: 2 for 0 / 0xd / 0xe (the waters), 1 for 1 / 3 / 0xb / 0xc, else 0.
 fn surface_kind(s: i32) -> i32 {
     match s {
@@ -639,13 +603,17 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let mut vel = sub(vel, scale(crate::gravity::up(ctx.hero, to), FALL / 3600.0));
     let to = crate::gravity::ride(w, to);
     w.mobys[id].pos = to;
-    let (s, at, moby, surface) = sweep(w, ctx, id, from, to, &mut vel);
+    // `0x37edb8` with the turret's record: the sphere lifted along its up row, Ratchet and the glove passed, a moby of
+    // class type 5 bounced off.
+    let (radius, lift) = if is_up(w, id) { (UP_RADIUS, UP_LIFT) } else { (RADIUS, LIFT) };
+    let rec = SweepRec { from, to, radius, lift: Some(lift), flags: 0, pass: &PASS, floor: FLOOR, bounce: RESTITUTION, creatures: true };
+    let Swept { res, at, moby, surface, .. } = sweep(w, ctx, id, &rec, &mut vel);
     {
         let m = &mut w.mobys[id];
         m.pos = at;
         m.set_pv_v(pv::VEL, vel);
     }
-    if s != Swept::Stop { return; }
+    if res != 2 { return; }
     if moby.is_some_and(|t| w.mobys.get(t).is_some_and(|x| matches!(x.o_class, PASS_CLASS | TURRET | UP_TURRET))) {
         w.mobys[id].set_pv_v(pv::VEL, scale(vel, f32::from_bits(0x3f8c_cccd)));
         return;
@@ -919,7 +887,7 @@ fn sparks(ctx: &mut Ctx, at: V3, n: i32) {
         let size = g.randf(0.5, 2.0);
         let spin: i8 = if g.randi(2) != 0 { 1 } else { -1 };
         let a = g.randf(f32::from_bits(0xbf86_0a93), f32::from_bits(0x3f86_0a93));
-        let mut v = super::gravity_bomb::rotate(across, a, up);
+        let mut v = crate::camera::rot(across, a, up);
         let speed = g.randf(0.05, 3.0) * 0.016_666_668;
         v = set_len(v, speed);
         v[2] = g.randf(1.0, 5.0) * 0.016_666_668;

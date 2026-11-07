@@ -26,6 +26,7 @@
 
 use crate::hero::physics::{add, add_rot, atan2, dist2, set_len, turn_ease, V3};
 use crate::moby::{Ctx, MobyWorld};
+use crate::gravity::to_world;
 
 /// `0x31dd00(group, 1)` (L02 `0x320b50`): every member of the group hooked.
 fn hook(w: &mut MobyWorld, group: i32) { super::maktar::hook_group(w, group, true); }
@@ -363,9 +364,6 @@ fn burst_09ff(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
     }
 }
-
-/// `0x2f02d8(out, l, rows)` (L00 `0x2ef318`): a local vector into the world by the rows.
-pub(crate) fn to_world(l: V3, r: &[V3; 3]) -> V3 { std::array::from_fn(|k| l[0] * r[0][k] + l[1] * r[1][k] + l[2] * r[2][k]) }
 
 /// The spills' classes (`0x3d06c8`: one in two each).
 const SPILLS: [i16; 2] = [0x09d4, 0x09d7];

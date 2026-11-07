@@ -310,7 +310,7 @@ fn convert(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, k: usize, layer: usize) 
             if let Some(m) = w.attached.get_mut(&id).and_then(|car| car.members.iter_mut().find(|m| m.kind == Kind::Tie && m.index == t)) {
                 (m.kind, m.index) = (Kind::Moby, c);
             }
-            adopt(w, c, layer, ctx);
+            w.adopt(c, Some(layer), &*ctx.host);
             ai::set_link(&mut w.mobys[id], slot, Some(c));
             let d = &mut w.mobys[c];
             d.rows = tie_rows(&tie);
@@ -321,20 +321,6 @@ fn convert(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, k: usize, layer: usize) 
         }
         break;
     }
-}
-
-/// `0x32efc0(m, owner)` (L00 `0x32a748`): updated and drawn from any distance, drawn, the owner, its place, angles and
-/// light words; rebuilt; mode's low 3 bits cleared.
-fn adopt(w: &mut MobyWorld, id: usize, owner: usize, ctx: &Ctx) {
-    let (pos, rot, light, ambient) = { let o = &w.mobys[owner]; (o.pos, o.rot, o.light, o.ambient) };
-    let m = &mut w.mobys[id];
-    m.update_dist = 0xff;
-    m.draw_dist = 0xff;
-    m.drawn = 1;
-    m.parent = Some(owner);
-    (m.pos, m.rot, m.light, m.ambient) = (pos, rot, light, ambient);
-    w.rebuild(id, &*ctx.host);
-    w.mobys[id].mode &= !7;
 }
 
 /// `0x3f6958` (L23 `0x3fdb20`): the sway starts, across the way to the camera in its frame (±90° at random from it),

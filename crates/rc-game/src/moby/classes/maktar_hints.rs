@@ -29,7 +29,7 @@
 //! `0x18c910`, `0x18c8f8`: G-HERO-005, read as none — each of those hints shows as to a player who never did the
 //! thing), the start's ship-mode byte `0x152c26` = 1 with the move to `[0x21]`.
 
-use crate::moby::{countdown, Ctx, MobyWorld};
+use crate::moby::{Ctx, MobyWorld};
 
 /// The Tractor Beam (item 0x2e) and the Electrolyzer (item 0x26).
 const TRACTOR: usize = 0x2e;
@@ -128,12 +128,12 @@ pub fn update_0c24(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let moby = |w: &MobyWorld, k: usize| usize::try_from(pv(w, k)).ok().filter(|&i| i < w.mobys.len());
     let master = moby(w, 0x1a).is_some_and(|i| w.mobys[i].o_class == 0x0b59 && ctx.game.variant == 1 && w.mobys[i].state == 8);
     if master {
-        if tick_down(w, id, 0x25) && (ctx.game.hint_flags[3] as u32 >> ctx.game.level.clamp(0, 31)) & 1 == 0 {
+        if w.mobys[id].count_i(4 * 0x25) && (ctx.game.hint_flags[3] as u32 >> ctx.game.level.clamp(0, 31)) & 1 == 0 {
             ctx.game.help_later(0x9c9, 0x20);
             ctx.game.hint_flags[3] |= level_bit as u8;
         }
         // `0x3d8118`: past its state 2.
-        if moby(w, 0x1b).is_some_and(|i| 2 < w.mobys[i].state) && tick_down(w, id, 0x26) && (ctx.game.help_levels[0x3a] as i32) >= 0 {
+        if moby(w, 0x1b).is_some_and(|i| 2 < w.mobys[i].state) && w.mobys[id].count_i(4 * 0x26) && (ctx.game.help_levels[0x3a] as i32) >= 0 {
             ctx.game.help(0x9e3, 0x3a);
         }
     }
@@ -143,7 +143,7 @@ pub fn update_0c24(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             ctx.game.help_later(0x9c6, 0x1d);
             w.mobys[id].set_pv_i(4 * 0x24, 0x34bc0);
         }
-        if tick_down(w, id, 0x24) {
+        if w.mobys[id].count_i(4 * 0x24) {
             ctx.game.help_later(0x9c6, 0x1d);
             w.mobys[id].set_pv_i(4 * 0x24, 0x34bc0);
         }
@@ -172,13 +172,4 @@ pub fn update_0c24(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             g.help(0xa2b, 0x82);
         }
     }
-}
-
-/// `0x2f2998(&[k])`: the pvar word `[k]` counted down; true when it was 0 or reaches it.
-fn tick_down(w: &mut MobyWorld, id: usize, k: usize) -> bool {
-    let m = &mut w.mobys[id];
-    let mut t = m.pv_i(4 * k);
-    let r = countdown(&mut t);
-    m.set_pv_i(4 * k, t);
-    r
 }

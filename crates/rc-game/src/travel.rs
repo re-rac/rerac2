@@ -474,6 +474,19 @@ fn ship_ground(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     crate::moby::floater::step_at(w, id, ctx, ROCK, weight);
 }
 
+/// L08 `0x370240` / `0x3702a8` (also on L19: `0x35fb28` / `0x35fb90`): with a parked ship (`0x152c00`), it and its
+/// parts (the list `0x221b10`, crate::game::GameState::ship_parts) hidden (mode | 3, no collision `+0x98`) or shown
+/// (mode bits 1 and 2 off, their class's collision).
+pub fn show_ship(w: &mut MobyWorld, ctx: &Ctx, on: bool) {
+    let Some(s) = ctx.game.travel.ship.filter(|&s| s < w.mobys.len()) else { return };
+    for i in std::iter::once(s).chain(ctx.game.ship_parts.iter().copied()) {
+        let Some(c) = w.mobys.get(i).map(|m| m.o_class) else { continue };
+        let coll = w.class(c).is_some_and(|k| k.has_collision);
+        let m = &mut w.mobys[i];
+        if on { m.mode &= !3; m.has_collision = coll; } else { m.mode |= 3; m.has_collision = false; }
+    }
+}
+
 fn dist3(a: V3, b: V3) -> f32 { ((a[0] - b[0]).powi(2) + (a[1] - b[1]).powi(2) + (a[2] - b[2]).powi(2)).sqrt() }
 
 /// `0x361628`: the parked ship's update (module docs).

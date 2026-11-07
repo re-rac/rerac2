@@ -36,6 +36,12 @@ pub fn rotate(q: Q, v: V3) -> V3 {
     add(add(v, scale(t, q[3])), cross(u, t))
 }
 
+/// `0x321b28(out, v, q)`: `v` turned by `q` (`q·v·q*`, the opposite way to [`rotate`]).
+pub fn qrot(q: Q, v: V3) -> V3 {
+    let t = mul(mul(q, [v[0], v[1], v[2], 0.0]), [-q[0], -q[1], -q[2], q[3]]);
+    [t[0], t[1], t[2]]
+}
+
 /// `0x2efc20` + `0x2efa00(rows, R, rows)`: every row turned by `q`.
 pub fn turn_rows(rows: &[V3; 3], q: Q) -> [V3; 3] { rows.map(|r| rotate(q, r)) }
 

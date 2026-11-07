@@ -6,7 +6,7 @@ use crate::moby::{ai, frames, mode, Ctx, MobyWorld};
 use super::super::fighters as maktar;
 use super::super::props::{seq, set_seq, wrapped};
 use super::arena::{D98, DF9};
-use super::fighters::{aim, bolts, bump, claim, first_sub, flash_reset, give_back, go, grav, in_arena, in_middle, lim, middle, pool_body, round_plates, shadow, spin_out, spot, start_body, target_of, tick, Pivot};
+use super::fighters::{aim, bolts, bump, claim, flash_reset, give_back, go, grav, in_arena, in_middle, lim, middle, pool_body, round_plates, shadow, spin_out, spot, start_body, target_of, tick, Pivot};
 
 // ---------------------------------------------------------------------------------------------------------------
 // 0x0d98
@@ -383,7 +383,7 @@ pub fn update_d98(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let mut flags = 0;
     match w.mobys[id].sub_state {
         2 => {
-            if first_sub(w, id) {
+            if w.mobys[id].first_sub() {
                 let mid = middle(w, id, ctx);
                 set_seq(w, id, ctx, 3, 0, 10);
                 w.mobys[id].timer = 0;
@@ -771,7 +771,7 @@ pub fn update_df9(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let d = dist2(p, t);
     match w.mobys[id].sub_state {
         2 => {
-            if first_sub(w, id) {
+            if w.mobys[id].first_sub() {
                 let s = ctx.game.rng.randf(0.5, 1.25);
                 ctx.host.set_anim_speed(&w.mobys[id], s);
                 lim(w, id, 0.002_222_222_3, 0.066_666_67, 0.001_163_553, 0.104_719_77);

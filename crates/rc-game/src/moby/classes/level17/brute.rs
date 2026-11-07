@@ -82,7 +82,7 @@
 use crate::hero::physics::{add, add_rot, approach_angle, atan2, dist, dist2, rot_dist, set_len, sub, sub_rot, V3};
 use crate::moby::classes::props::{seq, set_seq, wrapped};
 use crate::moby::classes::{death_fade, level17::hatchling};
-use crate::moby::{ai, bolts, countdown, Ctx, MobyWorld};
+use crate::moby::{ai, bolts, Ctx, MobyWorld};
 use crate::path_network;
 
 pub const CLASS: i16 = 0x0bcb;
@@ -181,26 +181,8 @@ fn senses(w: &mut MobyWorld, id: usize, a: f32, b: f32, c: u32) {
 }
 /// Its slow limits (subs 0 / 4 / 6, states 6 / 11).
 fn slow(w: &mut MobyWorld, id: usize) { senses(w, id, TURN_A, WALK_A, TURN_6); }
-fn tick_s(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut t = w.mobys[id].pv_s(off) as i32;
-    let out = countdown(&mut t);
-    w.mobys[id].set_pv_s(off, t as i16);
-    out
-}
-fn tick_i(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut t = w.mobys[id].pv_i(off);
-    let out = countdown(&mut t);
-    w.mobys[id].set_pv_i(off, t);
-    out
-}
 fn pod_of(w: &MobyWorld, id: usize) -> Option<usize> { usize::try_from(w.mobys[id].pv_i(POD)).ok().filter(|&p| p < w.mobys.len()) }
 fn pod_b(w: &MobyWorld, id: usize) -> bool { pod_of(w, id).is_some_and(|p| w.mobys[p].o_class == POD_B) }
-/// `0x32d7e0` (L00 `0x32a7f0`): the first time since the last sub-state change.
-fn first_sub(m: &mut crate::moby::Moby) -> bool {
-    if m.once & 2 != 0 { return false; }
-    m.once |= 2;
-    true
-}
 /// Taking turns in a group (`+0x730` and its group's list).
 fn in_turns(w: &MobyWorld, id: usize) -> bool {
     let m = &w.mobys[id];
@@ -452,7 +434,7 @@ fn subs(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
         0 => waiting(w, id, ctx),
         2 => {
             if found(w, id) { w.mobys[id].set_pv_s(WAIT, 200); }
-            if tick_s(w, id, WAIT) {
+            if w.mobys[id].count_s(WAIT) {
                 st(w, id, 5, 4);
                 set_seq(w, id, ctx, 3, 0, 0x14);
                 w.mobys[id].set_pv_s(WAIT, 0xdc);
@@ -498,14 +480,14 @@ fn waiting(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// At the wait's end idle (3 sub 0, sequence 2 over 20).
 fn wait_out(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    if !tick_s(w, id, WAIT) { return; }
+    if !w.mobys[id].count_s(WAIT) { return; }
     set_seq(w, id, ctx, 2, 0, 0x14);
     st(w, id, 3, 0);
 }
 
 /// Sub 3 (module docs); true when it is gone.
 fn hurt(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
-    if first_sub(&mut w.mobys[id]) {
+    if w.mobys[id].first_sub() {
         let s = ctx.host.anim(&w.mobys[id]).map_or(1.0, |a| a.speed);
         if s <= 0.0 || 1.0 < s { speed(w, id, ctx, 1.0); }
         ai::senses(&mut w.mobys[id], TURN_A * 8.0 * (1.0 / 3600.0), WALK_A * f32::from_bits(0x3e08_8889), f32::from_bits(TURN_6), f32::from_bits(TURN_6));
@@ -561,7 +543,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, d: f32, ang: f32) -> bool
             if (a == 2 && wrapped(w, id, ctx)) || (a == 0xe && 20.0 <= f) { idle_seq(w, id, ctx); }
         }
         4 => {
-            if tick_i(w, id, T_OFF) { swipe(w, id, ctx, 0); }
+            if w.mobys[id].count_i(T_OFF) { swipe(w, id, ctx, 0); }
         }
         6 => climb(w, id, ctx),
         8 => {
@@ -757,7 +739,7 @@ fn back_off(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, d: f32, ang: f32) {
         speed(w, id, ctx, 1.0);
         if d < NEAR + SLACK { swipe(w, id, ctx, 0); } else { walk_in(w, id, ctx); }
     }
-    if tick_i(w, id, T_BACK) && d < NEAR {
+    if w.mobys[id].count_i(T_BACK) && d < NEAR {
         st(w, id, 12, -1);
         speed(w, id, ctx, 1.0);
         swipe_seq(w, id, ctx, 0);

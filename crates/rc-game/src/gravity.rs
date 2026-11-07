@@ -306,8 +306,8 @@ pub fn ride_carry(w: &MobyWorld, base: V3, p: V3) -> V3 {
 /// A vector into the frame of `rows` (row i = image of axis i): `0x2ef340(out, v, transpose)`.
 pub fn to_local(v: V3, rows: &[V3; 3]) -> V3 { [dot(v, rows[0]), dot(v, rows[1]), dot(v, rows[2])] }
 
-/// A local vector back into the world: `0x2ef340(out, l, rows)`.
-pub fn to_world(l: V3, rows: &[V3; 3]) -> V3 { std::array::from_fn(|k| l[0] * rows[0][k] + l[1] * rows[1][k] + l[2] * rows[2][k]) }
+/// A local vector back into the world: `0x2ef318(out, l, rows)` (crate::hero::physics::through, the local vector first).
+pub fn to_world(l: V3, rows: &[V3; 3]) -> V3 { crate::hero::physics::through(rows, l) }
 
 /// `v` turned by `angle` about the unit `axis` (right-handed).
 pub fn rotate(v: V3, axis: V3, angle: f32) -> V3 {

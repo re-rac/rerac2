@@ -84,7 +84,7 @@
 //! wait out and a line free: 8 (a talk sequence, the next line). 3: the end, its stop and line reset, 10. 10: hidden
 //! without collision for 25 ticks with the beam's burst, then home (1).
 
-use crate::hero::physics::{add, add_rot, atan2, dist, ease, len, len2, scale, set_len, sub, V3};
+use crate::hero::physics::{add, add_rot, atan2, dist, ease, len, len2, set_len, sub, through, V3};
 use crate::moby::classes::props::{seq, set_seq, wrapped};
 use crate::moby::{ai, mode, Ctx, MobyWorld};
 use crate::path_network;
@@ -189,9 +189,6 @@ fn moby_at(w: &MobyWorld, i: i32) -> Option<usize> { usize::try_from(i).ok().fil
 
 fn members(w: &MobyWorld, g: i32) -> Vec<usize> { usize::try_from(g).ok().and_then(|g| w.groups.get(g)).cloned().unwrap_or_default() }
 
-/// `0x2f2a00(out, v, M)`: `v` turned by the three rows (as columns).
-fn turn(r: &[V3; 3], v: V3) -> V3 { add(add(scale(r[0], v[0]), scale(r[1], v[1])), scale(r[2], v[2])) }
-
 fn rows4(m: &[[f32; 4]]) -> [V3; 3] { std::array::from_fn(|k| [m[k][0], m[k][1], m[k][2]]) }
 
 /// Cuboid `i`'s place (`+0x30`).
@@ -232,7 +229,7 @@ fn setup(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let first = m.pv_i(C_POINTS);
         if let Some(c) = usize::try_from(first).ok().and_then(|i| ctx.level.cuboids.get(i)) {
             let d = sub(p, [c.matrix[3][0], c.matrix[3][1], c.matrix[3][2]]);
-            let local = turn(&rows4(&c.inverse), d);
+            let local = through(&rows4(&c.inverse), d);
             w.mobys[id].set_pv_v(C_LOCAL, local);
         }
         let m = &mut w.mobys[id];
@@ -415,7 +412,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let (k, local) = { let m = &w.mobys[id]; (m.pv_i(C_AT), m.pv_v(C_LOCAL)) };
     let c = w.mobys[id].pv_i(C_POINTS + 4 * k.clamp(0, 5) as usize);
-    let to = usize::try_from(c).ok().and_then(|i| ctx.level.cuboids.get(i)).map_or(w.mobys[id].pos, |c| add(turn(&rows4(&c.matrix), local), [c.matrix[3][0], c.matrix[3][1], c.matrix[3][2]]));
+    let to = usize::try_from(c).ok().and_then(|i| ctx.level.cuboids.get(i)).map_or(w.mobys[id].pos, |c| add(through(&rows4(&c.matrix), local), [c.matrix[3][0], c.matrix[3][1], c.matrix[3][2]]));
     let yaw = heading(w, id, ctx, to);
     let pick = w.mobys[id].pv_i(C_PICK);
     let speed = if pick != 0 && pick == k - 1 {
@@ -587,8 +584,8 @@ fn ask_on(w: &mut MobyWorld, g: i32) {
 fn carrier_door(w: &MobyWorld, c: usize, ctx: &Ctx) -> Option<(V3, V3)> {
     let m = &w.mobys[c];
     if m.o_class != CARRIER || m.state != 5 { return None; }
-    let way_in = add(turn(&m.rows, DOOR), m.pos);
-    let mut land = add(turn(&m.rows, STEP), m.pos);
+    let way_in = add(through(&m.rows, DOOR), m.pos);
+    let mut land = add(through(&m.rows, STEP), m.pos);
     land[2] += 2.0;
     land[2] = ai::ground_z(ctx, 0.5, land, 0);
     Some((land, way_in))
@@ -653,7 +650,7 @@ fn exhaust(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
     let Some(sys) = ctx.parts.as_deref_mut() else { return };
     let g = &mut ctx.game.rng;
     for off in EXHAUSTS {
-        let at = add(turn(&m.rows, off), m.pos);
+        let at = add(through(&m.rows, off), m.pos);
         for (k, (rgba, b3)) in [(0xdf20_2020u32, 0x44u8), (0xdf20_8080, 0x48), (0xdf80_8080, 0x44)].into_iter().enumerate() {
             let f = if k == 2 { f32::from_bits(0x3c88_8889) } else { f32::from_bits(0x3d4c_ccce) };
             let v = [c * f, s * f, f32::from_bits(0x3d08_8889)];
@@ -725,8 +722,8 @@ pub fn update_0fa5(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.set_pv_i(K_WAIT, t);
             if done {
                 let m = &w.mobys[id];
-                let at = add(turn(&m.rows, DOOR), m.pos);
-                let mut to = add(turn(&m.rows, STEP), m.pos);
+                let at = add(through(&m.rows, DOOR), m.pos);
+                let mut to = add(through(&m.rows, STEP), m.pos);
                 to[2] += 2.0;
                 to[2] = ai::ground_z(ctx, 0.5, to, 0);
                 if !launch(w, ctx, group, at, to) {

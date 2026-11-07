@@ -41,12 +41,6 @@ const GRAVITY: (f32, f32) = (10.0, 20.0);
 /// The puffs' speed after the break (`0x3d4cccce`).
 const SMOKE_SPEED: f32 = f32::from_bits(0x3d4c_ccce);
 
-/// A point in its scaled frame (`0x31e828` = L00 `0x326190`).
-fn frame_point(w: &MobyWorld, id: usize, v: V3) -> V3 {
-    let m = &w.mobys[id];
-    std::array::from_fn(|k| (v[0] * m.rows[0][k] + v[1] * m.rows[1][k] + v[2] * m.rows[2][k]) * m.scale + m.pos[k])
-}
-
 /// `0x2e61a8` on moby `id` (crate::particles::staged_burst) at [`AT`].
 #[allow(clippy::too_many_arguments)]
 fn puffs(w: &MobyWorld, id: usize, ctx: &mut Ctx, spread: f32, speed: f32, size: f32, fall: f32, vel: V3, count: i32, kind: u8) {
@@ -72,7 +66,7 @@ pub fn update_10f1(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         2 => {
             shards::throw_all(w, id, ctx, RANGE, SPIN, GRAVITY, 0xffff, 0, -1, 0, 0xffff);
             puffs(w, id, ctx, 0.2, f32::from_bits(0x3dee_eef0), 1.0, 5.0, VEL, 0x28, 1);
-            let at = frame_point(w, id, [13.0, 0.0, 14.0]);
+            let at = crate::moby::ai::frame_point(w, id, [13.0, 0.0, 14.0]);
             let e = Explosion { flash2: 1.0, near: 9.0, size: 0.75, embers: 10, billows: 3, flares: 5, sound: -1, lod: -1, flags: 0x0081_0001, ..Default::default() };
             blast::explode(w, ctx, Some(id), Some(at), &e);
             let g = w.mobys[id].pv_i(GLOW);

@@ -24,7 +24,7 @@
 //! hidden (`$gp+0x85c`, 0), its draw (`0x2e0b70(0x3ac090)` = L00 `0x2e7920`).
 
 use crate::moby::classes::level13::powerline::{self, pv, Shape};
-use crate::moby::{countdown, Ctx, MobyWorld};
+use crate::moby::{Ctx, MobyWorld};
 
 pub const CLASS: i16 = 0x07fb;
 
@@ -61,14 +61,6 @@ fn loop_off(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.set_shared_i(lp, -1);
 }
 
-fn tick_count(w: &mut MobyWorld, id: usize) -> bool {
-    let m = &mut w.mobys[id];
-    let mut c = m.pv_s(pv::COUNT) as i32;
-    let out = countdown(&mut c);
-    m.set_pv_s(pv::COUNT, c as i16);
-    out
-}
-
 /// 0x07fb (module docs).
 pub fn update_07fb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     match w.mobys[id].state {
@@ -103,7 +95,7 @@ pub fn update_07fb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             w.set_shared_i(lp, -1);
         }
         2 => {
-            if tick_count(w, id) {
+            if w.mobys[id].count_s(pv::COUNT) {
                 let m = &mut w.mobys[id];
                 m.state = 3;
                 m.set_pv_s(pv::COUNT, 0x78);
@@ -116,7 +108,7 @@ pub fn update_07fb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 w.set_shared_i(lp, h);
                 w.set_shared_i(op, id as i32 + 1);
             }
-            if tick_count(w, id) {
+            if w.mobys[id].count_s(pv::COUNT) {
                 let m = &mut w.mobys[id];
                 if m.pv_s(pv::PAUSES) != 0 { m.state = 2; }
                 m.set_pv_s(pv::COUNT, 0);

@@ -32,7 +32,7 @@
 //! is 0 in every placed lid on both levels.
 
 use crate::fx::FxQuad;
-use crate::hero::physics::{sub, unit, V3};
+use crate::hero::physics::{sub, unit, wrap, V3};
 use crate::moby::{Ctx, MobyWorld};
 use std::f32::consts::PI;
 
@@ -104,9 +104,6 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let sphere = [m.pos[0], m.pos[1], m.pos[2], r];
     if !ctx.view.is_some_and(|v| v.culled(m.draw_dist as f32, sphere)) { w.register_draw_first(id); }
 }
-
-/// `0x320440`: an angle wrapped to [−π, π).
-fn wrap(a: f32) -> f32 { ((a + PI) * 0.159_154_94).rem_euclid(1.0) * std::f32::consts::TAU - PI }
 
 /// `0x42fce0` (a first-list callback; module docs): the last lid of the frame's list draws every lid's quads, each
 /// layer for all of them before the next. Each lid's square (half-size `scale·8 / class scale`) at its height plus

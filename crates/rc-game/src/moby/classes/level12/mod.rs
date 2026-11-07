@@ -70,7 +70,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         launcher::CARRIER => Some(launcher::update_0fa5),
         launcher::GUIDE => Some(launcher::update_0fec),
         0x0f31 => Some(trooper::update_0f31),
-        0x114b => Some(trooper::update_114b),
         0x0d66 => Some(debris::update_0d66),
         0x03a6 => Some(shot::update_03a6),
         fence::CLASS => Some(fence::update_0fae),

@@ -56,7 +56,7 @@
 use crate::hero::physics::{add, add_rot, atan2, cross, dist, dist2, len2, scale, set_len, sub, unit, V3};
 use crate::hud::lerp_rgba;
 use crate::moby::{ai, Ctx, MobyWorld};
-use super::endako_a::to_world;
+use crate::gravity::to_world;
 
 /// The laser sentry.
 pub const SENTRY: i16 = 0x0ffd;
@@ -425,16 +425,8 @@ pub fn drop(w: &mut MobyWorld, id: usize, vel: V3) {
 fn tail(w: &mut MobyWorld, id: usize) {
     let m = &mut w.mobys[id];
     ai::flash(m, FLASH);
-    for o in [0x320, 0x322] { count_s(m, o); }
+    for o in [0x320, 0x322] { m.count_s(o); }
     if m.state_ticks != -1 { m.state_ticks = m.state_ticks.wrapping_add(1); }
-}
-
-/// `0x2efa80(&s)`: a 16-bit timer down (crate::moby::countdown); true when it is (or runs) out.
-fn count_s(m: &mut crate::moby::Moby, o: usize) -> bool {
-    let mut t = m.pv_s(o) as i32;
-    let out = crate::moby::countdown(&mut t);
-    m.set_pv_s(o, t as i16);
-    out
 }
 
 /// The beam's line (`0x2df4f8(start, end, 0, m, hit)`): its start, its end (where it met something) and what it met;
@@ -748,7 +740,7 @@ pub fn update_0ffc(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 let t = ctx.game.rng.rand_range(0x14, 0x3c);
                 w.mobys[id].set_pv_s(WAIT, t as i16);
             }
-            if (found(w) || w.mobys[id].pv_s(ALARM) != 0) && count_s(&mut w.mobys[id], WAIT) {
+            if (found(w) || w.mobys[id].pv_s(ALARM) != 0) && w.mobys[id].count_s(WAIT) {
                 w.mobys[id].set_state(3, 2);
                 set_seq(w, id, ctx, 1, 0, 0x14);
                 w.mobys[id].set_pv_s(ALARM, 0);
@@ -877,8 +869,8 @@ fn flamer_tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let mut t = m.pv_i(GIVE_UP);
     crate::moby::countdown(&mut t);
     m.set_pv_i(GIVE_UP, t);
-    count_s(m, CALM);
-    count_s(m, WAIT);
+    m.count_s(CALM);
+    m.count_s(WAIT);
     if m.state_ticks != -1 { m.state_ticks = m.state_ticks.wrapping_add(1); }
     // `0x3266c8(m, out, +0x1a0, 0)`: its velocity in its frame (the rows' transpose); the lean from its y.
     let v = m.pv_v(MV + 0xa0);

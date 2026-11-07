@@ -356,6 +356,33 @@ pub fn countdown(x: &mut i32) -> bool {
     *x < 1
 }
 
+/// `0x2eeb40`: a countdown in seconds, a frame (1/60) at a time; true when out (it was, or it is now: then 0).
+pub fn count_secs(x: &mut f32) -> bool {
+    if *x <= 1.0 / 60.0 {
+        *x = 0.0;
+        return true;
+    }
+    *x -= 1.0 / 60.0;
+    false
+}
+
+/// The looped sound whose handle is in the pvar at `off` stopped while it still plays (`0x3602a8`, `0x3602f0`); the
+/// handle −1.
+pub fn stop_loop(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, off: usize) {
+    let h = w.mobys[id].pv_i(off);
+    if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
+    w.mobys[id].set_pv_i(off, -1);
+}
+
+/// The moby's class sound `k` looped (`0x3605f0(k, 4)`) into the pvar at `off` unless the handle there still plays
+/// (`0x3602a8`).
+pub fn keep_loop(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, off: usize, k: i32) {
+    let h = w.mobys[id].pv_i(off);
+    if h != -1 && ctx.host.sound_playing(h) { return; }
+    let h = ctx.host.play_sound(&w.mobys[id], k, 4);
+    w.mobys[id].set_pv_i(off, h);
+}
+
 impl Moby {
     /// `0x31b8d0(moby, state, sub)`: a new state (the last kept, its ticks from 0; `sub` ≥ 0 sets the sub-state).
     pub fn set_state(&mut self, state: u8, sub: i32) {
@@ -377,6 +404,13 @@ impl Moby {
     pub fn first(&mut self) -> bool {
         if self.once & 1 != 0 { return false; }
         self.once |= 1;
+        true
+    }
+
+    /// `0x32a7f0`: true the first time since the last sub-state change.
+    pub fn first_sub(&mut self) -> bool {
+        if self.once & 2 != 0 { return false; }
+        self.once |= 2;
         true
     }
 
@@ -439,6 +473,27 @@ impl Moby {
         self.pvars[off] = v;
     }
     pub fn set_pv_v(&mut self, off: usize, v: V3) { for (k, x) in v.iter().enumerate() { self.set_pv_f(off + 4 * k, *x); } }
+    /// `0x2eeae0` on the s16 pvar at `off` ([`countdown`]): true when it was 0 or just reached it.
+    pub fn count_s(&mut self, off: usize) -> bool {
+        let mut t = self.pv_s(off) as i32;
+        let out = countdown(&mut t);
+        self.set_pv_s(off, t as i16);
+        out
+    }
+    /// `0x2eeab0` on the pvar word at `off` ([`countdown`]).
+    pub fn count_i(&mut self, off: usize) -> bool {
+        let mut t = self.pv_i(off);
+        let out = countdown(&mut t);
+        self.set_pv_i(off, t);
+        out
+    }
+    /// `0x2eeb40` on the float pvar at `off` ([`count_secs`]): seconds, a frame off.
+    pub fn count_f(&mut self, off: usize) -> bool {
+        let mut t = self.pv_f(off);
+        let out = count_secs(&mut t);
+        self.set_pv_f(off, t);
+        out
+    }
     /// `0x3241d8(m, rgb)`: the ambient from a colour word (r in the low byte; `0x313300`).
     pub fn set_ambient_word(&mut self, c: u32) { self.ambient = [c as u8, (c >> 8) as u8, (c >> 16) as u8]; }
     /// A quaternion in the pvars (crate::quat).
@@ -738,6 +793,8 @@ pub struct MobyWorld {
     pub hitters: crate::upgrades::Hitters,
     /// The weapon mods' tables and arcs (weapon_mods: Acid `0x253330`, Shock `0x2565a0`, the arcs `0x256b40`).
     pub mods: weapon_mods::Mods,
+    /// The Heavy Lancer's shots' trail bank and ribbon phase (`$gp+0x2440` / `$gp+0x2444`, classes::heavy_shot).
+    pub heavy_shot: classes::heavy_shot::Globals,
 }
 
 /// The instance data the static spawn reads besides the records (gameplay sections 20, 22..25).
@@ -1024,6 +1081,21 @@ impl MobyWorld {
         m.grid_rect = GRID_NONE;
         self.grid.update(id as u16, old, GRID_NONE);
         self.changed = true;
+    }
+
+    /// `0x32a748(m, owner)`: moby `id` updated and drawn from any distance (0xff), drawn; with an owner, its owner
+    /// (`+0xb8`), the owner's place, angles and light words (`+0x38`: the light and the ambient), its matrix rebuilt
+    /// (`0x313dc0`); its mode's low three bits cleared.
+    pub fn adopt(&mut self, id: usize, owner: Option<usize>, host: &dyn MobyHost) {
+        let m = &mut self.mobys[id];
+        (m.update_dist, m.draw_dist, m.drawn) = (0xff, 0xff, 1);
+        if let Some(o) = owner {
+            let (pos, rot, light, ambient) = { let o = &self.mobys[o]; (o.pos, o.rot, o.light, o.ambient) };
+            let m = &mut self.mobys[id];
+            (m.parent, m.pos, m.rot, m.light, m.ambient) = (Some(o), pos, rot, light, ambient);
+            self.rebuild(id, host);
+        }
+        self.mobys[id].mode &= 0xfff8;
     }
 
     /// `0x2de878(a, b, flags, 0, ignore)` from the moby loop: the line against the world and the mobys as they are now

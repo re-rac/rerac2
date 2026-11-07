@@ -102,7 +102,7 @@ use crate::hero::physics::{add, add_rot, approach, approach_angle, dist, dist2, 
 use crate::moby::blast::{self, Explosion};
 use crate::moby::classes::props::{set_seq, wrapped};
 use crate::moby::classes::shot::polar;
-use crate::moby::{countdown, Ctx, MobyWorld};
+use crate::moby::{countdown, stop_loop, Ctx, MobyWorld};
 use crate::pad::button;
 
 pub const CLASS: i16 = 0x0905;
@@ -246,13 +246,6 @@ fn keep_loop(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if ctx.host.sound_playing(w.mobys[id].pv_i(pv::LOOP)) { return; }
     let h = ctx.host.play_sound_of(&w.mobys[id], PAD, 1, 4);
     w.mobys[id].set_pv_i(pv::LOOP, h);
-}
-
-/// Its loop sound stopped.
-fn stop_loop(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let h = w.mobys[id].pv_i(pv::LOOP);
-    if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
-    w.mobys[id].set_pv_i(pv::LOOP, -1);
 }
 
 /// The smoothed look's spring back (`0x1b2044` / `0x1b2048` from the kept).
@@ -608,7 +601,7 @@ fn gliding(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, saved: V3) {
 fn crashed(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, saved: V3) {
     camera(w, id, ctx);
     if w.mobys[id].first() {
-        stop_loop(w, id, ctx);
+        stop_loop(w, id, ctx, pv::LOOP);
         sound(w, id, ctx, 4);
         w.mobys[id].set_pv_i(pv::REST, 15);
     }
@@ -630,7 +623,7 @@ fn crashed(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, saved: V3) {
 
 /// 10 (module docs).
 fn landing(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    stop_loop(w, id, ctx);
+    stop_loop(w, id, ctx, pv::LOOP);
     let m = &mut w.mobys[id];
     let home = m.pv_v(pv::HOME);
     let d = dist(m.pv_v(pv::POS), home);

@@ -30,9 +30,10 @@
 //! collision; the box may still move after it this tick.
 
 use crate::fx::FxQuad;
-use crate::hero::physics::{add, cross, dot, len, scale, set_len, sub, V3};
+use crate::hero::physics::{add, cross, len, scale, set_len, sub, through, V3};
 use crate::moby::attach::rows_of;
 use crate::moby::{Ctx, MobyWorld};
+use crate::gravity::to_local;
 
 pub const CLASS: i16 = 0x0f9f;
 /// The shuttle box (crate::moby::classes::level12::tractor::update_0fc4).
@@ -65,12 +66,6 @@ fn cuboid(ctx: &Ctx, i: i32) -> Option<([V3; 3], V3, V3, [V3; 3])> {
     let v = |r: [f32; 4]| [r[0], r[1], r[2]];
     Some(([v(c.matrix[0]), v(c.matrix[1]), v(c.matrix[2])], v(c.matrix[3]), v(c.extra), [v(c.inverse[0]), v(c.inverse[1]), v(c.inverse[2])]))
 }
-
-/// `R·d` (`0x2f2a28` with the transpose).
-fn local(r: &[V3; 3], d: V3) -> V3 { [dot(d, r[0]), dot(d, r[1]), dot(d, r[2])] }
-
-/// `v` through the rows (`0x2f2a00`).
-fn through(r: &[V3; 3], v: V3) -> V3 { add(add(scale(r[0], v[0]), scale(r[1], v[1])), scale(r[2], v[2])) }
 
 /// Gone with its uid marked (`0x21f204[uid]` ≠ 0, or its count in `0x19b4a8`).
 fn uid_done(w: &MobyWorld, id: usize, ctx: &Ctx) -> bool {
@@ -119,7 +114,7 @@ fn tick(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if let Some(hit) = w.coll_line(ctx, a, b, 0x12, None) {
         let m = &mut w.mobys[id];
         m.set_pv_i(SEEN, 1);
-        let v = local(&r, sub(hit.point, o));
+        let v = to_local(sub(hit.point, o), &r);
         m.set_pv_f(AT, -v[2] / -length);
         if let Some(bx) = hit.moby.filter(|&k| w.mobys.get(k).is_some_and(|x| x.o_class == BOX)) {
             let (pos, rot) = (w.mobys[id].pos, w.mobys[id].rot);
@@ -134,7 +129,7 @@ fn tick(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     point[2] += LIFT;
     if ctx.level.in_cuboid(ci, point) {
         let m = &w.mobys[id];
-        let z = -local(&r, sub(feet, o))[2] / -length;
+        let z = -to_local(sub(feet, o), &r)[2] / -length;
         let at = m.pv_f(AT);
         let burnt = z < at - BEFORE / length * 1.5 || at + PAST / length * 0.5 <= z || m.pv_i(SEEN) == 0 || m.pv_i(BARE) == 1;
         if burnt {
@@ -148,7 +143,7 @@ fn tick(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     point[2] = o[2];
     if ctx.level.in_cuboid(ci, point) {
-        let z = -local(&r, sub(point, o))[2] / -length;
+        let z = -to_local(sub(point, o), &r)[2] / -length;
         if (z + 1.0).abs() < 0.01 { finish(w, id, ctx); }
     }
     let far = w.mobys[id].pv_i(FAR);

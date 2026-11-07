@@ -57,6 +57,7 @@
 
 use crate::moby::{carry_hero, mode, Ctx, MobyWorld};
 use crate::shadow_volumes::probe_near;
+use crate::hero::physics::through;
 
 /// 0x0af3 (`0x3efea8`), state 0: no path (`+0` = −1) deletes it (`0x3157a0`). Not ported: the rest (its path's set-up
 /// `0x3f0048`, the guide along it `0x3f01c8` / `0x3f0340` and its view test `0x3f0528`): no placed one has a path.
@@ -413,8 +414,6 @@ fn smoke_0e93(w: &MobyWorld, id: usize, ctx: &mut Ctx, a: f32, b: f32) {
         crate::particles::staged(sys, rng, p, [v[0], v[1], v[2], size], [v[0], v[1], v[2] + sink, 0.01], c0, c1, i as i16, e as i16, o as i16, 0x1003c);
     }
 }
-
-fn through(rows: &[[f32; 3]; 3], v: [f32; 3]) -> [f32; 3] { std::array::from_fn(|k| v[0] * rows[0][k] + v[1] * rows[1][k] + v[2] * rows[2][k]) }
 
 /// `0x425010(a, b, m)`: twenty staged puffs (crate::particles::staged, def 0x1003c) from 1.75 up and 0.5 back in its
 /// frame, each along its facing ± `randf(−1, 1)` across and `randf(−0.15, 1)` up at `randf(a, b)` a tick, `randf(0.2,

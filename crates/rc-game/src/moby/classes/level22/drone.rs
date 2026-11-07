@@ -77,14 +77,6 @@ fn boss_of(w: &MobyWorld) -> Option<usize> { w.level22.boss.filter(|&b| w.mobys.
 fn seq(w: &MobyWorld, ctx: &Ctx, id: usize) -> u8 { ctx.host.anim(&w.mobys[id]).map_or(0xff, |a| a.seq_b) }
 fn ended(w: &MobyWorld, ctx: &Ctx, id: usize) -> bool { ctx.host.anim(&w.mobys[id]).is_some_and(|a| a.flags & 2 != 0) }
 
-/// `0x32a7f0`: the first time since the last sub-state change.
-fn first_sub(w: &mut MobyWorld, id: usize) -> bool {
-    let m = &mut w.mobys[id];
-    if m.once & 2 != 0 { return false; }
-    m.once |= 2;
-    true
-}
-
 /// `0x2e5b30(p, flags, ignore, r)` (`0x2df8d8`): the moby a sphere query meets first.
 fn moby_at(ctx: &Ctx, p: V3, flags: u32, ignore: Option<usize>, r: f32) -> Option<usize> {
     let sc = ctx.scene?;
@@ -239,7 +231,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     match w.mobys[id].sub_state {
         0 => {
-            if first_sub(w, id) && seq(w, ctx, id) != 1 { ctx.host.set_anim(&w.mobys[id], 1, 0, 20); }
+            if w.mobys[id].first_sub() && seq(w, ctx, id) != 1 { ctx.host.set_anim(&w.mobys[id], 1, 0, 20); }
             if w.level22.intro == 0 {
                 if visible && distance < 40.0 {
                     w.mobys[id].set_state(3, 1);
@@ -256,7 +248,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         1 => {
-            if first_sub(w, id) && seq(w, ctx, id) != 1 { ctx.host.set_anim(&w.mobys[id], 1, 0, 20); }
+            if w.mobys[id].first_sub() && seq(w, ctx, id) != 1 { ctx.host.set_anim(&w.mobys[id], 1, 0, 20); }
             if w.mobys[id].pv_i(0x258) == 0 {
                 w.mobys[id].set_state(2, 0);
             } else if visible && facing && distance < 30.0 {
@@ -267,7 +259,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         2 => {
-            if facing || first_sub(w, id) {
+            if facing || w.mobys[id].first_sub() {
                 if seq(w, ctx, id) != 3 { ctx.host.set_anim(&w.mobys[id], 3, 0, 10); }
                 let sp = w.level22.damage[3];
                 ctx.host.set_anim_speed(&w.mobys[id], sp);

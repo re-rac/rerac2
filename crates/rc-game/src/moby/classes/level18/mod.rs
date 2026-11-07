@@ -40,8 +40,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         hatch::CLASS => Some(hatch::update_1151),
         prey::CLASS => Some(prey::update_0ef4),
         stalker::CLASS => Some(stalker::update_0f0a),
-        // `0x436980`: L09's `0x3f85e8`, the shadow alone.
-        stalker::BODY => Some(super::level09::trooper::update_0d0e),
+        // The body 0x0f0b (`0x436980`, L09's `0x3f85e8`): crate::moby::classes::trooper::update_turret, registered there.
         dropship::CLASS => Some(dropship::update_0ede),
         // Level 20's 0x1212 runs the same code (`0x447010`).
         props::ARCS => Some(props::update_1212),

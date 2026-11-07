@@ -87,7 +87,7 @@ use crate::hero::physics::{add, add_rot, cross, dist, dist2, dot, len, scale, se
 use crate::moby::attach::angles_of;
 use crate::moby::blast::{self, Explosion};
 use crate::moby::hits::HitTemplate;
-use crate::moby::{ai, Ctx, MobyWorld};
+use crate::moby::{ai, keep_loop, stop_loop, Ctx, MobyWorld};
 use crate::pad::button;
 use crate::particles::hover_dust;
 use rc_formats::moby_anim::JointModifier;
@@ -486,20 +486,6 @@ fn by_level(ctx: &Ctx, v: (f32, f32, f32)) -> f32 {
     }
 }
 
-/// Keeps the looped sound `slot` going: `index` again when it no longer plays.
-fn keep_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, slot: usize, index: i32) {
-    if !ctx.host.sound_playing(w.mobys[id].pv_i(slot)) {
-        let h = ctx.host.play_sound(&w.mobys[id], index, 4);
-        w.mobys[id].set_pv_i(slot, h);
-    }
-}
-
-fn stop_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, slot: usize) {
-    let h = w.mobys[id].pv_i(slot);
-    if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
-    w.mobys[id].set_pv_i(slot, -1);
-}
-
 pub fn update_0eef(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if ctx.game.scenes.mode == crate::scene::SCENE || ctx.hero.state == 0x61 {
         let m = &mut w.mobys[id];
@@ -540,7 +526,7 @@ pub fn update_0eef(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         1 | 3 => {
             if w.mobys[id].state == 1 {
                 fresh = try_get_on(w, id, ctx);
-                keep_sound(w, id, ctx, pv::IDLE, 9);
+                keep_loop(w, id, ctx, pv::IDLE, 9);
             }
             steer(w, id, ctx);
             let last = fly(w, id, ctx);
@@ -552,7 +538,7 @@ pub fn update_0eef(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if !fresh && ctx.hero.vehicle.moby == Some(id) && ctx.hero.items.pressed & button::TRIANGLE != 0 {
                 get_off(w, id, ctx);
                 w.mobys[id].set_state(1, -1);
-                keep_sound(w, id, ctx, pv::IDLE, 9);
+                keep_loop(w, id, ctx, pv::IDLE, 9);
             }
         }
         5 => {
@@ -572,7 +558,7 @@ fn try_get_on(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     // `0x31a090(0, 0x41edd0, 1)`: the HUD's callback ([`draw_hud`]).
     ctx.game.hud_slots.set(Some(crate::hud::SlotCallback::Hovership { moby: id }), HUD_SLOT);
     board(w, id, ctx, RIDE_SEQ as u8);
-    stop_sound(w, id, ctx, pv::IDLE);
+    stop_loop(w, id, ctx, pv::IDLE);
     ctx.hero.view_lock = 1;
     true
 }
@@ -762,21 +748,21 @@ fn vacuum_sounds(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 if !ctx.host.sound_playing(m.pv_i(pv::SND)) {
                     let h = ctx.host.play_sound(m, 2, 4);
                     w.mobys[id].set_pv_i(pv::SND, h);
-                    stop_sound(w, id, ctx, pv::IDLE);
+                    stop_loop(w, id, ctx, pv::IDLE);
                 }
             }
             _ => {}
         }
-        stop_sound(w, id, ctx, pv::IDLE);
+        stop_loop(w, id, ctx, pv::IDLE);
     } else if m.pv_i(pv::VAC) == 2 {
-        stop_sound(w, id, ctx, pv::SND);
+        stop_loop(w, id, ctx, pv::SND);
         let m = &w.mobys[id];
         if m.pv_i(pv::VAC_T) == 0 { ctx.host.play_sound(m, 4, 0); }
         let m = &mut w.mobys[id];
         m.set_pv_i(pv::VAC, 0);
         m.set_pv_i(pv::VAC_T, 15);
     } else {
-        keep_sound(w, id, ctx, pv::IDLE, 9);
+        keep_loop(w, id, ctx, pv::IDLE, 9);
     }
 }
 
@@ -856,9 +842,9 @@ fn after(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         crate::shadow_volumes::probe_near(w, id, ctx, 64.0, 0x3c);
     }
     if w.mobys[id].pv_f(pv::THROTTLE) == 0.0 {
-        if w.mobys[id].pv_i(pv::VAC) != 2 { stop_sound(w, id, ctx, pv::SND); }
+        if w.mobys[id].pv_i(pv::VAC) != 2 { stop_loop(w, id, ctx, pv::SND); }
     } else if ctx.host.sound_playing(w.mobys[id].pv_i(pv::SND)) {
-        stop_sound(w, id, ctx, pv::IDLE);
+        stop_loop(w, id, ctx, pv::IDLE);
     } else {
         let h = ctx.host.play_sound(&w.mobys[id], 0, 4);
         w.mobys[id].set_pv_i(pv::SND, h);

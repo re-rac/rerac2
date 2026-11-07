@@ -165,14 +165,6 @@ fn limits(w: &mut MobyWorld, id: usize, l: [u32; 4]) {
     ai::senses(&mut w.mobys[id], a, b, c, d);
 }
 
-/// `0x34d750`: the first tick since the last sub-state change.
-fn first_sub(w: &mut MobyWorld, id: usize) -> bool {
-    let m = &mut w.mobys[id];
-    if m.once & 2 != 0 { return false; }
-    m.once |= 2;
-    true
-}
-
 fn anim(w: &MobyWorld, id: usize, ctx: &mut Ctx, s: u8, frame: u8, blend: i32) { set_seq(w, id, ctx, s, frame, blend.clamp(0, 255) as u8); }
 fn st(w: &mut MobyWorld, id: usize, state: u8, sub: i32) { w.mobys[id].set_state(state, sub); }
 fn rand_blend(ctx: &mut Ctx, a: i32, b: i32) -> i32 { ctx.game.rng.rand_range(a, b) }
@@ -540,7 +532,7 @@ fn attack(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, third: bool) {
 
 /// Sub 0 (module docs).
 fn calm(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    if first_sub(w, id) { limits(w, id, CALM); }
+    if w.mobys[id].first_sub() { limits(w, id, CALM); }
     let m = &w.mobys[id];
     let sees = m.pv_i(SEEN_NEAR) == 1 || (m.pv_i(SURE) != 0 && m.pv_s(RANGE) == 2);
     if sees && (tpos(w, id, ctx)[2] - w.mobys[id].pos[2]).abs() < 2.0 {
@@ -574,7 +566,7 @@ fn calm(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// Sub 1 (module docs).
 fn alert(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    if first_sub(w, id) {
+    if w.mobys[id].first_sub() {
         limits(w, id, RUN);
         let m = &mut w.mobys[id];
         m.set_pv_f(W_RANGE, 6.0);
@@ -733,11 +725,11 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         0 => calm(w, id, ctx),
         1 => alert(w, id, ctx),
         2 => {
-            if first_sub(w, id) { limits(w, id, RUN); }
+            if w.mobys[id].first_sub() { limits(w, id, RUN); }
             if !seen(w, id) && w.mobys[id].pv_i(SURE) == 0 { lost(w, id, ctx, [(0x19, 10, 0x14), (0x11, 0x14, 0x1e), (0x1e, 0x14, 0x1e), (0x18, 0x14, 0x1e)]); }
         }
         3 => {
-            if first_sub(w, id) { limits(w, id, RUN); }
+            if w.mobys[id].first_sub() { limits(w, id, RUN); }
             if w.mobys[id].pv_i(CHARGE) == 1 {
                 anim(w, id, ctx, 0xc, 0, 10);
                 st(w, id, 0x15, 2);
@@ -775,7 +767,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         5 => riding(w, id, ctx),
         6 => {
-            if first_sub(w, id) {
+            if w.mobys[id].first_sub() {
                 let g = make_part(w, id, ctx, WEAPON_CLASS, 3, false);
                 let m = &mut w.mobys[id];
                 ai::set_link(m, WEAPON, Some(g));

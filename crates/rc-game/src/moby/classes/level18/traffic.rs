@@ -60,7 +60,7 @@
 //! strips and a glow of the warp's size and colour, not the particles). A leader's collision is shared as its flag
 //! (the game copies its pointer `+0x98`).
 
-use crate::hero::physics::{add, add_rot, dist, scale, set_len, sub, V3};
+use crate::hero::physics::{add, add_rot, dist, scale, set_len, sub, through, V3};
 use crate::moby::blast::{self, Blast};
 use crate::moby::hits::HitTemplate;
 use crate::moby::{Ctx, MobyWorld};
@@ -135,9 +135,6 @@ static EXHAUST_KEYS: Keys = Keys { colors: &[0x0000_2030, 0x7f60_6060, 0x0023_23
 /// 60 ticks.
 static PUFF_KEYS: Keys = Keys { colors: &[0x00ff_ffff, 0x4060_3000, 0x7fff_ff00, 0x00ff_ffff], sizes: &[0, 3000, 1000, 0], times: &[0, 15, 45, 60], last: 4, life: 60, scale: 1.0 };
 const PER_TICK: f32 = 0.016_666_668;
-
-/// `0x2ef318`: `v` through the rows.
-fn through(v: V3, r: &[V3; 3]) -> V3 { std::array::from_fn(|k| v[0] * r[0][k] + v[1] * r[1][k] + v[2] * r[2][k]) }
 
 fn idx(w: &MobyWorld, k: i32) -> Option<usize> { usize::try_from(k).ok().filter(|&k| k < w.mobys.len()) }
 
@@ -294,7 +291,7 @@ fn run(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.has_collision = solid;
         m.rows = rows;
         m.rot = rot;
-        m.pos = add(through(m.pv_v(OFFSET), &rows), lp);
+        m.pos = add(through(&rows, m.pv_v(OFFSET)), lp);
     } else {
         let m = &mut w.mobys[id];
         m.pos = add(m.pos, m.pv_v(VEL));
@@ -315,7 +312,7 @@ fn run(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 fn ram(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &w.mobys[id];
     let (rows, pos) = (m.rows, m.pos);
-    let at = add(through(RAM_AT, &rows), pos);
+    let at = add(through(&rows, RAM_AT), pos);
     let near = ctx.scene.map(|sc| crate::collision::coll_sphere_mobys(sc, at, RAM_R, crate::collision::QueryFlags(0), Some(id))).unwrap_or_default();
     for t in near {
         if Some(t) == ctx.hero_moby {
@@ -338,7 +335,7 @@ fn ram(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].drawn == 0 || (ctx.game.frame & 0xf) as usize != id & 0xf { return; }
     for _ in 0..SPARKS {
         let m = &w.mobys[id];
-        let p = add(through(SPARK_AT, &m.rows), m.pos);
+        let p = add(through(&m.rows, SPARK_AT), m.pos);
         let r1 = m.rows[1];
         let f = ctx.game.rng.randf(SPARK_SPEED.0, SPARK_SPEED.1) * PER_TICK;
         let f = if ctx.game.rng.randi(2) != 0 { -f } else { f };
@@ -360,7 +357,7 @@ fn exhaust(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
     let g = &mut ctx.game.rng;
     let mut v: V3 = [0.0, 0.0, 1.0];
     for _ in 0..g.randi(2) + 1 {
-        let mut p = add(through(EXHAUST_AT, &rows), pos);
+        let mut p = add(through(&rows, EXHAUST_AT), pos);
         jitter(g, &mut p, 0.5);
         v = set_len(v, g.randf(8.0, 12.0) * PER_TICK);
         jitter(g, &mut v, 0.066_666_67);
@@ -402,7 +399,7 @@ fn warp_out(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.state_ticks = 0;
         m.mode |= 0x100;
         m.set_pv_f(WARP_SIZE, WARP_SIZES[0]);
-        let at = add(m.pos, through(WARP_OUT_AT, &m.rows));
+        let at = add(m.pos, through(&m.rows, WARP_OUT_AT));
         m.set_pv_v(WARP_AT, at);
         m.set_pv_v(VEL, set_len(m.rows[0], WARP_OUT_SPEED.0 * PER_TICK));
         m.mode |= 8;
@@ -453,7 +450,7 @@ fn warp_in(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         m.alpha = 0;
         let unit: [V3; 3] = std::array::from_fn(|i| set_len(m.rows[i], 1.0));
         let s = m.pv_i(WARP_IN) as f32 + 1.0;
-        let at = add(scale(through(WARP_IN_AT, &unit), s), m.pos);
+        let at = add(scale(through(&unit, WARP_IN_AT), s), m.pos);
         m.set_pv_v(WARP_AT, at);
         m.set_pv_v(VEL, set_len(m.rows[0], s * (PER_TICK * WARP_IN_SPEED[k])));
         m.mode |= 8;

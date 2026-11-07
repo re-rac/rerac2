@@ -1064,12 +1064,6 @@ fn turn_body(w: &mut MobyWorld, id: usize, yaw: f32) {
     w.mobys[id].set_pv_f(BODY_TURN, s);
 }
 
-/// The move in place to a yaw (`0x347ab8` = L00 `0x32ceb8`).
-fn turn_in_place(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, yaw: f32) {
-    let pos = w.mobys[id].pos;
-    ai::move_step(w, id, ctx, yaw, pos);
-}
-
 /// `0x433560` (module docs).
 fn movement(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let mut s = seq_a(w, id, ctx);
@@ -1085,11 +1079,11 @@ fn movement(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     turn_body(w, id, face_yaw);
                     ai::hold(w, id, ctx);
                 } else {
-                    turn_in_place(w, id, ctx, face_yaw);
+                    ai::turn_in_place(w, id, ctx, face_yaw);
                 }
                 return;
             }
-            if face_ask == 2 { turn_in_place(w, id, ctx, face_yaw); } else { ai::hold(w, id, ctx); }
+            if face_ask == 2 { ai::turn_in_place(w, id, ctx, face_yaw); } else { ai::hold(w, id, ctx); }
             let y = w.mobys[id].rot[2];
             turn_body(w, id, y);
         }

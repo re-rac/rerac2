@@ -51,7 +51,7 @@
 //! Not ported: in a scene the deletion once the loaded part (`0x1bdc70`, set by `0x319ba8`) is 5 or more; the moby word `+0x9c` = 1 of the throw. The frame slice uses its
 //! index for the moby's address `>> 8`.
 
-use crate::hero::physics::{add, approach, atan2, dist2, euler_rows, len2, set_len2, V3};
+use crate::hero::physics::{add, approach, atan2, dist2, euler_rows, len2, set_len2, through, V3};
 use crate::moby::classes::death_fade;
 use crate::moby::classes::props::{seq, wrapped};
 use crate::moby::{ai, bolts, mode, Ctx, MobyWorld};
@@ -97,16 +97,6 @@ const BITE_AT: V3 = [1.5, 0.0, 0.5];
 const MOST_AHEAD: i32 = 5;
 const DEG60: f32 = f32::from_bits(0x3f86_0a93);
 const DEG120: f32 = f32::from_bits(0x4006_0a93);
-
-/// `0x2ef318`: `v` through the rows.
-fn through(r: &[V3; 3], v: V3) -> V3 { std::array::from_fn(|k| v[0] * r[0][k] + v[1] * r[1][k] + v[2] * r[2][k]) }
-
-/// `0x32a7f0`: the first time since the last sub-state change.
-fn first_sub(m: &mut crate::moby::Moby) -> bool {
-    if m.once & 2 != 0 { return false; }
-    m.once |= 2;
-    true
-}
 
 /// The playing sequence (`+0x43`), and whether it is not blending (`+0x42` = `+0x43`).
 fn seq_b(w: &MobyWorld, id: usize, ctx: &Ctx) -> u8 { seq(w, id, ctx) }
@@ -228,16 +218,6 @@ fn may_attack(w: &MobyWorld, id: usize, ctx: &Ctx) -> bool {
     true
 }
 
-/// `0x342dd0` (L01 `0x323560`): the facing eased toward `yaw` at the movement block's turn limits.
-fn face(w: &mut MobyWorld, id: usize, yaw: f32) {
-    let m = &mut w.mobys[id];
-    let (a, b, most) = (m.pv_f(MV + 0x14), m.pv_f(MV + 0x18), m.pv_f(MV + 0x1c));
-    let (mut r, mut v) = (m.rot[2], m.pv_f(MV + 0xb4));
-    crate::hero::physics::turn_ease(yaw, a, b, most, &mut r, &mut v, 0);
-    m.rot[2] = r;
-    m.set_pv_f(MV + 0xb4, v);
-}
-
 fn yaw_to_hero(w: &MobyWorld, id: usize, ctx: &Ctx) -> f32 {
     let (p, h) = (w.mobys[id].pos, ctx.hero.pos);
     atan2(h[0] - p[0], h[1] - p[1])
@@ -283,7 +263,7 @@ pub fn update_119e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if 0x80 <= w.mobys[id].state { return; }
     if ctx.game.scenes.mode == crate::scene::SCENE { return; }
     match w.mobys[id].sub_state {
-        1 => if first_sub(&mut w.mobys[id]) {
+        1 => if w.mobys[id].first_sub() {
             let s = ctx.game.rng.randi(2);
             w.mobys[id].set_pv_i(SIDE, s);
         },
@@ -356,7 +336,7 @@ pub fn update_119e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 ai::move_step(w, id, ctx, yaw, hero);
             } else {
                 let yaw = yaw_to_hero(w, id, ctx);
-                face(w, id, yaw);
+                crate::moby::ai::face_at(&mut w.mobys[id], MV, yaw);
             }
             set_walk(w, id, SPEED, ACCEL);
             if settled(w, id, ctx) && ai::reached(w, id, ctx, 14.0) {

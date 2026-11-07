@@ -353,20 +353,11 @@ fn wake(w: &mut MobyWorld, id: usize) {
     let members = w.groups.get(group as usize).cloned().unwrap_or_default();
     for e in members {
         let Some(m) = w.mobys.get_mut(e) else { break };
-        if m.o_class == crate::moby::classes::level09::trooper::CLASS && m.pv_b(0x302) & 1 != 0 && m.pv_i(0x420) == 1 {
+        if m.o_class == crate::moby::classes::trooper::CLASS && m.pv_b(0x302) & 1 != 0 && m.pv_i(0x420) == 1 {
             m.set_pv_b(0x302, 2);
             m.mode &= !2;
         }
     }
-}
-
-/// `0x4130f8` (L09 `0x3ec3d0`): its class sound 2, its bolts, the blast, deleted.
-fn crush(w: &mut MobyWorld, k: usize, ctx: &mut Ctx) {
-    ctx.host.play_sound(&w.mobys[k], 2, 0);
-    bolts::drop(w, k, 0, 3, ctx);
-    let at = w.mobys[k].pos;
-    blast::burst(w, ctx, at, &blast::Blast { size: 1.0, bursts: [0x19, 0x14, 0x14], puffs: 0x14, streaks: 0x2d, light: true, shake: true });
-    w.delete(k);
 }
 
 /// 0x11e8 (module docs).
@@ -411,7 +402,10 @@ pub fn update_11e8(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if x <= -std::f32::consts::FRAC_PI_4 {
                 if let Some(k) = idx(w, w.mobys[id].pv_i(0x10)) {
                     let o = &w.mobys[k];
-                    if o.o_class == CRUSHED && o.state != 0xfe && o.state != 0xfd { crush(w, k, ctx); }
+                    if o.o_class == CRUSHED && o.state != 0xfe && o.state != 0xfd {
+                        // `0x4130f8` (L09 `0x3ec3d0`): the gunship's death.
+                        crate::moby::classes::level09::gunship::die(w, k, ctx);
+                    }
                 }
             }
             if w.mobys[id].rot[0] <= -FRAC_PI_2 {

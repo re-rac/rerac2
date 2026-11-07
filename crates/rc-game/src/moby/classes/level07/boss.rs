@@ -25,12 +25,13 @@
 //! `+0x2c4`), the weapons' damage tally (`0x1fe3b8`), the global `$gp+0x3cc8` set to 40° on sub 0, `0x18c2c4` = 40
 //! while dying, and the class word `+0x46` = 5.
 
-use crate::hero::physics::{add, add_rot, atan2, dist2, dot, len, set_len, sub, sub_rot, V3};
+use crate::hero::physics::{add, add_rot, atan2, dist2, dot, len, set_len, sub, sub_rot, through, V3};
 use crate::moby::classes::level04::launcher::carry;
 use crate::moby::classes::props::wrapped;
 use crate::moby::{ai, countdown, Ctx, Moby, MobyWorld};
 
 use super::{bomb, dropship, laser, turret};
+use crate::gravity::to_local;
 
 pub const CLASS: i16 = 0x0e5f;
 /// Its body's copy and its charge glow.
@@ -126,9 +127,6 @@ fn by_attempts(w: &MobyWorld, a: i32, b: i32, f0: f32, f1: f32) -> f32 {
 
 fn cuboid_pos(ctx: &Ctx, i: i32) -> V3 { ctx.level.cuboid_place(i).map_or([0.0; 3], |c| c.0) }
 
-fn through(v: V3, r: &[V3; 3]) -> V3 { std::array::from_fn(|i| v[0] * r[0][i] + v[1] * r[1][i] + v[2] * r[2][i]) }
-fn into(v: V3, r: &[V3; 3]) -> V3 { [dot(v, r[0]), dot(v, r[1]), dot(v, r[2])] }
-
 fn seqs(w: &MobyWorld, id: usize, ctx: &Ctx) -> (u8, u8) { ctx.host.anim(&w.mobys[id]).map_or((0xff, 0xff), |a| (a.seq_a, a.seq_b)) }
 
 /// `0x3f8c98`: it and its parts hidden without collision.
@@ -172,7 +170,7 @@ pub fn set_up(w: &mut MobyWorld, ctx: &mut Ctx, id: usize, platform: Option<usiz
     m.set_pv_f(pv::HP, most - most * (tier as f32 * SIXTH));
     m.rot[0] = 0.0;
     m.rot[1] = 0.0;
-    m.pos = add(through(START, &ctx.host.camera_rows()), ctx.host.camera_pos());
+    m.pos = add(through(&ctx.host.camera_rows(), START), ctx.host.camera_pos());
     m.set_pv_v(pv::VEL, [0.0; 3]);
     if 0 <= tier {
         let drops = by_attempts(w, 3, 7, 4.0, 1.0) as i32;
@@ -489,7 +487,7 @@ fn take_aim(w: &mut MobyWorld, id: usize) {
     let m = &w.mobys[id];
     let t = m.pv_v(ai::target(m));
     let aim = match (m.sub_state, ai::link(m, pv::PLATFORM).and_then(|p| w.mobys.get(p))) {
-        (0, Some(p)) => into(sub(t, p.pos), &p.rows),
+        (0, Some(p)) => to_local(sub(t, p.pos), &p.rows),
         _ => t,
     };
     w.mobys[id].set_pv_v(pv::AIM, aim);
@@ -500,7 +498,7 @@ fn aim(w: &MobyWorld, id: usize) -> V3 {
     let m = &w.mobys[id];
     let a = m.pv_v(pv::AIM);
     match (m.sub_state, ai::link(m, pv::PLATFORM).and_then(|p| w.mobys.get(p))) {
-        (0, Some(p)) => add(through(a, &p.rows), p.pos),
+        (0, Some(p)) => add(through(&p.rows, a), p.pos),
         _ => a,
     }
 }
@@ -566,7 +564,7 @@ fn place(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let target = m.pv_v(ai::target(m));
     if m.sub_state == 0 {
         let Some(p) = ai::link(m, pv::PLATFORM).and_then(|p| w.mobys.get(p)) else { return };
-        let v = into(sub(target, p.pos), &p.rows);
+        let v = to_local(sub(target, p.pos), &p.rows);
         let lean = if m.pv_i(pv::TIER) != 0 { -LEAN } else { LEAN };
         let mut g = m.pv_v(pv::GOAL);
         crate::hero::physics::approach(v[0] + lean, 1.0 / 6.0, &mut g[0]);
@@ -616,7 +614,7 @@ fn follow(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, limit: f32) {
     let riding = m.sub_state == 0;
     let target = if riding {
         let Some(p) = ai::link(m, pv::PLATFORM).and_then(|p| w.mobys.get(p)) else { return };
-        let t = add(through(m.pv_v(pv::GOAL), &p.rows), p.pos);
+        let t = add(through(&p.rows, m.pv_v(pv::GOAL)), p.pos);
         let carried = crate::moby::platform::block(p).map_or([0.0; 3], |b| p.pv_v(b + 0x10));
         let carried = if 0.0 <= limit && limit < len(carried) { set_len(carried, limit) } else { carried };
         let yaw = add_rot(p.rot[2], std::f32::consts::PI);
@@ -725,7 +723,7 @@ const GLOW_AT: V3 = [0.2, -0.5, 0.0];
 /// random.
 pub fn draw_0d45(w: &MobyWorld, id: usize, rng: &mut crate::rng::Rng, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
     let m = &w.mobys[id];
-    let at = add(through(GLOW_AT, &m.rows), m.pos);
+    let at = add(through(&m.rows, GLOW_AT), m.pos);
     for k in 0..4 {
         let t = rng.randf(0.0, 1.0);
         let c = crate::hud::lerp_rgba(t, GLOW_RGBA[k].0, GLOW_RGBA[k].1);

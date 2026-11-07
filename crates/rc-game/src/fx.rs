@@ -12,6 +12,7 @@
 //! | `0x3f0590` (L07) | the boss's charge glow 0x0d45 | its four glows ([`crate::moby::classes::level07::boss::draw_0d45`]) |
 //! | `0x3f4998` | 0x0ce9 in glow mode | a glow at each tie of its group ([`crate::moby::classes::tie_lights::draw`]) |
 //! | `0x3e4050` | the Lancer's shot | its trail's newest point and the trail ([`crate::moby::classes::shot::draw_trail`]) |
+//! | `0x420a70` | the Heavy Lancer's shot 0x0c89 | its trail's newest point and the trail ([`crate::moby::classes::heavy_shot::draw`]) |
 //! | `0x3a17f0` | the nanotech cluster 0x326 (the first list) | its sphere, halo and crate glass ([`crate::moby::classes::nanotech::draw`]) |
 //! | `0x3efd68` | the Gravity Bomb in the hand 0xce3 | where its throw lands ([`crate::moby::classes::gravity_bomb::draw_marker`]) |
 //! | `0x3f0e80` | the Gravity Bomb's blast 0xce5 | its shockwave and flares ([`crate::moby::classes::gravity_bomb::draw_blast`]) |
@@ -383,6 +384,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::level07::laser::CLASS => crate::moby::classes::level07::laser::draw(w, id, cam, out),
         crate::moby::classes::level07::boss::GLOW => crate::moby::classes::level07::boss::draw_0d45(w, id, &mut game.rng, cam, out),
         crate::moby::classes::shot::SHOT_CLASS => crate::moby::classes::shot::draw_trail(w, id, cam, &mut game.trail_phase, out),
+        crate::moby::classes::heavy_shot::CLASS => crate::moby::classes::heavy_shot::draw(w, id, cam, out),
         crate::moby::classes::nanotech::CLASS => crate::moby::classes::nanotech::draw(w, id, cam, out),
         crate::moby::classes::gravity_bomb::HAND_CLASS => crate::moby::classes::gravity_bomb::draw_marker(w, id, hero_state, game.frame, out),
         crate::moby::classes::gravity_bomb::BLAST_CLASS => crate::moby::classes::gravity_bomb::draw_blast(w, id, view, cam, out),

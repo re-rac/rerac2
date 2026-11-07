@@ -9,22 +9,15 @@
 //!
 //! The engine functions: `0x3294a8` = L00 `0x31f230` (crate::hero::physics::turn_ease), `0x2f9718` / `0x2f96e0` the
 //! distance across / in 3D, `0x32bb68` a vector turned about an axis (`0x32a110` + `0x32ba90`, crate::quat),
-//! `0x32e568` Ratchet standing on the moby ([`stands_on`]), `0x32b7c0` = L00 `0x321858`
+//! `0x32e568` Ratchet standing on the moby (crate::moby::ai::stands_on), `0x32b7c0` = L00 `0x321858`
 //! (crate::level::LevelData::in_cuboid), `0x2cf1f8` = L00 `0x2c4560` (Ratchet's state, crate::hero::Hero::request_state),
 //! `0x3337d8` the once-flag (crate::moby::Moby::first), `0x36a110` the class sound.
 
-use crate::hero::physics::{add, dist, dist2, scale, set_len, turn_ease};
+use crate::hero::physics::{add, dist, dist2, scale, turn_ease};
 use crate::moby::{Ctx, MobyWorld};
 
 /// `0x18a168`: Ratchet on a magnetic walkway with the Gravity Boots.
 fn on_walkway(ctx: &Ctx) -> bool { ctx.hero.surf.boots == 1 }
-
-/// `0x32e568(m)`: Ratchet standing on moby `id`: hanging or climbing (group 3, state 0x1b) on its ledge (`0x18a3a8`),
-/// else on the ground (`0x18a16e` = 0) with it under his feet (`0x18a15c`).
-fn stands_on(ctx: &Ctx, id: usize) -> bool {
-    let h = &*ctx.hero;
-    if h.group == 3 || h.state == 0x1b { h.ledge.moby == Some(id) } else { h.air_ticks == 0 && h.ground_moby == Some(id) }
-}
 
 /// The gate halves' turns: 0.1° a tick² both ways, at most 2° a tick (`0x3294a8(t, 0.001745, 0.001745, 0.03491)`).
 const GATE_ACCEL: f32 = f32::from_bits(0x3ae4_c38a);
@@ -83,24 +76,18 @@ pub fn update_0d97(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
 }
 
-/// `0x32bb68(a, out, v, axis)`: `v` turned by `a` about `axis` (made unit; under 1e-5 of a turn, `v` as it is).
-fn turn_about(a: f32, v: [f32; 3], axis: [f32; 3]) -> [f32; 3] {
-    if a.abs() < 1e-5 { return v; }
-    crate::quat::rotate(crate::quat::axis_angle(a, set_len(axis, 1.0)), v)
-}
-
 /// Rolls moby `id` by `a` about its +y row (its rows 0 and 2 turned, `0x32bb68` twice).
 fn roll(w: &mut MobyWorld, id: usize, a: f32) {
     let m = &mut w.mobys[id];
     let y = m.rows[1];
-    m.rows[0] = turn_about(a, m.rows[0], y);
-    m.rows[2] = turn_about(a, m.rows[2], y);
+    m.rows[0] = crate::camera::rot(m.rows[0], a, y);
+    m.rows[2] = crate::camera::rot(m.rows[2], a, y);
 }
 
 /// 0x0d65 (`0x3ff938`): a walkway section. Its pvars: `[0]` it rolls, `[4]` rolled back once, `[8]` a cuboid (−1
 /// none), `[0xc]` a moby (none at the start; another moby writes it). Deleted without pvars. Its tick count `+0x96`.
 /// * **0**: `[0xc]` and `[4]` 0, its rows kept (mode 0x100); 1, or 4 without `[0]` (4: nothing).
-/// * **1**: unless Ratchet stands on it ([`stands_on`]) its ticks 0; else on the walkway (`0x18a168` = 1) inside
+/// * **1**: unless Ratchet stands on it (crate::moby::ai::stands_on) its ticks 0; else on the walkway (`0x18a168` = 1) inside
 ///   cuboid `[8]` (`0x32b7c0`): ticks 0, Ratchet to state 0x6f (`0x2cf1f8(0x6f, 1)`), 2; and, without a cuboid, the
 ///   moby `[0xc]` in state 0xfe / 0xfd with Ratchet on the walkway: ticks 0, 2.
 /// * **2**: 91 ticks rolling 1° a tick about its +y row ([`roll`]); then Ratchet to state 0 (`0x2cf1f8(0, 1)`), 7.
@@ -127,7 +114,7 @@ pub fn update_0d65(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.state = if m.pv_i(0) == 0 { 4 } else { 1 };
         }
         1 => {
-            if !stands_on(ctx, id) {
+            if !crate::moby::ai::stands_on(ctx, id) {
                 w.mobys[id].state_ticks = 0;
                 return;
             }

@@ -60,7 +60,7 @@ use super::tabora_ai::{find_target, in_volumes, spring_angle, volume_reach, Volu
 use crate::fx::beams::{self, at_most, Kind};
 use crate::hero::physics::{add, add_rot, atan2, cross, dist2, len, rot_dist, scale, set_len, sub, V3};
 use crate::moby::classes::props::{seq, wrapped};
-use crate::moby::{ai, countdown, Ctx, MobyWorld};
+use crate::moby::{ai, Ctx, MobyWorld};
 use std::f32::consts::{FRAC_PI_4, PI};
 
 pub const CLASS: i16 = 0x1002;
@@ -117,14 +117,6 @@ pub fn update_1006(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) { beams::step(w,
 
 fn first_vols(w: &MobyWorld, id: usize) -> Volumes { let m = &w.mobys[id]; Volumes(m.pv_i(0x1d0), -1, m.pv_i(0x1d4), -1) }
 fn roam_vols(w: &MobyWorld, id: usize) -> Volumes { let m = &w.mobys[id]; Volumes(m.pv_i(0x1d8), m.pv_i(0x1e0), m.pv_i(0x1dc), -1) }
-
-fn down(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let m = &mut w.mobys[id];
-    let mut t = m.pv_s(off) as i32;
-    let r = countdown(&mut t);
-    m.set_pv_s(off, t as i16);
-    r
-}
 
 fn anim(w: &MobyWorld, id: usize, ctx: &mut Ctx, s: u8, blend: u8) {
     if seq(w, id, ctx) != s { ctx.host.set_anim(&w.mobys[id], s, 0, blend); }
@@ -615,7 +607,7 @@ fn hunt(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let hh = m.pv_f(HEIGHT);
     m.set_pv_f(GOAL + 8, hh);
     let yaw = to_target(w, id);
-    if down(w, id, NEAR) { steer(w, id, ctx, 5.5, 5.5, yaw, 0.0, 0.0); } else { steer(w, id, ctx, 32.0, 12.0, yaw, 0.0, 0.0); }
+    if w.mobys[id].count_s(NEAR) { steer(w, id, ctx, 5.5, 5.5, yaw, 0.0, 0.0); } else { steer(w, id, ctx, 32.0, 12.0, yaw, 0.0, 0.0); }
     if wrapped(w, id, ctx) {
         if len(w.mobys[id].pv_v(VEL)) < 0.016_666_668 {
             let s = (ctx.game.rng.rand() & 1) as u8 + 4;
@@ -625,14 +617,14 @@ fn hunt(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
     }
     let resume = if w.mobys[id].pv_i(T_RESULT) == 2 {
-        down(w, id, LOST)
+        w.mobys[id].count_s(LOST)
     } else if 240 <= w.mobys[id].pv_s(UNSEEN) {
         true
     } else {
         w.mobys[id].set_pv_s(LOST, 240);
         let m = &w.mobys[id];
         let not_mine = m.group != -1 && shared(w, id, GROUP_TURN) != m.pv_b(MY_TURN) as i32;
-        if !not_mine && down(w, id, AFTER) && w.beams.claim(Kind::Tabora, id, None, 1, 0) && w.mobys[id].pv_s(UNSEEN) == 0 {
+        if !not_mine && w.mobys[id].count_s(AFTER) && w.beams.claim(Kind::Tabora, id, None, 1, 0) && w.mobys[id].pv_s(UNSEEN) == 0 {
             let m = &mut w.mobys[id];
             m.set_pv_f(SWEEP, -FRAC_PI_4);
             m.set_pv_f(SWEEP_WAY, 1.0);
@@ -663,7 +655,7 @@ fn attack(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &w.mobys[id];
     let at = m.pv_v(T_AIM);
     let pitch = -atan2(dist2(m.pos, at), at[2] - m.pos[2]);
-    if down(w, id, NEAR) { steer(w, id, ctx, 5.5, 5.5, angle, 0.0, pitch); } else { steer(w, id, ctx, 32.0, 12.0, angle, 0.0, pitch); }
+    if w.mobys[id].count_s(NEAR) { steer(w, id, ctx, 5.5, 5.5, angle, 0.0, pitch); } else { steer(w, id, ctx, 32.0, 12.0, angle, 0.0, pitch); }
     let mut aim_now = false;
     match w.mobys[id].pv_b(STEP) {
         0 => {
@@ -702,7 +694,7 @@ fn attack(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             aim_now = true;
         }
         3 => {
-            if down(w, id, PAUSE) { w.mobys[id].set_pv_b(STEP, 2); }
+            if w.mobys[id].count_s(PAUSE) { w.mobys[id].set_pv_b(STEP, 2); }
             aim_now = true;
         }
         4 => {
@@ -870,7 +862,7 @@ fn tail(w: &mut MobyWorld, id: usize) {
     let m = &mut w.mobys[id];
     if (m.state_ticks as u16) < 0x7ffd { m.state_ticks = m.state_ticks.wrapping_add(1); }
     if m.drawn == 0 { m.set_pv_s(UNSEEN, m.pv_s(UNSEEN).wrapping_add(1)); } else { m.set_pv_s(UNSEEN, 0); }
-    down(w, id, WAIT);
+    w.mobys[id].count_s(WAIT);
     let m = &mut w.mobys[id];
     if 3 <= m.state && m.pv_s(RISEN) < 120 { m.set_pv_s(RISEN, m.pv_s(RISEN) + 1); }
     if 2 <= m.state { m.shadow_slab = [m.pv_f(FLOOR) - m.pos[2], 2.0]; }

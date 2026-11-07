@@ -29,8 +29,9 @@
 //!   * **Every tick**: the count goes up, and the pulse is 80 + 48·sin(2π·(count mod 150)/150) (`0x2f7028`).
 
 use crate::moby::attach::{pivot_turn, rows_of};
-use crate::moby::{Ctx, MobyWorld};
+use crate::moby::{keep_loop, stop_loop, Ctx, MobyWorld};
 use std::f32::consts::{FRAC_PI_2, PI};
+use crate::hero::physics::sub_rot;
 
 pub const HATCH: i16 = 0x0b11;
 pub const FLAP: i16 = 0x0ae7;
@@ -38,7 +39,7 @@ pub const BREAKABLE: i16 = 0x1108;
 pub const PAD: i16 = 0x0d60;
 
 /// 0x0d60 (`0x40b080`, 2 placed; the decomp's `func_L14_00409B20`): a pad that, stood on, sets off its moby. **0**:
-/// Ratchet on it (`0x32cea8` = L00 `0x325398`, crate::moby::classes::level17::floaters::hero_on): the moby `+0x00`
+/// Ratchet on it (`0x32cea8` = L00 `0x325398`, crate::moby::ai::stands_on): the moby `+0x00`
 /// (−1 none) hooked (`0x333698` = L00 `0x32a818`), 1. **1**: on its first tick its class sound 0 (`0x36ada0`).
 /// **Every tick** its phase `+0x04` turns 6.17° (`0x2f7a68`, wrapped); its glow (`+0x78`) eased 0.15 of the way
 /// (`0x2f7c08` = boot `0x2846e8`, crate::gui::lerp_colour) to the colour between 0x808c8c8c and 0x80282828 (in 1
@@ -46,7 +47,7 @@ pub const PAD: i16 = 0x0d60;
 pub fn update_0d60(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let (mut a, mut b) = (0x808c_8c8cu32, 0x8028_2828u32);
     match w.mobys[id].state {
-        0 => if crate::moby::classes::level17::floaters::hero_on(ctx, id) {
+        0 => if crate::moby::ai::stands_on(ctx, id) {
             let k = w.mobys[id].pv_i(0);
             if let Some(t) = usize::try_from(k).ok().and_then(|k| w.mobys.get_mut(k)) { t.once |= 4; }
             w.mobys[id].set_state(1, -1);
@@ -94,28 +95,6 @@ pub fn update_1108(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
 }
 
-/// `0x2f7ab0`: `a − b` wrapped into −π..π.
-fn wrapped_sub(a: f32, b: f32) -> f32 {
-    let d = a - b;
-    if PI <= d { d - PI - PI } else if d < -PI { d + PI + PI } else { d }
-}
-
-/// Its class sound `k` looped into pvar `at` unless it plays (`0x36ada0(k, 4)`).
-fn loop_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, k: i32, at: usize) {
-    let h = w.mobys[id].pv_i(at);
-    if !(h != -1 && ctx.host.sound_playing(h)) {
-        let h = ctx.host.play_sound(&w.mobys[id], k, 4);
-        w.mobys[id].set_pv_i(at, h);
-    }
-}
-
-/// The loop in pvar `at` stopped when it plays (`0x36aaa0`), −1.
-fn stop_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, at: usize) {
-    let h = w.mobys[id].pv_i(at);
-    if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
-    w.mobys[id].set_pv_i(at, -1);
-}
-
 pub fn update_0b11(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     match w.mobys[id].state {
         0 => {
@@ -125,11 +104,11 @@ pub fn update_0b11(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         1 => if w.mobys[id].once & 4 != 0 { w.mobys[id].set_state(2, -1) },
         2 => {
             if -FRAC_PI_2 < w.mobys[id].rot[0] {
-                loop_sound(w, id, ctx, 0, 0);
+                keep_loop(w, id, ctx, 0, 0);
                 let m = &mut w.mobys[id];
-                m.rot[0] = wrapped_sub(m.rot[0], 0.008_726_647);
+                m.rot[0] = sub_rot(m.rot[0], 0.008_726_647);
             }
-            stop_sound(w, id, ctx, 0);
+            stop_loop(w, id, ctx, 0);
         }
         _ => {}
     }

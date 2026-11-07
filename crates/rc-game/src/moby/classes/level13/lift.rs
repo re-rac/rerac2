@@ -7,8 +7,7 @@
 //!
 //! Nothing at all while Ratchet is in his state 0x82. **0**: updated at any distance, the flag 1, `+0x7c` = `+0x78`,
 //! `+0x60` = `+0x74`, its top its place, its bottom `+0x68` under it, the sound none, the speed 0; 1.
-//! * **1**: its sound stopped. Ratchet on it (`0x32e568` = L00 `0x325398`, crate::moby::classes::level17::floaters::
-//!   hero_on): with `+0xb4` a camera tweak of priority 5 (`0x2e1f68` = L00 `0x2d7468`: distance 1, pivot height 4.5),
+//! * **1**: its sound stopped. Ratchet on it (`0x32e568` = L00 `0x325398`, crate::moby::ai::stands_on): with `+0xb4` a camera tweak of priority 5 (`0x2e1f68` = L00 `0x2d7468`: distance 1, pivot height 4.5),
 //!   then 2 at the top, else 3. Else at the top with Ratchet more than half its travel below it: 2; at the bottom with
 //!   him more than half of it above and not in his state 0x82: 3.
 //! * **2** (down): at the bottom its tweak let go (`0x2e2008` = L00 `0x2d7508`), its sound stopped, Ratchet off it: 1.
@@ -24,8 +23,7 @@
 //!   (crate::moby::carry_hero_with).
 
 use crate::hero::physics::{ease, sub};
-use crate::moby::classes::level17::floaters::hero_on;
-use crate::moby::{Ctx, MobyWorld};
+use crate::moby::{keep_loop, stop_loop, Ctx, MobyWorld};
 
 pub const CLASS: i16 = 0x116d;
 
@@ -39,20 +37,6 @@ const WANTS_TWEAK: usize = 0xb4;
 const TWEAK: usize = 0xb8;
 const TWEAK_HELD: usize = 0xbc;
 const TROOPER: i16 = 0x0ea3;
-
-fn stop_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let h = w.mobys[id].pv_i(SOUND);
-    if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
-    w.mobys[id].set_pv_i(SOUND, -1);
-}
-
-fn keep_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let h = w.mobys[id].pv_i(SOUND);
-    if h < 0 || !ctx.host.sound_playing(h) {
-        let h = ctx.host.play_sound(&w.mobys[id], 0, 4);
-        w.mobys[id].set_pv_i(SOUND, h);
-    }
-}
 
 fn ask_tweak(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].pv_i(WANTS_TWEAK) == 0 { return; }
@@ -105,8 +89,8 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.set_pv_i(SPEED, 0);
         }
         1 => {
-            stop_sound(w, id, ctx);
-            if hero_on(ctx, id) {
+            stop_loop(w, id, ctx, SOUND);
+            if crate::moby::ai::stands_on(ctx, id) {
                 ask_tweak(w, id, ctx);
                 let to = if w.mobys[id].pos[2] == top { 2 } else { 3 };
                 w.mobys[id].set_state(to, -1);
@@ -122,31 +106,31 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         2 => {
             if w.mobys[id].pos[2] <= low {
                 let_go(w, id, ctx);
-                stop_sound(w, id, ctx);
-                if !hero_on(ctx, id) { w.mobys[id].state = 1; }
+                stop_loop(w, id, ctx, SOUND);
+                if !crate::moby::ai::stands_on(ctx, id) { w.mobys[id].state = 1; }
             } else if clear_below(w, id, ctx) {
-                keep_sound(w, id, ctx);
+                keep_loop(w, id, ctx, SOUND, 0);
                 ease_to(w, id, low);
             } else {
-                stop_sound(w, id, ctx);
+                stop_loop(w, id, ctx, SOUND);
             }
         }
         3 => {
             ease_to(w, id, top);
             if top <= w.mobys[id].pos[2] {
                 let_go(w, id, ctx);
-                stop_sound(w, id, ctx);
-                if !hero_on(ctx, id) {
+                stop_loop(w, id, ctx, SOUND);
+                if !crate::moby::ai::stands_on(ctx, id) {
                     let m = &mut w.mobys[id];
                     m.set_pv_i(0x60, m.pv_i(0x74));
                     m.set_pv_i(0x78, m.pv_i(0x78) - 1);
                     m.state = 1;
                 }
             } else {
-                keep_sound(w, id, ctx);
+                keep_loop(w, id, ctx, SOUND, 0);
             }
         }
-        4 => stop_sound(w, id, ctx),
+        4 => stop_loop(w, id, ctx, SOUND),
         _ => {}
     }
     let f = ctx.game.frame as f32 * f32::from_bits(0x3c88_8889);

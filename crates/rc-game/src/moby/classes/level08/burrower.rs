@@ -104,14 +104,6 @@ struct Steer {
     stop: f32,
 }
 
-fn s16_down(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let m = &mut w.mobys[id];
-    let mut t = m.pv_s(off) as i32;
-    let r = countdown(&mut t);
-    m.set_pv_s(off, t as i16);
-    r
-}
-
 fn first_vols(w: &MobyWorld, id: usize) -> Volumes {
     let m = &w.mobys[id];
     Volumes(m.pv_i(0x190), m.pv_i(0x198), m.pv_i(0x194), -1)
@@ -189,11 +181,11 @@ fn tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             w.mobys[id].set_pv_s(ALARM, t);
         }
     }
-    if w.mobys[id].pv_i(T_RESULT) == 2 { s16_down(w, id, ALARM); }
+    if w.mobys[id].pv_i(T_RESULT) == 2 { w.mobys[id].count_s(ALARM); }
     let m = &mut w.mobys[id];
     if (m.state_ticks as u16) < 0x7ffd { m.state_ticks += 1; }
-    s16_down(w, id, TIMER);
-    s16_down(w, id, WAIT);
+    w.mobys[id].count_s(TIMER);
+    w.mobys[id].count_s(WAIT);
     let m = &mut w.mobys[id];
     if 2 <= m.state { m.shadow_slab = [m.pv_f(FLOOR) - m.pos[2], 0.2]; }
 }
@@ -476,7 +468,7 @@ pub fn update_0fff(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         1 => wake(w, id, ctx),
         3 => {
-            if s16_down(w, id, TIMER) {
+            if w.mobys[id].count_s(TIMER) {
                 if seq(w, id, ctx) != 0 { ctx.host.set_anim(&w.mobys[id], 0, 0, 10); }
                 let m = &mut w.mobys[id];
                 m.drawn = 1;
@@ -587,7 +579,7 @@ fn hover(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let goal = add([dir.cos() * 2.0, dir.sin() * 2.0, 0.0], m.pos);
     m.set_pv_v(GOAL, goal);
     // `0x320440(frame · 0.025)`: the bob's phase wrapped into −π..π (`0x2eff90`'s fraction).
-    let phase = ((ctx.game.frame as f32 * 0.025 + PI) * 0.159_154_94).fract() * 6.283_185_5 - PI;
+    let phase = crate::hero::physics::wrap(ctx.game.frame as f32 * 0.025);
     pick_goal(w, id, ctx);
     let h = w.mobys[id].pv_f(HOME + 0xc) + 1.7 + 1.0 + phase.sin();
     if steer(w, id, ctx, Steer { turn_a: 360.0, turn_b: 180.0, turn_most: 560.0, accel: 20.0, slow: 0.0, top: 16.0, height: h, stop: -2.0 }) != 0 {
@@ -721,7 +713,7 @@ fn dive(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         3 => {
             steer(w, id, ctx, s(0.3));
-            if s16_down(w, id, TIMER) {
+            if w.mobys[id].count_s(TIMER) {
                 if near(w) {
                     set_seq(w, id, ctx, 4, 0, 3);
                     w.mobys[id].set_state(8, 1);

@@ -627,16 +627,6 @@ fn turn_about(w: &mut MobyWorld, id: usize) {
     m.set_state(6, 3);
 }
 
-/// `0x321c00(angle, out, v, axis)`: `v` turned `angle` about `axis`.
-fn rotate(v: V3, angle: f32, axis: V3) -> V3 {
-    if angle.abs() < 1e-5 { return v; }
-    let k = crate::hero::physics::set_len(axis, 1.0);
-    let (s, c) = angle.sin_cos();
-    let d = k[0] * v[0] + k[1] * v[1] + k[2] * v[2];
-    let x = crate::hero::physics::cross(k, v);
-    [0, 1, 2].map(|i| v[i] * c + x[i] * s + k[i] * d * (1.0 - c))
-}
-
 /// `0x40d320`: a raised plate of its group `+0x2d0` close ahead is gone round (its speed `+0x134` 0.0001 for the move).
 fn round_plates(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool { round_plates_with(w, id, ctx, 0x2d0, MV_3B + 0x34) }
 
@@ -653,7 +643,7 @@ fn round_plates_with(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, group: usize, 
         if PLATE_CONE.to_radians() <= crate::hero::physics::rot_dist(face, yaw) { continue; }
         let mut a = PLATE_TURN.to_radians();
         if 0.0 <= sub_rot(face, yaw) { a = -a; }
-        let v = rotate(sub(me, at), a, w.mobys[id].rows[2]);
+        let v = crate::camera::rot(sub(me, at), a, w.mobys[id].rows[2]);
         let goal = add(v, at);
         let keep = w.mobys[id].pv_f(speed);
         w.mobys[id].set_pv_f(speed, f32::from_bits(0x38d1_b717));
@@ -1092,7 +1082,7 @@ pub(super) fn shield_sparks(ctx: &mut Ctx, p: V3, n: i32) {
         let s = g.randf(SPARK[0], SPARK[1]);
         let spin = if g.randi(2) == 0 { -1 } else { 1 };
         let a = g.randf(-1.047_197_6, 1.047_197_6);
-        let mut v = set_len(rotate(way, a, [0.0, 0.0, 1.0]), g.randf(SPARK[2], SPARK[3]) / 60.0);
+        let mut v = set_len(crate::camera::rot(way, a, [0.0, 0.0, 1.0]), g.randf(SPARK[2], SPARK[3]) / 60.0);
         v[2] = g.randf(SPARK[4], SPARK[5]) / 60.0;
         let mut at = add(p, toward);
         for k in 0..3 { at[k] += g.randf_signed(0.0, 0.15); }

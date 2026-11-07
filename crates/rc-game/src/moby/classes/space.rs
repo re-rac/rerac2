@@ -64,7 +64,7 @@
 //! scatter (`0x37e150`); the moby groups (`+0x21`: the leaders' groups are their classes here); the view test
 //! `0x302b78` is the game's 4:3 frustum by its tangents, not its planes `0x1bd900..`.
 
-use crate::hero::physics::{add, atan2, dist, len, len2, rot_dist, scale, set_len, sub, sub_rot, V3};
+use crate::hero::physics::{add, atan2, dist, len, len2, rot_dist, scale, set_len, sub, sub_rot, through, V3};
 use crate::moby::{mode, Ctx, MobyWorld};
 
 pub mod escort;
@@ -685,7 +685,7 @@ pub(crate) fn think(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 let fwd = w.mobys[l].rows[0];
                 let side = crate::hero::physics::unit(crate::hero::physics::cross(fwd, [0.0, 0.0, 1.0]));
                 let up = crate::hero::physics::cross(side, fwd);
-                let goal = add(w.mobys[l].pos, in_frame([fwd, side, up], ai_v(w, id, 0)));
+                let goal = add(w.mobys[l].pos, through(&[fwd, side, up], ai_v(w, id, 0)));
                 set_goal(w, id, ctx, goal);
             }
         }
@@ -696,7 +696,7 @@ pub(crate) fn think(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 let rows = w.mobys[t].rows;
                 let mut goal = set_len(rows[0], match state { 4 => 25.0, 5 => 5.0, _ => 10.0 });
                 if state == 6 { goal = add(goal, scale(rows[2], 0.05)); }
-                if ai_i(w, id, a::OFFSET_ON) != 0 { goal = add(goal, in_frame(rows, ai_v(w, id, a::OFFSET))); }
+                if ai_i(w, id, a::OFFSET_ON) != 0 { goal = add(goal, through(&rows, ai_v(w, id, a::OFFSET))); }
                 let goal = add(w.mobys[t].pos, goal);
                 set_goal(w, id, ctx, goal);
                 if arrived(w, id) {
@@ -764,9 +764,6 @@ pub(crate) fn think(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => {}
     }
 }
-
-/// `0x301e10(out, v, rows)`: `v` in the frame `rows`.
-fn in_frame(rows: [V3; 3], v: V3) -> V3 { add(add(scale(rows[0], v[0]), scale(rows[1], v[1])), scale(rows[2], v[2])) }
 
 /// `0x374f50`'s 20 sparks: twinkles (`0x346ee8(0.2, 1.25, 0, at, 60, 0x4000ff7f, 0, 2, dir, 0)`,
 /// crate::particles::twinkle), `dir` 1/6 a tick at random angles.
@@ -1136,7 +1133,7 @@ pub(crate) fn exhaust(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
     let (nozzles, first) = (sp.nozzles, sp.desc);
     let jitter = |g: &mut crate::rng::Rng, p: V3| [p[0] + g.randf(-0.1, 0.1), p[1] + g.randf(-0.1, 0.1), p[2] + g.randf(-0.1, 0.1)];
     for &n in nozzles {
-        let base = add(m.pos, in_frame(m.rows, n));
+        let base = add(m.pos, through(&m.rows, n));
         for k in 0..3 {
             let g = &mut ctx.game.rng;
             let at = jitter(g, base);

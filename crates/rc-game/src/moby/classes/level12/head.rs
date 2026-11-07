@@ -8,7 +8,7 @@
 //! sequence, `0x3177c8` the rebuild.
 
 use crate::hero::physics::{add_rot, atan2, dist2, euler_rows, sub_rot, turn_spring};
-use crate::moby::{Ctx, Moby, MobyWorld};
+use crate::moby::{stop_loop, Ctx, Moby, MobyWorld};
 
 /// Its looped sound's handle (`+0x68`[0x114]).
 const SOUND: usize = 0x114;
@@ -40,12 +40,6 @@ fn aim(m: &mut Moby, b: usize, list: u8) {
         a[k] = x;
     }
     set_manip(m, list, Some(crate::quat::from_rows(&euler_rows(a))));
-}
-
-fn stop_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let h = w.mobys[id].pv_i(SOUND);
-    if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
-    w.mobys[id].set_pv_i(SOUND, -1);
 }
 
 /// 0x086a (`0x3bfaa8`, three placed): a head that follows Ratchet. Its pvars: two joint blocks (`+0x00` list 0, `+0x80`
@@ -90,7 +84,7 @@ pub fn update_086a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let u = w.mobys[id].update_dist;
             crate::moby::classes::props::spawn_in_place(w, id, 0x1132, u, &*ctx.host);
             ctx.host.play_sound(&w.mobys[id], 0, 0);
-            stop_sound(w, id, ctx);
+            stop_loop(w, id, ctx, SOUND);
             return w.delete(id);
         }
         _ => {}
@@ -103,7 +97,7 @@ pub fn update_086a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             w.mobys[id].set_pv_i(SOUND, h);
         }
     } else {
-        stop_sound(w, id, ctx);
+        stop_loop(w, id, ctx, SOUND);
     }
     let m = &mut w.mobys[id];
     let (accel, max) = (f32::from_bits(0x3ae4_c38a), f32::from_bits(0x3dd6_7752));

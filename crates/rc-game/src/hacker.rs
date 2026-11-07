@@ -44,7 +44,7 @@
 //! `0x24a7b0`; here none).
 
 use crate::fx::FxQuad;
-use crate::hero::physics::{add, add_rot, approach, atan2, cross, dot, ease, len, rot_dist, scale, set_len, sub, sub_rot, V3};
+use crate::hero::physics::{add, add_rot, approach, atan2, cross, dot, ease, len, rot_dist, scale, set_len, sub, sub_rot, through, V3};
 use crate::moby::{mode, Ctx, MobyWorld};
 use crate::pad::button;
 use crate::quat::{self, Q};
@@ -110,9 +110,6 @@ pub fn neighbours() -> [[i32; 6]; NODES] {
     }
     t
 }
-
-/// `0x2f02d8(out, v, rows)`: `v` through the rows (no translation).
-fn through(rows: &[V3; 3], v: V3) -> V3 { std::array::from_fn(|k| v[0] * rows[0][k] + v[1] * rows[1][k] + v[2] * rows[2][k]) }
 
 /// `0x2eff28(out, a, b)`: the VU's outer product as the level code calls it, `b × a`.
 fn outer(a: V3, b: V3) -> V3 { cross(b, a) }

@@ -14,7 +14,7 @@
 
 use super::attach::{angles_of, rows_of, turn};
 use super::{Moby, MobyWorld};
-use crate::hero::physics::{add, len, set_len, sub, V3};
+use crate::hero::physics::{add, len, set_len, sub, through, V3};
 
 /// The block's flags word.
 const FLAGS: usize = 0x3c;
@@ -23,9 +23,6 @@ const FLAGS: usize = 0x3c;
 pub fn block(m: &Moby) -> Option<usize> { (m.mode & 0x20 != 0).then(|| super::ai::block(m, 8)) }
 
 fn t(m: &[V3; 3]) -> [V3; 3] { std::array::from_fn(|i| std::array::from_fn(|j| m[j][i])) }
-
-/// `0x2ef318`: `v` through the rows (`v.x·r0 + v.y·r1 + v.z·r2`).
-fn through(v: V3, r: &[V3; 3]) -> V3 { std::array::from_fn(|k| v[0] * r[0][k] + v[1] * r[1][k] + v[2] * r[2][k]) }
 
 /// `0x322668(block, move, old, new)`: the platform's tick into its block at `b`: the move, the turn from the angles
 /// `old` to `new` (`0x2efa50(Rᵀ(old), R(new))` → `0x320000`) and, with flag 2, `old`.
@@ -46,7 +43,7 @@ fn frame(p: &Moby, b: usize) -> [V3; 3] {
 pub fn carry(w: &MobyWorld, p: usize, point: V3) -> Option<V3> {
     let pm = w.mobys.get(p)?;
     let b = block(pm)?;
-    let e = through(sub(add(point, pm.pv_v(b + 0x10)), pm.pos), &frame(pm, b));
+    let e = through(&frame(pm, b), sub(add(point, pm.pv_v(b + 0x10)), pm.pos));
     Some(sub(add(e, pm.pos), point))
 }
 
@@ -54,7 +51,7 @@ pub fn carry(w: &MobyWorld, p: usize, point: V3) -> Option<V3> {
 pub fn turn_dir(w: &MobyWorld, p: usize, v: V3) -> Option<V3> {
     let pm = w.mobys.get(p)?;
     let b = block(pm)?;
-    Some(through(v, &frame(pm, b)))
+    Some(through(&frame(pm, b), v))
 }
 
 /// `0x322058(_, p, pos, angles, &pos', &angles')`: a place and angles riding platform `p` after this tick's move and
@@ -62,7 +59,7 @@ pub fn turn_dir(w: &MobyWorld, p: usize, v: V3) -> Option<V3> {
 pub fn ride(w: &MobyWorld, p: usize, pos: V3, angles: V3) -> Option<(V3, V3)> {
     let pm = w.mobys.get(p)?;
     let b = block(pm)?;
-    let e = through(sub(add(pos, pm.pv_v(b + 0x10)), pm.pos), &frame(pm, b));
+    let e = through(&frame(pm, b), sub(add(pos, pm.pv_v(b + 0x10)), pm.pos));
     Some((add(e, pm.pos), angles_of(&turn(&rows_of(angles), &rows_of(pm.pv_v(b))))))
 }
 
@@ -75,7 +72,7 @@ pub fn to_local(w: &MobyWorld, p: usize, pos: V3, angles: V3) -> Option<(V3, V3)
     let pm = w.mobys.get(p)?;
     let b = block(pm)?;
     let inv = t(&rows(pm, b));
-    Some((through(sub(pos, pm.pos), &inv), angles_of(&turn(&rows_of(angles), &inv))))
+    Some((through(&inv, sub(pos, pm.pos)), angles_of(&turn(&rows_of(angles), &inv))))
 }
 
 /// What [`to_world`] gives: the place and angles, and with flag 4 the rider's new place and angles in the frame.
@@ -92,7 +89,7 @@ pub fn to_world(w: &MobyWorld, rider: usize, hero: Option<usize>, p: usize, loca
     let pm = w.mobys.get(p)?;
     let b = block(pm)?;
     let r = rows(pm, b);
-    let mut pos = add(through(local, &r), pm.pos);
+    let mut pos = add(through(&r, local), pm.pos);
     let angles = angles_of(&turn(&rows_of(local_angles), &r));
     let mv = pm.pv_v(b + 0x10);
     if pm.pv_i(b + FLAGS) & 4 != 0 {

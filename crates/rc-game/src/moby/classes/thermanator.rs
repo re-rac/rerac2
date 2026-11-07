@@ -195,9 +195,6 @@ fn pvars(w: &mut MobyWorld, id: usize) {
     if w.mobys[id].pvars.len() < crate::moby::PVAR_BYTES { w.mobys[id].pvars.resize(crate::moby::PVAR_BYTES, 0); }
 }
 
-/// `0x2adff8`: Ratchet in the water.
-fn in_water(ctx: &Ctx) -> bool { matches!(ctx.hero.group, 0x11 | 0x12) || matches!(ctx.hero.state, 0x67 | 0x7f | 0x72 | 0x73) }
-
 /// `0x410b00(group, v)`: every member of the group gets its turn `+0x15` = `v`.
 fn set_turn(w: &mut MobyWorld, group: i32, v: u8) {
     let Some(members) = usize::try_from(group).ok().and_then(|g| w.groups.get(g)).cloned() else { return };
@@ -417,7 +414,7 @@ fn hit_cold(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, met: Option<Option<usiz
                 let [x, y, _] = w.mobys[id].pos;
                 let n = w.liquid.patches.len();
                 w.liquid.disturb(x, y, 0.5, f32::from_bits(0xbcf5_c28f), 0..n, true);
-                if !in_water(ctx) { count(w, ctx, t, 1); }
+                if !ctx.hero.feet_kept() { count(w, ctx, t, 1); }
             }
             w.mobys[id].set_pv_i(cold::TURNING, 0);
         } else {

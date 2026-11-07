@@ -102,9 +102,8 @@
 
 use super::{pickups, planet, shot, special};
 use crate::hero::physics::{add, add_rot, cross, dist, dot, len, scale, set_len, sub, unit, V3};
-use crate::moby::ai;
 use crate::moby::frames::{self, upright};
-use crate::moby::{countdown, Ctx, MobyWorld};
+use crate::moby::{ai, countdown, Ctx, MobyWorld};
 use crate::quat::turn_rows;
 
 pub const CLASS: i16 = 0x0e0b;
@@ -138,14 +137,6 @@ fn seq(w: &MobyWorld, ctx: &Ctx, id: usize) -> u8 { ctx.host.anim(&w.mobys[id]).
 fn ended(w: &MobyWorld, ctx: &Ctx, id: usize) -> bool { ctx.host.anim(&w.mobys[id]).is_some_and(|a| a.flags & 2 != 0) }
 fn ftime(w: &MobyWorld, ctx: &Ctx, id: Option<usize>) -> f32 { id.map_or(0.0, |i| ctx.host.frame_time(&w.mobys[i])) }
 fn speed(w: &MobyWorld, ctx: &Ctx, id: usize) -> f32 { ctx.host.anim(&w.mobys[id]).map_or(1.0, |a| a.speed) }
-
-/// `0x32a7f0`: the first time since the last sub-state change.
-fn first_sub(w: &mut MobyWorld, id: usize) -> bool {
-    let m = &mut w.mobys[id];
-    if m.once & 2 != 0 { return false; }
-    m.once |= 2;
-    true
-}
 
 fn hp(w: &MobyWorld, id: usize) -> f32 { w.mobys[id].pv_f(0x20) }
 fn most(w: &MobyWorld) -> i32 { w.level22.most }
@@ -510,7 +501,7 @@ fn knock(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, hit: Option<crate::moby::h
         let c = add(add(crate::gravity::to_world([0.0, 0.0, m.pv_f(0x94)], &m.rows), m.pos), set_len(v, 4.0));
         ai::attack_sphere(w, id, ctx, 5.0, 100.0, 0.0, c, 0x9_0000, 0, 1, 0);
     }
-    if !first_sub(w, id) {
+    if !w.mobys[id].first_sub() {
         if let Some(c) = part(w, id, 0x448, PART_C) {
             if ended(w, ctx, c) && ctx.game.rng.randi(3) == 0 { ctx.host.set_anim(&w.mobys[c], 7, 0, 4); }
         }

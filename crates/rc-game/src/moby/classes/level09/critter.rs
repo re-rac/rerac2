@@ -35,7 +35,7 @@
 //!
 //! The L09 engine functions with the port's: `0x327070` / `0x327048` the sub's / state's first tick, `0x32a218` senses,
 //! `0x324590` take_damage, `0x3252d8` flight, `0x3275b8` find_target, `0x328fe8` / `0x329040` the moves (move_step /
-//! move_toward), `0x3292a8` / `0x32a0d8` = L02 `0x333980` the turn (crate::moby::classes::critter::face), `0x32a138`
+//! move_toward), `0x3292a8` / `0x32a0d8` = L02 `0x333980` the turn (crate::moby::ai::face_at), `0x32a138`
 //! face_point, `0x326ec0` keep_in_path, `0x326d30` spread, `0x320048` reached, `0x3195f0` attack_joint, `0x316fe8` the
 //! bolts, `0x31d518` = L00 `0x3210a8` (smoke_burst), `0x3238a8` = L00 `0x327498` (break_into), `0x3206a0` /
 //! `0x323718` the aims, `0x323128` the glow sprite, `0x30d900` delete.
@@ -44,7 +44,7 @@
 
 use crate::hero::physics::{add_rot, atan2, dist, dist2, sub, V3};
 use crate::hud::lerp_rgba;
-use crate::moby::classes::critter::{face, face_point, keep_in_path, spread};
+use crate::moby::classes::critter::{face_point, keep_in_path, spread};
 use crate::moby::classes::props::{seq, set_seq, wrapped};
 use crate::moby::{ai, countdown, joint_aim, mode, Ctx, MobyWorld};
 
@@ -83,13 +83,6 @@ const FAR: f32 = 14.0;
 const GLOW: [u32; 2] = [0x8000_0080, 0x0000_0020];
 const EYE: V3 = [0.25, 0.0, 0.1];
 const EYE_RGBA: [u32; 2] = [0x3000_0080, 0x0000_0020];
-
-fn first_sub(w: &mut MobyWorld, id: usize) -> bool {
-    let m = &mut w.mobys[id];
-    if m.once & 2 != 0 { return false; }
-    m.once |= 2;
-    true
-}
 
 fn group(w: &MobyWorld, id: usize) -> Vec<usize> {
     usize::try_from(w.mobys[id].group).ok().and_then(|g| w.groups.get(g)).cloned().unwrap_or_default()
@@ -211,13 +204,6 @@ fn senses(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     false
 }
 
-fn tick_word(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let mut t = w.mobys[id].pv_i(off);
-    let r = countdown(&mut t);
-    w.mobys[id].set_pv_i(off, t);
-    r
-}
-
 fn back_off(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let t = ctx.game.rng.rand_range(0x244, 600);
     let m = &mut w.mobys[id];
@@ -231,13 +217,13 @@ pub fn update_0d90(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let walk_speed = WALK_SPEED * 0.016_666_668;
     match w.mobys[id].sub_state {
         0 => {
-            if first_sub(w, id) {
+            if w.mobys[id].first_sub() {
                 ai::senses(&mut w.mobys[id], f32::from_bits(0x3a91_a2b4), f32::from_bits(0x3d08_8889), f32::from_bits(0x3be4_c38a), f32::from_bits(0x3ed6_7752));
                 let m = &mut w.mobys[id];
                 m.set_pv_f(MV + 0x24, f32::from_bits(0x3bda_740e));
                 m.set_pv_f(MV + 0x34, 0.5);
             }
-            if w.mobys[id].pv_s(SEEING) == 1 && tick_word(w, id, DELAY) {
+            if w.mobys[id].pv_s(SEEING) == 1 && w.mobys[id].count_i(DELAY) {
                 let s = if ctx.game.rng.randi(4) == 0 { 9 } else { 8 };
                 w.mobys[id].set_state(s, 2);
             } else if w.mobys[id].pv_s(ALARMED) != 0 {
@@ -252,7 +238,7 @@ pub fn update_0d90(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
         }
         1 => {
-            if first_sub(w, id) {
+            if w.mobys[id].first_sub() {
                 ai::senses(&mut w.mobys[id], f32::from_bits(0x3b11_a2b4), f32::from_bits(0x3daa_aaab), f32::from_bits(0x3be4_c38a), f32::from_bits(0x3ed6_7752));
                 let m = &mut w.mobys[id];
                 m.set_pv_f(MV + 0x34, 0.05);
@@ -262,7 +248,7 @@ pub fn update_0d90(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if m.pv_s(SEEING) == 1 { m.set_state(9, 2) } else if m.pv_s(T330) == 0 { m.set_state(1, 0) }
         }
         2 => {
-            if first_sub(w, id) {
+            if w.mobys[id].first_sub() {
                 ai::senses(&mut w.mobys[id], f32::from_bits(0x3b5a_740e), f32::from_bits(0x3daa_aaab), f32::from_bits(0x3be4_c38a), f32::from_bits(0x3ed6_7752));
                 let t = ctx.game.rng.rand_range(0, 0x1e);
                 let m = &mut w.mobys[id];
@@ -271,7 +257,7 @@ pub fn update_0d90(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 m.set_pv_f(MV + 0xd0, walk_speed);
                 m.set_pv_i(DELAY, t);
             }
-            if w.mobys[id].pv_s(SEEING) != 1 && tick_word(w, id, DELAY) { back_off(w, id, ctx); }
+            if w.mobys[id].pv_s(SEEING) != 1 && w.mobys[id].count_i(DELAY) { back_off(w, id, ctx); }
         }
         3 => {
             let r = ai::flight(w, id, ctx);
@@ -385,7 +371,8 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
             let m = &w.mobys[id];
             let t = ai::link(m, T_MOBY).and_then(|t| w.mobys.get(t)).map_or(ctx.hero.pos, |t| t.pos);
-            face(w, id, atan2(t[0] - m.pos[0], t[1] - m.pos[1]));
+            let yaw = atan2(t[0] - m.pos[0], t[1] - m.pos[1]);
+            crate::moby::ai::face_at(&mut w.mobys[id], MV, yaw);
             if !wrapped(w, id, ctx) { return; }
             let m = &mut w.mobys[id];
             m.set_pv_f(MV + 0x14, f32::from_bits(0x3be4_c38a));
@@ -415,7 +402,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 if seq(w, id, ctx) != 8 { ctx.host.set_anim(&w.mobys[id], 8, 2, 10); }
             }
             let yaw = w.mobys[id].pv_f(BITE_YAW);
-            face(w, id, yaw);
+            crate::moby::ai::face_at(&mut w.mobys[id], MV, yaw);
             if ai::reached(w, id, ctx, 13.0) {
                 let d = w.mobys[id].pv_b(0x34) as f32;
                 ai::attack_joint(w, id, ctx, 0.75, d, 1.0, 1, 0x400_0001, 0, 1, 0);

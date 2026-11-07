@@ -61,7 +61,7 @@
 //! Not ported: the camera records' resets (`0x4370f0`), the prints (`0x2a6170`), the
 //! missile's class-sphere write (`0x30b158`), the glints' byte 9, the turret global's clear at the set-up.
 
-use crate::hero::physics::{add, add_rot, approach, approach_angle, atan2, cross, dist, dot, ease, ease_speed, len, len2, rot_dist, scale, set_len, set_len2, sub, sub_rot, turn_ease, V3};
+use crate::hero::physics::{add, add_rot, approach, approach_angle, atan2, cross, dist, dot, ease, ease_speed, len, len2, rot_dist, scale, set_len, set_len2, sub, sub_rot, through, turn_ease, V3};
 use crate::moby::classes::props::wrapped;
 use crate::moby::{ai, blast, countdown, shards, Ctx, Moby, MobyWorld};
 use crate::particles;
@@ -218,7 +218,6 @@ pub struct Globals {
 // ---- Small helpers ----
 
 fn yaw_to(m: &Moby, p: V3) -> f32 { atan2(p[0] - m.pos[0], p[1] - m.pos[1]) }
-fn through(v: V3, r: &[V3; 3]) -> V3 { std::array::from_fn(|k| v[0] * r[0][k] + v[1] * r[1][k] + v[2] * r[2][k]) }
 fn dist_sq(a: V3, b: V3) -> f32 { let d = sub(a, b); dot(d, d) }
 fn live(w: &MobyWorld, k: Option<usize>) -> Option<usize> { k.filter(|&k| w.mobys.get(k).is_some_and(|m| m.state < 0x80)) }
 fn body(w: &MobyWorld, id: usize) -> Option<usize> { live(w, ai::link(&w.mobys[id], pv::BODY)) }
@@ -245,14 +244,6 @@ fn by_deaths(w: &MobyWorld, a: i32, b: i32, f0: f32, f1: f32) -> f32 {
     if a >= n { return f0; }
     if n >= b { return f1; }
     f0 + (f1 - f0) * ((n - a) as f32 / (b - a) as f32)
-}
-
-/// `0x31eb18`-style countdown of an int pvar.
-fn tick_i(m: &mut Moby, off: usize) -> bool {
-    let mut t = m.pv_i(off);
-    let out = countdown(&mut t);
-    m.set_pv_i(off, t);
-    out
 }
 
 /// `0x3581d0` when the handle is still playing.
@@ -382,7 +373,7 @@ pub fn update_0f79(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
             let to = yaw_to(&w.mobys[id], hero);
             turn(w, id, to, SLOWER);
-            if tick_i(&mut w.mobys[id], pv::FIRE_T) {
+            if w.mobys[id].count_i(pv::FIRE_T) {
                 drop_bomb(w, id, ctx);
                 ctx.host.play_level_sound_after(Some(&w.mobys[id]), 17, 0);
                 let t = ctx.game.rng.rand_range(45, 75);
@@ -667,7 +658,7 @@ fn aim(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         w.register_draw_first(id);
     }
     let done = match t {
-        Some(t) => w.mobys[t].mode & 1 != 0 && tick_i(&mut w.mobys[id], pv::AIM_WAIT),
+        Some(t) => w.mobys[t].mode & 1 != 0 && w.mobys[id].count_i(pv::AIM_WAIT),
         None => w.mobys[id].pv_f(pv::AIM_T) <= 0.0,
     };
     if done {
@@ -1097,7 +1088,7 @@ fn walk(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, top: f32) {
 fn blasters(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let Some(b) = body(w, id) else { return };
     let Some((rows, at)) = ctx.host.joint_matrix(&w.mobys[b], 2) else { return };
-    let from = add(through(MUZZLE, &rows), at);
+    let from = add(through(&rows, MUZZLE), at);
     let aim = ctx.hero.aim_point;
     let dmg = w.mobys[id].pv_b(pv::SHOT_DMG) as f32;
     let v = set_len(sub(aim, from), SHOT_SPEED * TICK);
@@ -1136,7 +1127,7 @@ fn missile(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let Some(b) = body(w, id) else { return };
     let mut c = ARM_POINT;
     if next != 0 { c[1] = -c[1]; }
-    let c = add(through(c, &w.mobys[b].rows), w.mobys[b].pos);
+    let c = add(through(&w.mobys[b].rows, c), w.mobys[b].pos);
     let mut t = w.mobys[g].pos;
     t[2] += 4.0;
     if w.coll_line(ctx, c, t, 2, Some(b)).is_some() { w.mobys[id].set_pv_i(pv::ARM, (next + 1) & 1); }
@@ -1148,7 +1139,7 @@ fn lob(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let Some(t) = target(w, id) else { return };
     let a = ctx.game.rng.rand_vec(0.0, 1.0);
     let m = &w.mobys[id];
-    let b = add(add(through(LOB_AT, &m.rows), m.pos), a);
+    let b = add(add(through(&m.rows, LOB_AT), m.pos), a);
     let mut c = scale(a, 3.0);
     c[2] = 0.0;
     let c = add(c, w.mobys[t].pos);
@@ -1181,7 +1172,7 @@ fn drop_bomb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 fn beam(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let Some(b) = body(w, id) else { return };
     let Some((rows, at)) = ctx.host.joint_matrix(&w.mobys[b], 2) else { return };
-    let start = add(through(MUZZLE, &rows), at);
+    let start = add(through(&rows, MUZZLE), at);
     let tp = match target(w, id) {
         Some(t) => { let m = &w.mobys[t]; [m.pos[0], m.pos[1], m.pv_f(0x78)] }
         None => w.mobys[id].pv_v(pv::LAST),
@@ -1273,7 +1264,7 @@ fn voices(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         w.snivelak.deaths += 1;
     }
     if ctx.host.speech_held() { ctx.host.speech_go(); }
-    tick_i(&mut w.mobys[id], pv::SPEECH_WAIT);
+    w.mobys[id].count_i(pv::SPEECH_WAIT);
 }
 
 // ---- The fight's start and end, the arena ----
@@ -1762,7 +1753,7 @@ pub fn update_rock(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         0 => {
             let m = &mut w.mobys[id];
             m.pos = add(m.pos, m.pv_v(rv::VEL));
-            if tick_i(m, rv::LIFE) && m.drawn == 0 { w.delete(id); }
+            if m.count_i(rv::LIFE) && m.drawn == 0 { w.delete(id); }
         }
         2 => {
             let m = &mut w.mobys[id];

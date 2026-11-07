@@ -22,15 +22,12 @@
 //!   tie's rows, `[0x1e]` · the tie's scale (its first row's length) toward the camera, of size `[0x18]` · the scale
 //!   · 210000, in the colour with its alpha · the fade.
 
-use crate::hero::physics::{add, dist, dot, len, set_len, sub, V3};
+use crate::hero::physics::{add, dist, dot, len, set_len, smooth_step, sub, V3};
 use crate::moby::{Ctx, MobyWorld};
 
 fn group(w: &MobyWorld, id: usize) -> Option<Vec<usize>> {
     usize::try_from(w.mobys[id].pv_i(0)).ok().and_then(|g| w.tie_groups.get(g)).filter(|g| !g.is_empty()).map(|g| g.iter().map(|&t| t as usize).collect())
 }
-
-/// `0x456ca8`: the smooth step `x²(3 − 2x)`.
-fn smooth(x: f32) -> f32 { x * x * (x * -2.0 + 3.0) }
 
 /// `0x456bc8(x, pv)`: the wave at time `x` (wrapped by the period `[0x39]`): 0 before the start, the smooth rise, 1
 /// held, the smooth fall.
@@ -41,7 +38,7 @@ fn wave(w: &MobyWorld, id: usize, x: f32) -> f32 {
     let (start, rise, hold, fall) = (m.pv_f(0x10), m.pv_f(0x14), m.pv_f(0x18), m.pv_f(0x1c));
     if x < start { return 0.0; }
     let x = x - start;
-    if x < rise { smooth(x / rise) } else if hold <= x - rise { 1.0 - smooth((x - rise - hold) / fall) } else { 1.0 }
+    if x < rise { smooth_step(x / rise) } else if hold <= x - rise { 1.0 - smooth_step((x - rise - hold) / fall) } else { 1.0 }
 }
 
 fn unit(v: V3) -> V3 { let l = len(v); if l != 0.0 { [v[0] / l, v[1] / l, v[2] / l] } else { v } }
@@ -106,10 +103,10 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 let u = unit(sub(p, pos));
                 let ang = std::f32::consts::FRAC_PI_2 - dot(u, v).clamp(-1.0, 1.0).asin();
                 if ang <= 1.396_263_6 { 0.0 }
-                else if ang <= 1.483_53 { smooth((ang - 1.396_263_6) / 0.087_266_445) }
+                else if ang <= 1.483_53 { smooth_step((ang - 1.396_263_6) / 0.087_266_445) }
                 else if ang <= 1.658_062_9 { 1.0 }
                 else if 2.007_129 < ang { 0.0 }
-                else { 1.0 - smooth((ang - 1.658_062_9) / 0.349_066_02) }
+                else { 1.0 - smooth_step((ang - 1.658_062_9) / 0.349_066_02) }
             }
             _ => 0.0,
         };
@@ -120,7 +117,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let through = |v: V3| -> V3 { std::array::from_fn(|k| v[0] * r[0][k] + v[1] * r[1][k] + v[2] * r[2][k]) };
             let to_cam = unit(sub(cam, p));
             let ang = std::f32::consts::FRAC_PI_2 - dot(through(face), to_cam).clamp(-1.0, 1.0).asin();
-            let fade = if cone_out <= ang { 0.0 } else if cone_in < ang { smooth((ang - cone_out) / (cone_in - cone_out)) } else { 1.0 };
+            let fade = if cone_out <= ang { 0.0 } else if cone_in < ang { smooth_step((ang - cone_out) / (cone_in - cone_out)) } else { 1.0 };
             let mut a = c >> 24;
             if a == 0 || fade == 0.0 { continue; }
             if fade != 1.0 { a = (a as f32 * fade) as i32 as u32; }

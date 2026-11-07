@@ -23,15 +23,12 @@
 //! `0x2dbdb0` ([`shards::spawn_shard`] / [`shards::spawn_ball`]), `0x3a1c98` the class sound, `0x3662f8` a point in
 //! its frame ([`frame_point`]).
 
-use crate::hero::physics::{add, scale, sub, V3};
+use crate::hero::physics::{add, scale, sub, through, V3};
 use crate::moby::blast::{self, Blast, Explosion};
 use crate::moby::{bolts, shards, Ctx, MobyWorld};
 
 /// The hit flags the breakables answer (`0x35df18(m, 0x4010000, 0)`).
 const BREAK_FLAGS: u32 = 0x0401_0000;
-
-/// `0x32e8f0(out, v, m + 0xc0)`: `v` through the moby's rows.
-fn through(r: &[V3; 3], v: V3) -> V3 { std::array::from_fn(|k| v[0] * r[0][k] + v[1] * r[1][k] + v[2] * r[2][k]) }
 
 /// `0x3662f8(x, y, z, m, out)`: a point in the moby's frame (its rows, unscaled) plus its place.
 fn frame_point(w: &MobyWorld, id: usize, v: V3) -> V3 {
