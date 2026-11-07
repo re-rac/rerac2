@@ -48,6 +48,15 @@ pub fn death_log() -> bool {
     *ON.get_or_init(|| std::env::var("RC_DEATH_LOG").is_ok_and(|v| v != "0"))
 }
 
+/// `RC_HIT_LOG=1` (dev): every hit an enemy takes ([`take_damage`]) on stdout, in the columns of
+/// work/scratch/rc2_hit_probe.py (the same from the original over PINE): the damage, the health left and its most, the
+/// hitter's class and item, the ticks since that hitter's last hit, whether it started a reaction (a stagger), the
+/// reaction's phase and shares, the state.
+pub fn hit_log() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var("RC_HIT_LOG").is_ok_and(|v| v != "0"))
+}
+
 /// The death log's view of a moby: its states, place, collision, reaction block and animation.
 pub fn death_line(w: &MobyWorld, id: usize, ctx: &Ctx) -> String {
     let m = &w.mobys[id];
@@ -1040,11 +1049,22 @@ pub(crate) fn react_start(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, dir: [f32
 /// hurting with `+0x75` / mid-flight), the reaction starts (the hit's direction, else straight back) and the moby
 /// goes into its hurt state. Returns the kind.
 pub fn take_damage(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, flag: bool) -> i32 {
-    if !death_log() { return damage_tick(w, id, ctx, flag); }
+    if !death_log() && !hit_log() { return damage_tick(w, id, ctx, flag); }
     let hp = |w: &MobyWorld| if w.mobys[id].mode & AI != 0 { w.mobys[id].pv_f(health(&w.mobys[id])) } else { 1.0 };
     let before = hp(w);
+    let r_before = w.mobys[id].pv_i(react(&w.mobys[id]) + 0x44);
     let kind = damage_tick(w, id, ctx, flag);
     let after = hp(w);
+    if hit_log() && after < before {
+        let m = &w.mobys[id];
+        let (h, r) = (health(m), react(m));
+        let hitter = link(m, h + 0x18).and_then(|s| w.mobys.get(s)).map_or(0xffff, |s| s.o_class as u16);
+        let stag = m.pv_i(r + 0x44) != r_before;
+        println!("hit\t{}\t{id}\t{:#06x}\t{:.3}\t{after:.3}\t{}\t{hitter:#06x}\t{}\t{}\t{}\t{}\t{:.3}\t{:.3}\t{}\t{}\tkind {kind}",
+            ctx.game.frame, m.o_class as u16, before - after, m.pv_s(h + 4), m.pv_b(h + 0x17), m.pv_s(h + 0x1c), stag as u8,
+            m.pv_b(r + 0x1a), m.pv_f(r + 0x58), m.pv_f(r + 0x5c), m.state, m.sub_state);
+    }
+    if !death_log() { return kind; }
     if after <= 0.0 && after != before {
         println!("death hit tick {}: kind {kind} (hp {before:.2} → {after:.2}) {}", ctx.game.frame, death_line(w, id, ctx));
         let serial = w.mobys[id].serial;

@@ -680,6 +680,7 @@ impl Mobys {
             shrubs: g2::shrub_instances(&lv.gameplay).unwrap_or_default().iter().map(|t| t.world_matrix()).collect(),
             tie_groups: g2::instance_groups(&lv.gameplay, "tie_groups").map_err(|e| eprintln!("mobys: tie groups: {e}")).unwrap_or_default(),
             shrub_groups: g2::instance_groups(&lv.gameplay, "shrub_groups").map_err(|e| eprintln!("mobys: shrub groups: {e}")).unwrap_or_default(),
+            spawnable: g2::moby_spawnable(&lv.gameplay).map_err(|e| eprintln!("mobys: spawnable count: {e}")).unwrap_or_default(),
         };
         let ground = |p: [f32; 3]| -> Option<f32> {
             let coll = lv.collision.as_ref()?;

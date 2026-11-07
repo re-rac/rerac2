@@ -570,6 +570,9 @@ pub struct MobyWorld {
     /// `0x1b1e20`: the first created moby's slot. The placed mobys come before it, and a placed moby's slot is never
     /// taken again: deleted, it stays there (state 0xfd) with its pvars, as the group lists and links name it.
     pub first_created: usize,
+    /// The moby instances' second word: the slots after the placed mobys for the created ones (`0x3012a0` lays them
+    /// out; `0x1b1e24` is the last). 0: a world built without a level ([`MAX_MOBYS`] in all).
+    pub spawnable: usize,
     /// `0x1b1948` as the last moby loop saw it (deletes stamp their slot with it).
     pub frame: i32,
     /// `RC_DEATH_LOG` (crate::moby::ai::death_log): the ticks since each enemy's death hit, by moby and its serial.
@@ -757,6 +760,8 @@ pub struct SpawnData {
     pub shrub_groups: Vec<Vec<u16>>,
     pub tie_classes: Vec<i32>,
     pub tie_spheres: Vec<[f32; 4]>,
+    /// The created mobys' slots ([`MobyWorld::spawnable`]).
+    pub spawnable: usize,
 }
 
 impl MobyWorld {
@@ -838,6 +843,7 @@ impl MobyWorld {
             if class.is_some() { self.rebuild(id, host); }
         }
         self.first_created = self.mobys.len();
+        self.spawnable = data.spawnable;
         // `0x302abc`: on a level (`0x1a79f8` ≥ 0) each record's talk slot (word 0x74) lists its moby (talk::register).
         if 0 <= rules.game.level {
             for (i, r) in records.iter().enumerate() {
@@ -989,10 +995,14 @@ impl MobyWorld {
     /// `0x2e7718(callback, moby)`: the moby's callback on the frame's first list (before the particles; crate::fx).
     pub fn register_draw_first(&mut self, id: usize) { self.draws_first.push(id); }
 
-    /// `0x1b1d40`: the free moby slots (past the placed mobys).
+    /// `0x1b1d40` (counted by `0x311290` each frame): the free slots of the created mobys' pool, from the first one
+    /// to the one before the last (`0x1b1e24`): those never used and those deleted (state 0xfe) at least two frames
+    /// ago.
     pub fn free_slots(&self) -> usize {
-        let used = self.mobys.iter().skip(self.first_created).filter(|m| m.state != 0xfe).count();
-        MAX_MOBYS.saturating_sub(self.first_created + used)
+        let frame = self.frame;
+        let used = self.mobys.iter().skip(self.first_created).filter(|m| m.state != 0xfe || frame < m.freed_at).count();
+        if self.spawnable == 0 { return MAX_MOBYS.saturating_sub(self.first_created + used); }
+        (self.spawnable - 1).saturating_sub(used)
     }
 
     /// Adds a class the level's table does not have (the gadget classes `0x306018` loads), with the next slot.

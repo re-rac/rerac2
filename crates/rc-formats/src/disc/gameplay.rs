@@ -206,6 +206,15 @@ pub fn moby_instances(gameplay: &[u8]) -> Result<Vec<PlacedMoby>> {
     Ok(out)
 }
 
+/// The moby instances' second word: the slots the loader (L00 `0x3012a0`) lays out after the placed mobys for the
+/// created ones (the pool runs to `0x1b1e24`, the last of them).
+pub fn moby_spawnable(gameplay: &[u8]) -> Result<usize> {
+    let Some(s) = section(gameplay, "moby_instances")? else { return Ok(0) };
+    let n = Buf(s).i32(4)?;
+    if !(0..=10_000).contains(&n) { return invalid("implausible spawnable moby count"); }
+    Ok(n as usize)
+}
+
 /// The instance pvars (sections 23 `pvar_table` and 24 `pvar_data`): `{s32 offset, s32 size}` per pvar index into the
 /// data. The loader (L00 `0x3012a0`) copies each moby's block (its record's pvar index, `+0x68`) out of the data.
 pub fn pvar_blocks(gameplay: &[u8]) -> Result<Vec<Vec<u8>>> {
