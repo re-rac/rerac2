@@ -10,6 +10,10 @@
 //! * **0x07ef** ([`update_07ef`], `0x3f5e50`, 1 placed): deletes itself.
 //! * **0x0c4b** ([`update_0c4b`], `0x42cdf0`, 1 placed): opens and closes when its group pokes it.
 //! * **0x0e8e** ([`update_0e8e`], `0x44c848`, 1 placed): sets two flag bytes when Ratchet comes in.
+//! * **0x1240** ([`update_1240`], `0x465f18`, 1 placed; the decomp's `func_L06_00464900`): a camera cue. Its pvars:
+//!   `+0x00` a fly-by camera, `+0x04` / `+0x08` two mobys. **0**: updated from 0xff; 1. **1**: the first moby in its
+//!   state 2 and the second still there (not deleted): the camera armed (`0x47c358` = L00 `0x42a4e0`,
+//!   crate::cameras), 2. **2**: the first moby out of its state 2: 1.
 //! * **0x0feb** ([`update_0feb`], `0x45da00`, 3 placed; the decomp's `func_L06_0045C3E8`): a vent that sprays on and
 //!   off. Its pvars: `+0x00` / `+0x04` the off and on timers, `+0x08` its hiss. Its alpha 0x80 each tick.
 //!   * **A hit** (flags 0x4010000, `0x35df18`) from anything but a 0x0fe5: its group's timers 0 when it was on
@@ -447,4 +451,26 @@ pub fn update_0feb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => {}
     }
     w.mobys[id].hit_slot = -1;
+}
+
+/// 0x1240 (module docs).
+pub fn update_1240(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let at = |w: &MobyWorld, k: i32| usize::try_from(k).ok().and_then(|k| w.mobys.get(k)).map(|m| m.state);
+    let m = &w.mobys[id];
+    let (cam, a, b) = (m.pv_i(0), m.pv_i(4), m.pv_i(8));
+    match m.state {
+        0 => {
+            let m = &mut w.mobys[id];
+            m.update_dist = 0xff;
+            m.state = 1;
+        }
+        1 => {
+            if at(w, a) == Some(2) && at(w, b).is_some_and(|s| s != 0xfe && s != 0xfd) {
+                ctx.game.cameras.arm(cam);
+                w.mobys[id].state = 2;
+            }
+        }
+        2 => if at(w, a) != Some(2) { w.mobys[id].state = 1 },
+        _ => {}
+    }
 }

@@ -14,7 +14,7 @@
 //!   (`0x404c60`: a swimmer that grabs Ratchet in the water, his state 0x12, and throws him out, his state 0x6f
 //!   `0x2f96e8`), 0x0b57 (`0x41b200`, Ratchet's state 0x37 and the level's scene functions `0x479xxx`).
 //! * The hints 0x0cdd (`0x4321e8`: help 0x9df / 0x9e0 / 0x9e1 / 0x9e2 / 0x9db / 0x9b5 by cuboids; it reads Ratchet's
-//!   `0x18c2d4` and the byte `0x1a7b27`, not mapped, and the uids gone for good `0x21ecc4`), 0x1240 (`0x465f18`: the level's table `0x1b21c4`, `0x47c358`).
+//!   `0x18c2d4` and the byte `0x1a7b27`, not mapped, and the uids gone for good `0x21ecc4`).
 
 pub mod arc_shot;
 pub mod barrel;
@@ -66,6 +66,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x0c4b => Some(props::update_0c4b),
         0x0e8e => Some(props::update_0e8e),
         0x0feb => Some(props::update_0feb),
+        0x1240 => Some(props::update_1240),
         0x08c9 => Some(lifts::update_08c9),
         0x0849 => Some(lifts::update_0849),
         glowbug::CLASS => Some(glowbug::update_0db0),
