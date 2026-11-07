@@ -62,17 +62,17 @@ pub mod pv {
 }
 
 /// `$gp+0x1c40`: where Ratchet stands in its frame; `$gp+0x1c50` / `+0x1c60`: the camera's eye and aim in his.
-const STAND: V3 = [1.3, 0.0, 0.0];
-const EYE: V3 = [-0.5, -1.0, 1.5];
-const AIM: V3 = [0.7, 0.0, f32::from_bits(0x3f51_eb85)];
+pub(crate) const STAND: V3 = [1.3, 0.0, 0.0];
+pub(crate) const EYE: V3 = [-0.5, -1.0, 1.5];
+pub(crate) const AIM: V3 = [0.7, 0.0, f32::from_bits(0x3f51_eb85)];
 /// The field of view: the play's (`0x3f8fea69`) and the zoom's (`0x3c8efa36`).
-const FOV: u32 = 0x3f8f_ea69;
-const FOV_ZOOM: u32 = 0x3c8e_fa36;
+pub(crate) const FOV: u32 = 0x3f8f_ea69;
+pub(crate) const FOV_ZOOM: u32 = 0x3c8e_fa36;
 
-fn idx(w: &MobyWorld, v: i32) -> Option<usize> { usize::try_from(v).ok().filter(|&i| i < w.mobys.len()) }
+pub(crate) fn idx(w: &MobyWorld, v: i32) -> Option<usize> { usize::try_from(v).ok().filter(|&i| i < w.mobys.len()) }
 
 /// `0x2f02d8` + the position: a point of moby `m`'s frame in the world.
-fn frame_point(rows: &[V3; 3], pos: V3, v: V3) -> V3 { add(std::array::from_fn(|k| v[0] * rows[0][k] + v[1] * rows[1][k] + v[2] * rows[2][k]), pos) }
+pub(crate) fn frame_point(rows: &[V3; 3], pos: V3, v: V3) -> V3 { add(std::array::from_fn(|k| v[0] * rows[0][k] + v[1] * rows[1][k] + v[2] * rows[2][k]), pos) }
 
 /// `RC_HACKER=1` (module docs), once.
 fn dev_open() -> bool {
@@ -81,7 +81,7 @@ fn dev_open() -> bool {
 }
 
 /// `0x32bf18(m, 1)` on it and its two mobys.
-fn hook(w: &mut MobyWorld, id: usize, me: bool) {
+pub(crate) fn hook(w: &mut MobyWorld, id: usize, me: bool) {
     if me { w.mobys[id].once |= 4; }
     for k in 0..2 {
         if let Some(i) = idx(w, w.mobys[id].pv_i(pv::HOOKS + 4 * k)) { w.mobys[i].once |= 4; }
@@ -90,7 +90,7 @@ fn hook(w: &mut MobyWorld, id: usize, me: bool) {
 
 /// `0x2d5010`: Ratchet's scripted walk: 1 walking (0x62, 0x63; or asked to: the port starts the state on his next
 /// tick), 2 there (0x64), else 0.
-fn walk(ctx: &Ctx) -> i32 {
+pub(crate) fn walk(ctx: &Ctx) -> i32 {
     match ctx.hero.state {
         0x62 | 0x63 => 1,
         100 => 2,
@@ -100,10 +100,10 @@ fn walk(ctx: &Ctx) -> i32 {
 }
 
 /// Ratchet held (`0x18c0b4` = 0x6f; or asked to be: the port starts the state on his next tick).
-fn held(ctx: &Ctx) -> bool { ctx.hero.state == 0x6f || ctx.hero.state_req.is_some_and(|r| r.id == 0x6f) }
+pub(crate) fn held(ctx: &Ctx) -> bool { ctx.hero.state == 0x6f || ctx.hero.state_req.is_some_and(|r| r.id == 0x6f) }
 
 /// `0x2caec8(0)`: Ratchet idle.
-fn idle(ctx: &mut Ctx) { ctx.hero.request_state(0, true); }
+pub(crate) fn idle(ctx: &mut Ctx) { ctx.hero.request_state(0, true); }
 
 /// `0x3e6780`: the way out (module docs).
 pub fn clean_up(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
@@ -126,7 +126,7 @@ pub fn clean_up(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 }
 
 /// The panel's list `+0xc..` (until −1, 14 at most).
-fn list(w: &MobyWorld, id: usize) -> Vec<i32> {
+pub(crate) fn list(w: &MobyWorld, id: usize) -> Vec<i32> {
     (0..crate::hacker::STEPS).map(|k| w.mobys[id].pv_i(pv::LIST + 4 * k)).take_while(|&v| 0 <= v).collect()
 }
 

@@ -131,8 +131,23 @@ pub fn burst_green(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, b: &Blast) { burst_
 /// moby class 0x139c, crate::moby::classes::ryno) is the same but for its shake's 20 ticks (and no `k`).
 pub fn burst_shaking(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, b: &Blast, shake_ticks: i32) { burst_in(w, ctx, at, b, shake_ticks, &ORANGE) }
 
+/// L21 `0x415a58(pos, s, shake, a, b, c, puffs, streaks, _, light, _, colour)` → `0x415f30` (the museum's copy, its
+/// moby 0x11e5; crate::moby::classes::level21::blaster): [`burst`] in the one colour `c` — the flash sprites `c` (the
+/// first and the pairs with 0x7f in its top byte), the blast sprites, the halo and the puffs (`c | 0x7f0000`) `c`, the
+/// streaks `c | 0x7f000000` (both ends), the flash ball `c`'s bytes at alpha 0x2d (its `k` unset: unread). Its sizes
+/// and life (`$gp+0x2db8` / `+0x2dbc` / `+0x2dc0`: 3, 4, 30) and the rest are L00's.
+pub fn burst_tinted(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, b: &Blast, c: u32) {
+    let rgb = c & 0xff_ffff;
+    let p = Palette { flashes: [c | 0x7f00_0000, c, c | 0x7f00_0000], bursts: [c, rgb, rgb], halo: rgb, ball: [c as u8, (c >> 8) as u8, (c >> 16) as u8], puff: c | 0x7f_0000 };
+    burst_full(w, ctx, at, b, 0x28, &p, Some(c | 0x7f00_0000), (0.0, 0x2d));
+}
+
 /// [`burst_shaking`] in the colours `p`.
-pub fn burst_in(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, b: &Blast, shake_ticks: i32, p: &Palette) {
+pub fn burst_in(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, b: &Blast, shake_ticks: i32, p: &Palette) { burst_full(w, ctx, at, b, shake_ticks, p, None, (K, FLASH_ALPHA)) }
+
+/// [`burst_in`] with the streaks' colour (`None`: the streaks' own white) and the flash ball's `k` and alpha.
+#[allow(clippy::too_many_arguments)]
+fn burst_full(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, b: &Blast, shake_ticks: i32, p: &Palette, streak: Option<u32>, (k, ball_alpha): (f32, u8)) {
     let (halo, puff) = (p.halo, p.puff);
     let cam = ctx.host.camera_pos();
     let s = b.size;
@@ -178,12 +193,15 @@ pub fn burst_in(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, b: &Blast, shake_ticks
             let (a1, a2) = (g.randf_signed(0.261_799_4, 1.396_263_4), g.randf_signed(0.261_799_4, 1.396_263_4));
             let v = turn(turn(v, r1, a1), r0, a2);
             let life = g.rand_range(20, 35) as i16;
-            particles::streak(sys, 0.004_05, at, v, life);
+            if let (Some(i), Some(c)) = (particles::streak(sys, 0.004_05, at, v, life), streak) {
+                rec::set_u32(&mut sys.pool.recs[i], 0xc, c);
+                rec::set_u32(&mut sys.pool.recs[i], 4, c);
+            }
         }
     }
     // The flash, between the streaks and the puffs.
     if b.light {
-        super::classes::flash::spawn(w, ctx, s * 3.5, K, at, [0.0, 0.0, s * 0.133_333_34], FLASH_LIFE, p.ball, FLASH_ALPHA);
+        super::classes::flash::spawn(w, ctx, s * 3.5, k, at, [0.0, 0.0, s * 0.133_333_34], FLASH_LIFE, p.ball, ball_alpha);
     }
     let Some(sys) = ctx.parts.as_deref_mut() else { return };
     let g = &mut ctx.game.rng;

@@ -1385,7 +1385,7 @@ fn puzzle_frame(p: &mut Play, lv: &crate::level_load::LoadedLevel, occl: Option<
         let aux = rc_game::particles::PartAux { cam_yaw: p.camera.yaw(), water_z: p.hero.surf.water_z, hero_speed: p.hero.eff_len, coll: Some(coll), rain: mobys.world.weather.aux(&mobys.level, &p.game) };
         rc_game::particles::update_parts(s, &mobys.world, p.camera.pos, p.hero.pos, &mut p.game.rng, &aux);
     }
-    let id = usize::try_from(p.game.scenes.arg.0).ok().filter(|&i| mobys.world.mobys.get(i).is_some_and(|m| m.state < 0x80 && matches!(m.o_class, rc_game::moby::classes::electrolyzer::CLASS | rc_game::moby::classes::hacker_panel::CLASS)));
+    let id = usize::try_from(p.game.scenes.arg.0).ok().filter(|&i| mobys.world.mobys.get(i).is_some_and(|m| m.state < 0x80 && matches!(m.o_class, rc_game::moby::classes::electrolyzer::CLASS | rc_game::moby::classes::hacker_panel::CLASS | rc_game::moby::classes::level21::hacking::CLASS)));
     if let Some(id) = id {
         // The puzzle reads the pad as the hero's tick would have.
         p.hero.items.pressed = p.pad.pressed;
@@ -1401,6 +1401,8 @@ fn puzzle_frame(p: &mut Play, lv: &crate::level_load::LoadedLevel, occl: Option<
         let mut ctx = rc_game::moby::Ctx { host: &mut host, hero: &mut p.hero, game: &mut p.game, coll: Some(coll), scene: scene.as_ref(), hero_moby: mobys.hero_moby, hero_view, level: &mobys.level, parts: parts.as_deref_mut(), view: None };
         if mobys.world.mobys[id].o_class == rc_game::moby::classes::hacker_panel::CLASS {
             rc_game::moby::classes::hacker_panel::update(&mut mobys.world, id, &mut ctx);
+        } else if mobys.world.mobys[id].o_class == rc_game::moby::classes::level21::hacking::CLASS {
+            rc_game::moby::classes::level21::hacking::update_1312(&mut mobys.world, id, &mut ctx);
         } else {
             rc_game::moby::classes::electrolyzer::update(&mut mobys.world, id, &mut ctx);
         }
