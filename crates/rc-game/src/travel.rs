@@ -127,11 +127,14 @@ const GROUND_LIFT: f32 = 0.4;
 const Z_ACCEL: f32 = 1.0 / 1800.0;
 const Z_MAX: f32 = 1.0 / 60.0;
 /// The parked ship's rocking (`0x361050` → `0x32bd98` / `0x32c0b0`, crate::moby::floater; the game's block is
-/// `0x220da0`, kept here in its pvars at `+0x40`): its tunables at `$gp−0x2d18..` (gain, clamp, kick, wobble, wobble
-/// speed in degrees a second, response, damping).
-const ROCK: usize = 0x40;
-const ROCK_SET: usize = 0x10;
-const ROCK_BASE: usize = 0x14;
+/// `0x220da0`, kept here in its pvars at `+0x70`, past its platform block `+0x20..+0x60` that the rocking's move
+/// writes): its tunables at `$gp−0x2d18..` (gain, clamp, kick, wobble, wobble speed in degrees a second, response,
+/// damping).
+const ROCK: usize = 0x70;
+const ROCK_SET: usize = 0x60;
+const ROCK_BASE: usize = 0x64;
+/// `0x360d28`: the ship's platform block pointer (`+0x08`) at its pvars' `+0x20`.
+const PLATFORM: usize = 0x20;
 const SHIP_ROCK: crate::moby::floater::Params = crate::moby::floater::Params {
     gain: [0.005; 3],
     damping: [0.025; 3],
@@ -434,6 +437,7 @@ fn ship_ground(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let base = ground(ctx, pos).map_or(pos[2], |g| g + GROUND_LIFT);
         w.mobys[id].pos[2] = base;
         w.mobys[id].set_pv_f(ROCK_BASE, base);
+        w.mobys[id].set_pv_i(8, PLATFORM as i32);
         crate::moby::floater::init(w, id, ctx, ROCK, &SHIP_ROCK);
         w.mobys[id].pvars[ROCK_SET] = 1;
     }
