@@ -733,6 +733,8 @@ impl Hero {
         if self.air_ticks == 0 {
             self.grounded_ticks += 1;
             self.last_ground_point = self.ground_point;
+            // Ground under him ends the hops in a row (`0x18b6e0`), but for the lava hop's own.
+            if self.state != 0x38 { self.hot_hops = 0; }
         } else {
             self.grounded_ticks = 0;
         }
