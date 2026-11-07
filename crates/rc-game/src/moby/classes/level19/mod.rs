@@ -5,6 +5,7 @@
 pub mod den;
 pub mod director;
 pub mod floe;
+pub mod fly_by;
 pub mod frozen;
 pub mod lurker;
 pub mod props;
@@ -27,6 +28,7 @@ pub struct Globals {
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
         props::WATCHER => Some(props::update_0629),
+        fly_by::CLASS => Some(fly_by::update_0c35),
         props::ICE => Some(props::update_11c7),
         props::TELEPORTER => Some(props::update_0edc),
         props::DROPPER => Some(props::update_11ff),

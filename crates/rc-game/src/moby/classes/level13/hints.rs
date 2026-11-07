@@ -28,19 +28,8 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].state != 1 { return; }
     let pv = |k: usize| w.mobys[id].pv_i(k);
     let (c0, c1, c2) = (pv(0), pv(4), pv(8));
-    match w.mobys[id].pv_s(WATCH) {
-        0 => {
-            if ctx.level.in_cuboid(c1, ctx.hero.pos) && ctx.hero.group == 0xf { w.mobys[id].set_pv_s(WATCH, 1); }
-        }
-        1 => {
-            if ctx.hero.state == 0x3e {
-                w.mobys[id].set_pv_s(WATCH, 0);
-            } else if ctx.level.in_cuboid(c2, ctx.hero.pos) && !ctx.game.has_skill_point(4) {
-                ctx.game.award_skill_point(4);
-            }
-        }
-        _ => {}
-    }
+    let watch = crate::skill_points::watch(ctx, w.mobys[id].pv_s(WATCH) as i32, c1, c2, crate::skill_points::point::BOLDAN);
+    w.mobys[id].set_pv_s(WATCH, watch as i16);
     if !ctx.level.in_cuboid(c0, ctx.hero.pos) { return; }
     let n = ctx.game.flags.get(FLAG).copied().unwrap_or(0);
     if n < 2 && w.mobys[id].pv_s(SHOWN) == 0 {

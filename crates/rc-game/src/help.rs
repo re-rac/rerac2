@@ -336,3 +336,29 @@ impl Panel {
         out
     }
 }
+
+/// The two help asks the hint watchers write inline over the slot records (`0x18c958 + 0xc·slot`): L04 0x0c26
+/// (crate::moby::classes::level04::hints) and L14 0x0c30 (crate::moby::classes::level14::hints) spell them out.
+impl GameState {
+    /// Asked once `n` ticks have passed since its last showing (`play_time − last > n` unsigned, `0x1a7390`) or it was
+    /// never shown; else its last showing moved up to now.
+    pub fn help_again(&mut self, text: i32, slot: usize, n: u32) {
+        let (now, old) = (self.play_time, self.help_last.get(slot).copied().unwrap_or(0));
+        if n < now.wrapping_sub(old) as u32 || old == 0 {
+            self.help(text, slot as i32);
+        } else if old < now {
+            if let Some(t) = self.help_last.get_mut(slot) { *t = now; }
+        }
+    }
+
+    /// Never shown (its count 0): only counted as shown — once, its last showing now, this level's bit and bit 31;
+    /// else [`GameState::help_again`] past 1080 ticks.
+    pub fn help_after_first(&mut self, text: i32, slot: usize) {
+        if self.help_counts.get(slot).copied().unwrap_or(0) != 0 { return self.help_again(text, slot, 1080); }
+        if let Some(c) = self.help_counts.get_mut(slot) { *c = c.wrapping_add(1); }
+        let now = self.play_time;
+        if let Some(t) = self.help_last.get_mut(slot) { if *t < now { *t = now; } }
+        let bit = 1u32.checked_shl(self.level.max(0) as u32).unwrap_or(0);
+        if let Some(l) = self.help_levels.get_mut(slot) { *l |= bit | 0x8000_0000; }
+    }
+}

@@ -9,6 +9,7 @@ pub mod energy;
 pub mod fence;
 pub mod field;
 pub mod gate;
+pub mod hints;
 pub mod lift;
 pub mod lift_guard;
 pub mod movers;
@@ -45,6 +46,7 @@ pub fn draw(w: &mut crate::moby::MobyWorld, host: &dyn crate::moby::MobyHost, ga
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
+        hints::CLASS => Some(hints::update_0c30),
         steam::CLASS => Some(steam::update_0b0d),
         steam::BOBBER => Some(steam::update_0af2),
         steam::SEQUENCER => Some(steam::update_0b19),

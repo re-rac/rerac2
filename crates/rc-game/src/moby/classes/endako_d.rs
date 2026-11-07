@@ -1743,3 +1743,11 @@ pub fn update_0972(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         _ => {}
     }
 }
+
+/// The robots' counts by kind (L14 `$gp+0x326c..+0x3274`, L03 `0x1b2750`: each robot's tick `0x3c4828` / L14
+/// `0x3c7d50` counts itself in when awake, not in state 1, and within 16 across of Ratchet; the frame's start clears
+/// them): here counted at the asking. Their reader: the prison's hints 0x0c30 (crate::moby::classes::level14::hints,
+/// the zap robots 0x0a59).
+pub fn near_hero(w: &MobyWorld, ctx: &Ctx, class: i16) -> usize {
+    w.mobys.iter().filter(|m| m.o_class == class && m.state < 0x80 && m.state != 1 && crate::hero::physics::dist2(m.pos, ctx.hero.pos) < 16.0).count()
+}

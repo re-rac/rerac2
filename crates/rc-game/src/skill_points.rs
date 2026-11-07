@@ -75,6 +75,13 @@ pub mod point {
     pub const GIANT_ORBIT: usize = 0x08;
     /// Snivelak's flock members: more than 13 shot (0x12ca, L16 `0x37b8f0`, crate::moby::classes::flock::update_12ca).
     pub const FLOCK: usize = 0x0b;
+    /// Boldan's cuboids (L13 0x0c2f, crate::moby::classes::level13::hints; [`super::watch`]).
+    pub const BOLDAN: usize = 0x04;
+    /// Damosel's cuboids (L18 0x0c34, crate::moby::classes::level18::hints; [`super::watch`]).
+    pub const DAMOSEL: usize = 0x07;
+    /// Dobbo's orbit's asteroid clusters 0x0d3d all shot down (L22 0x12db `0x387310`,
+    /// crate::moby::classes::level22::asteroid::update_12db).
+    pub const CLUSTERS: usize = 0x18;
 }
 
 impl GameState {
@@ -94,6 +101,22 @@ impl GameState {
 
     /// `0x327df0`: the points earned, at most 30.
     pub fn skill_point_count(&self) -> i32 { count(&self.skill_points) }
+}
+
+/// The watch two levels' hint watchers keep for a point (L13 0x0c2f `0x3e9d48`, point 4; L18 0x0c34 `0x3a1fd8`,
+/// point 7; written inline in each): **0** Ratchet in the cuboid `start` in his movement group 0xf (`0x18c0bc`): 1.
+/// **1** in his state 0x3e: 0; else in the cuboid `end`: point `k` awarded ([`GameState::award_skill_point`]). The
+/// watch's new value.
+pub fn watch(ctx: &mut crate::moby::Ctx, watch: i32, start: i32, end: i32, k: usize) -> i32 {
+    match watch {
+        0 if ctx.level.in_cuboid(start, ctx.hero.pos) && ctx.hero.group == 0xf => 1,
+        1 if ctx.hero.state == 0x3e => 0,
+        1 => {
+            if ctx.level.in_cuboid(end, ctx.hero.pos) { ctx.game.award_skill_point(k); }
+            1
+        }
+        w => w,
+    }
 }
 
 /// `0x327df0` over the bytes `0x1a7a68..`: those set, at most 30.

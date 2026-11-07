@@ -94,10 +94,15 @@ impl VendorPlay {
     }
 
     /// `0x374038(vendor)`: the menu opened on moby `id`: its kind by its class — a vendor 0xb's from its pvar `+0x94`,
-    /// the mod vendor 0x0ddc's the mods (list 1, rc_game::moby::classes::mod_vendor).
+    /// the mod vendor 0x0ddc's the mods (list 1, rc_game::moby::classes::mod_vendor), the ship shack's 0x1309 the ship's.
     pub(crate) fn open(&mut self, p: &mut Parts, id: usize, widescreen: bool) {
         let Some(v) = p.world.mobys.get(id) else { return };
-        let kind = if v.o_class == rc_game::moby::classes::mod_vendor::CLASS { 1 } else { v.pv_i(0x94) };
+        let kind = match v.o_class {
+            rc_game::moby::classes::mod_vendor::CLASS => 1,
+            // The ship shack's stand 0x1309 (rc_game::moby::classes::ship_vendor): the ship's.
+            rc_game::moby::classes::ship_vendor::CLASS => 4,
+            _ => v.pv_i(0x94),
+        };
         self.virtual_open = false;
         self.open_kind(p, id, kind, widescreen);
     }

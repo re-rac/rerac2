@@ -8,11 +8,13 @@ pub mod breeder;
 pub mod director;
 pub mod dropship;
 pub mod hatch;
+pub mod hints;
 pub mod launcher;
 pub mod pad;
 pub mod prey;
 pub mod props;
 pub mod seller;
+pub mod spinner;
 pub mod stalker;
 pub mod traffic;
 
@@ -56,6 +58,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         capturable::BITER | capturable::GUNNER => Some(capturable::update),
         capturable::SHOT => Some(capturable::update_1263),
         launcher::CLASS => Some(launcher::update_1158),
+        hints::CLASS => Some(hints::update_0c34),
+        spinner::CLASS => Some(spinner::update_10f8),
         _ => None,
     }
 }

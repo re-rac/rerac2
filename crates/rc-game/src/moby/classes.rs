@@ -120,6 +120,7 @@ pub mod endako_crane;
 pub mod endako_d;
 pub mod endako_boss;
 pub mod mod_vendor;
+pub mod ship_vendor;
 pub mod hacker_panel;
 pub mod sheep;
 pub mod sheepinator;
@@ -460,6 +461,8 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         0x12ea => Some(endako_b::update_12ea),
         mod_vendor::CLASS => Some(mod_vendor::update),
         mod_vendor::MACHINE => Some(mod_vendor::update_machine),
+        // The ship shack's (L24 `0x37ae10`).
+        ship_vendor::CLASS => Some(ship_vendor::update_1309),
         // Endako (endakoC).
         endako_c::SENTRY => Some(endako_c::update_0ffd),
         endako_c::FLAMER => Some(endako_c::update_0ffc),

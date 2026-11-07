@@ -8,19 +8,21 @@
 //! height's and yaw's easing speeds, `+0xa4` its turning sound.
 //!
 //! * **0**: put on the ground under it (`0x31ede0`: the line from 0.5 up, flags 2); a target (mode | 0x4000); its home
-//!   and first yaw kept, its health 4; 1.
+//!   and first yaw kept, its health 4; 1. With Ratchet dead twice or more in the fight (`$gp+0x26b4`,
+//!   crate::moby::classes::level16::boss::Globals::deaths) and the halfword `0x1941dc` under 3 (nothing in the code
+//!   writes it: taken as 0, as level 11's `0x194158`), the help text 0x0a0b (slot 0x62).
 //! * **1** / **4** (4: just left): its sound 3 on the state's first tick. Back to 1 once Ratchet is off it (4) or 20
 //!   ticks in the air. In 1, Ratchet on the ground on it: he is put at (−0.666, 0, 1.4) in its frame at its angles
 //!   in state 0x31 (`0x2b9680(…, 0x31, 0)`), `0x18b650` it, the script camera swung in from the view over 60 ticks
-//!   (`0x434970`, mode 3), `$gp+0x2670` it; 2. Else it sinks toward 1 under its raised height (`0x3185c0`: 1/1800 a
+//!   (`0x434970`, mode 3), the help slot 0x62 off (`0x18cdf0` = 0xffff, also every tick of 2), `$gp+0x2670` it; 2. Else it sinks toward 1 under its raised height (`0x3185c0`: 1/1800 a
 //!   tick², at most 1/30 a tick) and, with Ratchet more than 3 away across, turns its back to him (`0x318a78`: 0.1°
 //!   a tick², at most 6° a tick).
 //! * **2** (rising): on its first tick its sound 3 and the pitch 0; it rises to its raised height (1/600 a tick², at
 //!   most 0.1) turning toward the moby `+0x64` (0.067° a tick², at most 6°; its sound 4 looped while more than 10°
-//!   off); at its height and within 5°: 3. Ratchet placed, the camera led ([`hold`]).
+//!   off); at its height and within 5°: 3. Ratchet placed, its fire ([`fire`]), the camera led ([`hold`]).
 //! * **3** (steered): the crosshair (`0x2d4770`: the marker 0x26 at the screen's centre, size 1, `0x600fff0f`). △ or
 //!   Ratchet out of 0x31: off ([`get_off`], `0x4182c0`), 4, its turning sound stopped, the prompt's lease taken for
-//!   30 ticks (owner 2). Else [`steer`] and [`hold`].
+//!   30 ticks (owner 2). Else [`steer`], [`fire`] and [`hold`].
 //! * **Its hits**: from the class 0x12be its health −1; from the classes 0x0f79 / 0x09b0, or at no health: gone —
 //!   hidden, no collision, not a target, off if ridden, 6. Else from anything but 0x0ea7 while it is steered and
 //!   Ratchet not kept from harm: its damage to Ratchet (`0x2a6750`), off and 4 at no health left, else kept from
@@ -36,16 +38,21 @@
 //! targets (`0x418300`): its angles with the pitch (and 0.1 rad more down), 4.5 behind and 4 above its middle in
 //! that frame, at least 1 above it.
 //!
+//! **The fire** ([`fire`], `0x4183e8`): once its rest `+0x8c` is out (`0x2e7e58` = L00 `0x2eeab0`) and with □ or ○
+//! held (`0x138320 & 0xa0`), a blaster shot (`0x3fdb70` = L13 `0x40f0a0`, crate::moby::classes::thugs::fire, the
+//! class 0x0ea7 the boss takes its full damage from) from the barrel `+0x88` (`$gp+0x2a80`: (2, ∓0.75, 2.5) in its
+//! frame), at 75 a second, damage 1 (×5 in the challenge mode, `0x1a7a12`). Its way: with its own collision off
+//! (`+0x98` = 0; back to its class's after), a moby within 1.5 of (2, 0, 2) in its frame but Ratchet (`0x2da788` = L00
+//! `0x2e14b0`, its first) — toward that moby's place; else the camera's line from 2 to 120 along its forward
+//! (`0x2d7b50` = L00 `0x2de878`, flags 0, Ratchet skipped) — toward where it meets; else toward its far end. Then the
+//! rest 8 ticks (`$gp+0x2ab8`) and the other barrel.
+//!
 //! Not ported:
-//! * The fire (`0x4183e8`: with □ or ○ held and its rest out, a shot from the barrels in turn toward what the
-//!   camera's line meets, the projectile `0x3fdb70` = L13 `0x40f0a0`, not in the port), and the help text 0x0a0b
-//!   at its set-up (`$gp+0x26b4` ≥ 2 and `0x1941dc` < 3: neither word is known here).
-//! * Its platform record (`+0x20`, `0x31bc70`: what Ratchet standing on it is carried by), the word `0x18cdf0`
-//!   (0xffff while it rises and is steered).
+//! * Its platform record (`+0x20`, `0x31bc70`: what Ratchet standing on it is carried by).
 //! * Its break (`0x418140`: five pieces, its sound 0 and the shatter `0x3e9ff0`).
 //! * `0x31ede0`'s gravity-frame branch (`0x1a8ca0`).
 
-use crate::hero::physics::{add, add_rot, atan2, dist2, ease, sub_rot, rot_dist, turn_ease, approach, V3};
+use crate::hero::physics::{add, add_rot, atan2, dist2, ease, scale, set_len, sub, sub_rot, rot_dist, turn_ease, approach, V3};
 use crate::moby::attach::rows_of;
 use crate::moby::{Ctx, MobyWorld};
 use crate::pad::button;
@@ -61,6 +68,8 @@ mod pv {
     pub const YAW0: usize = 0x7c;
     pub const YAW_V: usize = 0x80;
     pub const PITCH_V: usize = 0x84;
+    pub const BARREL: usize = 0x88;
+    pub const REST: usize = 0x8c;
     pub const PITCH: usize = 0x90;
     pub const HEALTH: usize = 0x94;
     pub const Z_V: usize = 0x98;
@@ -70,6 +79,16 @@ mod pv {
 
 /// `$gp+0x2a30`: Ratchet's place in its frame.
 const SEAT: V3 = [f32::from_bits(0xbf2a_7efa), 0.0, f32::from_bits(0x3fb3_3333)];
+/// The help text's slot (`0x18c958 + 0xc·0x62` = `0x18cdf0`).
+const HELP_SLOT: i32 = 0x62;
+/// `$gp+0x2a80` / `$gp+0x2aa0`: the barrels in its frame; the point (and radius, its w) it looks about for a moby.
+const BARRELS: [V3; 2] = [[2.0, -0.75, 2.5], [2.0, 0.75, 2.5]];
+const AIM: V3 = [2.0, 0.0, 2.0];
+const AIM_R: f32 = 1.5;
+/// `$gp+0x2ab0` / `$gp+0x2ab4` / `$gp+0x2ab8`: the shot's speed (a second), its damage, the rest between shots.
+const SHOT_SPEED: f32 = 75.0;
+const SHOT_DAMAGE: f32 = 1.0;
+const REST: i32 = 8;
 /// `$gp+0x2a40` / `$gp+0x2a44`: how far under its raised height it waits, and the distance it turns its back past.
 const LOW: f32 = 1.0;
 const FAR: f32 = 3.0;
@@ -117,6 +136,7 @@ pub fn update_10ee(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.set_pv_f(pv::YAW0, m.rot[2]);
             m.set_pv_f(pv::HEALTH, 4.0);
             m.set_state(1, -1);
+            if 2 <= w.snivelak.deaths { ctx.game.help(0x0a0b, HELP_SLOT); }
         }
         1 | 4 => wait(w, id, ctx),
         2 => {
@@ -135,6 +155,8 @@ pub fn update_10ee(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.set_pv_f(pv::TURN_V, yv);
             if sub_rot(yaw, angle).abs() < f32::from_bits(0x3e32_b8c4) { stop_sound(w, id, ctx) } else { keep_sound(w, id, ctx) }
             if (z - high).abs() <= zv && rot_dist(yaw, angle) <= f32::from_bits(0x3db2_b8c4) { w.mobys[id].set_state(3, -1); }
+            help_off(ctx);
+            fire(w, id, ctx);
             hold(w, id, ctx);
         }
         3 => {
@@ -147,6 +169,7 @@ pub fn update_10ee(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 ctx.game.prompt.hold = 30;
             } else {
                 steer(w, id, ctx);
+                fire(w, id, ctx);
                 hold(w, id, ctx);
             }
         }
@@ -169,6 +192,7 @@ fn wait(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         ctx.hero.ride_on(id, at, rot, true);
         let (view, euler) = ctx.game.cameras.view_euler();
         ctx.game.cameras.camera_script(view, euler, crate::script_camera::MODE_SWING, 60, false, ctx.hero);
+        help_off(ctx);
         w.mobys[id].set_state(2, -1);
         return;
     }
@@ -201,6 +225,42 @@ fn hold(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let mut pos = add(to_world(CAM_OFF, &rows_of(ang)), look);
     if pos[2] < m.pos[2] + CAM_ABOVE { pos[2] = m.pos[2] + CAM_ABOVE; }
     ctx.game.cameras.camera_script_targets(Some(pos), Some(ang));
+}
+
+/// `0x18cdf0` = 0xffff: the help slot 0x62's count −1, so its text is never asked for again.
+fn help_off(ctx: &mut Ctx) {
+    if let Some(c) = ctx.game.help_counts.get_mut(HELP_SLOT as usize) { *c = -1; }
+}
+
+/// `0x4183e8` (module docs).
+fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let mut rest = w.mobys[id].pv_i(pv::REST);
+    let out = crate::moby::countdown(&mut rest);
+    w.mobys[id].set_pv_i(pv::REST, rest);
+    if !out || ctx.hero.items.held & (button::SQUARE | button::CIRCLE) == 0 { return; }
+    let m = &w.mobys[id];
+    let barrel = m.pv_i(pv::BARREL);
+    let muzzle = add(to_world(BARRELS[(barrel & 1) as usize], &m.rows), m.pos);
+    let aim = add(to_world(AIM, &m.rows), m.pos);
+    let (cam, fwd) = (ctx.host.camera_pos(), ctx.host.camera_rows()[0]);
+    let near = add(scale(fwd, 2.0), cam);
+    let far = add(scale(fwd, 120.0), cam);
+    let had = w.mobys[id].has_collision;
+    w.mobys[id].has_collision = false;
+    let found = ctx.scene.and_then(|sc| {
+        crate::collision::coll_sphere_mobys(sc, aim, AIM_R, crate::collision::QueryFlags(0), ctx.hero_moby).into_iter().find(|&k| k != id)
+    });
+    let to = match found.and_then(|k| w.mobys.get(k)) {
+        Some(k) => k.pos,
+        None => w.coll_line(ctx, near, far, 0, ctx.hero_moby).map_or(far, |o| o.point),
+    };
+    let vel = set_len(sub(to, muzzle), SHOT_SPEED * f32::from_bits(0x3c88_8889));
+    w.mobys[id].has_collision = had;
+    let damage = if ctx.game.challenge { SHOT_DAMAGE * 5.0 } else { SHOT_DAMAGE };
+    crate::moby::classes::thugs::fire(w, ctx, id, vel, muzzle, damage);
+    let m = &mut w.mobys[id];
+    m.set_pv_i(pv::REST, REST);
+    m.set_pv_i(pv::BARREL, (barrel + 1) & 1);
 }
 
 /// `0x4182c0`: `0x18b650` and `$gp+0x2670` cleared, Ratchet idle (`0x2c45f8(0)`: with no body), the script camera let

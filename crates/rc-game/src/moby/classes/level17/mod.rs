@@ -4,6 +4,7 @@
 
 pub mod carrier;
 pub mod brute;
+pub mod collectible;
 pub mod floaters;
 pub mod gate;
 pub mod hatchling;
@@ -22,6 +23,7 @@ use crate::moby::MobyWorld;
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
+        collectible::CLASS => Some(collectible::update_1249),
         seller::CLASS => Some(seller::update_11a6),
         vent::CLASS => Some(vent::update_02be),
         hazard::CHAIN | hazard::CHAIN_B | hazard::LOUD => Some(hazard::update_0878),
