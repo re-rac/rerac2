@@ -42,8 +42,12 @@
 //!   (`0x4329f0`): the fighters 0x957 and one big ship (`0x383038`, its group's start `0x437c40` and its cloak
 //!   `0x437e50`, 450 health). 3 (`0x432ba8`): the gate race.
 //!
-//! Not ported: the select's draw (`0x420420`, the screen callback `0x325e00(0, …)`) and the results' (`0x421f80`,
-//! Hrugis `0x4254c8`, Gorn `0x431c88`), the mission's HUD and pause items (`0x41f478`), the autosave after a reward
+//! **The screens** (the HUD's screen callback `0x325e00(0, …)`, crate::hud::ScreenCallback): the select's while it is
+//! up ([`draw_select`], `0x420420`, Hrugis `0x423cb8`, Gorn `0x430500`), the results' from the reward on
+//! ([`draw_results`], `0x421f80`, Hrugis `0x4254c8`, Gorn `0x431c88`); else, after the mission's tick with no results
+//! up, the mission's HUD (`0x41f478`, not ported: no callback here).
+//!
+//! Not ported: the mission's HUD and pause items (`0x41f478`), the autosave after a reward
 //! (`0x325a28(0, −1)`), the second help 0xa18 (Hrugis / Gorn, `0x380780`), the fog's restore on the reset, the
 //! sound stopped on the reward (the ship's `+0x270`), Hrugis's 75 clouds (`0x427150(75, 16)`) and its first
 //! mission's two arcs (`0x39ea50`), the gate race's spark pickup (`0x42e6b0`, class 0x126c) and the gates' own
@@ -118,7 +122,8 @@ fn level(class: i16) -> Level {
 }
 
 /// The missions won (the save's bytes).
-fn won(ctx: &Ctx, lv: &Level, m: usize) -> i32 { ctx.game.flags.get(lv.won + m).copied().unwrap_or(0) as i32 }
+fn won(ctx: &Ctx, lv: &Level, m: usize) -> i32 { won_in(ctx.game, lv, m) }
+fn won_in(game: &crate::game::GameState, lv: &Level, m: usize) -> i32 { game.flags.get(lv.won + m).copied().unwrap_or(0) as i32 }
 
 fn get(w: &MobyWorld, id: usize, o: usize) -> i32 { w.mobys[id].pv_i(o) }
 fn set(w: &mut MobyWorld, id: usize, o: usize, v: i32) { w.mobys[id].set_pv_i(o, v) }
@@ -213,7 +218,15 @@ fn run(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, lv: &Level) {
     set(w, id, super::PASSIVE, quiet as i32);
     set(w, id, super::HELD, 0);
     let m = get(w, id, pv::SELECTED);
-    if m == -2 || ctx.game.frame < 3 { return; }
+    if m != -2 && 3 <= ctx.game.frame { tick_mission(w, id, ctx, lv, m); }
+    // `0x325e00(0, 0x41f478)` once (`$gp+0x2358`) with no results up: the mission's HUD (not ported: none here).
+    if get(w, id, pv::RESULTS) == 0 && matches!(ctx.game.screen_callback, Some(crate::hud::ScreenCallback::MissionSelect { .. } | crate::hud::ScreenCallback::MissionResults { .. })) {
+        ctx.game.screen_callback = None;
+    }
+}
+
+/// The mission `m`'s tick (module docs).
+fn tick_mission(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, lv: &Level, m: i32) {
     match (w.mobys[id].o_class, m) {
         (_, 3) => gate_race(w, id, ctx, lv),
         (FELTZIN, 0) => feltzin_waves(w, id, ctx, lv),
@@ -234,6 +247,10 @@ fn run(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, lv: &Level) {
 /// open (0 always, 1 after the first win, 2 after 0 and 1, 3 after 0, 1 and 2; the sound 4, the select down) or
 /// refuses it (the sound 5). Returns the mission taken, else −2.
 fn select(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, lv: &Level) -> i32 {
+    // `0x325e00(0, 0x420420)` once while it is up (`$gp+0x235c`): the select's screen ([`draw_select`]).
+    if !matches!(ctx.game.screen_callback, Some(crate::hud::ScreenCallback::MissionSelect { .. })) {
+        ctx.game.screen_callback = Some(crate::hud::ScreenCallback::MissionSelect { moby: id });
+    }
     let pressed = ctx.hero.items.pressed;
     let mut row = get(w, id, pv::CHOICE);
     if pressed & button::LEFT != 0 {
@@ -298,6 +315,8 @@ fn reward(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, lv: &Level, m: usize) {
     if ctx.game.scenes.mode == crate::scene::SCENE || !out(w, id, pv::T_END) { return; }
     if get(w, id, pv::RESULTS) == 0 {
         ctx.game.blocking_fade(30);
+        // `0x325e00(0, 0x421f80)` and `0x1b34f8` = m: the results' screen ([`draw_results`]).
+        ctx.game.screen_callback = Some(crate::hud::ScreenCallback::MissionResults { moby: id, mission: m });
         let n = won(ctx, lv, m);
         let mut bolts = lv.rewards[m][n.min(2) as usize];
         if ctx.game.challenge { bolts *= 10; }
@@ -629,4 +648,125 @@ fn gate_race(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, lv: &Level) {
             w.mobys[g].set_pv_i(8, colour as i32);
         }
     }
+}
+
+/// How a select's mission title is drawn: font 1 centred (`0x2ea570`), font 1 centred at a scale on its own line
+/// (`0x2ea738`), font 2 centred (`0x2ea608`).
+#[derive(Clone, Copy)]
+enum Title {
+    One,
+    Scaled(f32, f32),
+    Two,
+}
+
+/// The screens' texts by level (module docs): the missions' titles, their lines, the results' line with no bolts.
+struct Screens {
+    titles: [(u32, Title); 4],
+    lines: [u32; 4],
+    no_bolts: u32,
+}
+
+fn screens(class: i16) -> Screens {
+    match class {
+        HRUGIS => Screens { titles: [(0x2e78, Title::Scaled(0.9, 101.0)), (0x2e79, Title::One), (0x2e7b, Title::Two), (0x2e7c, Title::Two)], lines: [0x2e7d, 0x2e7e, 0x2e7f, 0x2e81], no_bolts: 0x11fb },
+        GORN => Screens { titles: [(0x2e8a, Title::One), (0x2e8b, Title::One), (0x2e8c, Title::One), (0x2e8d, Title::One)], lines: [0x2e85, 0x2e86, 0x2e87, 0x2e88], no_bolts: 0x11ff },
+        _ => Screens { titles: [(0x2e6c, Title::One), (0x2e6e, Title::Scaled(0.85, 102.0)), (0x2e6d, Title::One), (0x2e70, Title::One)], lines: [0x2e71, 0x2e73, 0x2e72, 0x2e75], no_bolts: 0x11f5 },
+    }
+}
+
+const WHITE: u32 = 0x80f0_f0f0;
+/// The screens' box for the lines (`0x303000(117, y, 280, 400, …)`).
+const BOX: (i32, i32, i32) = (0x75, 0x118, 400);
+
+fn text(out: &mut Vec<crate::hud::ScreenDraw>, font: u8, text: Vec<u8>, pos: [f32; 2], scale: f32, align: crate::hud::Align) {
+    out.push(crate::hud::ScreenDraw::Text { font, text, pos, scale, colour: WHITE, align });
+}
+
+fn boxed(out: &mut Vec<crate::hud::ScreenDraw>, text: Vec<u8>, y: i32) {
+    out.push(crate::hud::ScreenDraw::Box { font: 2, text, rect: [BOX.0, y, BOX.1, BOX.2], colour: WHITE });
+}
+
+/// The screens' panel: the GUI sprites 0x45 (`0x60442d00`) and 0x44 (`0x55f0c070`) at (256, 200).
+fn panel(out: &mut Vec<crate::hud::ScreenDraw>) {
+    for (id, colour) in [(0x45, 0x6044_2d00u32), (0x44, 0x55f0_c070)] {
+        out.push(crate::hud::ScreenDraw::Hud(crate::hud::Draw::Sprite { id, pos: [256.0, 200.0], scale: [1.0, 1.0], frame: 0.0, colour }));
+    }
+}
+
+/// The bolts of mission `m` at its `n`-th win (the level's table, × 10 in the challenge mode `0x1a7a12`).
+fn bolts_of(game: &crate::game::GameState, lv: &Level, m: usize, n: i32) -> i32 {
+    let b = lv.rewards[m][n.clamp(0, 2) as usize];
+    if game.challenge { b * 10 } else { b }
+}
+
+/// `0x420420` (Hrugis `0x423cb8`, Gorn `0x430500`: the same code on their texts, [`screens`]): the select's screen,
+/// in the counters' place; outside of play (`0x1a8f00` ≠ 0) nothing is drawn. The panel; the arrows 0x4a at (259,
+/// 291) and 0x4b at (251, 291), each `0x80007fff` while → (←) is held, else pulsing over 50 frames (`0x1b1fc8`)
+/// between `0x80ffde8d` and `0x60442d00`; the row's number (0x2e08, font 3 centred at (256, 46)). A row not open (1
+/// before mission 0's first win, 2 before 0's and 1's, 3 before 0's, 1's and 2's): 0x2e09 (font 3 centred, 170 down).
+/// An open one: its title (101 down: [`Title`]), its line in the box at (117, 131), its bolts at its next win (0x2e76,
+/// in the box at (117, 242); for row 0 only when some) and 0x2dd5 (font 2, left, at (181, 294)). Then 0x2dd6 (119,
+/// 294), 0x2dd7 (356, 294) and 0x2dd8 (279, 294), font 2, left.
+///
+/// Not ported: `$gp+0x2ef4` (cleared), the other languages' places (`0x1a7bbc`: English here), the PAL sizes.
+pub fn draw_select(w: &MobyWorld, id: usize, inp: &crate::hud::ScreenIn, out: &mut Vec<crate::hud::ScreenDraw>) -> bool {
+    use crate::hud::{format_int, lerp_rgba, text_of, Align, Draw, ScreenDraw};
+    let Some(m) = w.mobys.get(id) else { return true };
+    if inp.game.scenes.mode != crate::scene::PLAY { return true; }
+    let (lv, sc) = (level(m.o_class), screens(m.o_class));
+    panel(out);
+    let k = w.frame.rem_euclid(50);
+    let t = if k < 25 { k as f32 * 0.04 } else { 1.0 - (k - 25) as f32 * 0.04 };
+    let pulse = lerp_rgba(t, 0x80ff_de8d, 0x6044_2d00);
+    let held = inp.hero.items.held;
+    for (sprite, x, b) in [(0x4a, 259.0, button::RIGHT), (0x4b, 251.0, button::LEFT)] {
+        let colour = if held & b != 0 { 0x8000_7fff } else { pulse };
+        out.push(ScreenDraw::Hud(Draw::Sprite { id: sprite, pos: [x, 291.0], scale: [1.0, 1.0], frame: 0.0, colour }));
+    }
+    let row = m.pv_i(pv::CHOICE);
+    text(out, 3, format_int(&text_of(inp, 0x2e08, usize::MAX), row + 1), [256.0, 46.0], 1.0, Align::Centre);
+    if (0..4).contains(&row) {
+        let r = row as usize;
+        if (0..r).any(|k| won_in(inp.game, &lv, k) == 0) {
+            text(out, 3, text_of(inp, 0x2e09, usize::MAX), [256.0, 170.0], 1.0, Align::Centre);
+        } else {
+            let (title, how) = sc.titles[r];
+            let t = text_of(inp, title, usize::MAX);
+            match how {
+                Title::One => text(out, 1, t, [256.0, 101.0], 1.0, Align::Centre),
+                Title::Scaled(s, y) => text(out, 1, t, [256.0, y], s, Align::Centre),
+                Title::Two => text(out, 2, t, [256.0, 101.0], 1.0, Align::Centre),
+            }
+            boxed(out, text_of(inp, sc.lines[r], usize::MAX), 131);
+            let bolts = bolts_of(inp.game, &lv, r, won_in(inp.game, &lv, r));
+            if r != 0 || bolts != 0 { boxed(out, format_int(&text_of(inp, 0x2e76, usize::MAX), bolts), 242); }
+            text(out, 2, text_of(inp, 0x2dd5, usize::MAX), [181.0, 294.0], 1.0, Align::Left);
+        }
+    }
+    for (t, x) in [(0x2dd6, 119.0), (0x2dd7, 356.0), (0x2dd8, 279.0)] {
+        text(out, 2, text_of(inp, t, usize::MAX), [x, 294.0], 1.0, Align::Left);
+    }
+    true
+}
+
+/// `0x421f80` (Hrugis `0x4254c8`, Gorn `0x431c88`): the results of mission `mission`, in the counters' place. The
+/// panel; 0x2e29 (font 2 centred at (256, 46)); 0x3061 in the box at (117, 131); the bolts its last win paid (0x2e5c,
+/// or with none the level's no-bolts line, in the box at (117, 210)); 0x3062 at (117, 294) and 0x3063 at (274, 294),
+/// font 2, left.
+///
+/// Not ported: the row's number it formats and does not draw (0x2e08), the other languages' places, the PAL sizes.
+pub fn draw_results(w: &MobyWorld, id: usize, mission: usize, inp: &crate::hud::ScreenIn, out: &mut Vec<crate::hud::ScreenDraw>) -> bool {
+    use crate::hud::{format_int, text_of, Align};
+    let Some(m) = w.mobys.get(id) else { return true };
+    let (lv, sc) = (level(m.o_class), screens(m.o_class));
+    let mission = mission.min(3);
+    panel(out);
+    text(out, 2, text_of(inp, 0x2e29, usize::MAX), [256.0, 46.0], 1.0, Align::Centre);
+    boxed(out, text_of(inp, 0x3061, usize::MAX), 131);
+    let bolts = bolts_of(inp.game, &lv, mission, won_in(inp.game, &lv, mission) - 1);
+    let line = if bolts == 0 { text_of(inp, sc.no_bolts, usize::MAX) } else { format_int(&text_of(inp, 0x2e5c, usize::MAX), bolts) };
+    boxed(out, line, 210);
+    text(out, 2, text_of(inp, 0x3062, usize::MAX), [117.0, 294.0], 1.0, Align::Left);
+    text(out, 2, text_of(inp, 0x3063, usize::MAX), [274.0, 294.0], 1.0, Align::Left);
+    true
 }

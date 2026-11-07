@@ -564,3 +564,52 @@ pub fn pass(world: &mut MobyWorld, ctx: &mut Ctx) {
         ctx.hero.hypno.kill_z = m.pv_f(capturable::KILL_Z);
     }
 }
+
+// The time meter's words (L18 `$gp+0x2274..`): the bars' colours at no time and at the whole (each lerped by the share
+// left), their gap from the middle, top, width and height, the text's line, the frame's drop below the top.
+const METER_FROM: [u32; 2] = [0x8010_30ff, 0x8000_0080];
+const METER_TO: [u32; 2] = [0x8020_ff30, 0x8000_8000];
+const METER_GAP: i32 = 40;
+const METER_TOP: i32 = 26;
+const METER_W: i32 = 182;
+const METER_H: i32 = 12;
+const METER_TEXT: i32 = 24;
+const METER_FRAME: i32 = 5;
+
+/// L18 `0x427fa0` (the decomp's `func_L18_00426AB0`; L19 / L20 their copies): the Hypnomatic's time meter, the HUD's
+/// screen callback while the body plays (crate::hud::ScreenCallback::Hypno; nothing out of the body's mode 4). Its
+/// frame sprites 0xdb (`0x60442d00`) and 0xdc (`0x55f0c070`) at the screen's middle, 31 down; two bars (`0x2e94a8`)
+/// 26..38 down from 40 either side of the middle, out 182 × the time's share left (`+0x3bc` / `+0x3be`), shaded from
+/// `0x801030ff` → `0x8020ff30` to `0x80000080` → `0x80008000` by it (the first colour at the middle's side); the
+/// seconds left (`"%3d"`, the time / 60) centred in font 3 on the line 24, as a shadow in `0xff000000` (scale 0.96
+/// a pixel down, 1.04 a pixel up) under it in the bars' first colour — blinking (shown when the time's bits 3 or 4
+/// are set) from 300 ticks down to 32. It takes the counters' place.
+///
+/// Not ported: the depth words, the PAL sizes.
+pub fn draw_meter(hero: &Hero, out: &mut Vec<crate::hud::ScreenDraw>) -> bool {
+    use crate::hud::{lerp_rgba, Align, Draw, ScreenDraw};
+    if hero.mode != 4 { return false; }
+    let mid = crate::gui::SCREEN_W as i32 / 2;
+    for (id, colour) in [(0xdb, 0x6044_2d00u32), (0xdc, 0x55f0_c070)] {
+        out.push(ScreenDraw::Hud(Draw::Sprite { id, pos: [mid as f32, (METER_TOP + METER_FRAME) as f32], scale: [1.0, 1.0], frame: 0.0, colour }));
+    }
+    let h = &hero.hypno;
+    let f = h.time as f32 / h.time_full as f32;
+    let c = [lerp_rgba(f, METER_FROM[0], METER_TO[0]), lerp_rgba(f, METER_FROM[1], METER_TO[1])];
+    let (y0, y1) = (METER_TOP, METER_TOP + METER_H);
+    let right = mid + METER_GAP;
+    let x1 = ((right as f32) + METER_W as f32 * f) as i32;
+    out.push(ScreenDraw::Hud(Draw::Bar { pos: [right as f32, y0 as f32], size: [(x1 - right) as f32, (y1 - y0) as f32], colours: c }));
+    let left = mid - METER_GAP;
+    let x1 = ((left as f32) - METER_W as f32 * f) as i32;
+    out.push(ScreenDraw::Hud(Draw::Bar { pos: [x1 as f32, y0 as f32], size: [(left - x1) as f32, (y1 - y0) as f32], colours: [c[1], c[0]] }));
+    let left_ticks = h.time as u16;
+    if left_ticks < 32 || 300 < left_ticks || left_ticks & 0x18 != 0 {
+        let mut text = format!("{:3}", left_ticks as i16 / 60).into_bytes();
+        text.truncate(3);
+        for (dy, scale, colour) in [(1, 0.96, 0xff00_0000u32), (-1, 1.04, 0xff00_0000), (0, 1.0, c[0])] {
+            out.push(ScreenDraw::Text { font: 3, text: text.clone(), pos: [mid as f32, (METER_TEXT + dy) as f32], scale, colour, align: Align::Centre });
+        }
+    }
+    true
+}

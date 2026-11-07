@@ -222,6 +222,205 @@ impl Fader {
 pub enum ScreenCallback {
     /// `0x3f9818`: the Spiderbot's clock (crate::moby::classes::spiderbot::draw_screen).
     Spiderbot,
+    /// L18 `0x427fa0` (L19 / L20 their copies; set by `0x327fe8(0, 0x427fa0)` = L00 `0x30da30`): the Hypnomatic's
+    /// time meter (crate::hero::hypno::draw_meter). The port keeps its setting in crate::hero::HypnoBlock::meter
+    /// ([`ScreenCallback::current`]).
+    Hypno,
+    /// L05 `0x420420` (Hrugis `0x423cb8`, Gorn `0x430500`): the space mission select of the mission moby `moby`
+    /// (crate::moby::classes::space::mission::draw_select).
+    MissionSelect { moby: usize },
+    /// L05 `0x421f80` (Hrugis `0x4254c8`, Gorn `0x431c88`): the results of its mission `mission`
+    /// (crate::moby::classes::space::mission::draw_results).
+    MissionResults { moby: usize, mission: usize },
+    /// L04 `0x40c228` (L11 its copy): the hoverbike race select of the bike `moby`
+    /// (crate::moby::classes::race::bike::draw_select).
+    RaceSelect { moby: usize },
+}
+
+impl ScreenCallback {
+    /// The callback set: the Hypnomatic's meter while its flag stands (the creature's capture sets it and the way back
+    /// clears it, as `0x327fe8` does the GUI's word), else the game's word.
+    pub fn current(game: &crate::game::GameState, hero: &crate::hero::Hero) -> Option<ScreenCallback> {
+        if hero.hypno.meter { Some(ScreenCallback::Hypno) } else { game.screen_callback }
+    }
+
+    /// The callbacks drawn through [`ScreenDraw`] (all but the Spiderbot's, which the engine draws itself): their draws
+    /// into `out`; true when it takes the counters' place.
+    pub fn draw(self, w: &mut crate::moby::MobyWorld, inp: &ScreenIn, out: &mut Vec<ScreenDraw>) -> bool {
+        use crate::moby::classes::space::mission;
+        match self {
+            ScreenCallback::Spiderbot => false,
+            ScreenCallback::Hypno => crate::hero::hypno::draw_meter(inp.hero, out),
+            ScreenCallback::MissionSelect { moby } => mission::draw_select(w, moby, inp, out),
+            ScreenCallback::MissionResults { moby, mission: m } => mission::draw_results(w, moby, m, inp, out),
+            ScreenCallback::RaceSelect { moby } => crate::moby::classes::race::bike::draw_select(w, moby, inp, out),
+        }
+    }
+}
+
+/// What a class's screen draw reads at the HUD's draw besides the mobys: the game, Ratchet and the level's texts by
+/// id (the level's table, else the front end's: `0x2f5460`).
+pub struct ScreenIn<'a> {
+    pub game: &'a crate::game::GameState,
+    pub hero: &'a crate::hero::Hero,
+    pub texts: &'a dyn Fn(u32) -> Vec<u8>,
+}
+
+/// One screen draw of a class's HUD code (a [`ScreenCallback`], a [`HudSlots`] callback or a second-list callback
+/// drawing on the screen: [`list_screen`]), in the order it was made.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ScreenDraw {
+    /// One of the HUD's own draws ([`Draw`]: a GUI sprite, an icon, font-1 text, a shaded bar).
+    Hud(Draw),
+    /// Text in the font of FX texture `font` (1, 2 or 3; `0x2ea738` centred and scaled in font 1, `0x2e9f68` left and
+    /// `0x2ea608` centred in font 2, `0x2ea6a0` centred in font 3) at `pos`, aligned as `align`.
+    Text { font: u8, text: Vec<u8>, pos: [f32; 2], scale: f32, colour: u32, align: Align },
+    /// Text in the font of FX texture `font` wrapped into the box `x, y, w, h` (pixels; the space levels' `0x303000` →
+    /// `0x302ce8` in font 2: [`text_box`]).
+    Box { font: u8, text: Vec<u8>, rect: [i32; 4], colour: u32 },
+    /// A quad of FX texture `fx` on the screen (`0x2e89d8` / L05 `0x3008c0`'s rectangle, `0x2e8e68`'s turned quad):
+    /// its corners in strip order (pixels), each with its place in the texture (texels), MODULATEd by `colour`.
+    Fx { fx: u16, corners: [[f32; 2]; 4], st: [[f32; 2]; 4], colour: u32 },
+}
+
+/// The FX textures the class screen draws take ([`ScreenDraw::Fx`]; the engine loads them into the HUD's layer): the
+/// hovership's radar dot 60 (crate::moby::classes::level08::hovership::draw_radar), the museum hovercraft's dials and
+/// needle (`0x3f` / `0x40` + the set `+0x64`, 10 on the museum: crate::moby::classes::level21::hovercraft::draw_hud).
+pub const SCREEN_FX: [u16; 3] = [60, 0x3f + 10, 0x40 + 10];
+
+/// `0x2e89d8(x, y, w, h, u, v, uw, vh, rgba, tex)` (and L05 `0x3008c0`, its float twin): FX texture `fx`'s texels
+/// `u..u + uw`, `v..v + vh` over the pixels `x..x + w`, `y..y + h`.
+#[allow(clippy::too_many_arguments)]
+pub fn fx_rect(out: &mut Vec<ScreenDraw>, fx: u16, [x, y, w, h]: [f32; 4], [u, v, uw, vh]: [f32; 4], colour: u32) {
+    let (x1, y1, u1, v1) = (x + w, y + h, u + uw, v + vh);
+    out.push(ScreenDraw::Fx { fx, corners: [[x, y], [x1, y], [x, y1], [x1, y1]], st: [[u, v], [u1, v], [u, v1], [u1, v1]], colour });
+}
+
+/// `0x2e8e68(cx, cy, w, h, angle, tw, th, tex, z, rgba, flip u, flip v, pu, pv)`: FX texture `fx`'s texels 1..`tw`,
+/// 1..`th` on a `w` × `h` quad turned by `angle` about the point `c`, which is at `pivot` (`pu`, `pv`) of it: its up
+/// edge `h·(sin a, cos a)`, its across edge `w·(cos a, −sin a)`; the top corners `c + up·(1 − pv)`, the bottom ones
+/// `c − up·pv`, the left ones less `across·(1 − pu)`, the right ones plus `across·pu`. Not ported: the flips (0 from
+/// every port caller).
+#[allow(clippy::too_many_arguments)]
+pub fn fx_turned(out: &mut Vec<ScreenDraw>, fx: u16, c: [f32; 2], [w, h]: [f32; 2], angle: f32, [tw, th]: [f32; 2], [pu, pv]: [f32; 2], colour: u32) {
+    let (s, k) = (angle.sin(), angle.cos());
+    let up = [h * s, h * k];
+    let across = [w * k, -w * s];
+    let at = |a: f32, b: f32| [c[0] + up[0] * a + across[0] * b, c[1] + up[1] * a + across[1] * b];
+    let corners = [at(1.0 - pv, -(1.0 - pu)), at(1.0 - pv, pu), at(-pv, -(1.0 - pu)), at(-pv, pu)];
+    out.push(ScreenDraw::Fx { fx, corners, st: [[1.0, 1.0], [tw, 1.0], [1.0, th], [tw, th]], colour });
+}
+
+/// Text `id` from the level's table ([`ScreenIn::texts`]) as the draws take it: cut at its end (NUL) and at `len`
+/// characters (the draws' length argument).
+pub fn text_of(inp: &ScreenIn, id: u32, len: usize) -> Vec<u8> {
+    let mut t = (inp.texts)(id);
+    if let Some(n) = t.iter().position(|&c| c == 0) { t.truncate(n); }
+    t.truncate(len);
+    t
+}
+
+/// The first `%d` of `fmt` (a level text) replaced by `n` (`sprintf`, the only conversion these texts take).
+pub fn format_int(fmt: &[u8], n: i32) -> Vec<u8> {
+    let Some(k) = fmt.windows(2).position(|p| p == b"%d") else { return fmt.to_vec() };
+    let mut out = fmt[..k].to_vec();
+    out.extend_from_slice(n.to_string().as_bytes());
+    out.extend_from_slice(&fmt[k + 2..]);
+    out
+}
+
+/// The second draw list's callbacks that draw on the screen (`0x2e7920`'s list, run by the frame's draw before the
+/// HUD's): each moby the last tick registered there ([`crate::moby::MobyWorld::draws`]) whose class's callback draws
+/// HUD art, in the order they registered; the engine draws them under the HUD. Their world quads, if any, are
+/// crate::fx's.
+///
+/// | Callback | Moby | Draws |
+/// |---|---|---|
+/// | `0x3b4e98` / `0x40b478` (L21) | the museum's hovercraft 0x085c / 0x0f2f ridden | its gauges and the low-health text (crate::moby::classes::level21::hovercraft::draw_hud) |
+pub fn list_screen(w: &mut crate::moby::MobyWorld, inp: &ScreenIn, out: &mut Vec<ScreenDraw>) {
+    use crate::moby::classes::level21::hovercraft;
+    for id in w.draws.clone() {
+        let Some(m) = w.mobys.get(id).filter(|m| m.state < 0x80) else { continue };
+        match m.o_class {
+            hovercraft::EARLY | hovercraft::MUSEUM => hovercraft::draw_hud(w, id, inp, out),
+            _ => {}
+        }
+    }
+}
+
+/// `0x302ce8(x, y, w, h, colour, text, count, font)` (L05; L10 `0x305f58`, L15 `0x304058`): `text` laid out from
+/// the box's top left a word at a time (a word: up to a space or a character under 0x10); a word that would pass the
+/// right edge starts a line 16 down at the left (the character it stopped at taken again unless a space or under
+/// 0x10); the codes 8..15 change nothing here (their colour table is off: the decomp's `D_L05_001B2028`, 0 on these screens); other characters with
+/// an advance drawn 16 × 16 (under 0x20: 24 × 16; the space not drawn; 0x80..0xa7 with their accent, glyph + 0x40,
+/// over them) and the line moved on by the advance; it stops at the end, at a NUL or when a line would pass the
+/// box's bottom. Returns the height used.
+pub fn text_box(out: &mut Vec<Quad>, glyphs: &[Glyph; 256], slot: usize, text: &[u8], [x, y, width, height]: [i32; 4], colour: u32) -> i32 {
+    let rgba = colour.to_le_bytes();
+    let mut quad = |x: i32, y: i32, w: f32, g: Glyph| {
+        let (x, y, u, v) = (x as f32, y as f32, g.u as f32, g.v as f32);
+        out.push(Quad { pos: [[x, y], [x + w, y], [x, y + 16.0], [x + w, y + 16.0]], uv: [[u, v], [u + w, v], [u, v + 16.0], [u + w, v + 16.0]], tex: Tex::Slot(slot), rgba });
+    };
+    let (mut cx, mut cy, mut i) = (x, y, 0usize);
+    if text.is_empty() || text[0] == 0 { return 16; }
+    while cy + 16 <= y + height {
+        let mut ww = 0.0f32;
+        let mut k = i;
+        while k < text.len() && text[k] != b' ' && 0x10 <= text[k] {
+            ww += glyphs[text[k] as usize].advance as f32;
+            k += 1;
+        }
+        let c = text.get(i).copied().unwrap_or(0);
+        if ((x + width) as f32) < cx as f32 + ww {
+            if c != b' ' && 0x10 <= c { i = i.wrapping_sub(1); }
+            cx = x;
+            cy += 16;
+        } else if (8..16).contains(&c) {
+        } else {
+            let g = glyphs[c as usize];
+            if g.advance != 0 {
+                if (0x80..0xa8).contains(&c) {
+                    let a = glyphs[c as usize + 0x40];
+                    quad(cx + a.advance as i32, cy + a.y as i32, 16.0, a);
+                }
+                if c < 0x20 { quad(cx, cy + g.y as i32, 24.0, g); } else if c > 0x20 { quad(cx, cy + g.y as i32, 16.0, g); }
+                cx += g.advance as i32;
+            }
+        }
+        i = i.wrapping_add(1);
+        if i >= text.len() || text[i] == 0 { break; }
+    }
+    cy - y + 16
+}
+
+/// The screen draws as GUI quads, in their order: the HUD's own by [`quads`]; the texts in `fonts[font − 1]` (its
+/// glyphs and texture slot); the FX quads by `fx` (the layer's texture of an FX texture and its texel size).
+pub fn screen_quads(draws: &[ScreenDraw], sprites: &HashMap<u32, Sprite>, fonts: [Option<(&[Glyph; 256], usize)>; 3], icon: &dyn Fn(u16, u16) -> Option<(Tex, [f32; 2])>, fx: &dyn Fn(u16) -> Option<(Tex, [f32; 2])>) -> Vec<Quad> {
+    let mut out = Vec::new();
+    for d in draws {
+        match d {
+            ScreenDraw::Hud(h) => {
+                if let Some((g, _)) = fonts[0] { out.extend(quads(std::slice::from_ref(h), sprites, g, icon, gui::MENU_TAN)); }
+            }
+            ScreenDraw::Text { font, text, pos, scale, colour, align } => {
+                if colour >> 24 == 0 { continue; }
+                let Some((g, slot)) = fonts.get((*font as usize).wrapping_sub(1)).copied().flatten() else { continue };
+                let w = gui::text_width(g, text, *scale);
+                let x = match align { Align::Left => pos[0], Align::Centre => pos[0] - (w >> 1) as f32, Align::Right => pos[0] - w as f32 };
+                gui::text(&mut out, g, slot, text, x, pos[1], *scale, colour.to_le_bytes());
+            }
+            ScreenDraw::Box { font, text, rect, colour } => {
+                let Some((g, slot)) = fonts.get((*font as usize).wrapping_sub(1)).copied().flatten() else { continue };
+                text_box(&mut out, g, slot, text, *rect, *colour);
+            }
+            ScreenDraw::Fx { fx: id, corners, st, colour } => {
+                if colour >> 24 == 0 { continue; }
+                let Some((tex, _)) = fx(*id) else { continue };
+                out.push(Quad { pos: *corners, uv: *st, tex, rgba: colour.to_le_bytes() });
+            }
+        }
+    }
+    out
 }
 
 /// A class's HUD callback in one of the GUI object's four draw slots (L08 / L19 only: `+0x3f9f8 + 8·slot`, the
@@ -231,14 +430,17 @@ pub enum SlotCallback {
     /// L08 `0x3dc980` / L19 `0x3c5780`: the crystals' / moonstones' counter of the moby 0x09f3 `moby` (the draw reads
     /// it through `$gp+0x1448`, which the counter sets to itself; crate::moby::classes::level08::counter::draw).
     Counter { moby: usize },
+    /// L08 `0x41edd0` / L19 `0x413438`: the hovership `moby`'s HUD — its health bar, the vacuum's texts, the nearest
+    /// raritanium's distance and the raritanium's radar (crate::moby::classes::level08::hovership::draw_hud).
+    Hovership { moby: usize },
 }
 
 /// The class HUD callbacks (L08 `0x31a090(arg, f, slot)`, L19 `0x30b458`): four slots the HUD's draw (L08 `0x31a7b8`,
 /// L00's `0x30e200`) runs after the screen callback ([`ScreenCallback`]), in their order; the results are or'd with
 /// the screen callback's, and non-zero takes the counters' place. Cleared with the level's state.
 ///
-/// Their callers: Tabora's and Grelbin's counter 0x09f3 (slot 2, crate::moby::classes::level08::counter). Next: the
-/// hovership's `0x41edd0` (its health bar and the vacuum's texts, crate::moby::classes::level08::hovership).
+/// Their callers: Tabora's and Grelbin's counter 0x09f3 (slot 2, crate::moby::classes::level08::counter) and the
+/// hovership 0x0eef while ridden (slot 1, crate::moby::classes::level08::hovership::draw_hud).
 ///
 /// Not ported: the argument (0 from every caller; the draws do not read it), the second set of two slots
 /// (`+0x3fa18`, no setter found on these levels), the counters' L08 / L19 extra when a callback takes their place
@@ -256,11 +458,17 @@ impl HudSlots {
 
     /// The HUD draw's pass over the slots (struct docs): each callback's draws into `out`; true when one takes the
     /// counters' place.
-    pub fn draw(&self, w: &mut crate::moby::MobyWorld, game: &crate::game::GameState, out: &mut Vec<Draw>) -> bool {
+    pub fn draw(&self, w: &mut crate::moby::MobyWorld, inp: &ScreenIn, out: &mut Vec<ScreenDraw>) -> bool {
         let mut taken = false;
         for f in self.0.iter().flatten() {
             taken |= match *f {
-                SlotCallback::Counter { moby } => crate::moby::classes::level08::counter::draw(w, moby, game, out),
+                SlotCallback::Counter { moby } => {
+                    let mut d = Vec::new();
+                    let r = crate::moby::classes::level08::counter::draw(w, moby, inp.game, &mut d);
+                    out.extend(d.into_iter().map(ScreenDraw::Hud));
+                    r
+                }
+                SlotCallback::Hovership { moby } => crate::moby::classes::level08::hovership::draw_hud(w, moby, inp, out),
             };
         }
         taken

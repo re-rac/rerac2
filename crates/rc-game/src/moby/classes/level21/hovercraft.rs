@@ -38,6 +38,9 @@
 //!   its shadow probed (range 60). 0x085c: its collision back; the nearest raritanium's words reset (1 000 000,
 //!   none).
 //!
+//! **The HUD** ([`draw_hud`], 0x085c `0x3b4e98`, 0x0f2f `0x40b478`: the same code on their own words, all equal):
+//! registered each ridden tick on the second draw list (`0x2ee5d8` = L00 `0x2e7920`; crate::hud::list_screen).
+//!
 //! **The flight** ([`fly`]; 0x085c's inline, 0x0f2f's `0x40c8b0`; the controls `0x3b5a80` / `0x40bb20`: the stick
 //! reversed for the turn and the pitch, `1 − (1 − p)²` of ✕'s pressure less ○'s for the throttle and of L2's less
 //! R2's for the strafe, □'s pressure the brake on the levels 8, 21 and 30 (0x0f2f also 16), else the jump): as the
@@ -56,10 +59,11 @@
 //! The port's pad buttons are digital (pressure 0 or 1), so the controls read the held bits and □'s pressure.
 //!
 //! Not ported:
-//! * The HUD's callbacks (`0x3b4e98`, `0x40b478`, registered each ridden tick on the second draw list, `0x2ee5d8` =
-//!   L00 `0x2e7920`, not in crate::hud::HudSlots: the gauges, the health bar by the texture set `+0x64`'s palette,
-//!   which state 0 copies to `0x243b20` / `0x25cd30` once a level, the low-health text 0x31d5): the draw lists' port
-//!   (crate::fx) sends world quads only, no screen art.
+//! * The health bar of the HUD ([`draw_hud`]): its two FX textures (`$gp+0x920` / `0x924` + the set `+0x64`, 128 ×
+//!   128 at (368, 144 up from the bottom), `0x70808080`) drawn through their palette (`$gp+0x9a8`), whose entries
+//!   from 2 up to the bar's cut (`+0xa8` / `+0x98`) are the set's own (copied by state 0 to `0x243b20` / `0x25cd30`
+//!   once a level) and the rest `0x80000000`: the HUD's layer holds the FX textures decoded, not their indices, so
+//!   the bar is not drawn (its words are kept).
 //! * The dust under them while ridden (`0x3b5d10`, the hovership's `0x41fd70`; 0x0f2f's `0x40bcf0`) and 0x085c's
 //!   vacuum camera shake (`0x1b9c60`).
 //! * 0x085c's guns (`0x3b5c48`: two 0x09a1 mobys, `0x3c1468`, kept at its joints 7 / 8; their update `0x3c14f8`
@@ -357,6 +361,8 @@ fn after(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, c: &Craft) {
         at[2] += c.seat.1;
         let rot = m.rot;
         ctx.hero.ride_place(at, rot);
+        // `0x2ee5d8(0x3b4e98 / 0x40b478, moby)`: its HUD on the second draw list ([`draw_hud`]).
+        w.register_draw(id);
     }
 }
 
@@ -494,4 +500,67 @@ pub fn update_0f2f(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
     after(w, id, ctx, c);
     shadow(w, id, ctx);
+}
+
+/// The HUD's words (0x085c `$gp+0x900..`, 0x0f2f `$gp+0x2650..`: the same values) and pvars.
+mod hud {
+    /// The dials' colour, their FX textures (+ the set) and the needles'.
+    pub const DIAL: u32 = 0xff80_8080;
+    pub const DIAL_FX: [i32; 2] = [0x3f, 0x3f];
+    pub const NEEDLE_FX: i32 = 0x40;
+    pub const NEEDLE: u32 = 0x6080_8080;
+    /// The speed's sweep and start (degrees), the throttle's.
+    pub const SPEED_DIAL: (f32, f32) = (270.0, 45.0);
+    pub const THROTTLE_DIAL: (f32, f32) = (-270.0, -42.0);
+    /// The dials' left edge; the speed the speed's dial is full at (a second).
+    pub const LEFT: f32 = 16.0;
+    pub const TOP_SPEED: f32 = 80.0;
+    /// The texture set (`+0x64`).
+    pub const SET: usize = 0x64;
+}
+
+/// `0x3b4e98` (0x085c) / `0x40b478` (0x0f2f): the ridden craft's HUD (module docs; crate::hud::list_screen).
+/// * Its two dials: FX `0x3f` + the set (`+0x64`) twice, 64 × 64 (its 64 × 64 texels) at (16, 80 up from the bottom)
+///   and 64 to the right of it, in `0xff808080`.
+/// * Its needles: FX `0x40` + the set, 32 × 32 (its 32 × 32 texels) turned about (0.5, 0.35) of it at the dials'
+///   centres (48 and 112 across, 48 up), in `0x60808080` — the speed's at `45° + 270°·|v| / 80` (|v| the velocity's
+///   length a second, `0x2eefa0`), the throttle's at `−42° − 270°·|throttle|` (each `0x2efe60`).
+/// * Its health bar's words: the shown health (`+0xa4` / `+0x94`) eased a fifth of the way to the health
+///   (`0x18b65c`), a step at most 1; the bar's cut (`+0xa8` / `+0x98`) `2 + 251·shown / most` held to 2..0xfd (the
+///   bar itself: module docs).
+/// * Below a tenth of its most health every other 90 frames (`$gp+0x36d8`) the text 0x31d5 (font 2, centred at
+///   (256, 370), `0x80000080`).
+///
+/// Not ported: 0x085c's level-8 block (the raritanium's texts and marker, the hovership's; the class is on the
+/// museum only), the GS state words (`0x37ce68`).
+pub fn draw_hud(w: &mut MobyWorld, id: usize, inp: &crate::hud::ScreenIn, out: &mut Vec<crate::hud::ScreenDraw>) {
+    use crate::hud::{fx_rect, fx_turned, text_of, Align, ScreenDraw};
+    let (ease_at, cut_at) = if w.mobys[id].o_class == EARLY { (e::HUD_EASE, e::HUD_BAR) } else { (f::HUD_EASE, f::HUD_BAR) };
+    let m = &mut w.mobys[id];
+    if m.pvars.len() < cut_at + 4 { return; }
+    let set = m.pv_i(hud::SET);
+    let sh = crate::gui::SCREEN_H as i32;
+    let dials_y = (sh - 0x50) as f32;
+    let x = hud::LEFT as i32;
+    for (k, fx) in hud::DIAL_FX.into_iter().enumerate() {
+        fx_rect(out, (fx + set) as u16, [(x + 0x40 * k as i32) as f32, dials_y, 64.0, 64.0], [0.0, 0.0, 64.0, 64.0], hud::DIAL);
+    }
+    let needle = (hud::NEEDLE_FX + set) as u16;
+    let centre_y = (sh - 0x30) as f32;
+    let speed = len(m.pv_v(pv::VEL)) * DEG;
+    let a = add_rot(hud::SPEED_DIAL.0 * speed / (hud::TOP_SPEED * PER_TICK), hud::SPEED_DIAL.1 * DEG);
+    fx_turned(out, needle, [hud::LEFT + 32.0, centre_y], [32.0, 32.0], a, [32.0, 32.0], [0.5, 0.35], hud::NEEDLE);
+    let throttle = m.pv_f(pv::THROTTLE).abs() * DEG;
+    let a = add_rot(hud::THROTTLE_DIAL.1 * DEG, hud::THROTTLE_DIAL.0 * throttle);
+    fx_turned(out, needle, [hud::LEFT + 64.0 + 32.0, centre_y], [32.0, 32.0], a, [32.0, 32.0], [0.5, 0.35], hud::NEEDLE);
+    let v = &inp.hero.vehicle;
+    let ease = m.pv_f(ease_at);
+    let mut d = (v.health - ease) * 0.2;
+    if 1.0 < d.abs() { d /= d.abs(); }
+    m.set_pv_f(ease_at, ease + d);
+    let cut = (((ease + d) * 251.0 / v.max_health) as i32 + 2).min(0xfd).max(2);
+    m.set_pv_i(cut_at, cut);
+    if v.health < v.max_health * 0.1 && (w.frame / 90) & 1 != 0 {
+        out.push(ScreenDraw::Text { font: 2, text: text_of(inp, 0x31d5, 100), pos: [256.0, 370.0], scale: 1.0, colour: 0x8000_0080, align: Align::Centre });
+    }
 }

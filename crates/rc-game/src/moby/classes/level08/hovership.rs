@@ -58,6 +58,11 @@
 //! **Its hits**: each tick a sphere of 1 at its joint 0 (0.3 down) hits the mobys (damage 1, L19 20, flags 0x10000,
 //! along its velocity); past 10 a second also one of 0.7 at its joint 1.
 //!
+//! **The HUD** ([`draw_hud`], `0x41edd0`): its callback in the HUD's slot 1 (crate::hud::HudSlots) from the boarding
+//! to the way off — the vehicle's health bar, the vacuum's texts, the nearest raritanium's distance and the radar
+//! ([`draw_radar`], `0x421dc8`); its sound as the raritanium's count runs out is played from the next ridden tick
+//! ([`hud_sound`]).
+//!
 //! **The raritanium 0x099a** (its pvars: `+0` its life in seconds, `+4` the timer, `+8` the pull's speed): gone when
 //! its uid is done (with a mission). **0**: hidden, update distance 0xff, the timer its life, sequence 0, on the ground
 //! under it (from 200 up); 1. **1**: while Ratchet rides a hovership it tells it of itself (`+0x1b0`, the nearest at
@@ -69,10 +74,6 @@
 //! raritanium + 1 (`0x1a7a04`), its uid counted, gone.
 //!
 //! Not ported:
-//! * The HUD's callback `0x41edd0` (the vehicle's health bar, the vacuum's texts 0x2dee / 0x2ded / 0x2def, the
-//!   nearest raritanium's distance 0x3076 and its mark): its slot would be crate::hud::HudSlots's. Its
-//!   reset of `+0x68` / `+0x6c` (1 000 000, none) after the moby loop is done here at the end of the hovership's own
-//!   update while it is ridden.
 //! * The nearest raritanium's marker moby (`+0x74`, `0x436c68` / `0x436d08`) and the HUD state behind it (`+0x88`,
 //!   `+0x8a`, `+0x8c`, `$gp+0x2a38`, `$gp+0x29a4`).
 //! * The dust under it (`0x41fd70`), the vacuum's camera shake (`0x1b9b20`), its engine trail (`0x33a4f0` /
@@ -126,6 +127,10 @@ mod pv {
     pub const VAC_T: usize = 0x1ac;
     pub const PICKUP: usize = 0x1b0;
     pub const IDLE: usize = 0x1b4;
+    /// The port's: `+0x8e` as the last ridden tick saw it (the HUD's sound, [`super::draw_hud`]).
+    pub const HUD_SEEN: usize = 0x1b8;
+    /// The HUD's eased health (`+0xa4`, [`super::draw_hud`]).
+    pub const HUD_EASE: usize = 0xa4;
 }
 
 pub(crate) const DEG: f32 = 0.017_453_294;
@@ -495,6 +500,7 @@ pub fn update_0eef(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let ridden = ctx.hero.vehicle.moby == Some(id);
     let v = &mut ctx.hero.vehicle;
     v.bar = if ridden && w.mobys[id].state != 0 { (v.health / v.max_health * 200.0) as i32 } else { 200 };
+    if ridden { hud_sound(w, id, ctx); }
 
     let mut fresh = false;
     match w.mobys[id].state {
@@ -544,6 +550,8 @@ fn try_get_on(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     if matches!(ctx.hero.state, 0x62 | 0x31) || !hero_ready(w, ctx) || !offer(w, id, ctx, GET_ON) { return false; }
     let m = &w.mobys[id];
     ctx.host.music_request(m.pv_i(pv::MUSIC_ON.0), m.pv_i(pv::MUSIC_ON.1));
+    // `0x31a090(0, 0x41edd0, 1)`: the HUD's callback ([`draw_hud`]).
+    ctx.game.hud_slots.set(Some(crate::hud::SlotCallback::Hovership { moby: id }), HUD_SLOT);
     board(w, id, ctx, RIDE_SEQ as u8);
     stop_sound(w, id, ctx, pv::IDLE);
     ctx.hero.view_lock = 1;
@@ -764,6 +772,7 @@ fn hits(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 fn get_off(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &w.mobys[id];
     ctx.host.music_request(m.pv_i(pv::MUSIC_OFF.0), m.pv_i(pv::MUSIC_OFF.1));
+    ctx.game.hud_slots.set(None, HUD_SLOT);
     ctx.hero.ride_off();
     ctx.hero.land_lag = 10;
     ctx.hero.vehicle.word_654 = 0xffff;
@@ -801,9 +810,6 @@ fn after(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let (z, rot) = (m.pos[2], m.rot);
         ctx.hero.ride_place(at, rot);
         ctx.hero.ground_point = [at[0], at[1], z];
-        // The HUD callback's reset after the moby loop (module docs).
-        m.set_pv_f(pv::NEAR_D, 1_000_000.0);
-        m.set_pv_i(pv::NEAR, 0);
     }
     let solid = w.class(HOVERSHIP).is_some_and(|k| k.has_collision);
     w.mobys[id].has_collision = solid;
@@ -905,3 +911,163 @@ pub fn update_099a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
 }
 
+
+/// The HUD slot the hovership's callback takes (`0x31a090(0, f, 1)`).
+const HUD_SLOT: usize = 1;
+
+/// The sound the HUD's `+0x8e` plays as it reaches 1 (`0x41edd0`: `0x36ebe0(3, 0, moby, 0x085c)`, sound 3 of 0x085c's
+/// table), played here from the ridden tick after the draw reached it (the port's HUD draw has no sounds).
+fn hud_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let m = &w.mobys[id];
+    let n = m.pv_s(pv::HUD_8E);
+    if n == 1 && m.pv_s(pv::HUD_SEEN) != 1 { ctx.host.play_sound_of(m, 0x085c, 3, 0); }
+    w.mobys[id].set_pv_s(pv::HUD_SEEN, n);
+}
+
+// The HUD's words (L08 `$gp+0x2a34..`, L19 the same).
+const HUD_DOWN: f32 = -3.0;
+const BAR_AT: [f32; 4] = [123.0, 41.0, 145.0, 7.0];
+const BAR_COLOURS: [u32; 2] = [0xff10_30ff, 0xff20_ff30];
+const TEXT_RIGHT: (i32, i32) = (185, 110);
+const TEXT_UP: i32 = 42;
+const NEAR_TEXT: f32 = 10.0;
+const PULSE: (f32, f32) = (1.0, 0.0);
+const SQUARE_SCALE: f32 = 1.0;
+const COLLECT_SCALE: (f32, f32, f32) = (1.0, 1.0, 1.0);
+const COLLECT_TICKS: i32 = 180;
+const RADAR_AT: [f32; 2] = [435.0, 64.0];
+const RADAR_DOT: f32 = 8.0;
+const RADAR_TEXELS: f32 = 64.0;
+const RADAR_REACH: f32 = 256.0;
+const RADAR_SPAN: f32 = 55.0;
+const RADAR_FX: u16 = 60;
+const RADAR_RGB: u32 = 0xffff;
+
+/// `0x41edd0` (L19 `0x413438`): the HUD's slot-1 callback while Ratchet rides a hovership (crate::hud::HudSlots, set
+/// on board and cleared on the way off; it reads the ridden moby `0x18b650`, `id` while none). It takes the counters'
+/// place. Below a quarter of the vehicle's most health (`0x18b65c` / `0x18b660`) every other 90 frames (`0x1b2508`)
+/// its colours flash (`& 0xff0f0fff`; not the bar's).
+/// * Its frame sprites 0xa8 (`0x60442d00`) and 0xa9 (`0x55f0c070`) at the screen's centre, 3 up (`$gp+0x295c`).
+/// * Its health bar: the shown health (`+0xa4`) eased a fifth of the way to the health, a step at most 1; the bar
+///   (`0x2e94a8`) from (123, 41 up from the bottom) 145 × its share of the most across and 7 down, shaded from
+///   `0xff1030ff` to that mixed toward `0xff20ff30` by the share.
+/// * On Tabora and Grelbin (the levels 8 and 0x13): `+0x8e` (set to 180 by a raritanium taken, crate's 0x099a)
+///   counted down; while it runs the text 0x2def three times (font 1, centred 110 from the right, 42 up: scales 0.96,
+///   0.98 and 1, alphas `(1 − t)³·127` × 0.5, × 0.75 and × 1 in red, blue and grey, t its share of 180 gone); out,
+///   with a nearest raritanium (`+0x6c`): farther than 10, its distance (`+0x68`) in the text 0x3076 (font 2, left,
+///   185 from the right, 42 up, `0x80ffde8d`; 24 more to the left in the language 3, English here); else the text
+///   0x2dee (font 1, centred, scale `1 + 0·sin(frame / 10)`) while □ is not held (`0x138320`), 0x2ded (scale 1) while
+///   it is, in `0x80f0f0f0`. Then the radar ([`draw_radar`]).
+/// * Last the nearest raritanium's words reset (`+0x6c` none, `+0x68` 1 000 000): the raritanium's update sets them
+///   again (crate's 0x099a, in the moby loop before this draw).
+///
+/// Not ported: the marker block (`+0x8a` set: the sprites 0xaa / 0xab and the icon 0xeaa2 frame 3 by `+0x88` /
+/// `+0x8c` / `$gp+0x2a38`; nothing in the port sets `+0x8a`: module docs), the GS state words around it
+/// (`0x38afb8`), the depth words (`0x300d58` / `0x300dc8` / `0x300d88`), the PAL sizes (`0x1b3240` / `0x1b3244`).
+pub fn draw_hud(w: &mut MobyWorld, id: usize, inp: &crate::hud::ScreenIn, out: &mut Vec<crate::hud::ScreenDraw>) -> bool {
+    use crate::hud::{Align, Draw, ScreenDraw};
+    let id = inp.hero.vehicle.moby.unwrap_or(id);
+    if w.mobys.get(id).is_none_or(|m| m.pvars.len() < 0x1bc) { return true; }
+    let v = &inp.hero.vehicle;
+    let mask: u32 = if v.health < v.max_health * 0.25 && (w.frame / 90) & 1 != 0 { 0xff0f_0fff } else { !0 };
+    let (sw, sh) = (crate::gui::SCREEN_W as i32, crate::gui::SCREEN_H as i32);
+    let m = &mut w.mobys[id];
+    let mut n = m.pv_s(pv::HUD_8E) as i32;
+    crate::moby::countdown(&mut n);
+    m.set_pv_s(pv::HUD_8E, n as i16);
+    let centre = [(sw / 2) as f32, (sh / 2 + (HUD_DOWN + 0.5) as i32) as f32];
+    for (sprite, colour) in [(0xa8, 0x6044_2d00u32), (0xa9, 0x55f0_c070)] {
+        out.push(ScreenDraw::Hud(Draw::Sprite { id: sprite, pos: centre, scale: [1.0, 1.0], frame: 0.0, colour: colour & mask }));
+    }
+    let ease = m.pv_f(pv::HUD_EASE);
+    let mut d = (v.health - ease) * 0.2;
+    if 1.0 < d.abs() { d /= d.abs(); }
+    m.set_pv_f(pv::HUD_EASE, ease + d);
+    let f = (ease + d) / v.max_health;
+    let colours = [BAR_COLOURS[0], crate::hud::lerp_rgba(f, BAR_COLOURS[0], BAR_COLOURS[1])];
+    let [bx, by, bw, bh] = BAR_AT;
+    let (x0, y0) = (bx as i32, sh - (by + 0.5) as i32);
+    let (x1, y1) = ((bx + bw * f) as i32, y0 + (bh + 0.5) as i32);
+    out.push(ScreenDraw::Hud(Draw::Bar { pos: [x0 as f32, y0 as f32], size: [(x1 - x0) as f32, (y1 - y0) as f32], colours }));
+    if !matches!(inp.game.level, 8 | 0x13) { return reset_near(w, id); }
+    let y = (sh - (TEXT_UP as f32 + 0.5) as i32) as f32;
+    let centred = (sw - TEXT_RIGHT.1) as f32;
+    let m = &w.mobys[id];
+    if n == 0 {
+        if ai::link(m, pv::NEAR).is_some() {
+            let dist = m.pv_f(pv::NEAR_D);
+            if NEAR_TEXT < dist {
+                let text = crate::hud::format_int(&crate::hud::text_of(inp, 0x3076, usize::MAX), dist as i32);
+                let x = (sw - TEXT_RIGHT.0) as f32;
+                out.push(ScreenDraw::Text { font: 2, text, pos: [x, y], scale: 1.0, colour: 0x80ff_de8d & mask, align: Align::Left });
+            } else if inp.hero.items.held & button::SQUARE == 0 {
+                // `0x32e460`: the angle wrapped to −π..π.
+                let a = add_rot((w.frame as f32) * 0.1, 0.0);
+                let scale = PULSE.0 + PULSE.1 * a.sin();
+                out.push(ScreenDraw::Text { font: 1, text: crate::hud::text_of(inp, 0x2dee, 0x11), pos: [centred, y], scale, colour: 0x80f0_f0f0 & mask, align: Align::Centre });
+            } else {
+                out.push(ScreenDraw::Text { font: 1, text: crate::hud::text_of(inp, 0x2ded, 0xd), pos: [centred, y], scale: SQUARE_SCALE, colour: 0x80f0_f0f0 & mask, align: Align::Centre });
+            }
+        }
+    } else {
+        let t = (COLLECT_TICKS - n) as f32 / COLLECT_TICKS as f32;
+        let (base, top, from) = COLLECT_SCALE;
+        let grow = 1.0 - (1.0 - t) * (1.0 - t);
+        let scale = base + (top - from) * grow;
+        let k = 1.0 - t;
+        let fade = k * k * k * 127.0;
+        let text = crate::hud::text_of(inp, 0x2def, 0x11);
+        for (s, a, rgb) in [(0.96, 0.5, 0x80u32), (0.98, 0.75, 0x80_0000), (1.0, 1.0, 0x80_8080)] {
+            let colour = (((fade * a) as i32 as u32) << 24 | rgb) & mask;
+            out.push(ScreenDraw::Text { font: 1, text: text.clone(), pos: [centred, y], scale: scale * s, colour, align: Align::Centre });
+        }
+    }
+    draw_radar(w, id, out);
+    reset_near(w, id)
+}
+
+/// The end of [`draw_hud`]: the nearest raritanium's words reset; the counters' place taken.
+fn reset_near(w: &mut MobyWorld, id: usize) -> bool {
+    let m = &mut w.mobys[id];
+    m.set_pv_i(pv::NEAR, 0);
+    m.set_pv_f(pv::NEAR_D, 1_000_000.0);
+    true
+}
+
+/// `0x421dc8` (L19 `0x416430`): the raritanium's radar, top right. Its frame sprites 0xba / 0xbb / 0xbc
+/// (`0x60442d00`, `0x60241700`, `0x55f0c070`) at (439, 68), scaled (0.8, −0.8); its centre's dot (FX 60, 8 × 8, its
+/// 64 × 64 texels, `0x80808080`) at (435, 64). With a raritanium that told the hovership of itself (`+0x1b0`), each
+/// moby of its group (`+0x21`, not deleted, not a crystal 0x096a) within 256 of the hovership: a dot of FX 60 at
+/// (435, 64) plus its way from the hovership made `55·d/256` long, seen in the camera's frame (`0x1b9d30`, the
+/// rows' transpose) turned a quarter about z (its left the radar's −x, its forward up), `z/8 + 4` square (at most 16,
+/// at least 0) and its alpha `(1 − d/256)·128` over `0xffff`.
+fn draw_radar(w: &MobyWorld, id: usize, out: &mut Vec<crate::hud::ScreenDraw>) {
+    use crate::hud::{Draw, ScreenDraw};
+    let [ax, ay] = RADAR_AT;
+    let frame_at = [ax + 4.0, ((ay + 4.0) + 0.5) as i32 as f32];
+    for (sprite, colour) in [(0xba, 0x6044_2d00u32), (0xbb, 0x6024_1700), (0xbc, 0x55f0_c070)] {
+        out.push(ScreenDraw::Hud(Draw::Sprite { id: sprite, pos: frame_at, scale: [0.8, -0.8], frame: 0.0, colour }));
+    }
+    let y0 = (ay + 0.5) as i32 as f32;
+    crate::hud::fx_rect(out, RADAR_FX, [ax, y0, RADAR_DOT, RADAR_DOT], [0.0, 0.0, RADAR_TEXELS, RADAR_TEXELS], 0x8080_8080);
+    let Some(r) = ai::link(&w.mobys[id], pv::PICKUP).filter(|&r| r < w.mobys.len()) else { return };
+    let Some(members) = w.groups.get(w.mobys[r].group as u8 as usize) else { return };
+    let me = w.mobys[id].pos;
+    let turn = crate::moby::attach::rows_of([0.0, 0.0, std::f32::consts::FRAC_PI_2]);
+    let rows = w.cam_rows;
+    for &k in members {
+        let Some(o) = w.mobys.get(k).filter(|o| o.state != 0xfe && o.state != 0xfd && o.o_class != 0x096a) else { continue };
+        let d = dist(me, o.pos);
+        if RADAR_REACH < d { continue; }
+        let way = set_len(sub(o.pos, me), d / RADAR_REACH * RADAR_SPAN);
+        let local = [dot(rows[0], way), dot(rows[1], way), dot(rows[2], way)];
+        let p = add(add(scale(turn[0], local[0]), scale(turn[1], local[1])), scale(turn[2], local[2]));
+        let alpha = ((1.0 - d / RADAR_REACH) * 128.0) as i32 as u32;
+        let most = RADAR_DOT + RADAR_DOT;
+        let size = p[2] * 0.125 + RADAR_DOT * 0.5;
+        let size = if size <= most { size.max(0.0) } else { most };
+        let x = p[0] + ax;
+        let y = ((ay - p[1]) + 0.5) as i32 as f32;
+        crate::hud::fx_rect(out, RADAR_FX, [x, y, size, size], [0.0, 0.0, RADAR_TEXELS, RADAR_TEXELS], RADAR_RGB | alpha << 24);
+    }
+}

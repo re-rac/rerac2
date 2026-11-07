@@ -2455,7 +2455,7 @@ fn draw_hud(
         // fights' HUD's (rc_game::ship), font 3 (FX texture 3: the arena's counters,
         // rc_game::moby::classes::arena::draw_hud) and the arena wipe's edge.
         let mut fx = std::collections::HashMap::new();
-        for id in [0x26u16, 0x20, 0x21, 0x27, 0x1f, rc_game::moby::classes::arena::FONT_3, rc_game::moby::classes::arena::WIPE_FX].into_iter().chain(rc_game::ship::HUD_FX) {
+        for id in [0x26u16, 0x20, 0x21, 0x27, 0x1f, rc_game::moby::classes::arena::FONT_3, rc_game::moby::classes::arena::WIPE_FX].into_iter().chain(rc_game::ship::HUD_FX).chain(rc_game::hud::SCREEN_FX) {
             if let Some(t) = level.0.particles.textures.as_ref().and_then(|t| t.fx_textures.get(id as usize)).and_then(Option::as_ref) {
                 fx.insert(id, (textures.len(), [t.width as f32, t.height as f32]));
                 // The HUD's atlas holds the GS's bytes (0x80 = 1.0); the FX textures' alpha is decoded to 0..0xff (their
@@ -2628,18 +2628,32 @@ fn draw_hud(
         // counters' place. Its texts go over its sprites.
         let mut screen_text = Vec::new();
         let mut screen_draws = Vec::new();
-        let screen = match (p.game.screen_callback, p.mobys.as_ref()) {
-            (Some(rc_game::hud::ScreenCallback::Spiderbot), Some(m)) => rc_game::moby::classes::spiderbot::draw_screen(&m.world, (&hud.data.assets().glyphs_2, 2), &mut screen_draws, &mut screen_text),
-            _ => false,
-        };
-        // Then the class HUD callbacks (L08 / L19 `0x31a090`'s slots, rc_game::hud::HudSlots), or'd with it.
-        let mut slot_draws = Vec::new();
-        let slots = match (&p.ship, p.mobys.as_mut()) {
-            (None, Some(m)) => p.game.hud_slots.draw(&mut m.world, &p.game, &mut slot_draws),
-            _ => false,
-        };
+        // The class screen draws (rc_game::hud::ScreenDraw): the second draw list's (rc_game::hud::list_screen, drawn
+        // with the world's callbacks, so first), the screen callback's, the slots'.
+        let mut class_draws = Vec::new();
+        let screen;
+        let slots;
+        {
+            let a = hud.data.assets();
+            let texts = |id: u32| rc_formats::strings::find_index(&p.texts, id as i32).map(|i| p.texts[i].text.clone()).unwrap_or_else(|| a.strings.get(id).to_vec());
+            let inp = rc_game::hud::ScreenIn { game: &p.game, hero: &p.hero, texts: &texts };
+            if let Some(m) = p.mobys.as_mut() { rc_game::hud::list_screen(&mut m.world, &inp, &mut class_draws); }
+            screen = match (rc_game::hud::ScreenCallback::current(&p.game, &p.hero), p.mobys.as_mut()) {
+                (Some(rc_game::hud::ScreenCallback::Spiderbot), Some(m)) => rc_game::moby::classes::spiderbot::draw_screen(&m.world, (&a.glyphs_2, 2), &mut screen_draws, &mut screen_text),
+                (Some(cb), Some(m)) => cb.draw(&mut m.world, &inp, &mut class_draws),
+                _ => false,
+            };
+            // Then the class HUD callbacks (L08 / L19 `0x31a090`'s slots, rc_game::hud::HudSlots), or'd with it.
+            slots = match (&p.ship, p.mobys.as_mut()) {
+                (None, Some(m)) => p.game.hud_slots.draw(&mut m.world, &inp, &mut class_draws),
+                _ => false,
+            };
+            let icon = |id: u16, f: u16| hud.icons.get(&(id, f)).map(|&(i, s)| (rc_game::gui::Tex::Slot(i), s));
+            let fx = |id: u16| hud.fx.get(&id).map(|&(i, s)| (rc_game::gui::Tex::Slot(i), s));
+            let font_3 = hud.fx.get(&rc_game::moby::classes::arena::FONT_3).map(|&(i, _)| (&a.glyphs_3, i));
+            quads.extend(rc_game::hud::screen_quads(&class_draws, &a.sprites, [Some((&a.glyphs, 1)), Some((&a.glyphs_2, 2)), font_3], &icon, &fx));
+        }
         let mut draws = if p.ship.is_some() || screen { screen_draws } else { Vec::new() };
-        draws.append(&mut slot_draws);
         if p.ship.is_none() && !screen && !slots { draws.extend(p.hud.draw(p.game.bolts)); }
         // The boss bar while a fight refreshes it (`0x2f2158`).
         if let (None, Some((f, _))) = (&p.ship, p.game.boss_bar) { rc_game::hud::boss_bar(f, p.game.boss_icon, &mut draws); }
@@ -2771,6 +2785,7 @@ fn draw_hud(
     // drawn with the world's callbacks in the game, so first here, under the HUD.
     if let Some(m) = p.mobys.as_ref().filter(|_| !movie) {
         let (w, h) = (rc_game::gui::SCREEN_W, rc_game::gui::SCREEN_H);
+        for &c in &m.world.screen_tints { d.screen_prim(crate::hud_render::Tex::None, [[0.0, 0.0], [w, 0.0], [0.0, h], [w, h]], [[0.0; 2]; 4], c, false); }
         for &c in &m.world.screen_fills { d.screen_prim(crate::hud_render::Tex::None, [[0.0, 0.0], [w, 0.0], [0.0, h], [w, h]], [[0.0; 2]; 4], c, true); }
     }
     for q in quads {

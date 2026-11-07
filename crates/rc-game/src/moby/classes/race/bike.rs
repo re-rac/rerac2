@@ -36,8 +36,11 @@
 //! A scene hides it (not on Joba) until it ends.
 //!
 //! Not ported (left, with their addresses):
-//! * The HUD callbacks (`0x32e338`): the select's screen `0x40c228`, the standings `0x4127a8` (the decomp's
-//!   `DrawRaceStandingsHud`), the race timer `0x4188b8`, the bike's glow `0x40e2e0` → `0x40e658` / `0x40e340`; the
+//! * The HUD's screen callbacks (`0x32e338`) but the select's ([`draw_select`]): the standings `0x4127a8` (the
+//!   decomp's `DrawRaceStandingsHud`, set each tick of state 3: its scrolling list walks the standings chain
+//!   `+0x39c` / `+0x3a0` and the racers' `+0x1a4`, which the port does not keep), the race's HUD `0x4188b8` (set at
+//!   the start: the turbo, weapon and boost gauges, the place and lap, the track strip with the racers' marks and
+//!   their springs `+0x1cc..+0x1e0`, the wrong-way text 0x2e2b), so the counters show in their place; the bike's glow `0x40e2e0` → `0x40e658` / `0x40e340`; the
 //!   results' message box (`0x1a7cd0` / `0x1a7cd4`: △ goes on at once here).
 //! * The pause menu's race items (`0x40c170` restart, `0x40c190` quit, `0x40c1a8`; the words `$gp+0x18c8` /
 //!   `$gp+0x18d0` they set are read here: crate::moby::classes::race::Globals::restart / quit).
@@ -76,11 +79,12 @@ fn cd_i(m: &mut Moby, off: usize) -> bool {
 
 /// The race's wins (`0x40b6c0`: the flag byte `0x1395b8 + 0x4d + k`, Joba's `+0x57`) and losses (`0x40b758`: `+0x52`,
 /// Joba's `+0x5c`) of race `k`.
-fn wins(ctx: &Ctx, k: i32) -> i32 { flag(ctx, if ctx.game.level == 0xb { 0x57 } else { 0x4d }, k) }
-fn losses(ctx: &Ctx, k: i32) -> i32 { flag(ctx, if ctx.game.level == 0xb { 0x5c } else { 0x52 }, k) }
-fn flag(ctx: &Ctx, base: usize, k: i32) -> i32 {
-    if !matches!(ctx.game.level, 4 | 0xb) { return 0; }
-    usize::try_from(k).ok().and_then(|k| ctx.game.flags.get(base + k)).map_or(0, |&b| b as i32)
+fn wins(ctx: &Ctx, k: i32) -> i32 { wins_in(ctx.game, k) }
+fn wins_in(game: &crate::game::GameState, k: i32) -> i32 { flag(game, if game.level == 0xb { 0x57 } else { 0x4d }, k) }
+fn losses(ctx: &Ctx, k: i32) -> i32 { flag(ctx.game, if ctx.game.level == 0xb { 0x5c } else { 0x52 }, k) }
+fn flag(game: &crate::game::GameState, base: usize, k: i32) -> i32 {
+    if !matches!(game.level, 4 | 0xb) { return 0; }
+    usize::try_from(k).ok().and_then(|k| game.flags.get(base + k)).map_or(0, |&b| b as i32)
 }
 fn bump_flag(ctx: &mut Ctx, base4: usize, base11: usize, k: i32) {
     let base = if ctx.game.level == 0xb { base11 } else { base4 };
@@ -252,6 +256,8 @@ fn mount(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &mut w.mobys[id];
     m.state = 2;
     m.timer = if w.race.again { 2 } else { 0 };
+    // `0x32e338(0, 0x40c228)` unless asked for again: the select's screen ([`draw_select`]).
+    if !w.race.again { ctx.game.screen_callback = Some(crate::hud::ScreenCallback::RaceSelect { moby: id }); }
     w.race.entered = false;
     m.set_pv_i(0x394, 0x96);
     m.update_dist = 0xff;
@@ -287,6 +293,8 @@ fn racing(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         0 => {
             w.race.select_cam = false;
             select(w, id, ctx);
+            // `0x32e338(0, 0x40c228)` each tick of the select.
+            ctx.game.screen_callback = Some(crate::hud::ScreenCallback::RaceSelect { moby: id });
             return;
         }
         1 => {
@@ -310,6 +318,8 @@ fn racing(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 w.rebuild(p, &*ctx.host);
             }
             w.mobys[id].mode &= 0xffbe;
+            // `0x32e338(0, 0x4188b8)`: the race's HUD (not ported: no callback here).
+            ctx.game.screen_callback = None;
             w.race.count = 0;
             w.race.start_boost = false;
             w.race.on_water = false;
@@ -504,6 +514,8 @@ fn off(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         retry(w, id, ctx, true);
         return;
     }
+    // `0x32e338(0, 0)` after the results' box (`0x41c1ec`).
+    ctx.game.screen_callback = None;
     let music = if ctx.game.level == 0xb { w.mobys[id].pv_i(0x484) } else { w.mobys[id].pv_i(0x480) };
     let Some((p, mut r)) = ctx.level.cuboid_place(home) else { return };
     if w.race.select_cam { r[2] = 0.92; }
@@ -562,6 +574,8 @@ fn retry(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, hidden: bool) {
     hold_hero(ctx, id);
     if hidden {
         w.mobys[id].timer = 0;
+        // `0x32e338(0, 0)`.
+        ctx.game.screen_callback = None;
         w.mobys[id].mode |= 0x41;
         if let Some(p) = pilot(w, id) { w.mobys[p].mode |= 0x41; }
         for r in racers(w, id) {
@@ -1457,4 +1471,79 @@ fn ranks(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
         w.mobys[r].set_pv_b(0xa2, (l + 1) as u8);
         w.mobys[r].set_pv_b(0xa3, n as u8);
     }
+}
+
+/// `0x40c228` (L11 its copy, the same code): the race select's screen, in the counters' place, for the race picked
+/// (`$gp+0x18c4`). The panel 0x45 (`0x60442d00`) and 0x44 (`0x55f0c070`) at (256, 200), scaled (1, 0.92); the arrows
+/// 0x4a at (259, 283) and 0x4b at (251, 283), each `0x80f0f0f0` while → (←) is held, else pulsing over 50 frames
+/// between `0x80ffde8d` and `0x60442d00`; the race's number (0x2e08, font 3 centred at (256, 60)); 0x2dd6 (119, 286),
+/// 0x2dd7 (356, 286), 0x2dd5 (181, 286), 0x2dd8 (279, 286) in font 2, left; the race's title (its record's text,
+/// font 1 centred at (256, 110)). With `k` 5 (Joba 10) and the prize its record's by its wins so far (at most the
+/// third, × 10 in the challenge mode): a race not open (no 0x10000000 and the one before it not won) — 0x2e09 (font
+/// 3 centred, 150 down) and `"%s %d %s"` of 0x2e13, the prize and 0x2df4 (210 + k down); an open one — its rules
+/// in font 1 centred: 0x2e0f / 0x2e10 (flag 4; Joba 0x2e2f / 0x2e30) at 150 − k, 0x2e11 / 0x2e12 (flag 1) at 170 −
+/// k, on Joba 0x2e32 / 0x2e31 (flag 0x10) at 190 − k, 0x2e5b (flag 2) at 210 − k (190 − k off Joba); the prize
+/// (`"%s %d %s"`, or `"%s ?"` with none: 0x1b0900) at 210 + k; its wins (0x2e14) at 230 + k.
+///
+/// Not ported: the best time (`0x1a7368` / `0x1a737c` by the race: 0x305e at (306, 230 + k), and the wins' text 110
+/// to the left — the best times are not kept, so it is not drawn), the GUI's view tangent it sets for its sprites
+/// (`0x1bdc70`: tan 0.5622, then the bike's `+0x28c`), the wide screen's 0.9 (`0x1a7b98`), the PAL sizes.
+pub fn draw_select(w: &MobyWorld, id: usize, inp: &crate::hud::ScreenIn, out: &mut Vec<crate::hud::ScreenDraw>) -> bool {
+    use crate::hud::{format_int, lerp_rgba, text_of, Align, Draw, ScreenDraw};
+    let _ = id;
+    let game = inp.game;
+    let white = 0x80f0_f0f0;
+    let text = |out: &mut Vec<ScreenDraw>, font: u8, text: Vec<u8>, pos: [f32; 2], align: Align| out.push(ScreenDraw::Text { font, text, pos, scale: 1.0, colour: white, align });
+    for (sprite, colour) in [(0x45, 0x6044_2d00u32), (0x44, 0x55f0_c070)] {
+        out.push(ScreenDraw::Hud(Draw::Sprite { id: sprite, pos: [256.0, 200.0], scale: [1.0, 0.92], frame: 0.0, colour }));
+    }
+    let k = w.frame.rem_euclid(50);
+    let t = if k < 25 { k as f32 * 0.04 } else { 1.0 - (k - 25) as f32 * 0.04 };
+    let pulse = lerp_rgba(t, 0x80ff_de8d, 0x6044_2d00);
+    let held = inp.hero.items.held;
+    for (sprite, x, b) in [(0x4a, 259.0, button::RIGHT), (0x4b, 251.0, button::LEFT)] {
+        let colour = if held & b != 0 { white } else { pulse };
+        out.push(ScreenDraw::Hud(Draw::Sprite { id: sprite, pos: [x, 283.0], scale: [1.0, 1.0], frame: 0.0, colour }));
+    }
+    let pick = w.race.pick;
+    text(out, 3, format_int(&text_of(inp, 0x2e08, usize::MAX), pick + 1), [256.0, 60.0], Align::Centre);
+    for (t, x) in [(0x2dd6, 119.0), (0x2dd7, 356.0), (0x2dd5, 181.0), (0x2dd8, 279.0)] {
+        text(out, 2, text_of(inp, t, usize::MAX), [x, 286.0], Align::Left);
+    }
+    let rec = super::record(game.level, pick);
+    text(out, 1, text_of(inp, rec.text as u32, usize::MAX), [256.0, 110.0], Align::Centre);
+    let joba = game.level == 0xb;
+    let k = if joba { 10.0 } else { 5.0 };
+    let won = wins_in(game, pick);
+    let prize = rec.prizes[won.clamp(0, 2) as usize];
+    let prize = if game.challenge { prize * 10 } else { prize };
+    let prize_text = |none: bool| -> Vec<u8> {
+        let mut t = text_of(inp, 0x2e13, usize::MAX);
+        if none {
+            t.extend_from_slice(b" ?");
+        } else {
+            t.push(b' ');
+            t.extend_from_slice(prize.to_string().as_bytes());
+            t.push(b' ');
+            t.extend_from_slice(&text_of(inp, 0x2df4, usize::MAX));
+        }
+        t
+    };
+    if rec.flags & 0x1000_0000 == 0 && (pick < 1 || wins_in(game, pick - 1) < 1) {
+        text(out, 3, text_of(inp, 0x2e09, usize::MAX), [256.0, 150.0], Align::Centre);
+        text(out, 1, prize_text(false), [256.0, 210.0 + k], Align::Centre);
+        return true;
+    }
+    let rule = if rec.flags & 4 == 0 { if joba { 0x2e2f } else { 0x2e0f } } else if joba { 0x2e30 } else { 0x2e10 };
+    text(out, 1, text_of(inp, rule, usize::MAX), [256.0, 150.0 - k], Align::Centre);
+    text(out, 1, text_of(inp, if rec.flags & 1 != 0 { 0x2e12 } else { 0x2e11 }, usize::MAX), [256.0, 170.0 - k], Align::Centre);
+    if joba {
+        text(out, 1, text_of(inp, if rec.flags & 0x10 != 0 { 0x2e31 } else { 0x2e32 }, usize::MAX), [256.0, 190.0 - k], Align::Centre);
+        if rec.flags & 2 != 0 { text(out, 1, text_of(inp, 0x2e5b, usize::MAX), [256.0, 210.0 - k], Align::Centre); }
+    } else if rec.flags & 2 != 0 {
+        text(out, 1, text_of(inp, 0x2e5b, usize::MAX), [256.0, 190.0 - k], Align::Centre);
+    }
+    text(out, 1, prize_text(rec.prizes[won.clamp(0, 2) as usize] == 0), [256.0, 210.0 + k], Align::Centre);
+    text(out, 1, format_int(&text_of(inp, 0x2e14, usize::MAX), won), [256.0, 230.0 + k], Align::Centre);
+    true
 }
