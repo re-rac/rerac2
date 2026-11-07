@@ -71,8 +71,10 @@ impl Hero {
             let k = ARMOUR[self.damage.armour.clamp(0, 4) as usize];
             n = ((n as f32 * k + 0.5) as i32).max(1);
         }
+        let before = self.hp;
         self.hp = (self.hp - n).max(0);
         self.show_health = Some(0x168);
+        if crate::moby::ai::hit_log() { println!("ratchet\t{}\t{}\t{before} → {}\tstate {:#x}", self.frame, before - self.hp, self.hp, self.state); }
     }
 
     /// The death on the lava with no health left (`0x2aca80`, and the lava hop 0x38's entry in `0x2c4560`): on level 2
