@@ -21,13 +21,13 @@
 //! **The group's shared words** (gameplay section 21): `+0x3fc` the frame of the pick, `+0x400` the uid of its
 //! creature nearest Ratchet on the bank (sub 3, not backing off), every 10 frames.
 //!
-//! **The stream.** The game's spray is particles (type 2, `0x328640` = L00 `0x3327e8`: not ported, G-PRT-001); the
-//! stream's hits follow its first particle (`+0x3f0`): its reach `+0x3f4` grows with the particle's distance from
-//! the mouth while it lives, the hits stop when it is gone. Here the particle is stood in for by its flight: 0.15 a
-//! tick from the spit's first spray frame for its life of 30..36 ticks (the spawn's arguments).
+//! **The stream.** The game's spray is particles (type 2, `0x328640` = L00 `0x3327e8`, crate::particles::staged,
+//! [`spray_puffs`]); the stream's hits follow its first particle (`+0x3f0`): its reach `+0x3f4` grows with the particle's
+//! distance from the mouth while it lives, the hits stop when it is gone. Here the particle is stood in for by its
+//! flight: 0.15 a tick from the spit's first spray frame for its life of 30..36 ticks (the spawn's arguments).
 //!
 //! Not ported: the shadow, the tail's aim (`0x31cfa0`), the splashes and ripples (`0x3dd160`, `0x3dd3e0`,
-//! `0x3dd030`), the spray's particles. Its death's fade: crate::moby::classes::death_fade (`0x3eb1d0`).
+//! `0x3dd030`). Its death's fade: crate::moby::classes::death_fade (`0x3eb1d0`).
 
 use crate::hero::physics::*;
 use crate::moby::{ai, Ctx, MobyWorld};
@@ -370,7 +370,44 @@ fn spit(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, spray: bool) {
         line_hit(w, id, ctx, damage, mouth, tip);
         ai::attack_sphere(w, id, ctx, 0.3, damage, 1.0, tip, 0x400_0001, 0, 1, 0);
     }
-    if spray && w.mobys[id].pv_i(0x3f0) == 0 { w.mobys[id].set_pv_i(0x3f0, 1); }
+    if spray {
+        spray_puffs(ctx, mouth, yaw, pitch);
+        if w.mobys[id].pv_i(0x3f0) == 0 { w.mobys[id].set_pv_i(0x3f0, 1); }
+    }
+}
+
+/// `0x3dd520`'s spray: two puffs (`0x328640(pos, v0, v1, c0, c1, in, ease, out, −1)`) within 0.18 of the mouth, 0.15
+/// a tick along the spit (rising `randf(0.0075, 0.00917)`, size 0.2) slowing to 1/120 within ±9° (sinking
+/// `randf(−0.03, −0.0367)`, size 1), 0x50608040 → 0x10608040, for 2..4 / 20..24 / 30..36 ticks; then three within 0.24,
+/// 1/6 a tick within ±18° (rising `randf(0.00583, 0.0125)`, size 0.05) slowing to 1/120 within ±4° (sinking
+/// `randf(−0.014, −0.03)`, size 0.09), 0x8050ff30 → 0x3050ff30, for 2..4 / 20..24 / 100..120 ticks. A roll's even
+/// low bit and the next's odd one dull a puff's colours (0x30304020 both; 0x80306000 → 0x30304000); an odd one
+/// draws it with ALPHA 0x48 (its byte 3).
+fn spray_puffs(ctx: &mut Ctx, mouth: V3, yaw: f32, pitch: f32) {
+    // `0x31a498(len, yaw, pitch)`.
+    let polar = |l: f32, yaw: f32| [yaw.cos() * l * pitch.cos(), yaw.sin() * l * pitch.cos(), pitch.sin() * l];
+    let Some(sys) = ctx.parts.as_deref_mut() else { return };
+    let g = &mut ctx.game.rng;
+    let mut puff = |g: &mut crate::rng::Rng, k: f32, cs: [u32; 2], dull: [u32; 2], v0: (f32, f32, [f32; 2], f32), v1: (f32, f32, [f32; 2], f32), out: [f32; 2]| {
+        let r = g.rand();
+        let (c0, c1) = if r & 1 == 0 && g.rand() & 1 != 0 { (dull[0], dull[1]) } else { (cs[0], cs[1]) };
+        let pos = [mouth[0] + g.randf(-k, k), mouth[1] + g.randf(-k, k), mouth[2] + g.randf(-k, k)];
+        // The first two go straight along the spit (no roll).
+        let a_yaw = if v0.1 == 0.0 { yaw } else { add_rot(yaw, g.randf(-v0.1, v0.1) * 0.017_453_294) };
+        let mut a = polar(v0.0, a_yaw);
+        a[2] += g.randf(v0.2[0], v0.2[1]);
+        let mut b = polar(v1.0, add_rot(yaw, g.randf(-v1.1, v1.1) * 0.017_453_294));
+        b[2] += g.randf(v1.2[0], v1.2[1]);
+        let lens = [g.randf(2.0, 4.0), g.randf(20.0, 24.0), g.randf(out[0], out[1])].map(|x| x as i32 as i16);
+        let i = crate::particles::staged(sys, g, pos, [a[0], a[1], a[2], v0.3], [b[0], b[1], b[2], v1.3], c0, c1, lens[0], lens[1], lens[2], -1);
+        if let (Some(i), true) = (i, r & 1 != 0) { sys.pool.recs[i][3] = 0x48; }
+    };
+    for _ in 0..2 {
+        puff(g, 0.18, [0x5060_8040, 0x1060_8040], [0x3030_4020; 2], (0.15, 0.0, [f32::from_bits(0x3bf5_c290), f32::from_bits(0x3c16_2fca)], 0.2), (f32::from_bits(0x3c08_8889), 9.0, [f32::from_bits(0xbcf5_c290), f32::from_bits(0xbd16_2fca)], 1.0), [30.0, 36.0]);
+    }
+    for _ in 0..3 {
+        puff(g, 0.24, [0x8050_ff30, 0x3050_ff30], [0x8030_6000, 0x3030_4000], (f32::from_bits(0x3e2a_aaab), 18.0, [f32::from_bits(0x3bbf_258c), f32::from_bits(0x3c4c_ccce)], 0.05), (f32::from_bits(0x3c08_8889), 4.0, [f32::from_bits(0xbc65_6042), f32::from_bits(0xbcf5_c290)], 0.09), [100.0, f32::from_bits(0x42f0_0001)]);
+    }
 }
 
 /// `0x3132c8(damage, push, m, from, to, flags, …)`: a hit along the line from `from` to `to`, to the first moby it
