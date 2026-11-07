@@ -2,6 +2,8 @@
 //! addresses with the port's). Each class's update is registered in [`update_for`]; crate::moby::classes::update_for
 //! asks it after its own.
 
+pub mod crank;
+pub mod hints;
 pub mod node;
 pub mod props;
 pub mod spinner;
@@ -26,6 +28,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         node::CLASS => Some(node::update_0a79),
         spinner::CLASS => Some(spinner::update_0c8e),
         veil::CLASS => Some(veil::update_0c91),
+        hints::CLASS => Some(hints::update_1268),
+        crank::CLASS => Some(crank::update_0118),
         _ => None,
     }
 }

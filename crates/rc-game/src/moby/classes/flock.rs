@@ -12,8 +12,12 @@
 //! `+0x30..+0x5c` its glows' points and `+0xa0..` its trails' (both × `+0x78`), `+0x90` / `+0x94` the glows' reaches,
 //! `+0x98` the trails', `+0x1c` the trails' phase, `+0x18` its looped sound.
 //!
-//! A shot member explodes (`0x324930`, crate::moby::blast::explode). Not ported: the kill count `0x1a9048` a shot
-//! member adds to; on level 0xd the leader's hiding above z 89 (that level is not ported).
+//! A shot member explodes (`0x324930`, crate::moby::blast::explode) and counts in the level's kills (`0x1a9048`,
+//! crate::moby::MobyWorld::flock_kills). **0x12ca** ([`update_12ca`], L02 `0x38b3c0`, L16 `0x37b8f0`; the same function
+//! on levels 2, 3, 9, 13, 16, 18 and 20, placed on 16 only) turns the count into Snivelak's skill point 0xb: past 13 on
+//! level 0x10, once (crate::skill_points).
+//!
+//! Not ported: on level 0xd the leader's hiding above z 89 (that level is not ported).
 
 use crate::hero::physics::{add_rot, approach, atan2, dist, len2, sub, sub_rot, V3};
 use crate::hud::lerp_rgba;
@@ -237,6 +241,8 @@ fn tick(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             x.drawn = 0;
             x.has_collision = false;
             x.mode |= 1;
+            // `0x1a9048`: the kill count (0x12ca's, [`update_12ca`]).
+            w.flock_kills += 1;
             crate::moby::shards::throw_all(w, m, ctx, [-7.0, -7.0, 3.0, 0.0, 7.0, 7.0, 13.0, 0.0], (90.0, 360.0), (10.0, 20.0), 0x3f, 2, -1, 0, 0xffff);
             match w.mobys[m].o_class {
                 0x1290 | 0x134b => { ctx.host.play_sound(&w.mobys[m], 0, 0); }
@@ -301,6 +307,19 @@ fn member_glows(w: &mut MobyWorld, m: usize, ctx: &mut Ctx) {
     if d < reach[1] as f32 {
         for &o in &offsets { particles::glow_def(sys, rng, s * far_size, 0.6, o, m, pos, reach[1] as i16, false, far, 2, 1); }
     }
+}
+
+/// 0x12ca (L02 `0x38b3c0`, module docs): its first tick updated at any distance (`+0x30` 0xff); then, with the kills
+/// past 13 on level 0x10 and skill point 0xb (`0x1a7a73`) not yet had, the award (its four steps:
+/// crate::game::GameState::award_skill_point; the reward flag `0x1a903c` is not ported).
+pub fn update_12ca(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let m = &mut w.mobys[id];
+    if m.state == 0 {
+        m.update_dist = 0xff;
+        m.state = 1;
+    }
+    if w.flock_kills < 14 || ctx.game.level != 0x10 { return; }
+    ctx.game.award_skill_point(crate::skill_points::point::FLOCK);
 }
 
 /// `0x38ee50` (the leader's draw callback): class by class (the game's eight draws), each member of its group that is

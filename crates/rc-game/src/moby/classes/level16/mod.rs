@@ -12,6 +12,8 @@ pub mod laser;
 pub mod movers;
 pub mod props;
 pub mod rocks;
+pub mod topple;
+pub mod triggers;
 pub mod turret;
 
 /// This level's draw callbacks (crate::fx): true when the moby's class is one of them.
@@ -47,6 +49,11 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         drone::CLASS => Some(drone::update_0f35),
         drone::SHOT => Some(drone::update_0f7a),
         turret::GUN => Some(turret::update_10ee),
+        movers::LIFT => Some(movers::update_1104),
+        topple::CLASS => Some(topple::update_0e7f),
+        triggers::OPENER => Some(triggers::update_1107),
+        triggers::WAKER => Some(triggers::update_1154),
+        triggers::FLOOR => Some(triggers::update_1145),
         _ => None,
     }
 }

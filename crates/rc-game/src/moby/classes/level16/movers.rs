@@ -28,14 +28,31 @@
 //!   120 × π/10800 a tick (`$gp+0x2e40` / `+0x2e44`), by the change from the last offset).
 //! * **5**: above 0, its roll 5° less (`0x2e9298` = L00 `0x2efea8`) and `+0x10` 5 less; else the kept timer byte,
 //!   waits and roll back, 1.
+//!
+//! **0x1104** ([`update_1104`], `0x419dd8`, 2 placed; the decomp's `func_L16_004189A0`): a lift along a path, out and
+//! back each time its timer byte is set. Its pvars: `+0x20` its platform block, `+0x60` the path (crate::level::
+//! LevelData::paths), `+0x64` the wait at the far end (ticks), `+0x68` the speed (a second, a tick from the set-up),
+//! `+0x6c` the point it is at.
+//! * **0**: at the path's first point, at point 0, its speed / 60; 1 (the path −1 prints the game's warning,
+//!   `0x2a6170` = L00 `0x2a48f0`, not ported).
+//! * **1**: its timer byte set: 2.
+//! * **2**: a step of its speed toward the next point (`0x2e8218` / `0x2e84e8` / `0x2e81e8` = L00 `0x2eeea0` /
+//!   `0x2ef138` / `0x2eee70`); within 0.88 of a step of it (`0x2e83a8` = L00 `0x2ef018`) the next one on; at the last,
+//!   3.
+//! * **3**: after the wait (its ticks `+0x96`): 4.
+//! * **4**: the same toward the point before, held while Ratchet is under it (lower, within 3 across, `0x2e83e0` =
+//!   L00 `0x2ef050`, and 2.5 up or down); at point 0 its timer byte cleared, 1.
+//!
+//! Then its ticks counted, its block written (`0x31bc70` = L00 `0x322668`) and Ratchet on it carried.
 
-use crate::hero::physics::{add, add_rot, scale, sub, sub_rot};
+use crate::hero::physics::{add, add_rot, dist, dist2, scale, set_len, sub, sub_rot, V3};
 use crate::moby::{Ctx, MobyWorld};
 
 pub const MOVER_A: i16 = 0x10fc;
 pub const MOVER_B: i16 = 0x10fd;
 pub const MOVER_C: i16 = 0x10fe;
 pub const FLIPPER: i16 = 0x114c;
+pub const LIFT: i16 = 0x1104;
 
 const BLOCK: usize = 0x20;
 const BACK: usize = 0x68;
@@ -143,4 +160,60 @@ pub fn update_114c(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
         }
         _ => {}
     }
+}
+
+/// 0x1104 (module docs).
+pub fn update_1104(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    const PATH: usize = 0x60;
+    const WAIT: usize = 0x64;
+    const SPEED: usize = 0x68;
+    const AT: usize = 0x6c;
+    let near = f32::from_bits(0x3f61_47ae);
+    let (old, old_rot) = (w.mobys[id].pos, w.mobys[id].rot);
+    let level = ctx.level;
+    let points = usize::try_from(w.mobys[id].pv_i(PATH)).ok().and_then(|i| level.paths.get(i));
+    let point = |k: i32| -> Option<V3> { points.and_then(|p| usize::try_from(k).ok().and_then(|k| p.get(k))).map(|p| [p[0], p[1], p[2]]) };
+    let n = points.map_or(0, |p| p.len() as i32);
+    let m = &mut w.mobys[id];
+    let step = |m: &mut crate::moby::Moby, to: V3| m.pos = add(m.pos, set_len(sub(to, m.pos), m.pv_f(SPEED)));
+    match m.state {
+        0 => {
+            if let Some(p) = point(0) { m.pos = p; }
+            m.set_pv_i(AT, 0);
+            m.set_pv_f(SPEED, m.pv_f(SPEED) * f32::from_bits(0x3c88_8889));
+            m.set_state(1, -1);
+        }
+        1 => {
+            if m.timer != 0 { m.set_state(2, -1); }
+        }
+        2 => {
+            if let Some(to) = point(m.pv_i(AT) + 1) {
+                step(m, to);
+                if dist(m.pos, to) <= m.pv_f(SPEED) * near { m.set_pv_i(AT, m.pv_i(AT) + 1); }
+            }
+            if n - 1 <= m.pv_i(AT) { m.set_state(3, -1); }
+        }
+        3 => {
+            if m.pv_i(WAIT) <= m.state_ticks as u16 as i32 { m.set_state(4, -1); }
+        }
+        4 => {
+            let h = ctx.hero.pos;
+            let under = h[2] < m.pos[2] && dist2(m.pos, h) < 3.0 && (m.pos[2] - h[2]).abs() < 2.5;
+            if let Some(to) = point(m.pv_i(AT) - 1) {
+                if !under { step(m, to); }
+                if dist(m.pos, to) <= m.pv_f(SPEED) * near { m.set_pv_i(AT, m.pv_i(AT) - 1); }
+            }
+            if m.pv_i(AT) <= 0 {
+                m.timer = 0;
+                m.set_state(1, -1);
+            }
+        }
+        _ => {}
+    }
+    let m = &mut w.mobys[id];
+    m.state_ticks = m.state_ticks.wrapping_add(1);
+    let (new, rot) = (m.pos, m.rot);
+    crate::moby::platform::write(m, BLOCK, sub(new, old), old_rot, rot);
+    let flags = m.pv_i(BLOCK + 0x3c) as u32;
+    crate::moby::carry_hero_with(ctx, id, flags, old, old_rot[2], new, rot[2]);
 }

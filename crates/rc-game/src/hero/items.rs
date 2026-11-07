@@ -355,6 +355,8 @@ pub struct ItemBlock {
     pub held: u32,
     pub pressed: u32,
     pub square_recent: bool,
+    /// The ticks since □ was last pressed (within the last 32; `0x330240(0x80, n)` from the moby loop: n > it).
+    pub square_ago: Option<i32>,
     /// `0x18aa18`: the moby a weapon aims at (its lock) and its aim height, set by the weapon's update each tick it
     /// holds one and read once by the posture (crate::hero::posture, `0x2abc18`).
     pub aim_target: Option<(usize, f32)>,

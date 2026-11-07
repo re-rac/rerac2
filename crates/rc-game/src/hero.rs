@@ -661,6 +661,7 @@ pub fn hero_update(hero: &mut Hero, env: &Env, anim: &mut dyn AnimCtl) -> HeroTi
     hero.items.held = env.pad.held;
     hero.items.pressed = env.pad.pressed;
     hero.items.square_recent = env.pad.pressed_within(crate::pad::button::SQUARE, 3).is_some();
+    hero.items.square_ago = env.pad.pressed_within(crate::pad::button::SQUARE, 32);
     hero.vehicle.square = env.pad.pressure[7].to_f32();
     if let Some(r) = hero.state_req.take() { hero.set_state(anim, env, r.id, r.play); }
     if let Some((blend, seq, frame)) = hero.anim_req.take() { hero.set_anim(anim, blend, seq, frame); }

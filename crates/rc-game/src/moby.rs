@@ -684,6 +684,8 @@ pub struct MobyWorld {
     pub level23: classes::level23::Globals,
     /// Level 16's swinging bridges' swing (classes::level16::drawbridge::Globals).
     pub drawbridge: classes::level16::drawbridge::Globals,
+    /// `0x1a9048`: the flock members shot on this level (classes::flock; read by 0x12ca, classes::flock::update_12ca).
+    pub flock_kills: i32,
     /// Level 14's electric strands (classes::level14::fence::Globals).
     pub fence14: classes::level14::fence::Globals,
     /// The sinking pits' samples and grids (classes::level14::pit::Globals).

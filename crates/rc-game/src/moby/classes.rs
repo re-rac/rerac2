@@ -339,6 +339,8 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         // Damosel's traffic (L18 `0x3fcb78`): 0x0d5c is in the flocks' class switches, but its update is the traffic's.
         level18::traffic::CAR | level18::traffic::RAM | 0x11cc | 0x0d5c => Some(level18::traffic::update_11cf),
         c if flock::CLASSES.contains(&c) => Some(flock::update),
+        // The flock kills' skill point (L02 `0x38b3c0`, on levels 2, 3, 9, 13, 16, 18 and 20).
+        0x12ca => Some(flock::update_12ca),
         0x0ca0 => Some(oozla::update_0ca0),
         0x046f => Some(oozla::update_046f),
         // The water surfaces (crate::water): the ocean about the camera and the liquid lids.

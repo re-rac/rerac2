@@ -318,7 +318,11 @@ impl Hero {
     /// target speed factor `0x189fd0 = scale·|stick|`; no stick: the yaw itself, factor 0. Mode 1 drops an axis under
     /// 0.12 when the other is over 0.7 (the quick-select / strafe readers). The stick sector and the strafe flag
     /// (`0x18b276/7`, strafing `0x18b274`) are not ported.
-    pub fn stick_target(&mut self, env: &Env, scale: f32, mode: i32) {
+    pub fn stick_target(&mut self, env: &Env, scale: f32, mode: i32) { self.stick_target_in(&env.cam_rows, env.cam_yaw, env.mirror, scale, mode) }
+
+    /// [`Hero::stick_target`] through the camera's rows and yaw given (the objects that call `0x2b3af8` from the moby
+    /// loop: crate::moby::classes::level26::crank).
+    pub fn stick_target_in(&mut self, cam_rows: &[V3; 3], cam_yaw: f32, mirror: bool, scale: f32, mode: i32) {
         let [mut x, mut y] = self.stick;
         if mode == 1 {
             if 0.7 < y.abs() && x.abs() < 0.12 { x = 0.0; }
@@ -341,10 +345,10 @@ impl Hero {
             self.stick_sector = if rot_dist(a, PI / 2.0) < q { 3 } else if rot_dist(a, 0.0) < q { 1 } else if rot_dist(a, PI) < q { 0 } else { 2 };
             self.strafe_back = self.stick_sector == 3 && 0.15 < self.stick_mag;
         }
-        self.target_yaw = add_rot(atan2(-y, -x), env.cam_yaw);
-        let (sx, sy) = (if env.mirror { x } else { -x }, -y);
+        self.target_yaw = add_rot(atan2(-y, -x), cam_yaw);
+        let (sx, sy) = (if mirror { x } else { -x }, -y);
         // `0x2ef318(out, (−y, −x), camera)`: the stick turned into the world through the camera's rows.
-        let r = &env.cam_rows;
+        let r = cam_rows;
         self.stick_dir = [sy * r[0][0] + sx * r[1][0], sy * r[0][1] + sx * r[1][1], sy * r[0][2] + sx * r[1][2]];
         self.target_speed = scale * (x * x + y * y).sqrt();
     }
