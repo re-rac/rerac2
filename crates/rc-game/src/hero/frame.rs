@@ -178,10 +178,9 @@ impl Hero {
         }
     }
 
-    /// `0x2b9488`'s mode-0 branch, after a frame: outside the states 0x24 / 0x25 / 0x74 / 0x30 / 0x2c / 0x2b and the
-    /// groups 0x11 / 0x15 / 0x16 / 0x1f, his pitch and roll spring to 0 (0.015, 0.3, at most 0.0873; velocities
-    /// `0x189ec0` / `0x189ec4`) and the velocities turn him about his own axes (`0x2b3ec8(vx, vy, 0)`). Done once both
-    /// velocities are 0.
+    /// `0x2b9488`'s mode-0 branch, every tick out of a frame: outside the states 0x24 / 0x25 / 0x74 / 0x30 / 0x2c / 0x2b
+    /// and the groups 0x11 / 0x15 / 0x16 / 0x1f, his pitch and roll spring to 0 (0.015, 0.3, at most 0.0873; velocities
+    /// `0x189ec0` / `0x189ec4`) and the velocities turn him about his own axes (`0x2b3ec8(vx, vy, 0)`).
     pub(super) fn frame_release(&mut self) {
         let skip = matches!(self.state, 0x24 | 0x25 | 0x74 | 0x30 | 0x2c | 0x2b) || matches!(self.group, 0x11 | 0x15 | 0x16 | 0x1f);
         if skip { return; }
@@ -190,10 +189,11 @@ impl Hero {
         turn_spring(0.0, 0.015, 0.3, f32::from_bits(0x3db2_b8c4), &mut x, &mut vx, 0);
         turn_spring(0.0, 0.015, 0.3, f32::from_bits(0x3db2_b8c4), &mut y, &mut vy, 0);
         self.rot_vel = [vx, vy];
+        // No turn: his angles stay as they are (the rows' round trip would only add rounding).
+        if vx == 0.0 && vy == 0.0 { return; }
         let r = euler_rows(self.rot);
         let d = euler_rows([vx, vy, 0.0]);
         self.rot = crate::moby::attach::angles_of(&d.map(|row| to_world(row, &r)));
-        if vx == 0.0 && vy == 0.0 { self.gravity.tilted = false; }
     }
 
     /// `0x2c3330`: in a frame, idle (group 0) on the ground with neither a step (`0x189f90`) nor a push (`0x189fa4`) of

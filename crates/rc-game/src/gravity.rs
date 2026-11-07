@@ -92,10 +92,6 @@ pub struct Gravity {
     pub moby_rows: [V3; 3],
     /// `0x189fa4`: the length of this tick's push step (`0x189f70`; 0 without a push).
     pub push_step: f32,
-    /// The port's: Ratchet still carries a frame's pitch and roll. Out of the frames `0x2b9488`'s mode-0 branch springs
-    /// them back to 0; the port runs it only while this is set (crate::hero::frame), so the world path of a level
-    /// without frames is unchanged.
-    pub tilted: bool,
     /// `0x18a110` / `0x18a11c`: the magnetic walkways' down and its word beside it (the quad's w), as Boldan's cuboids
     /// 0x0f55 (crate::moby::classes::level13::walkway: against a cuboid's first row, the word 10) and Snivelak's
     /// 0x0c32 (crate::moby::classes::level16::walkway: toward a cuboid's centre, the word 2) set them. Frame mode 1's
@@ -120,7 +116,6 @@ impl Default for Gravity {
             tick_start: [0.0; 3],
             moby_rows: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
             push_step: 0.0,
-            tilted: false,
             walkway_normal: [0.0; 3],
             walkway_k: 0.0,
             walkway_hold: 0,
