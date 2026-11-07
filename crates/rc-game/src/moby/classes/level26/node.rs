@@ -11,8 +11,8 @@
 //!   distance 0x113, mode | 0x4000; its place kept; the amount 0, no sound, the rate `$gp+0xf08` (360) × π/10800;
 //!   then 1.
 //! * **1** (with the sphere on): the amount `a` read.
-//!   * `a` or the last amount not 0: its sparks ([`sparks`], `0x3c5d08` = L14 `0x4288b8`); its place `+0x10` + its up
-//!     row at `4 · a · its scale / its class's`; with `a` below the last, a hit sphere (`0x31d338`: radius 2.1, damage
+//!   * `a` or the last amount not 0: its sparks (`0x3c5d08` = L14 `0x4288b8`, crate::moby::sparks on L26's data);
+//!     its place `+0x10` + its up row at `4 · a · its scale / its class's`; with `a` below the last, a hit sphere (`0x31d338`: radius 2.1, damage
 //!     3, push 1, flags 0x10000, 0, 1, 0).
 //!   * `a` changing (not the last, not 0 or 1): its class sound 2 looped (mode 4) unless its own plays; else that one
 //!     stopped (`0x35fd60`).
@@ -39,7 +39,7 @@
 //! custom render path); `0x18cc7c` (not mapped). The count's text is drawn "text n " (the port's count carries a third
 //! text; none here).
 
-use crate::hero::physics::{add, scale, set_len, sub, unit, V3};
+use crate::hero::physics::{add, set_len, sub, unit};
 use crate::hud::lerp_rgba;
 use crate::moby::attach::angles_of;
 use crate::moby::classes::props::group_alive;
@@ -124,7 +124,7 @@ fn rising(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let a = link.and_then(|k| w.mobys.get(k)).map_or(0.0, |o| o.pv_f(0x34));
     let last = w.mobys[id].pv_f(AMOUNT);
     if a != 0.0 || last != 0.0 {
-        sparks(w, id, ctx);
+        crate::moby::sparks::emit(w, id, ctx, &crate::moby::sparks::L26);
         let class_scale = w.class(CLASS).map_or(1.0, |c| c.scale);
         let m = &mut w.mobys[id];
         let up = set_len(m.rows[2], RISE * a * (m.scale / class_scale));
@@ -207,31 +207,4 @@ fn pulse(w: &mut MobyWorld, id: usize) {
     let p = crate::hero::physics::add_rot(m.pv_f(PHASE), rate * UNIT);
     m.set_pv_f(PHASE, p);
     m.glow = lerp_rgba(p.sin() * 0.5 + 0.5, a, b);
-}
-
-/// `$gp+0x1000` / `+0x1008` / `+0x1010` / `+0x1020` / `+0x1030`: the sparks' sizes, colours, life ranges, the share of
-/// the big kind, and the two ends of the line they run along (in its frame).
-const SPARK_SIZE: [f32; 2] = [0.5, 2.0];
-const SPARK_RGBA: [u32; 2] = [0x6000_6080, 0x6000_4090];
-const SPARK_LIFE: [(i32, i32); 2] = [(0x2d, 0x3c), (0x46, 0x5a)];
-const SPARK_BIG: f32 = 0.2;
-const SPARK_ENDS: [V3; 2] = [[0.0, 0.0, -4.0], [0.0, 0.0, -1.5]];
-
-/// `0x3c5d08` (L14 `0x4288b8`, the decomp's `func_L14_004272D8`): a glint (`0x33b050` = L00 `0x33b5e0`,
-/// crate::particles::glint) at one end of its line (`0x31bb58(2)`), running to the other over its life (one time in
-/// five, `0x31bbf0(0, 1)` < 0.2, the big kind), its roll `0x31bb58(0xff)`.
-fn sparks(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let m = &w.mobys[id];
-    let (pos, rows, hero) = (m.pos, m.rows, ctx.hero.pos);
-    let rng = &mut ctx.game.rng;
-    let side = rng.randi(2) as usize;
-    let kind = usize::from(rng.randf(0.0, 1.0) < SPARK_BIG);
-    let n = rng.rand_range(SPARK_LIFE[kind].0, SPARK_LIFE[kind].1);
-    let through = |v: V3| -> V3 { std::array::from_fn(|k| v[0] * rows[0][k] + v[1] * rows[1][k] + v[2] * rows[2][k]) };
-    let at = add(through(SPARK_ENDS[side]), pos);
-    let step = scale(through(sub(SPARK_ENDS[(side + 1) & 1], SPARK_ENDS[side])), 1.0 / n as f32);
-    let rot = rng.randi(0xff) as u8;
-    if let Some(sys) = ctx.parts.as_deref_mut() {
-        crate::particles::glint(sys, SPARK_SIZE[kind], at, step, SPARK_RGBA[kind], (n & 0xff) as u16, rot, false, hero);
-    }
 }

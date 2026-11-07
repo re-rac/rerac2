@@ -198,6 +198,22 @@ pub fn look(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, l: &Layout) { look_with
 /// [`look`] with the pitch's ask left alone (`pitch_ask` false: L04's 0x0c38 works it out but never stores it) or no
 /// asks at all (`track` false: L04's 0x0d3e before its first scene), the aims still run.
 pub fn look_with(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, l: &Layout, pitch_ask: bool, track: bool) {
+    let t = Turns { yaw: f32::from_bits(0x3fc9_0fdc), head: 0.6, body: 0.4, pitch: (-l.pitch, l.pitch) };
+    look_turns(w, id, ctx, l, pitch_ask, track, &t);
+}
+
+/// The look's turn limits: the yaw off its facing (both ways), the head's and body's shares of it, the pitch's range.
+#[derive(Clone, Copy, Debug)]
+pub struct Turns {
+    pub yaw: f32,
+    pub head: f32,
+    pub body: f32,
+    pub pitch: (f32, f32),
+}
+
+/// [`look_with`] with its own turn limits (the prison's seller 0x10f3, crate::moby::classes::level14::seller: ±50°,
+/// 0.5 / 0.3, −1°..30°).
+pub fn look_turns(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, l: &Layout, pitch_ask: bool, track: bool, t: &Turns) {
     use std::f32::consts::FRAC_PI_2;
     const POINT: usize = 0x100;
     const HEAD_SCALE: usize = 0x70;
@@ -226,13 +242,12 @@ pub fn look_with(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, l: &Layout, pitch_
             w.mobys[id].pv_v(POINT)
         };
         let d: V3 = sub(target, [pos[0], pos[1], pos[2] + 2.0]);
-        let lim = f32::from_bits(0x3fc9_0fdc);
-        let turn = sub_rot(atan2(d[0], d[1]), yaw).clamp(-lim, lim);
-        let pitch = (-atan2(len2(d), d[2])).clamp(-l.pitch, l.pitch);
+        let turn = sub_rot(atan2(d[0], d[1]), yaw).clamp(-t.yaw, t.yaw);
+        let pitch = (-atan2(len2(d), d[2])).clamp(t.pitch.0, t.pitch.1);
         let m = &mut w.mobys[id];
         if pitch_ask { m.set_pv_f(joint_aim::ASK + 4, pitch); }
-        m.set_pv_f(joint_aim::ASK + 8, turn * 0.6);
-        m.set_pv_f(0x80 + joint_aim::ASK + 8, turn * 0.4);
+        m.set_pv_f(joint_aim::ASK + 8, turn * t.head);
+        m.set_pv_f(0x80 + joint_aim::ASK + 8, turn * t.body);
     }
     if ctx.game.cheat(crate::cheats::cheat::ACTOR_HEADS) { w.mobys[id].set_pv_f(HEAD_SCALE, 2.75); }
     let damp = f32::from_bits(0x3e99_999a);
@@ -243,9 +258,15 @@ pub fn look_with(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, l: &Layout, pitch_
 /// The actors' heads (module docs): in a scene with cheat byte 0, the first actor of `id`'s class takes the level's
 /// head node on its joint list 0 at `scale`, once.
 pub fn actor_heads(w: &mut MobyWorld, id: usize, ctx: &Ctx, scale: f32) {
+    let class = w.mobys[id].o_class;
+    actor_heads_of(w, id, ctx, class, scale);
+}
+
+/// [`actor_heads`] for the scene actors of another class (L01 `0x321cc8`, L14 `0x335478`; the decomp's
+/// `func_L01_003209F8(m, 0, class, scale)`: the prison's seller 0x10f3 for its actor 0x11d3).
+pub fn actor_heads_of(w: &mut MobyWorld, id: usize, ctx: &Ctx, class: i16, scale: f32) {
     if ctx.game.scenes.mode != crate::scene::SCENE || !ctx.game.cheat(crate::cheats::cheat::ACTOR_HEADS) { return; }
     let Some(p) = ctx.game.scenes.player.as_ref() else { return };
-    let class = w.mobys[id].o_class;
     let Some(&(a, _)) = p.actors.iter().find(|&&(a, _)| a != id && w.mobys.get(a).is_some_and(|m| m.o_class == class)) else { return };
     let m = &mut w.mobys[a];
     if !m.joint_scales.iter().any(|j| j.0 == 0) { m.joint_scales.push((0, scale)); }

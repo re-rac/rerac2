@@ -366,8 +366,8 @@ fn touch(w: &mut MobyWorld, id: usize, ctx: &Ctx, r: f32, damage: f32, flags: u3
     c
 }
 
-/// `0x35e438(p, path, 0)`: the path's point nearest `p` (−1 no path).
-pub(super) fn nearest_point(ctx: &Ctx, p: V3, path: i32) -> i16 {
+/// `0x35e438(p, path, 0)` (L14 `0x34cf20`): the path's point nearest `p` (−1 no path).
+pub fn nearest_point(ctx: &Ctx, p: V3, path: i32) -> i16 {
     let Some(pts) = usize::try_from(path).ok().and_then(|i| ctx.level.paths.get(i)).filter(|v| !v.is_empty()) else { return -1 };
     let mut best = 1e11;
     let mut at = 0;
@@ -381,16 +381,22 @@ pub(super) fn nearest_point(ctx: &Ctx, p: V3, path: i32) -> i16 {
     at as i16
 }
 
-/// `0x3f8ff0(near, m, &goal, path, &point, backward)`: the goal its path point; passed within `near` across, the next
-/// (or back); past the last (first) false, the point wrapped.
-fn path_step(w: &mut MobyWorld, id: usize, ctx: &Ctx, near: f32, path: i32, backward: bool) -> bool {
+/// `0x3f8ff0` on its own goal and point ([`path_step_at`]).
+fn path_step(w: &mut MobyWorld, id: usize, ctx: &Ctx, near: f32, path: i32, backward: bool) -> bool { path_step_at(w, id, ctx, near, path, GOAL, POINT, backward) }
+
+/// `0x3f8ff0(near, m, &goal, path, &point, backward)` (the shared L14 / L18 / L19 / L20 code: L14 `0x425290`, L19
+/// `0x3dde48`, L20 `0x3fda88`; its users crate::moby::classes::level14::roamer and this): the goal (the pvar at
+/// `goal`) its path point (the short at `point`); passed within `near` across, the next (or back); past the last
+/// (first) false, the point wrapped.
+#[allow(clippy::too_many_arguments)]
+pub fn path_step_at(w: &mut MobyWorld, id: usize, ctx: &Ctx, near: f32, path: i32, goal: usize, point: usize, backward: bool) -> bool {
     let Some(pts) = usize::try_from(path).ok().and_then(|i| ctx.level.paths.get(i)).filter(|v| !v.is_empty()) else { return false };
     let n = pts.len() as i16;
     let m = &mut w.mobys[id];
-    let mut i = m.pv_s(POINT);
+    let mut i = m.pv_s(point);
     let q = pts[(i.max(0) as usize).min(pts.len() - 1)];
-    m.set_pv_v(GOAL, [q[0], q[1], q[2]]);
-    m.set_pv_f(GOAL + 0xc, q[3]);
+    m.set_pv_v(goal, [q[0], q[1], q[2]]);
+    m.set_pv_f(goal + 0xc, q[3]);
     let passed = dist2(m.pos, [q[0], q[1], q[2]]) < near;
     let ok = if !backward {
         if passed { i += 1; }
@@ -409,7 +415,7 @@ fn path_step(w: &mut MobyWorld, id: usize, ctx: &Ctx, near: f32, path: i32, back
             true
         }
     };
-    m.set_pv_s(POINT, i);
+    m.set_pv_s(point, i);
     ok
 }
 

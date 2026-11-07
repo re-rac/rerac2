@@ -50,6 +50,7 @@ pub mod knock;
 pub mod platform;
 pub mod shards;
 pub mod slide;
+pub mod sparks;
 pub mod talk;
 pub mod target_search;
 
@@ -651,6 +652,10 @@ pub struct MobyWorld {
     /// The frame's additive full-screen fills (`0x2e8810` under ALPHA 0x48, GS RGBA) the draw callbacks asked for
     /// (crate::fx::callbacks clears them; the engine draws them under the HUD): the Blitz Gun's screen flash.
     pub screen_fills: Vec<u32>,
+    /// The frame's blended full-screen fills (`0x303d60` = L00 `0x2fc158` under ALPHA 0x44, GS RGBA: the colour over the
+    /// frame by its alpha) the draw callbacks asked for, cleared and drawn as [`Self::screen_fills`]: the prison's
+    /// dark (crate::moby::classes::level14::guard).
+    pub screen_tints: Vec<u32>,
     /// The quads the updates send straight to the GS (`0x2eb998` called from an update, not a draw callback: the
     /// Meteor Gun's scorches, crate::moby::classes::meteor), drawn with the frame's callbacks (crate::fx::callbacks
     /// takes them).

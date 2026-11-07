@@ -9,6 +9,7 @@ pub mod energy;
 pub mod fence;
 pub mod field;
 pub mod gate;
+pub mod guard;
 pub mod hints;
 pub mod lift;
 pub mod lift_guard;
@@ -17,15 +18,19 @@ pub mod pit;
 pub mod plate;
 pub mod props;
 pub mod rappeller;
+pub mod roamer;
 pub mod screen;
+pub mod seller;
 pub mod sheet;
 pub mod steam;
 pub mod switch;
 
 /// This level's draw callbacks (crate::fx): true when the moby's class is one of them.
 #[allow(clippy::too_many_arguments)]
-pub fn draw(w: &mut crate::moby::MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, _hero_state: i32, _view: &crate::particles::BSphereView, cam: crate::hero::physics::V3, id: usize, _first: bool, out: &mut Vec<crate::fx::FxQuad>, frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
+pub fn draw(w: &mut crate::moby::MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, _hero_state: i32, _view: &crate::particles::BSphereView, cam: crate::hero::physics::V3, id: usize, first: bool, out: &mut Vec<crate::fx::FxQuad>, frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
     match w.mobys[id].o_class {
+        // The dark (`0x428830`) is a first-list callback.
+        guard::CLASS => if first { guard::draw(w, id) },
         fence::CLASS => fence::draw(w, id, cam, out),
         field::CLASS => field::draw(w, id, cam, host.camera_rows(), frame),
         sheet::CLASS => sheet::draw(w, id, &mut game.rng, out),
@@ -76,6 +81,9 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         director::CLASS => Some(director::update_10ff),
         plate::CLASS => Some(plate::update_0f4d),
         super::critter::PRISON => Some(super::critter::update),
+        roamer::CLASS => Some(roamer::update_0f91),
+        guard::CLASS => Some(guard::update_1100),
+        seller::CLASS => Some(seller::update_10f3),
         _ => None,
     }
 }

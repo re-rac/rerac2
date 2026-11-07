@@ -15,6 +15,7 @@ pub mod misc;
 pub mod mortar;
 pub mod props;
 pub mod seller;
+pub mod shuttle;
 pub mod vent;
 
 use crate::hero::physics::V3;
@@ -47,6 +48,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         lifts::DOCK => Some(lifts::update_0935),
         lifts::LIFT_A | lifts::LIFT_B => Some(lifts::update_08ac),
         lifts::ELEVATOR => Some(lifts::update_08a7),
+        shuttle::CLASS => Some(shuttle::update_0922),
         misc::MARKER_A | misc::MARKER_B | misc::MARKER_C => Some(misc::update_0877),
         misc::UPDRAFT => Some(misc::update_120d),
         misc::BARRIER => Some(misc::update_1256),

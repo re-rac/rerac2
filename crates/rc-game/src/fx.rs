@@ -343,6 +343,7 @@ pub fn callbacks(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut
     let mut first = Vec::new();
     let mut frame = Vec::new();
     w.screen_fills.clear();
+    w.screen_tints.clear();
     // The ship's shadow (`0x361af8`, a first-list callback; crate::travel).
     crate::travel::draw_ship_shadow(game, view, &mut first);
     // Ratchet's hand-item glows (`0x2a7ac8`, a first-list callback of his).
