@@ -462,6 +462,26 @@ pub fn move_step(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, yaw: f32, goal: V3
     w.mobys[id].pv_i(o + 0x94)
 }
 
+/// `0x3327f0(yaw, speed, accel, m, goal, opts)` (L02; L12 `0x330a60`): [`move_step`] with the movement options `opts`
+/// (`+0x38`) and, when above 0, the top speed `speed` (`+0x28`) and the speed-up `accel` (`+0x20`) for the move; all
+/// three put back after. 8 without the block.
+#[allow(clippy::too_many_arguments)]
+pub fn move_with(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, yaw: f32, goal: V3, opts: i32, speed: f32, accel: f32) -> i32 {
+    let m = &mut w.mobys[id];
+    if m.pv_i(0x18) == 0 { return 8; }
+    let o = mv(m);
+    let (kept_opts, kept_speed, kept_accel) = (m.pv_i(o + 0x38), m.pv_f(o + 0x28), m.pv_f(o + 0x20));
+    m.set_pv_i(o + 0x38, opts);
+    if 0.0 < speed { m.set_pv_f(o + 0x28, speed); }
+    if 0.0 < accel { m.set_pv_f(o + 0x20, accel); }
+    let f = move_step(w, id, ctx, yaw, goal);
+    let m = &mut w.mobys[id];
+    m.set_pv_f(o + 0x20, kept_accel);
+    m.set_pv_i(o + 0x38, kept_opts);
+    m.set_pv_f(o + 0x28, kept_speed);
+    f
+}
+
 /// `0x32db38(m, block, yaw)`: the turn the movement block at `o` asks of its aim records (`+0x48` / `+0x4c`, pvar
 /// offsets, 0 none; crate::moby::joint_aim's asked z `+0x68`): unless option 0x10 (no turn), `yaw` less its facing
 /// (`0x2efea8`) held to ±π/2 (`0x3fc90fdc`; mirrored, the other way), shared evenly between the records there are,

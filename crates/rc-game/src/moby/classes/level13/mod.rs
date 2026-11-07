@@ -42,7 +42,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x0efa => Some(props::update_0efa),
         0x0c86 => Some(targets::update_0c86),
         0x0c87 => Some(targets::update_0c87),
-        0x0fec => Some(props::update_0fec),
+        // The guide of level 12's launcher (`0x41eea0` = L12 `0x41b2a8`): only the scenes show it here.
+        super::level12::launcher::GUIDE => Some(super::level12::launcher::update_0fec),
         0x11b0 => Some(props::update_11b0),
         0x1225 => Some(props::update_1225),
         lift::CLASS => Some(lift::update),

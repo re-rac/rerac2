@@ -11,12 +11,19 @@
 //! [`power_core`]. 0x0eb1 (`0x451ad0`, the challenge mode's flag 0x18): [`props`]. The creature in the water that
 //! swallows Ratchet, 0x0947 (`0x404c60`; L09, L12 too): crate::moby::classes::swimmer.
 //!
+//! The hovering sentry 0x0bc7 (`0x422070`, on the line test crate::moby::slide): [`sentry`]. The ferry 0x0330:
+//! crate::moby::classes::ferry.
+//!
 //! Not ported (level 6's other classes):
-//! * 0x0fe6 (`0x45bbc8`, the decomp's `func_L06_0045A5B0`, 5 placed: 6024 bytes and its level helpers; it hunts
-//!   Ratchet within 30 inside the polygons of its paths `+0x118` / `+0x138`, states 0..0x15) and 0x0bc7 (`0x422070`,
-//!   `func_L06_00420AE8`, 4 placed, 3996 bytes), both on the line test (G-CLS-005).
-//! * Ratchet's: the ferry 0x0330 (`0x3e5460`, L11 `0x3b7340`: a ride on paths with its own controls), 0x0b57
-//!   (`0x41b200`, 3 placed: Ratchet's state 0x37 and the level's scene functions `0x479xxx`).
+//! * 0x0fe6 (`0x45bbc8`, the decomp's `func_L06_0045A5B0`, 5 placed, 6024 bytes): the water creature that grabs
+//!   Ratchet — states 0..0x15 on its health block alone (no reaction or movement block), its polygons `+0x118` /
+//!   `+0x138`, its cuboid `+0x104`, the moby `+0x108` whose pvar byte `+0x14` freezes it (states 0x14 / 0x15), the
+//!   hold of Ratchet `+0x13c` (his place its own from 1); its helpers `0x45b130` .. `0x45bb18` (set-up `0x45b320`,
+//!   the state pick `0x45b1c0` with the tables `0x1b1970` / `0x1b1980`, the swim `0x45b6e8` / `0x45b7c8` / `0x45b4d8`,
+//!   the bite `0x45b8f0`, the near tests `0x45baa8` / `0x45bb18`, `0x45b250`), the water tests `0x277258` / `0x278e78`
+//!   and its ripples and splashes (`0x2fd1b8`, `0x2c19d8`), the line test L04 `0x33cb08`, the pull on Ratchet
+//!   `0x2a7ea0`, the shared `0x3660f0` / L00 `0x410d18` / L01 `0x310bc0`, the moby-dropping fx `0x2c42e0(0x39, 1)`.
+//! * Ratchet's: 0x0b57 (`0x41b200`, 3 placed: Ratchet's state 0x37 and the level's scene functions `0x479xxx`).
 //! * The hints 0x0cdd (`0x4321e8`: help 0x9df / 0x9e0 / 0x9e1 / 0x9e2 / 0x9db / 0x9b5 by cuboids, on the help records
 //!   crate::game::GameState::help; it reads Ratchet's `0x18c2d4`, the byte `0x1a7b27`, the uids' save bits `0x19b4a8`
 //!   and the uids gone for good `0x21ecc4`, not mapped).
@@ -32,6 +39,7 @@ pub mod host;
 pub mod lifts;
 pub mod pole;
 pub mod props;
+pub mod sentry;
 pub mod spinners;
 pub mod traffic;
 
@@ -91,6 +99,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         spinners::CLASS_0FC1 => Some(spinners::update_0fc1),
         spinners::CLASS_0FC0 => Some(spinners::update_0fc0),
         power_core::CLASS => Some(power_core::update_0fc2),
+        sentry::CLASS => Some(sentry::update_0bc7),
         0x0eb1 => Some(props::update_0eb1),
         _ => None,
     }

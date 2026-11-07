@@ -670,6 +670,8 @@ pub struct MobyWorld {
     pub convoy: classes::level07::train::Globals,
     /// Level 11's globals (classes::level11::Globals).
     pub level11: classes::level11::Globals,
+    /// Level 12's globals (classes::level12::Globals).
+    pub level12: classes::level12::Globals,
     /// The hoverbike races' words (classes::race::Globals; levels 4 and 11).
     pub race: classes::race::Globals,
     /// Level 18's director's globals (classes::level18::director::Globals).

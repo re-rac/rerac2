@@ -2,10 +2,8 @@
 //! the L00 ones the port knows them by where they differ). Each class's update is registered in [`update_for`] and
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
 //!
-//! Not ported yet: the launcher system — the critters 0x0bb8 (`0x3e0d78`, 10 placed: set-up `0x3e1890`, tail
-//! `0x3e1b88`, the walkers 0x0fb4 given them `0x3e2f00`; launched by `0x3e1c30` from a cuboid's group, then along their
-//! cuboid waypoints on the framework, counted dead toward the help texts 0xa2d..0xa30 and skill point 0x0a) and their
-//! carrier 0x0fa5 (`0x41a510`, 1 placed: three paths, its child's pad `0x41ba60` / `0x41bb00`, its exhaust `0x41a188`).
+//! The launcher system — the carrier 0x0fa5 (`0x41a510`), its critters 0x0bb8 (`0x3e0d78`) and its guide 0x0fec
+//! (`0x41b2a8`, level 13's too), with the walkers 0x0fb4 taking critters: [`launcher`]; its two counts in [`Globals`].
 
 use crate::hero::physics::V3;
 use crate::moby::MobyWorld;
@@ -17,6 +15,7 @@ pub mod field;
 pub mod grid;
 pub mod head;
 pub mod hints;
+pub mod launcher;
 pub mod lifts;
 pub mod mine;
 pub mod misc;
@@ -28,6 +27,16 @@ pub mod trader;
 pub mod tractor;
 pub mod trooper;
 pub mod walker;
+
+/// The level's globals its classes share.
+#[derive(Clone, Debug, Default)]
+pub struct Globals {
+    /// `$gp+0x19b0`: the critters killed (crate::moby::classes::level12::launcher; the help at 50 / 100 / 150 / 200).
+    pub kills: i32,
+    /// `$gp+0x19b4`: the critters lost on their way — killed or taken by a walker (launcher, walker); none when one
+    /// comes back aboard: skill point 0x0a.
+    pub taken: i32,
+}
 
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
@@ -57,6 +66,9 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x0424 => Some(props::update_0424),
         0x0fab => Some(mine::update_0fab),
         0x0fb4 => Some(walker::update_0fb4),
+        launcher::CRITTER => Some(launcher::update_0bb8),
+        launcher::CARRIER => Some(launcher::update_0fa5),
+        launcher::GUIDE => Some(launcher::update_0fec),
         0x0f31 => Some(trooper::update_0f31),
         0x114b => Some(trooper::update_114b),
         0x0d66 => Some(debris::update_0d66),
@@ -93,6 +105,10 @@ pub fn draw(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crat
         }
         grid::CLASS => {
             grid::draw(w, id, cam, out);
+            true
+        }
+        launcher::CRITTER => {
+            launcher::draw(w, id, host, cam, out);
             true
         }
         _ => false,

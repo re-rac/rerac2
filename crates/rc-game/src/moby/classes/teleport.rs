@@ -118,7 +118,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// `0x3cb600`: 32 pairs of glints 0.5 over the carrier fanning out round it (each `randf(17°, 28°)` on from the last),
 /// `randf(6, 10)/60` a tick (the second of a pair 0.8 of it), sizes 0.3 and 0.2, `rand_range(15, 30)` ticks, their
 /// colour `randf(0, 1)` of the way from 0x80800000 to 0x80808000.
-fn burst(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
+pub fn burst(w: &MobyWorld, id: usize, ctx: &mut Ctx) {
     let c = w.mobys[id].pos;
     let p = [c[0], c[1], c[2] + 0.5];
     let hero = ctx.hero.pos;

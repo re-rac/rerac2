@@ -43,8 +43,8 @@
 //! (sequence 9). 13: the end → 1 (sub 0, sequence 0).
 //!
 //! Not ported: the joint aims (`0x327a50` on `+0x240` / `+0x2c0`; the framework's aims are not ported), the big-head
-//! cheat (`0x32a7b0`, `$gp+0x1a00` 1.9), the count of taken mobys (`$gp+0x19b4`, read by nothing ported), its class's
-//! `+0x46` (5).
+//! cheat (`0x32a7b0`, `$gp+0x1a00` 1.9), its class's `+0x46` (5). The moby it takes is the launcher's critter
+//! 0x0bb8 (crate::moby::classes::level12::launcher, which hands it over).
 
 use crate::hero::physics::{add, approach_angle, atan2, scale, set_len, sub, V3};
 use crate::moby::classes::props::{seq, set_seq, wrapped};
@@ -403,8 +403,9 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 }
 
 /// `0x3e1e10(o, hand, rot, last)`: the moby taken: its sequence 10 (blend 5), its state 8 (sub 1) unless its `+0xbc`
-/// is 8; a sixth of the way to the hand, its yaw toward the taker's by 12° a tick; the last tick: hidden without
-/// collision, a smoke burst (1) at it, state 1 (sub 0).
+/// is 8; a sixth of the way to the hand, its yaw toward the taker's by 12° a tick; the last tick: the lost count
+/// `$gp+0x19b4` up (crate::moby::classes::level12::Globals::taken), hidden without collision, a smoke burst (1) at
+/// it, state 1 (sub 0).
 fn take_one(w: &mut MobyWorld, o: usize, ctx: &mut Ctx, hand: V3, yaw: f32, last: bool) {
     set_seq(w, o, ctx, 10, 0, 5);
     if w.mobys[o].timer != 8 { st(w, o, 8, 1); }
@@ -413,6 +414,8 @@ fn take_one(w: &mut MobyWorld, o: usize, ctx: &mut Ctx, hand: V3, yaw: f32, last
     m.pos = add(m.pos, d);
     approach_angle(yaw, f32::from_bits(0x3e56_7752), &mut m.rot[2], 0);
     if last {
+        w.level12.taken += 1;
+        let m = &mut w.mobys[o];
         m.has_collision = false;
         m.mode = (m.mode & !mode::TARGET) | 0x41;
         let at = m.pos;

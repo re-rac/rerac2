@@ -27,6 +27,8 @@
 //!   `0x2d97a8`, L03 `0x2d6e28`: crate::upgrades, GameState::all_upgraded);
 //! * 0x16 (`0x1a7a7e`): the Sheepinator's 16th class-0xfb4 target turned on level 0xc (`$gp+0x1de0`; L00 `0x3c76e0`,
 //!   crate::moby::classes::sheepinator; its upgraded hand's `0x406cf8` counts too, not ported yet);
+//! * 0x0a (`0x1a7a72`): Todano's critters 0x0bb8 back aboard their carrier with none lost (L12 `0x3e1474`,
+//!   crate::moby::classes::level12::launcher);
 //! * 0x0b (`0x1a7a73`): Snivelak's flock members shot past 13 (0x12ca, L16 `0x37b8f0`, the level 0x10 count of
 //!   L02 `0x38b3c0`; crate::moby::classes::flock::update_12ca);
 //! * 0x1c (`0x1a7a84`): Endako's sentry 0x0ffd's death (`0x4201b8`, crate::moby::classes::endako_c::crane_kill) —

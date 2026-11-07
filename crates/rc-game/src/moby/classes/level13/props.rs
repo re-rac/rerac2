@@ -11,7 +11,7 @@
 //! * **0x0f20** ([`update_0f20`], `0x38d770`, 1 placed): hides the level's enemies in its scene 3.
 //! * **0x040f** ([`update_040f`], `0x38d600`, 2 placed): cuboids that kill Ratchet.
 //! * **0x0efa** ([`update_0efa`], `0x41c6f0`, 3 placed): two cuboids that set the death height.
-//! * **0x0fec** ([`update_0fec`], `0x41eea0`, 1 placed): shown out of the scenes.
+//! * **0x0fec** (`0x41eea0`, 1 placed): shown out of the scenes — level 12's guide, crate::moby::classes::level12::launcher.
 //! * **0x11b0** ([`update_11b0`], `0x425c00`, 1 placed): flag bytes set by cuboids.
 //! * **0x1225** ([`update_1225`], `0x427c88`, 1 placed): gone with another moby once its mission is done.
 //!
@@ -153,24 +153,6 @@ pub fn update_0efa(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let p = ctx.hero.pos;
     if ctx.level.in_cuboid(m.pv_i(0), p) { ctx.game.death_z = Some(30.0); }
     if ctx.level.in_cuboid(m.pv_i(4), p) { ctx.game.death_z = Some(95.0); }
-}
-
-/// 0x0fec (`0x41eea0`, 1 placed): on level 13 (`0x1a79f8` = 0xd) only shown by the scenes: while one plays
-/// (`0x1a8f00` = 2) without collision (`+0x98` 0), hidden and not a target (mode `& 0xefff | 0x41`); else shown, a
-/// target (mode `& 0xffbe | 0x1000`) with its class's collision.
-///
-/// Not ported: its other levels' part (a talker on paths with its sequences, `0x41f318` … `0x41f6b0`), never run here.
-pub fn update_0fec(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    if ctx.game.level != 0xd { return; }
-    let coll = w.class(w.mobys[id].o_class).is_some_and(|c| c.has_collision);
-    let m = &mut w.mobys[id];
-    if ctx.game.scenes.mode != crate::scene::SCENE {
-        m.mode = (m.mode & 0xffbe) | 0x1000;
-        m.has_collision = coll;
-    } else {
-        m.has_collision = false;
-        m.mode = (m.mode & 0xefff) | 0x41;
-    }
 }
 
 /// 0x11b0 (`0x425c00`, 1 placed): its pvars `[0..0x10]` four cuboids, `[0x10]` a moby. Ratchet in cuboid `[8]` /
