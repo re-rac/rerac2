@@ -6,9 +6,8 @@
 //!   `+0x180`), active (`0x37c130(m, 1)`, [`space::start`]), state 1, drawn from anywhere, the rows kept, scale 0.2;
 //!   its path speed 10 a second (`+0x278`, which the AI block's `+0x154` points to: the state 0xc's top speed), the
 //!   point `+0x26c` 0, `+0x270` / `+0x274` 0, the AI block's `+0x150` 0xffff (`0x379c68`). With its leader word
-//!   (`+0x264`) into the leaders' list with the callback `0x438a28` (its group's activation by the mission puts it
-//!   at the path's first point going for the second, its velocity 1/12 a tick toward it: not ported with the
-//!   missions' activation `0x37b280`).
+//!   (`+0x264`) into the leaders' list with the callback `0x438a28` ([`restart`]: its group's activation by the
+//!   missions, crate::moby::classes::space::activate_group).
 //! * **State 1**: at its goal (`0x3850a0`, [`space::arrived`]) the next point (`+0x26c`); the path's last but one
 //!   reached it stops (state 3: nothing more). A point's fourth word not −1 and odd is a wait of (w >> 1) seconds
 //!   (state 2, `+0x274`), its goal the next point anyway, the goal's timer 2000000; then the AI state 0xc, the AI tick
@@ -30,6 +29,19 @@ const SPEED: usize = 0x278;
 
 fn path(w: &MobyWorld, id: usize, ctx: &Ctx) -> Vec<[f32; 4]> {
     usize::try_from(w.mobys[id].pv_i(PATH)).ok().and_then(|p| ctx.level.paths.get(p)).cloned().unwrap_or_default()
+}
+
+/// `0x438a28` (the decomp's `func_L15_00436C68`): at the path's first point going for the second (the point
+/// `+0x26c` 1), its velocity 1/12 a tick toward it, the goal's timer 2000000.
+pub(crate) fn restart(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
+    let pts = path(w, id, ctx);
+    w.mobys[id].set_pv_i(POINT, 1);
+    let (Some(p0), Some(p1)) = (pts.first(), pts.get(1)) else { return };
+    w.mobys[id].pos = [p0[0], p0[1], p0[2]];
+    space::set_goal(w, id, ctx, [p1[0], p1[1], p1[2]]);
+    let v = crate::hero::physics::scale(crate::hero::physics::sub(space::ai_v(w, id, a::GOAL), w.mobys[id].pos), 1.0 / 12.0);
+    space::set_ai_v(w, id, a::VEL, v);
+    space::set_ai_i(w, id, a::TIMER, 2_000_000);
 }
 
 /// `0x438750`.

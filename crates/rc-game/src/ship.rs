@@ -154,6 +154,12 @@ pub struct Flight {
     pub done: bool,
     /// `$gp+0x2630`.
     pub mode: i32,
+    /// The other ship levels' library words (crate::moby::classes::space's [`Flight::lib_hooks`]): the cruise speed
+    /// (`lib +0x30` a second, `0x37c098`; 0 the flight's own), the boost slowed to 30 (`lib +0x3c`, `0x375168`), the
+    /// view of a mission's cut (its place and angles, `0x4445a0`).
+    cruise: f32,
+    slow_boost: bool,
+    cut_view: Option<(V3, V3)>,
     /// `$gp+0x2684` / `+0x2688`: the d-pad's yaw and pitch ramps (0.1 a tick to 1).
     ramp_yaw: f32,
     ramp_pitch: f32,
@@ -282,6 +288,9 @@ impl Flight {
             fade: 0.0,
             done: false,
             mode: 0,
+            cruise: 0.0,
+            slow_boost: false,
+            cut_view: None,
             ramp_yaw: 0.0,
             ramp_pitch: 0.0,
             pitch: 0.0,
@@ -309,6 +318,7 @@ impl Flight {
         if let (true, Some(s)) = (self.hit_sound, self.ship) { host.play_sound_of(&w.mobys[s], SHIP_CLASS, 0xe, 0); }
         if self.mode == 6 { return self.dying(w); }
         self.mission(w);
+        if self.lib_hooks(w) { return; }
         if !self.cut() { return; }
         self.frame = self.frame.wrapping_add(1);
         let (pitch, yaw) = self.steer(pad);
@@ -598,7 +608,9 @@ impl Flight {
     /// `0x435a18`: the speed springs to the cruise; the camera moves along the ship's forward; the barrel roll's side
     /// step; each axis kept within 5..1000.
     fn advance(&mut self, w: &MobyWorld) {
-        let (top, rate) = if self.boost == 0 { (k::CRUISE, k::SPEED_K) } else { (k::BOOST, k::BOOST_K) };
+        let cruise = if 0.0 < self.cruise { self.cruise } else { k::CRUISE };
+        let boost = if self.slow_boost { 30.0 } else { k::BOOST };
+        let (top, rate) = if self.boost == 0 { (cruise, k::SPEED_K) } else { (boost, k::BOOST_K) };
         self.speed = spring(self.speed, top / 60.0, rate, k::SPEED_D, 0.0, &mut self.speed_v);
         let fwd = self.ship.and_then(|i| w.mobys.get(i)).map_or(self.rows[0], |m| m.rows[0]);
         self.pos = add(self.pos, scale(fwd, self.speed));
@@ -1206,9 +1218,50 @@ impl Flight {
         if self.mode == 1 && 1.0 <= self.fade {
             self.mode = 4;
             self.saved = (self.pos, self.rows);
-            self.pos = mission::CUT_POS;
-            self.rows = crate::moby::attach::rows_of(mission::CUT_ROT);
+            let (at, rot) = self.cut_view.unwrap_or((mission::CUT_POS, mission::CUT_ROT));
+            self.pos = at;
+            self.rows = crate::moby::attach::rows_of(rot);
         }
+    }
+
+    /// The other ship levels' missions (crate::moby::classes::space::mission, their mission moby's words): the
+    /// cruise speed and the slowed boost (`0x443d64`, `0x375168`), the hull and shield refilled (the missions' reset:
+    /// `lib +0x28` = 100, the weapon slot 6's shield full), a hit on the ship (`0x37bef0(n)`, [`Flight::damage`]), the
+    /// ship placed (`0x4478d0(faces, at)`: the camera at `at` facing `faces`, its up kept), the cut asked (`0x4445a0`:
+    /// mode 1, the fades of [`Flight::cut`] to the cut's view and back) and the flight in it (`0x4445d8`). Returns
+    /// whether the flight is held (`lib +0x48`, `0x37b1c8`: the camera's update `0x443d6c` flies nothing then).
+    fn lib_hooks(&mut self, w: &mut MobyWorld) -> bool {
+        use crate::moby::classes::space as sp;
+        let Some(m) = sp::lib(w) else { return false };
+        if w.mobys[m].o_class == MISSION_CLASS { return false; }
+        self.cruise = w.mobys[m].pv_f(sp::CRUISE);
+        self.slow_boost = w.mobys[m].pv_i(sp::SLOW_BOOST) != 0;
+        if w.mobys[m].pv_i(sp::REFILL) != 0 {
+            w.mobys[m].set_pv_i(sp::REFILL, 0);
+            self.hull = 100;
+            self.shield = k::SHIELD;
+        }
+        let hurt = w.mobys[m].pv_f(sp::SHIP_DAMAGE);
+        if hurt != 0.0 {
+            w.mobys[m].set_pv_f(sp::SHIP_DAMAGE, 0.0);
+            self.damage(w, hurt);
+        }
+        if w.mobys[m].pv_i(sp::PLACE_ASK) != 0 {
+            w.mobys[m].set_pv_i(sp::PLACE_ASK, 0);
+            self.pos = w.mobys[m].pv_v(sp::PLACE_AT);
+            let f = unit(sub(w.mobys[m].pv_v(sp::PLACE_FACES), self.pos));
+            let l = unit(cross(self.rows[2], f));
+            self.rows = [f, l, unit(cross(f, l))];
+        }
+        if w.mobys[m].pv_i(sp::CUT_ASK) != 0 && self.mode == 0 {
+            w.mobys[m].set_pv_i(sp::CUT_ASK, 0);
+            self.mode = 1;
+            self.cut_ticks = w.mobys[m].pv_i(sp::CUT_TICKS);
+            self.cut_view = Some((w.mobys[m].pv_v(sp::CUT_AT), w.mobys[m].pv_v(sp::CUT_ROT)));
+        }
+        let cutting = w.mobys[m].pv_i(sp::CUT_ASK) != 0 || matches!(self.mode, 1..=5);
+        w.mobys[m].set_pv_i(sp::CUTTING, cutting as i32);
+        w.mobys[m].pv_i(sp::HELD) != 0
     }
 
     /// The HUD's counts (`0x40e7a8`: `"%s: %d"` with the strings 0x3067 and 0x3068 at (24, 357) and (24, 384)): the

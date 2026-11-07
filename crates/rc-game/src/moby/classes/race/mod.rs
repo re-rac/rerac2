@@ -233,7 +233,7 @@ pub fn lateral(a: V3, b: V3, p: V3) -> f32 {
 }
 
 /// `0x33eab0` (L01 `0x311c18`): the point of the segment a–b nearest `p` across (xy; the height along with it).
-fn on_segment(a: V3, b: V3, p: V3) -> V3 {
+pub(crate) fn on_segment(a: V3, b: V3, p: V3) -> V3 {
     let e = sub(b, a);
     let o = sub(a, p);
     let q = [p[0] + e[1], p[1] - e[0], 0.0];

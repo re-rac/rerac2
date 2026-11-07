@@ -5,8 +5,9 @@
 //! the rows kept, health 1 (`+0x148`, `+0x180`), active (`0x37c130(m, 1)`, [`super::start`]), at a random point of
 //! the fight's sphere, scale 0.02, the fly-by's wait 120 (`+0x1c8`), the sounds' handles none (`+0x1c0` / `+0x1c4`),
 //! the route not begun (`+0x1b8`). With its disc's leader word (`+0x1b4`) it joins the leaders' list with a callback
-//! (`0x37b0d0(m, 0x418cd0, 0, 0)`: the route begun again and the done flag cleared, called by the missions' group
-//! activation `0x37b280`, not ported) and the done flag (`0x1b0f50`) is cleared.
+//! (`0x37b0d0(m, 0x418cd0, 0, 0)`: the route begun again and the done flag cleared, [`restart`], called by the
+//! missions' group activation `0x37c4f0`, crate::moby::classes::space::activate_group) and the done flag
+//! (`0x1b0f50`) is cleared.
 //!
 //! **Each tick** while active (`+0x110`): the route is the level's path `0x1fe380[0x221d48]` (the route the mission
 //! picks, [`super::route`]; `{count, …}` then its points 16 bytes each). The AI state is 0xb (`0x37dff0(m, 0xb)`:
@@ -58,6 +59,18 @@ pub(crate) const SPEC: Spec = Spec {
     nozzles: &[],
     ..FIGHTER_SPEC
 };
+
+/// `0x418cd0` (L10 / L15 the same; the decomp's `func_L05_00417730`): the leaders' callback of the group's
+/// activation — the done flag cleared, the route not begun (`+0x1bc`, `+0x1b8`).
+pub(crate) fn restart(w: &mut MobyWorld, id: usize) {
+    let m = &mut w.mobys[id];
+    m.set_pv_i(DONE, 0);
+    m.set_pv_i(GOAL, 0);
+    m.set_pv_i(BEGUN, 0);
+}
+
+/// `0x42b730(escort)` (the gate races' test): the level's done flag (`0x1b0f50`: an escort past its route's end).
+pub(crate) fn done(w: &MobyWorld) -> bool { w.mobys.iter().any(|m| m.o_class == CLASS && m.state < 0x80 && m.pv_i(DONE) != 0) }
 
 /// `0x418668`.
 pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {

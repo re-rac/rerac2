@@ -48,11 +48,14 @@
 //! **The other ship levels** (Feltzin 5, Hrugis 10, Gorn 15: the same library, the decomp's `func_L05_0037…` /
 //! `func_002ED688`.., at L05 `0x37aad0..`, L10 `0x37c8e0..`, L15 `0x3812f8..`): their ships are the fighter's pattern
 //! with their own numbers ([`Spec`], the levels' modules: crate::moby::classes::level05 / level10). Each level's
-//! mission object (L05 0x1103 `0x41efc0`, L10 0x1155 `0x422828`, L15 0x119f `0x42f288`; not ported) sets the
+//! mission object (L05 0x1103 `0x41efc0`, L10 0x1155 `0x422828`, L15 0x119f `0x42f288`: [`mission`]) sets the
 //! library's globals at its start: the fight's sphere (its `+0x68`[0], read here from the placed mission moby, as
 //! [`arena`]), the ready flag `0x221ca4` (L10; `0x37c8e0` returns it: taken as set here, as on Wupash) and the hit
 //! handler `0x221cd4` that `0x37e600` (the push) calls ([`hits`]: L05 `0x421c18`, L10 `0x4252b0`, L15 `0x431ad8`).
-//! The quiet and the tick's leading group are the Wupash mission's alone here (their missions keep them).
+//! The library's globals are words on the level's mission moby ([`lib`]): the quiet, the tick's leading group, the
+//! route, the "all ships put away" flag and the others the missions set ([`ALL_AWAY`] ..). The missions run the
+//! ships by their groups: [`activate_group`] (`0x37c4f0`, with the leaders' callbacks), [`put_away_all`]
+//! (`0x37c480`), [`scatter_group`] / [`goal_group`], [`activate_one`].
 //!
 //! Not ported: the exhaust trails (`0x3ca6c0` / `0x3cbc40` through `0x349c48`); the no-fly volumes' check
 //! (`0x3782c8`: none on Wupash) and the formations' set-up and break-up (`0x376d20`, `0x376e58`: none form on
@@ -63,6 +66,7 @@ use crate::hero::physics::{add, atan2, dist, len, len2, rot_dist, scale, set_len
 use crate::moby::{mode, Ctx, MobyWorld};
 
 pub mod escort;
+pub mod mission;
 
 /// The fighter's class.
 pub const FIGHTER: i16 = 0x0957;
@@ -89,8 +93,206 @@ pub const ROUTE: usize = 0x10c;
 
 /// The mission's route ([`ROUTE`]): the level's path's points.
 pub(crate) fn route(w: &MobyWorld, ctx: &Ctx) -> Vec<[f32; 4]> {
-    let i = w.mobys.iter().find(|m| MISSIONS.contains(&m.o_class) && m.state < 0x80).map_or(0, |m| m.pv_i(ROUTE));
+    let i = lib(w).map_or(0, |m| w.mobys[m].pv_i(ROUTE));
     usize::try_from(i).ok().and_then(|i| ctx.level.paths.get(i)).cloned().unwrap_or_default()
+}
+
+/// The library's other globals the missions set (L05 `0x221cc0..`, L10 `0x221c80..`, L15 `0x221dc0..`, L25
+/// `0x221800..`; the port's words on the level's mission moby, [`lib`]): the "all ships put away" flag `+0x34`
+/// (`0x37b188` = the decomp's `func_L05_00379F18`: while set, every activation `0x37c130` puts the ship away at
+/// once), the flight held `+0x48` (`0x37b1b8`: the ship camera's update `0x443d6c` flies nothing while it is set —
+/// the menus and the results), the ship's cruise speed `+0x30` (a second; 0 here: the flight's own, 8;
+/// `0x37c048` moves it by a gate's pass or miss, 8..15), the boost slowed to 30 `+0x3c` (`0x37b198`, the gate
+/// race), the waves done `+0x14`; the cut asked (`0x4445a0(at, angles, ticks)`, [`ask_cut`]) and the flight in a cut
+/// (`0x4445d8`), the ship placed (`0x4478d0(faces, at)`), the hull and shield refilled (the missions' reset), a hit
+/// on the ship (`0x37bef0(n)`).
+pub const ALL_AWAY: usize = 0x120;
+pub const HELD: usize = 0x124;
+pub const CRUISE: usize = 0x128;
+pub const SLOW_BOOST: usize = 0x12c;
+pub const WAVES: usize = 0x130;
+pub const CUT_ASK: usize = 0x134;
+pub const CUT_TICKS: usize = 0x138;
+pub const CUTTING: usize = 0x13c;
+pub const CUT_AT: usize = 0x140;
+pub const CUT_ROT: usize = 0x150;
+pub const PLACE_ASK: usize = 0x160;
+pub const PLACE_AT: usize = 0x170;
+pub const PLACE_FACES: usize = 0x180;
+pub const REFILL: usize = 0x190;
+pub const SHIP_DAMAGE: usize = 0x194;
+
+/// The level's mission moby (the library's globals: [`MISSIONS`]).
+pub fn lib(w: &MobyWorld) -> Option<usize> { w.mobys.iter().position(|m| MISSIONS.contains(&m.o_class) && m.state < 0x80) }
+
+fn lib_i(w: &MobyWorld, o: usize) -> i32 { lib(w).map_or(0, |m| w.mobys[m].pv_i(o)) }
+pub(crate) fn set_lib_i(w: &mut MobyWorld, o: usize, v: i32) {
+    if let Some(m) = lib(w) { w.mobys[m].set_pv_i(o, v); }
+}
+
+/// `0x4445a0(at, angles, ticks)` (L10 `0x446358`, L15 `0x450f70`, L25 `0x434f60`): the ship camera's cut — the view
+/// at `at` with the angles `rot` for `ticks`, behind the fades (crate::ship::Flight's modes 1..5).
+pub(crate) fn ask_cut(w: &mut MobyWorld, at: V3, rot: V3, ticks: i32) {
+    let Some(m) = lib(w) else { return };
+    let m = &mut w.mobys[m];
+    m.set_pv_i(CUT_ASK, 1);
+    m.set_pv_i(CUT_TICKS, ticks);
+    m.set_pv_i(CUTTING, 1);
+    m.set_pv_v(CUT_AT, at);
+    m.set_pv_v(CUT_ROT, rot);
+}
+
+/// `0x4445d8`: the cut still on (asked, or the flight in it).
+pub(crate) fn cutting(w: &MobyWorld) -> bool { lib_i(w, CUTTING) != 0 }
+
+/// `0x4478d0(faces, at)` (L25 `0x4381d0`): the ship camera at `at` facing `faces`, its up kept.
+pub(crate) fn place_ship(w: &mut MobyWorld, faces: V3, at: V3) {
+    let Some(m) = lib(w) else { return };
+    let m = &mut w.mobys[m];
+    m.set_pv_i(PLACE_ASK, 1);
+    m.set_pv_v(PLACE_AT, at);
+    m.set_pv_v(PLACE_FACES, faces);
+}
+
+/// `0x37bef0(n)` (L10 `0x37dcd8`, L15 `0x382740`, L25 `0x375e78`): `n` taken off the ship (crate::ship::Flight's
+/// damage: the shield, then the hull; halved in a barrel roll).
+pub(crate) fn hurt_ship(w: &mut MobyWorld, n: f32) {
+    let Some(m) = lib(w) else { return };
+    let d = w.mobys[m].pv_f(SHIP_DAMAGE) + n;
+    w.mobys[m].set_pv_f(SHIP_DAMAGE, d);
+}
+
+/// `0x37b188(v)` (`func_L05_00379F18`): the "all ships put away" flag.
+pub(crate) fn set_all_away(w: &mut MobyWorld, on: bool) { set_lib_i(w, ALL_AWAY, on as i32) }
+fn all_away(w: &MobyWorld) -> bool { lib_i(w, ALL_AWAY) != 0 }
+
+/// The moby's group's members (`0x1fb220[+0x21]`, the list's last entry has its top bit), none without one.
+pub(crate) fn members(w: &MobyWorld, id: usize) -> Vec<usize> {
+    usize::try_from(w.mobys[id].group).ok().and_then(|g| w.groups.get(g)).cloned().unwrap_or_default()
+}
+
+/// The leaders' list (`0x225dd0`, `0x37b0d0` at the ships' starts: those with their disc's leader word), in level
+/// order.
+pub(crate) fn leaders(w: &MobyWorld) -> Vec<usize> {
+    (0..w.mobys.len()).filter(|&i| { let m = &w.mobys[i]; m.state < 0x80 && is_ai(m.o_class) && m.pv_i(spec(m.o_class).leads) != 0 }).collect()
+}
+
+/// `0x37b140(class)` (`func_L05_00379ED0`): the leaders' list's first ship of `class`.
+pub(crate) fn leader_of(w: &MobyWorld, class: i16) -> Option<usize> { leaders(w).into_iter().find(|&l| w.mobys[l].o_class == class) }
+
+/// `0x37c610` (`func_L05_0037B3A0`): `id`'s group has an active ship (`+0x110`).
+pub(crate) fn group_active(w: &MobyWorld, id: usize) -> bool {
+    members(w, id).into_iter().any(|m| is_ai(w.mobys[m].o_class) && ai_i(w, m, a::ACTIVE) == 1)
+}
+
+/// `0x37e470` (L10; L15 `0x382ed0`, the decomp's `func_L10_0037D200`): `id`'s group's ships alive — the mode's bit
+/// 0x20 and health above 0; here the active ones (`+0x110`) with health.
+pub(crate) fn alive(w: &MobyWorld, id: usize) -> usize {
+    members(w, id).into_iter().filter(|&m| is_ai(w.mobys[m].o_class) && ai_i(w, m, a::ACTIVE) == 1 && 0.0 < w.mobys[m].pv_f(HEALTH)).count()
+}
+
+/// The leaders' callbacks (`0x37b0d0(m, on, 0, off)`): the group's activation's and put-away's.
+fn on_activate(w: &mut MobyWorld, l: usize, ctx: &mut Ctx) {
+    match w.mobys[l].o_class {
+        escort::CLASS => escort::restart(w, l),
+        super::level15::convoy::CLASS => super::level15::convoy::restart(w, l, ctx),
+        super::level10::carrier::CLASS => super::level10::carrier::on_activate(w, l),
+        super::level15::bigship::CLASS => super::level15::bigship::on_activate(w, l, ctx),
+        _ => {}
+    }
+}
+
+fn on_put_away(w: &mut MobyWorld, l: usize) {
+    if w.mobys[l].o_class == super::level10::carrier::CLASS { super::level10::carrier::on_put_away(w, l); }
+}
+
+/// `0x37c4f0(m, 1)` (L10 `0x37e2b8`, L15 `0x382d18`, L25 `0x376428`; `func_L05_0037B280`): `m`'s group activated —
+/// first each leader of `m`'s class its callback, then every member with an AI block (`0x37c130(member, 1)`,
+/// [`activate`]). Nothing without a group.
+pub(crate) fn activate_group(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let list = members(w, id);
+    if list.is_empty() { return; }
+    let class = w.mobys[id].o_class;
+    for l in leaders(w) {
+        if w.mobys[l].o_class == class { on_activate(w, l, ctx); }
+    }
+    for m in list {
+        if is_ai(w.mobys[m].o_class) && w.mobys[m].state < 0x80 { activate(w, m, ctx); }
+    }
+}
+
+/// `0x37c268` (`func_L05_0037AFF8`): `m`'s group put away (its leaders' put-away callbacks first).
+fn put_away_group(w: &mut MobyWorld, id: usize) {
+    let list = members(w, id);
+    if list.is_empty() { return; }
+    let class = w.mobys[id].o_class;
+    for l in leaders(w) {
+        if w.mobys[l].o_class == class { on_put_away(w, l); }
+    }
+    for m in list {
+        if is_ai(w.mobys[m].o_class) && w.mobys[m].state < 0x80 { put_away(w, m); }
+    }
+}
+
+/// The classes `0x37c378` deletes: the missiles 0x974 / 0x1161, the pickups 0x946 / 0x10cf and the fight's shots and
+/// effects (0x1173, 0x12d8, 0x1182, 0x1191, 0x10f9, 0x117c, 0x117d, 0x117f); Hrugis's `0x4274d8` its own list
+/// (0x1315, 0x1327, 0x1328 for the first four).
+const SWEPT: [i16; 12] = [0x1173, 0x12d8, 0x0974, 0x1161, 0x1182, 0x1191, 0x10f9, 0x0946, 0x10cf, 0x117c, 0x117d, 0x117f];
+const SWEPT_HRUGIS: [i16; 9] = [0x1315, 0x1327, 0x1328, 0x10f9, 0x0946, 0x10cf, 0x117c, 0x117d, 0x117f];
+
+/// `0x37c378` / Hrugis's `0x4274d8`: the fight's leftovers deleted.
+pub(crate) fn sweep(w: &mut MobyWorld, hrugis: bool) {
+    let list: &[i16] = if hrugis { &SWEPT_HRUGIS } else { &SWEPT };
+    for i in 0..w.mobys.len() {
+        if w.mobys[i].state < 0x80 && list.contains(&w.mobys[i].o_class) { w.delete(i); }
+    }
+}
+
+/// `0x37c480` (L10 `0x37e248`, L15 `0x382ca8`, L25 `0x3763b8`; `func_L05_0037B210`): every leader's group put away,
+/// the counts cleared and the leftovers deleted (`0x37c378`).
+pub(crate) fn put_away_all(w: &mut MobyWorld) {
+    for l in leaders(w) { put_away_group(w, l); }
+    sweep(w, false);
+}
+
+/// `0x37e150(m, at, r)` (`func_L05_0037CEE0`): `m`'s group's ships each at a random point `r` from `at` (`0x33b330`);
+/// not ported: the push out of the no-fly volumes (`+0x90`, the mission's pvars 1..4; none of them is kept here).
+pub(crate) fn scatter_group(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, at: V3, r: f32) {
+    for m in members(w, id) {
+        let g = &mut ctx.game.rng;
+        let p = super::shot::polar(r, g.rand_angle(), g.rand_angle());
+        w.mobys[m].pos = add(at, p);
+    }
+}
+
+/// `0x37e878(m, at, r)` (`func_L05_0037D608`): the group's ships with an AI block each going for a random point `r`
+/// from `at` ([`set_goal`]).
+pub(crate) fn goal_group(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, at: V3, r: f32) {
+    for m in members(w, id) {
+        if !is_ai(w.mobys[m].o_class) { continue; }
+        let g = &mut ctx.game.rng;
+        let p = super::shot::polar(r, g.rand_angle(), g.rand_angle());
+        set_goal(w, m, ctx, add(at, p));
+    }
+}
+
+/// `0x37c6b0(class, 1)` (L10 `0x37e508`, L15 `0x383038`; `func_L05_0037B440`): the first ship of `class`'s leader's group not active, activated.
+pub(crate) fn activate_one(w: &mut MobyWorld, class: i16, ctx: &mut Ctx) -> Option<usize> {
+    let l = leader_of(w, class)?;
+    let m = members(w, l).into_iter().find(|&m| is_ai(w.mobys[m].o_class) && ai_i(w, m, a::ACTIVE) == 0)?;
+    activate(w, m, ctx);
+    Some(m)
+}
+
+/// The fight's sphere's centre (the cuboids' `0x1b2614[lib +0]`'s place, the missions' gathering point).
+pub(crate) fn centre(w: &MobyWorld, ctx: &Ctx) -> V3 { arena(w, ctx).0 }
+
+/// `0x37c048(d)` (`func_L05_0037ADD8`): the ship's cruise speed moved by `d`, kept within 8..15 a second.
+pub(crate) fn add_cruise(w: &mut MobyWorld, d: f32) {
+    let Some(m) = lib(w) else { return };
+    let c = w.mobys[m].pv_f(CRUISE);
+    let c = if c == 0.0 { 8.0 } else { c };
+    w.mobys[m].set_pv_f(CRUISE, (c + d).clamp(8.0, 15.0));
 }
 
 /// The AI block's words.
@@ -140,7 +342,7 @@ const MISSIONS: [i16; 4] = [0x0eee, 0x1103, 0x1155, 0x119f];
 
 /// The fight's sphere (`0x1b2114 + 0x221800·0x80`: the mission object's `+0x68`[0]): its centre and radius.
 fn arena(w: &MobyWorld, ctx: &Ctx) -> (V3, f32) {
-    let i = w.mobys.iter().find(|m| MISSIONS.contains(&m.o_class)).map_or(0, |m| m.pv_i(0));
+    let i = lib(w).map_or(0, |m| w.mobys[m].pv_i(0));
     let Some(v) = usize::try_from(i).ok().and_then(|i| ctx.level.spheres.get(i)) else { return ([512.0; 3], 256.0) };
     let m = &v.matrix;
     ([m[3][0], m[3][1], m[3][2]], len([m[0][0], m[0][1], m[0][2]]))
@@ -369,6 +571,8 @@ pub(crate) fn start(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     take_own_target(w, id);
     wander_goal(w, id, ctx);
     w.changed = true;
+    // `0x37c130`'s end: with the "all ships put away" flag set (the missions' menus) at once put away again.
+    if all_away(w) { put_away(w, id); }
 }
 
 /// The class code's own target (`0x3ca118` / `0x3cb770` in the moby's state 1): with its disc target (`+0x1b0` /
@@ -745,7 +949,7 @@ pub(crate) fn maybe_attack(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if 4 <= attacking { return; }
     let class = w.mobys[id].o_class;
     // Only the tick's leading group (`0x3769a0`).
-    if w.mobys.iter().find(|m| m.o_class == 0x0eee && m.state < 0x80).is_some_and(|m| m.pv_i(LEADER) != 0 && m.pv_i(LEADER) != class as i32) { return; }
+    if lib(w).is_some_and(|m| w.mobys[m].pv_i(LEADER) != 0 && w.mobys[m].pv_i(LEADER) != class as i32) { return; }
     // `0x377f20(m, 5)`: its group's active ships whose last kind was 5 — itself too, so one that just circled makes a
     // run next.
     let circling = w.mobys.iter().any(|m| m.o_class == class && m.state < 0x80 && m.pv_i(AI + a::ACTIVE) == 1 && m.pv_i(AI + a::KIND) == 5);
@@ -786,7 +990,7 @@ pub fn leader(w: &MobyWorld, rng: &mut crate::rng::Rng) -> i32 {
 }
 
 /// `0x22182c`: the quiet (the mission object's word).
-fn passive(w: &MobyWorld) -> bool { w.mobys.iter().find(|m| m.o_class == 0x0eee && m.state < 0x80).is_some_and(|m| m.pv_i(PASSIVE) != 0) }
+fn passive(w: &MobyWorld) -> bool { lib_i(w, PASSIVE) != 0 }
 
 /// `0x376548(1)` / `0x378250(10, at)` / `0x378878(10, goal)`: every fighter back (`0x376068`), within 10 of `at`,
 /// going for a point within 10 of `goal`.
@@ -819,6 +1023,7 @@ pub(crate) fn activate(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     take_own_target(w, id);
     wander_goal(w, id, ctx);
     w.changed = true;
+    if all_away(w) { put_away(w, id); }
 }
 
 /// The goal again from where it is now (`0x3783a0`, L05 `0x37e480`).

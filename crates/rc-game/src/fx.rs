@@ -472,6 +472,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
                 || level26::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
                 || level20::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
                 || crate::moby::classes::level10::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
+                || crate::moby::classes::level15::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
                 || level18::draw(w, host, game, hero_state, view, cam, id, first, out, frame);
         }
     }
