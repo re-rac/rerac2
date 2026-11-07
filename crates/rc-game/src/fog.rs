@@ -154,10 +154,10 @@ pub fn underwater_test(flag: &mut bool, cam: V3, off: bool, mut cast: impl FnMut
 }
 
 /// [`underwater_test`] against the world and the mobys' meshes (`0x2de878(a, b, 0x12)`), the water's height the liquid
-/// grid's there (crate::water::grid::Grid::height), else its hit's (the water plane is not ported: G-REN-009).
+/// grid's there, else the water plane's (crate::water::grid::Grid::surface), else its hit's.
 pub fn underwater_test_in(flag: &mut bool, cam: V3, off: bool, coll: &rc_formats::collision::Collision, scene: Option<&crate::collision::mobys::MobyScene>, liquid: Option<&crate::water::grid::Grid>) {
     let cast = |a: V3, b: V3| crate::collision::coll_line_m(coll, scene, a, b, crate::collision::QueryFlags(0x12), None).map(|o| (o.point, o.surface_id()));
-    underwater_test(flag, cam, off, cast, |p| liquid.filter(|g| g.on()).and_then(|g| g.height(p)));
+    underwater_test(flag, cam, off, cast, |p| liquid.and_then(|g| g.surface(p)));
 }
 
 #[cfg(test)]

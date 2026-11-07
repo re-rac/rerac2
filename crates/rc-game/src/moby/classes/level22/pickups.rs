@@ -263,8 +263,9 @@ pub fn drop_at(w: &mut MobyWorld, pos: V3, kind: usize) {
 
 /// `0x3fc6f8` / `0x3fdc80` / `0x3fe6e8(boss, pos, staggered, scale)`: the pickup at `pos`, update distance 0xff, draw
 /// distance 0x50, drawn, mode | 0x108 (the health's | 0x41 too), its scale × the kind's, its rows the identity;
-/// staggered ones flagged (`+0x2a`) and their tick count `(n + 2) % 31`.
-fn create(w: &mut MobyWorld, kind: usize, pos: V3, staggered: bool) -> usize {
+/// staggered ones flagged (`+0x2a`) and their tick count `(n + 2) % 31`. Damosel orbit's fight makes its pickups
+/// with the same code (L23 `0x4037b0` / `0x404d38` / `0x405700`, crate::moby::classes::level23::pickups).
+pub fn create(w: &mut MobyWorld, kind: usize, pos: V3, staggered: bool) -> usize {
     let id = w.create(CLASSES[kind]);
     let n = w.level22.pickups.staggered;
     let m = &mut w.mobys[id];

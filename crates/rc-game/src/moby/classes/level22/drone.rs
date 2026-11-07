@@ -1,7 +1,7 @@
 //! Dobbo orbit's drones **0x0edd** (L22 `0x40dd88`, the decomp's `func_US2_L22_0040DD88`; its set-up and tail
 //! `0x40eb38` / `0x40ef80`, the decomp's `func_L22_0040D638` / `func_L22_0040DA80`; 25 placed) and their shots
 //! **0x0f5d** (made `0x40f300`, update `0x40f240` — the decomp's `func_L22_0040DE00` / `func_L22_0040DD40`, the
-//! update shared with L23's 0x118e, whose hit `0x423b68` differs and is not ported here): small flyers that keep to
+//! update shared with L23's 0x118e, whose hit `0x423b68` differs: crate::moby::classes::level23::shots::turret_hit): small flyers that keep to
 //! 7.2 above the planetoid, chase Giant Clank and shoot at him, and come back elsewhere when they die. They walk with
 //! the opponent's tests (crate::moby::classes::level22::planet: the walk test from Giant Clank, the paths' nearest
 //! point, the pickups' point draw `0x3a4980`).
@@ -476,6 +476,8 @@ pub fn update_0f5d(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// `0x40f428(m, from)` (module docs).
 fn shot_hit(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, from: V3) {
+    // Damosel orbit's turret shot runs this update with its own hit (L23 `0x423b68`).
+    if w.mobys[id].o_class == crate::moby::classes::level23::shots::TURRET { return crate::moby::classes::level23::shots::turret_hit(w, id, ctx, from); }
     let to = w.mobys[id].pos;
     let Some(h) = w.coll_line(ctx, from, to, 0, Some(id)) else { return };
     let Some(o) = h.moby else { return };

@@ -95,7 +95,7 @@ const WAVE_SHOWS: [&[usize]; 5] = [&[0, 1], &[2], &[3, 5, 6], &[4], &[7]];
 /// * **The gates**: with the way out done, or the way in but not the turret: the gate `+0xc8` (hidden) on and `+0xcc`
 ///   (shown) off. The turret reached but not done: `+0xc8` off and the two armed (`+0x74` −1, `0x3ff480`). Not done
 ///   and the director hooked (`0x345910` = L00 `0x32a838`): its timer byte 1, the hook cleared, the turret's mission
-///   done, back from the turret (`0x2d0050(0)`), the door on, and with `+0xc0`: `+0xd0` hooked (twice: the second test
+///   done, back from the Hypnomatic's body (`0x2d0050(0)`, crate::hero::hypno), the door on, and with `+0xc0`: `+0xd0` hooked (twice: the second test
 ///   is `+0xd4`'s), `+0xc0`'s timer byte 1. Its timer byte set and the way out done: the byte 0, `+0xc8` on, the door
 ///   off, `+0xd0` hooked, the two disarmed (`+0x74` 0, `0x3ff490`).
 /// * **The end** (skill point 0x1b not had): the group `+0xe0` all standing and shown, and none of the four streamed
@@ -105,8 +105,7 @@ const WAVE_SHOWS: [&[usize]; 5] = [&[0, 1], &[2], &[3, 5, 6], &[4], &[7]];
 /// `0x3fbd90`: a member of a group put into play at a point out of view — 1324 bytes and the classes' own entries);
 /// the camera cuts (`0x3fb2c0` / `0x3fb360`, cuboids `+0x90..` and the bits `0x1395b8 + 0x94`: the scripted camera
 /// `0x335438` / `0x335370` / `0x3353c8` and its sound); the draw callback `0x3fc2c0` (eleven beams between two fixed
-/// lists of points); the turret body (4: `0x2d0050`'s own part, the hero's turret mode is not ported — the return
-/// is crate::hero::Hero::body_back while a body plays); `0x384740` (`0x152c26` = 1) before each placing; the
+/// lists of points); `0x384740` (`0x152c26` = 1) before each placing; the
 /// NPC-busy word `0x1b24e8` (crate::moby::talk); the tweak's gate `0x1cb9c0` (read as 0); the autosave after the
 /// scene (`0x327c10` = L00 `0x30d658(0, −1)`); the skill point's reward flag `0x1a903c`.
 pub fn update_0f01(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {

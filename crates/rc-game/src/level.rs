@@ -30,6 +30,8 @@ pub struct LevelData {
     /// The liquid grid's records, groups and masks, read so from its overlay (crate::water::grid::read_tables; None on
     /// a level without it).
     pub liquid: Option<crate::water::grid::Tables>,
+    /// Todano's mesh water's meshes, read so from its overlay (crate::water::mesh::read_tables; None elsewhere).
+    pub mesh: Option<crate::water::mesh::Tables>,
     /// The height map the rain stops on (core header `+0xa4`; the engine sets it from the core).
     pub height_map: Option<rc_formats::height_map::HeightMap>,
 }
@@ -50,6 +52,7 @@ impl LevelData {
             arena: Vec::new(),
             joba: Vec::new(),
             liquid: None,
+            mesh: None,
             variant_planes: g::variant_planes(gameplay).map_err(|e| eprintln!("level: variant planes: {e}")).unwrap_or_default(),
             height_map: None,
         }

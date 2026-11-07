@@ -52,6 +52,7 @@ pub mod flock;
 pub mod gate;
 pub mod gravity_bomb;
 pub mod hoverbomb;
+pub mod hypnomatic;
 pub mod keeper;
 pub mod lancer;
 pub mod lava_gun;
@@ -66,6 +67,7 @@ pub mod pickup;
 pub mod platinum;
 pub mod death_fade;
 pub mod props;
+pub mod race;
 pub mod space;
 pub mod spitter;
 pub mod shield;
@@ -77,6 +79,7 @@ pub mod spiderbot_plus;
 pub mod swingshot;
 pub mod synthenoid;
 pub mod teleport;
+pub mod thermanator;
 pub mod tie_lights;
 pub mod telepad;
 pub mod museum_pad;
@@ -143,8 +146,9 @@ use super::UpdateFn;
 /// Storm's storm 0x09a9 (`0x3bc078`) is listed for the levels whose class list lacks it: its look is its draw's. The
 /// upgraded Synthenoids' drone 0x0b02 and bomb 0x0cf3 (L00 `lvl.vtbl` `0x3d5e70` / `0x3f56b0`) are listed so too. The
 /// upgraded Shield Charger's shield 0x1192 (`0x3c51d8`) and its zap 0x1195 (`0x414628`) have no model: their looks are
-/// their draws'.
-pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS, explosion::CLASS, spiderbot::BOT_CLASS, endako_boss::BEAM, endako_boss::TRACER, endako_boss::ROCKET, blitz::TRACER, gravity_bomb::MINI_BOMB, gravity_bomb::MINI_BLAST, pulse_rifle::SHOT, spiderbot::PLUS_BOT, spiderbot_plus::SHOT, spiderbot_plus::LOB, blitz::MEGA_TRACER, beam::CLASS, synthenoid::SHOT, turret::PLASMA, vaporizer::SHOT, plasma_coil::BALL, plasma_storm::BALL, synthenoid::PLUS_DRONE, synthenoid_bomb::CLASS, zodiac::EFFECT, shield::CLASS, shield::PLUS_CLASS, shield_zap::CLASS, level07::laser::CLASS, level07::boss::GLOW, level07::boss::BODY];
+/// their draws'. The Thermanator's shots 0x0bd8 / 0x0bd7 (L00 `lvl.vtbl` `0x3e2c28` / `0x3e16c0`) are listed for the
+/// levels whose class list lacks them: their looks are their particles.
+pub const CREATED_LOGIC: &[i16] = &[crate::ship::LASER_CLASS, teleport::CLASS, explosion::CLASS, spiderbot::BOT_CLASS, endako_boss::BEAM, endako_boss::TRACER, endako_boss::ROCKET, blitz::TRACER, gravity_bomb::MINI_BOMB, gravity_bomb::MINI_BLAST, pulse_rifle::SHOT, spiderbot::PLUS_BOT, spiderbot_plus::SHOT, spiderbot_plus::LOB, blitz::MEGA_TRACER, beam::CLASS, synthenoid::SHOT, turret::PLASMA, vaporizer::SHOT, plasma_coil::BALL, plasma_storm::BALL, synthenoid::PLUS_DRONE, synthenoid_bomb::CLASS, zodiac::EFFECT, shield::CLASS, shield::PLUS_CLASS, shield_zap::CLASS, level07::laser::CLASS, level07::boss::GLOW, level07::boss::BODY, thermanator::COLD, thermanator::HOT];
 
 pub fn update_for(o_class: i16) -> Option<UpdateFn> {
     match o_class {
@@ -199,6 +203,8 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         zodiac::EFFECT => Some(zodiac::update_effect),
         // The Sheepinator (`0x3c76e0`; the challenge mode's row 0x6d too) and its sheep (`0x404338`).
         sheepinator::HAND_CLASS => Some(sheepinator::update),
+        // The Hypnomatic (`0x3ba758`, every level): its beam hooks the capture's creatures (level18::capturable).
+        hypnomatic::HAND_CLASS => Some(hypnomatic::update),
         sheep::CLASS => Some(sheep::update),
         // The Plasma Coil (`0x3e9608`) and its ball (`0x3cbb78`).
         plasma_coil::HAND_CLASS => Some(plasma_coil::update),
@@ -219,6 +225,10 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         sheepinator::BLACK_CLASS => Some(sheepinator::update),
         black_sheep::CLASS => Some(black_sheep::update),
         lava_gun::HAND_CLASS => Some(lava_gun::update),
+        // The Thermanator (`0x4105a8`) and its cold and hot shots (`0x3e2c28` / `0x3e16c0`).
+        thermanator::HAND_CLASS => Some(thermanator::update),
+        thermanator::COLD => Some(thermanator::update_cold),
+        thermanator::HOT => Some(thermanator::update_hot),
         // The Meteor Gun (`0x3eb9c0`, rows 0x3f / 0x5f / 0x60) and its meteor (`0x3dc568`).
         meteor::HAND_CLASS => Some(meteor::update_hand),
         meteor::METEOR => Some(meteor::update),
@@ -330,6 +340,7 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         c if crate::water::ocean::CLASSES.contains(&c) => Some(crate::water::ocean::update),
         c if crate::water::lid::CLASSES.contains(&c) => Some(crate::water::lid::update),
         c if crate::water::grid::CLASSES.contains(&c) => Some(crate::water::grid::update),
+        c if crate::water::mesh::CLASSES.contains(&c) => crate::water::mesh::update_for(c),
         0x0a92 | 0x0a93 => Some(oozla::update_float),
         0x09a2 => Some(leaper::update),
         0x0b2b => Some(spitter::update),
@@ -472,7 +483,7 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         // The barrier (L13 `0x420d98`, L16 `0x41a6e0`).
         barrier::CLASS => Some(barrier::update_112e),
         // The levels' own (their modules' lists).
-        _ => level04::update_for(o_class).or_else(|| level06::update_for(o_class)).or_else(|| level07::update_for(o_class)).or_else(|| level08::update_for(o_class)).or_else(|| level09::update_for(o_class)).or_else(|| level10::update_for(o_class)).or_else(|| level11::update_for(o_class)).or_else(|| level13::update_for(o_class)).or_else(|| level14::update_for(o_class)).or_else(|| level16::update_for(o_class)).or_else(|| level12::update_for(o_class)).or_else(|| level17::update_for(o_class)).or_else(|| level18::update_for(o_class)).or_else(|| level19::update_for(o_class)).or_else(|| level20::update_for(o_class)).or_else(|| level21::update_for(o_class)).or_else(|| level22::update_for(o_class)).or_else(|| level26::update_for(o_class)).or_else(|| level05::update_for(o_class)).or_else(|| level15::update_for(o_class)).or_else(|| level23::update_for(o_class)),
+        _ => race::update_for(o_class).or_else(|| level04::update_for(o_class)).or_else(|| level06::update_for(o_class)).or_else(|| level07::update_for(o_class)).or_else(|| level08::update_for(o_class)).or_else(|| level09::update_for(o_class)).or_else(|| level10::update_for(o_class)).or_else(|| level11::update_for(o_class)).or_else(|| level13::update_for(o_class)).or_else(|| level14::update_for(o_class)).or_else(|| level16::update_for(o_class)).or_else(|| level12::update_for(o_class)).or_else(|| level17::update_for(o_class)).or_else(|| level18::update_for(o_class)).or_else(|| level19::update_for(o_class)).or_else(|| level20::update_for(o_class)).or_else(|| level21::update_for(o_class)).or_else(|| level22::update_for(o_class)).or_else(|| level26::update_for(o_class)).or_else(|| level05::update_for(o_class)).or_else(|| level15::update_for(o_class)).or_else(|| level23::update_for(o_class)),
     }
 }
 

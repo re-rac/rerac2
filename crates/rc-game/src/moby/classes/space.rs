@@ -62,6 +62,8 @@
 use crate::hero::physics::{add, atan2, dist, len, len2, rot_dist, scale, set_len, sub, sub_rot, V3};
 use crate::moby::{mode, Ctx, MobyWorld};
 
+pub mod escort;
+
 /// The fighter's class.
 pub const FIGHTER: i16 = 0x0957;
 
@@ -81,6 +83,15 @@ pub const PASSIVE: usize = 0x100;
 pub const ACTIVE_COUNT: usize = 0x104;
 /// The group that may start attacks this tick (`0x2258c0[$gp−0x2a94]`, the class).
 pub const LEADER: usize = 0x108;
+/// The route the mission picks (L05 `0x221d48`: an index into the level's paths `0x1fe380`; the port's word on the
+/// level's mission moby, 0 while the missions are not ported).
+pub const ROUTE: usize = 0x10c;
+
+/// The mission's route ([`ROUTE`]): the level's path's points.
+pub(crate) fn route(w: &MobyWorld, ctx: &Ctx) -> Vec<[f32; 4]> {
+    let i = w.mobys.iter().find(|m| MISSIONS.contains(&m.o_class) && m.state < 0x80).map_or(0, |m| m.pv_i(ROUTE));
+    usize::try_from(i).ok().and_then(|i| ctx.level.paths.get(i)).cloned().unwrap_or_default()
+}
 
 /// The AI block's words.
 pub(crate) mod a {
@@ -110,14 +121,18 @@ pub(crate) mod a {
     /// The last push's face normal (`+0xd0`) and the pushes in a row off faces (`+0x15c`).
     pub const PUSH_NORMAL: usize = 0xd0;
     pub const PUSHES: usize = 0x15c;
+    /// The formation's leader (`+0x10`, index + 1): the tuning takes the leader's state (`0x377bd0`).
+    pub const LEADER: usize = 0x10;
+    /// The top speed's float for state 0xc (`+0x154`, a pointer into the moby's pvars; here its offset + 1).
+    pub const SPEED_AT: usize = 0x154;
 }
 
 pub(crate) fn ai_i(w: &MobyWorld, id: usize, o: usize) -> i32 { w.mobys[id].pv_i(AI + o) }
 pub(crate) fn ai_f(w: &MobyWorld, id: usize, o: usize) -> f32 { w.mobys[id].pv_f(AI + o) }
-fn ai_v(w: &MobyWorld, id: usize, o: usize) -> V3 { w.mobys[id].pv_v(AI + o) }
+pub(crate) fn ai_v(w: &MobyWorld, id: usize, o: usize) -> V3 { w.mobys[id].pv_v(AI + o) }
 pub(crate) fn set_ai_i(w: &mut MobyWorld, id: usize, o: usize, v: i32) { w.mobys[id].set_pv_i(AI + o, v) }
 pub(crate) fn set_ai_f(w: &mut MobyWorld, id: usize, o: usize, v: f32) { w.mobys[id].set_pv_f(AI + o, v) }
-fn set_ai_v(w: &mut MobyWorld, id: usize, o: usize, v: V3) { w.mobys[id].set_pv_v(AI + o, v) }
+pub(crate) fn set_ai_v(w: &mut MobyWorld, id: usize, o: usize, v: V3) { w.mobys[id].set_pv_v(AI + o, v) }
 
 /// The levels' mission objects whose `+0x68`[0] is the fight's sphere (Wupash 0x0eee; Feltzin 0x1103, Hrugis
 /// 0x1155, Gorn 0x119f: their `0x221cc0` / `0x221c80` / `0x221dc0`).
@@ -136,10 +151,13 @@ fn target(w: &MobyWorld, id: usize) -> Option<usize> {
     usize::try_from(ai_i(w, id, a::TARGET) - 1).ok().filter(|&t| w.mobys.get(t).is_some_and(|m| m.state < 0x80))
 }
 
-/// `0x377bd0`: the state's pull, push and top speed (a tick).
-fn tuning(state: i32, in_range: bool) -> (f32, f32, f32) {
+/// `0x377bd0`: the state's pull, push and top speed (a tick). 0xc (along a path) takes its top speed from the
+/// moby's own float the AI block's `+0x154` points to (a second's; here [`a::SPEED_AT`] holds its pvar offset + 1),
+/// else 1/6.
+fn tuning(state: i32, in_range: bool, path_top: Option<f32>) -> (f32, f32, f32) {
     let (mut k, mut kd, top) = match state {
         2 => (0.005, 0.025, 0.133_333_34),
+        0xc => (0.005, 0.025, path_top.map_or(0.166_666_67, |s| s * (1.0 / 60.0))),
         3 => (0.02, 0.1, 0.416_666_7),
         4 | 0xb => (0.02, 0.1, 0.5),
         5 => (0.04, 0.2, 0.416_666_7),
@@ -156,7 +174,7 @@ fn tuning(state: i32, in_range: bool) -> (f32, f32, f32) {
 }
 
 /// `0x378508`: the goal set, then checked ([`check_goal`]) but in the states 2 and 0xc.
-fn set_goal(w: &mut MobyWorld, id: usize, ctx: &Ctx, goal: V3) {
+pub(crate) fn set_goal(w: &mut MobyWorld, id: usize, ctx: &Ctx, goal: V3) {
     set_ai_v(w, id, a::GOAL, goal);
     if !matches!(ai_i(w, id, a::STATE), 2 | 0xc) { check_goal(w, id, ctx); }
 }
@@ -201,7 +219,7 @@ fn ahead_goal(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
 }
 
 /// `0x3786e8`: at the goal (within 1; 8 in state 2), or the goal's timer out.
-fn arrived(w: &mut MobyWorld, id: usize) -> bool {
+pub(crate) fn arrived(w: &mut MobyWorld, id: usize) -> bool {
     let state = ai_i(w, id, a::STATE);
     let near = if state == 2 { 8.0 } else { 1.0 };
     let at = dist(w.mobys[id].pos, ai_v(w, id, a::GOAL)) < near && state != 8;
@@ -288,18 +306,19 @@ pub(crate) const FIGHTER_SPEC: Spec = Spec {
 };
 
 /// The other levels' ships ([`Spec`]).
-fn level_spec(class: i16) -> Option<Spec> { super::level05::ship_spec(class).or_else(|| super::level10::ship_spec(class)) }
+fn level_spec(class: i16) -> Option<Spec> { super::level05::ship_spec(class).or_else(|| super::level10::ship_spec(class)).or_else(|| super::level15::ship_spec(class)) }
 
 fn spec(class: i16) -> Spec {
     match class {
         GUNSHIP => Spec { health: 5.0, scale: 0.04, range: 32.0, wait: 0x3c, shot: (0.6, 1.3, 0x6000_0090), circles: true, target: 0x260, leads: 0x264, gun: 0x268, flyby: 0x2ee, engine: Some((GUNSHIP, 1)), death: None, gun_sound: Some((GUNSHIP, 0, false)), nozzles: &[[-0.21, 0.061, 0.045], [-0.21, -0.061, 0.045]], desc: 3, exhaust_on_screen: false, ..FIGHTER_SPEC },
         FIGHTER => FIGHTER_SPEC,
+        escort::CLASS => escort::SPEC,
         _ => level_spec(class).unwrap_or(FIGHTER_SPEC),
     }
 }
 
 /// Its own target (`+0x1b0` / `+0x260`): the moby of that index, if any.
-fn own_target(w: &MobyWorld, id: usize) -> Option<usize> {
+pub(crate) fn own_target(w: &MobyWorld, id: usize) -> Option<usize> {
     let idx = w.mobys[id].pv_i(spec(w.mobys[id].o_class).target);
     if idx < 0 { return None; }
     w.mobys.iter().position(|m| m.index as i32 == idx && m.state < 0x80)
@@ -321,7 +340,7 @@ pub(crate) fn in_view(ctx: &Ctx, c: V3, r: f32) -> bool {
 fn radius(w: &MobyWorld, id: usize) -> f32 { w.mobys[id].bsphere[3] / 1024.0 }
 
 /// The space AI's ships (the fighters and the gunships, the other levels' ships).
-pub(crate) fn is_ai(class: i16) -> bool { class == FIGHTER || class == GUNSHIP || level_spec(class).is_some() }
+pub(crate) fn is_ai(class: i16) -> bool { class == FIGHTER || class == GUNSHIP || class == escort::CLASS || level_spec(class).is_some() }
 
 /// `0x3ca4a8` / `0x3cba68` / `0x376068`: the start (the other levels' the same, some left where they were placed:
 /// Hrugis's `0x380228`, a wander goal from there).
@@ -369,7 +388,11 @@ pub(crate) fn take_own_target(w: &mut MobyWorld, id: usize) {
 pub(crate) fn think(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let state = ai_i(w, id, a::STATE);
     let in_range = ai_i(w, id, a::RANGE) != 0;
-    let (k, kd, top) = tuning(state, in_range);
+    // The tuning by its formation leader's state when it has one (`+0x10`).
+    let leader = usize::try_from(ai_i(w, id, a::LEADER) - 1).ok().filter(|&l| w.mobys.get(l).is_some_and(|m| m.state < 0x80));
+    let tuned = leader.map_or(state, |l| ai_i(w, l, a::STATE));
+    let path_top = usize::try_from(ai_i(w, id, a::SPEED_AT) - 1).ok().map(|o| w.mobys[id].pv_f(o));
+    let (k, kd, top) = tuning(tuned, in_range, path_top);
     // The step (not circling).
     if state != 8 { w.mobys[id].pos = add(w.mobys[id].pos, ai_v(w, id, a::VEL)); }
     // `0x374f50` (not in state 2): kept inside the sphere less its own size; pushed off faces more than 6 times in a

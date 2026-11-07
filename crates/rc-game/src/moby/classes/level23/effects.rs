@@ -1,5 +1,5 @@
-//! Damosel orbit's effect objects of its opponent 0x0f7f's fight (L23 addresses; the opponent is not ported, and the
-//! words it keeps — crate::moby::classes::level23::Globals — stay as the level starts them):
+//! Damosel orbit's effect objects of its opponent 0x0f7f's fight (L23 addresses; the words they read are the
+//! opponent's, crate::moby::classes::level23::boss, kept in crate::moby::classes::level23::Globals):
 //!
 //! * **0x1251** ([`update_1251`], `0x42b1c0`, the decomp's `func_L23_00429CC0`; one placed): its set-up (`0x42b2c8`,
 //!   state 0: its sound handles −1, draw distance 0x50, update 0xff, its words 0, at (500, 500, 575), state 1). With
@@ -37,7 +37,7 @@ fn count(w: &mut MobyWorld, id: usize) {
 /// 0x1251 (`0x42b1c0`, module docs).
 pub fn update_1251(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
     set_up(w, id, [500.0, 500.0, 575.0]);
-    let o = w.mobys.iter().position(|m| m.o_class == super::targets::OPPONENT && m.state < 0xfd);
+    let o = super::targets::opponent(w);
     if let Some(o) = o {
         let g = &w.level23;
         let guard = w.mobys[o].pv_i(0x604) != 0;

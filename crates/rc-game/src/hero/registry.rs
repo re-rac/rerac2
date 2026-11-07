@@ -40,6 +40,9 @@ pub enum Module {
     Misc,
     /// `giant.rs`: Giant Clank (`0x18c0d4` = 2: 0x56..0x5a, 0x5d..0x5f; his jump 0x5b is the jump group's).
     Giant,
+    /// `hypno.rs`: the Hypnomatic's body (`0x18c0d4` = 4: 0x8d..0x91, 0x94; its jump 0x92 is the jump group's, its
+    /// bite 0x93 the melee group's).
+    Hypno,
     /// Not ported yet.
     Unported,
 }
@@ -87,8 +90,9 @@ pub const STATES: &[StateInfo] = &[
     s(0x79, 0x14, Damage, true), s(0x7a, 0x14, Damage, true), s(0x7b, 0x1c, Gear, true), s(0x7c, 0x14, Damage, true),
     s(0x7d, 0x14, Damage, true), s(0x7f, 0x14, Damage, true), s(0x81, 4, Jump, true), s(0x82, 0x1e, Gear, true),
     s(0x83, 6, Melee, true), s(0x85, 0x20, Gear, true), s(0x86, 0x20, Gear, true), s(0x89, 4, Jump, true),
-    s(0x8a, 0x21, Swing, true), s(0x8b, 0x21, Swing, true), s(0x8c, 7, Damage, true), s(0x92, 4, Jump, true),
-    s(0x93, 6, Melee, true),
+    s(0x8a, 0x21, Swing, true), s(0x8b, 0x21, Swing, true), s(0x8c, 7, Damage, true), s(0x8d, 0, Hypno, true),
+    s(0x8e, 1, Hypno, true), s(0x8f, 2, Hypno, true), s(0x90, 7, Hypno, true), s(0x91, 0x14, Hypno, true),
+    s(0x92, 4, Jump, true), s(0x93, 6, Melee, true), s(0x94, 2, Hypno, true),
 ];
 
 pub fn info(id: i32) -> Option<&'static StateInfo> { STATES.iter().find(|s| s.id == id) }

@@ -37,10 +37,11 @@
 //! **His special** (class 0x5f3, crate::moby::classes::level22::special): from state 1 with △ within 7, one off the
 //! specials, at (2, −2.1, 8.7) in his frame (`0x3ba568`); in 0x5e's first 22 frames at his left hand (joint 4),
 //! charging while he holds it there; given up at a knock-back (`0x3ba798`); none while one is out (`0x3ba868`).
+//! On L23 his shots and special are that level's own copies (`0x423f30`, `0x4249c0`, `0x424a88`;
+//! crate::moby::classes::level23::shots, crate::moby::classes::level23::special).
 //!
 //! Not ported: the gun's pose layer in his draw (the engine draws Ratchet's layers only), his aim pointer `0x188c`
-//! the shots set, the level's L23 shots and special (L23 `0x2aed78` calls its own copies: his charge and specials
-//! are spent there without a shot); the body's lean (the posture records `0x25de10 + 0x12f0..0x149c` from the
+//! the shots set; the body's lean (the posture records `0x25de10 + 0x12f0..0x149c` from the
 //! walk's yaw velocity and in the jump); the strafe's camera lean in the body tick; the per-hit playback rate of
 //! 0x59 (`0x25fba0`); the hurt's sound bank. The level ELFs' variants of the L00 helpers (the edge brake `0x2be9e0`,
 //! the wall check `0x2b8f18`) are the port's L00 ones, with their body branches.
@@ -558,7 +559,7 @@ impl Hero {
 }
 
 /// After the hero's tick while Giant Clank plays: his hits of the tick, the camera's shake, and his asks of the
-/// level (Dobbo's orbit's shots and special; L23's are not ported).
+/// level (Dobbo's orbit's shots and special, and Damosel orbit's own).
 pub fn pass(world: &mut MobyWorld, ctx: &mut Ctx) {
     if let Some((amp, ticks)) = ctx.hero.giant.shake.take() { ctx.game.shakes.ask(0, amp, ticks); }
     let hits = std::mem::take(&mut ctx.hero.giant.hits);
@@ -582,6 +583,26 @@ pub fn pass(world: &mut MobyWorld, ctx: &mut Ctx) {
                     special::hold(world, ctx, hm, at);
                 }
                 GiantReq::EndSpecial => special::end(world, ctx),
+            }
+        }
+    } else if ctx.game.level == 23 {
+        // Damosel orbit's own copies (L23 `0x423f30`, `0x4249c0`, `0x424a88(him, 0)`).
+        use crate::moby::classes::level23::{shots, special};
+        if let Some(s) = ctx.hero.giant.special {
+            if !world.mobys.get(s).is_some_and(|m| m.o_class == special::CLASS && m.state < 0x80) { ctx.hero.giant.special = None; }
+        }
+        for r in reqs {
+            match r {
+                GiantReq::Shot { joint, strong } => {
+                    let Some(p) = ctx.host.joint(&world.mobys[hm], joint) else { continue };
+                    let at = add(p, scale(world.mobys[hm].rows[0], f32::from_bits(0x3fb3_3333)));
+                    shots::fire(world, ctx, hm, at, None, false, strong);
+                }
+                GiantReq::Special(at) => {
+                    let Some(at) = at.or_else(|| ctx.host.joint(&world.mobys[hm], 4)) else { continue };
+                    special::hold(world, ctx, hm, at, true);
+                }
+                GiantReq::EndSpecial => special::end(world, ctx, true, false),
             }
         }
     }

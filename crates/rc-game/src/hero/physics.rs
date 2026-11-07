@@ -653,8 +653,8 @@ impl Hero {
             self.surface = o.surface_id();
             match self.surface {
                 0 => {
-                    // `0x31d7a0`: the liquid grid's rippled height there, else the face's.
-                    self.surf.water_z = env.liquid.filter(|g| g.on()).and_then(|g| g.height(o.point)).unwrap_or(o.point[2]);
+                    // `0x31d7a0`: the liquid grid's rippled height there, else the water plane's, else the face's.
+                    self.surf.water_z = env.liquid.and_then(|g| g.surface(o.point)).unwrap_or(o.point[2]);
                     if self.pos[2] < self.surf.water_z && self.water.under < 1 { self.water.under = 1; }
                     hit = env.line(a, b, 0x24);
                     if let Some(o) = &hit { self.footstep = o.sound_class() as u8; }

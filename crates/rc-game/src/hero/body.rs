@@ -22,11 +22,13 @@
 //! is `0x2a65d8`: no ledge probe but Clank's, no rail or pole, no item pass (`0x2b21f0`) and no pose layers
 //! (`0x2afc38`): [`body_pass`] delivers the body's own hits (Clank's punch) in its place.
 //!
-//! Clank's GUI slot 3 callbacks (`0x2f8c00(0x23, …)`, his command ring) are crate::hero::commands.
+//! Clank's GUI slot 3 callbacks (`0x2f8c00(0x23, …)`, his command ring) are crate::hero::commands, as is his antenna
+//! 0x04b4 (`0x18b684`, deleted at the return). The Hypnomatic's body (4) is crate::hero::hypno: its way in
+//! ([`Hero::hypno_switch`], L18 `0x2cfe70`) and its own part of the way back (L18 `0x2d0050`, [`Hero::body_back_keep`]).
 //!
 //! Not ported: the item records `0x18b700` / `0x18b850` (`0x3253d0`), Ratchet's moby's `+0x9c`, the
-//! words `0x18aa44` / `0x18aa60` / `0x18aa68` (`0x2d33d8`), the body's light (`0x31bcac`), Clank's mobys
-//! `0x18b680` / `0x18b684` deleted at the return (none made: G-HERO-004), the use's idle sequence of `0x2b5208`.
+//! words `0x18aa44` / `0x18aa60` / `0x18aa68` (`0x2d33d8`), the body's light (`0x31bcac`), Clank's moby
+//! `0x18b680` deleted at the return (none made: G-HERO-004), the use's idle sequence of `0x2b5208`.
 
 use super::posture::Posture;
 use super::Hero;
@@ -114,10 +116,17 @@ impl Hero {
     }
 
     /// `0x2b8718`: back to Ratchet (module docs). `in_scene`: the game in a scene (`0x1a8f00` 2 or 6).
-    pub fn body_back(&mut self, in_scene: bool) {
+    pub fn body_back(&mut self, in_scene: bool) { self.body_back_keep(false, in_scene) }
+
+    /// [`Hero::body_back`]; from the Hypnomatic's body (L18 `0x2d0050(keep)`) its own part first
+    /// (crate::hero::hypno: `keep` keeps the time's meter, a capture from the body).
+    pub fn body_back_keep(&mut self, keep: bool, in_scene: bool) {
+        if self.mode == 4 { self.hypno_leave(keep); }
         if self.mode == 1 {
             self.body.clank_hp = self.hp;
             self.hp = self.body.ratchet_hp as i32;
+            // `0x2b8718`: Clank's antenna deleted (crate::hero::commands).
+            self.body.commands.antenna_gone();
         }
         reset_records(&mut self.posture);
         self.mode = 0;
@@ -135,6 +144,7 @@ impl Hero {
             0 => Some(0),
             1 => Some(0x3f),
             2 => Some(0x56),
+            4 => Some(0x8d),
             _ => None,
         }
     }
@@ -143,7 +153,13 @@ impl Hero {
 /// After the hero's tick while a body plays (`0x2a65d8` has no item pass): the hits the body's states dealt this tick
 /// (Clank's punch, `0x2ba8e0` case 0x4d), as the item pass delivers Ratchet's ([`crate::hero::items::item_pass`]).
 pub fn body_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
-    // Clank's antenna and his command word (`0x2ac520`, the end of `0x2a65d8`; crate::hero::commands).
+    after(world, ctx);
+    // Clank's antenna (`0x2ac520`: its signal, its moby on his joint 7) and his command word (the end of `0x2a65d8`;
+    // crate::hero::commands).
+    if ctx.hero.mode == 1 {
+        let running = super::commands::antenna_signal(ctx.hero);
+        super::commands::antenna(world, ctx, running);
+    }
     super::commands::tick(ctx.hero);
     // Giant Clank's hits (crate::hero::giant).
     if ctx.hero.mode == 2 { super::giant::pass(world, ctx); }
@@ -157,4 +173,13 @@ pub fn body_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
         }
         world.sphere_hit(ctx.scene, c, h.r, 0, ctx.hero_moby, Some(&t));
     }
+}
+
+/// The world's part of the body switches, before the item pass or the body's own: the Hypnomatic's body's requests
+/// (crate::hero::hypno, also those its way back left), Clank's antenna deleted at his way back (crate::hero::commands).
+pub fn after(world: &mut MobyWorld, ctx: &mut Ctx) {
+    if let Some(id) = ctx.hero.body.commands.antenna_drop.take() {
+        if world.mobys.get(id).is_some_and(|m| m.o_class == super::commands::ANTENNA_CLASS && m.state < 0xfe) { world.delete(id); }
+    }
+    super::hypno::pass(world, ctx);
 }

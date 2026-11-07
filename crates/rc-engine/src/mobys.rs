@@ -721,6 +721,7 @@ impl Mobys {
             l.arena = arena_challenges();
             l.joba = joba_challenges();
             l.liquid = liquid_tables(&lv.gameplay);
+            l.mesh = mesh_tables();
             l
         }, footstep_base: footstep_base(&lv.gameplay), left_out }
     }
@@ -749,6 +750,18 @@ fn liquid_tables(gameplay: &[u8]) -> Option<rc_game::water::grid::Tables> {
     let light = rc_formats::tfrag_light::parse_light_bank(gameplay).ok().and_then(|b| b.key_lights().first().copied()).map_or([0.0, 0.0], |d| [d[0], d[1]]);
     let t = rc_game::water::grid::read_tables(level, &read, light);
     if t.is_none() { eprintln!("liquid grid: level {level}'s tables were not read"); }
+    t
+}
+
+/// Todano's mesh water's meshes (rc_game::water::mesh::read_tables) on its level; None otherwise.
+fn mesh_tables() -> Option<rc_game::water::mesh::Tables> {
+    let level = crate::level_load::level_index() as i32;
+    if level != rc_game::water::mesh::LEVEL { return None; }
+    let bytes = crate::level_wad::overlay(&crate::level_load::extracted_root(), crate::level_load::level_index()).ok()?;
+    let o = rc_formats::level_overlay::LevelOverlay::parse(&bytes).ok()?;
+    let read = |a: u32, n: usize| o.read(a, n).map(<[u8]>::to_vec);
+    let t = rc_game::water::mesh::read_tables(level, &read);
+    if t.is_none() { eprintln!("mesh water: level {level}'s meshes were not read"); }
     t
 }
 

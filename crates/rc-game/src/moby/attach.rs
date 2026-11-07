@@ -5,8 +5,13 @@
 //! member's matrix changes and its index goes to [`MobyWorld::moved_ties`] / [`MobyWorld::moved_shrubs`] for the
 //! engine.
 //!
-//! Not ported: the carrier's joint frames (`param_8`: a member on the moby's nearest joint `0x3245b0`), the offset
-//! moby `+0x40`, the shrubs' sphere and scale words and the ties' update `0x36c068` (the engine's).
+//! A member's own turn (its record's `+0x40`, set by `0x3250c0(block, kind, index, angles)`: angles the carrier keeps
+//! and changes) turns a moby or tie member's rows further in their own frame (`0x324bd0`: the rows times the angles'
+//! rows) — [`Member::turn`], [`MobyWorld::attach_member_turn`].
+//!
+//! Not ported: the carrier's joint frames (`param_8`: a member on the moby's nearest joint `0x3245b0`), a moby
+//! member's offset by its `+0x40` moby's place, the shrubs' sphere and scale words and the ties' update `0x36c068`
+//! (the engine's).
 
 use super::{mode, MobyHost, MobyWorld};
 use crate::hero::physics::V3;
@@ -33,6 +38,8 @@ pub struct Member {
     pub index: usize,
     pub offset: V3,
     pub rows: [V3; 3],
+    /// Its own turn (`+0x40`'s angles), none by default.
+    pub turn: Option<V3>,
 }
 
 fn dot(a: V3, b: V3) -> f32 { a[0] * b[0] + a[1] * b[1] + a[2] * b[2] }
@@ -90,7 +97,7 @@ impl MobyWorld {
                 m.mode |= mode::KEEP_ROWS | mode::NO_MATRIX;
                 m.drive = true;
                 let (offset, rows) = local(m.pos, &m.rows);
-                out.push(Member { kind: Kind::Moby, index: i, offset, rows });
+                out.push(Member { kind: Kind::Moby, index: i, offset, rows, turn: None });
             }
         }
         for (kind, group, list, mats) in [(Kind::Tie, tie_group, &self.tie_groups, &self.ties), (Kind::Shrub, shrub_group, &self.shrub_groups, &self.shrubs)] {
@@ -99,7 +106,7 @@ impl MobyWorld {
                 if out.len() >= max { break; }
                 let Some(m) = mats.get(i as usize) else { continue };
                 let (offset, rows) = local([m[3][0], m[3][1], m[3][2]], &rows3(m));
-                out.push(Member { kind, index: i as usize, offset, rows });
+                out.push(Member { kind, index: i as usize, offset, rows, turn: None });
             }
         }
         if out.is_empty() { self.attached.remove(&carrier); } else { self.attached.insert(carrier, Carrier { members: out, use_rows: false }); }
@@ -116,6 +123,13 @@ impl MobyWorld {
         for m in &mut c.members { m.rows = m.rows.map(|row| to_world(row, r)); }
     }
 
+    /// `0x3250c0(block, kind, index, angles)`: the member of that kind and index takes its own turn `angles` (the
+    /// carrier changes them each tick by calling this again).
+    pub fn attach_member_turn(&mut self, carrier: usize, kind: Kind, index: usize, angles: V3) {
+        let Some(c) = self.attached.get_mut(&carrier) else { return };
+        if let Some(m) = c.members.iter_mut().find(|m| m.kind == kind && m.index == index) { m.turn = Some(angles); }
+    }
+
     /// Keeps only the first `n` members (a carrier that ends its block early).
     pub fn attach_limit(&mut self, carrier: usize, n: usize) {
         if let Some(c) = self.attached.get_mut(&carrier) { c.members.truncate(n); }
@@ -128,7 +142,10 @@ impl MobyWorld {
         let (cp, cr) = (c.pos, if use_rows { c.rows } else { rows_of(c.rot) });
         let place = |m: &Member| {
             let o = to_world(m.offset, &cr);
-            ([cp[0] + o[0], cp[1] + o[1], cp[2] + o[2]], m.rows.map(|r| to_world(r, &cr)))
+            let rows = m.rows.map(|r| to_world(r, &cr));
+            // The member's own turn (not a shrub's).
+            let rows = match m.turn { Some(t) if m.kind != Kind::Shrub => turn(&rows, &rows_of(t)), _ => rows };
+            ([cp[0] + o[0], cp[1] + o[1], cp[2] + o[2]], rows)
         };
         for m in &members {
             let (pos, rows) = place(m);

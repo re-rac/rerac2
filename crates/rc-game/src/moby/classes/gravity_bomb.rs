@@ -203,6 +203,12 @@ fn landing(w: &MobyWorld, ctx: &Ctx, id: usize, from: V3, vel: V3) -> Option<(V3
 
 /// [`landing`] under the gravity `gravity` a tick² (the upgraded Spiderbot's charge, crate::moby::classes::spiderbot_plus).
 pub fn landing_with(w: &MobyWorld, ctx: &Ctx, id: usize, from: V3, vel: V3, gravity: f32) -> Option<(V3, V3)> {
+    landing_hit(w, ctx, id, from, vel, gravity).map(|(p, n, _)| (p, n))
+}
+
+/// [`landing_with`] with the moby the arc met too (`0x37e988`'s object out, the line's moby; None: the world): the
+/// Thermanator's aim (crate::moby::classes::thermanator).
+pub fn landing_hit(w: &MobyWorld, ctx: &Ctx, id: usize, from: V3, vel: V3, gravity: f32) -> Option<(V3, V3, Option<usize>)> {
     if ctx.hero.state == 0x6f || ctx.game.scenes.mode != crate::scene::PLAY { return None; }
     let (mut p, mut v) = (from, vel);
     for _ in 0..300 {
@@ -214,7 +220,7 @@ pub fn landing_with(w: &MobyWorld, ctx: &Ctx, id: usize, from: V3, vel: V3, grav
         if let Some(h) = w.coll_line(ctx, a, p, 0x12, Some(id)) {
             let n = crate::hero::physics::unit(h.normal);
             let cam = ctx.host.camera_pos();
-            return Some((add(cam, scale(sub(h.point, cam), 0.94)), n));
+            return Some((add(cam, scale(sub(h.point, cam), 0.94)), n, h.moby));
         }
     }
     None

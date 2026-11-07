@@ -62,12 +62,37 @@
 //! (ai::attack_line), `0x33b658` = L00 `0x320538` (crate::moby::blast::explode), `0x2fbd48` = L00 `0x2e14b0`
 //! (crate::moby::MobyWorld::sphere_hit), `0x307068` = L02 `0x2f0170` (crate::moby::classes::teleport::start).
 //!
-//! Not ported: the Hypnomatic's capture (the head's branch on a hooked creature, `0x345910` = L00 `0x32a838`: the
-//! script camera's swirl `0x456fa8` / `0x456e60` / `0x456eb8`, the meter `0x427fa0` through `0x327fe8`, the stats
-//! `0x18c360 + 0x294..`, the prompt; sub-states 7 and 8 and Ratchet's body 4 (`0x2cfe70` = L03 `0x2b8508(4, 0x8d)`,
-//! its states and its way back `0x2d0050`); the controlled branches (timer byte 1, the pad's buttons `0x138320`), as
-//! nothing in the port takes one over (the Hypnomatic is not ported); the debug prints (`0x2c27f0`); the paths'
-//! lengths into their points' `w` (`0x35ea60`, read by nothing here).
+//! **The capture** (the Hypnomatic's beam hooks a gunner of endless lives, crate::moby::classes::hypnomatic; the code
+//! serves every kind). The head ([`head`]), not taken over and not already in sub-state 7, a hooked creature
+//! (`0x345910` = L00 `0x32a838`): update distance 0xff, the time's meter off (`0x327fe8(0, 0)`), `+0x39f` let go, the
+//! script camera switched in where the view is (`0x456fa8` = L00 `0x428880`, a snap; `0x456e60` / `0x456eb8` its
+//! targets the same), Ratchet out of the look states 1 / 0x1d (idle) and held 20 ticks (`0x18a000`), the swirl's
+//! speed `+0x3b8` = (its distance across to the view − 3) / 180, unhooked (`0x3458f0`), the swirl's ticks `+0x396` =
+//! 180, sequence 16, a capture runs (`$gp+0xb70`, crate::hero::hypno::HypnoBlock::capturing), the prompt's lease 6
+//! (`0x342248(6, 0, 20)`), state 0 sub 7.
+//! * **Sub 7, the swirl** ([`swirl`]): the lease; its class sound 6 (of 0x0ee1's table) on the sub-state's first tick
+//!   and the loop 9 (mode 4) kept playing (`+0x3f0`); its flash (`0x33b308`); turning to Ratchet; Ratchet invincible
+//!   5 ticks and held 10. Its ticks out: the time's meter on (`0x327fe8(0, 0x427fa0)`), its time `+0x3bc` = `+0x3be`;
+//!   from the body, the way back first (`0x2d0050(1)`); its flash off and grey (`0x428288`), taken over (timer byte
+//!   1), no fence, its wait 30, the switch (`0x2cfe70(4, 0x8d, it)`: crate::hero::Hero::hypno_switch, Ratchet facing
+//!   its yaw), no capture running, state 7 sub 8, the loop stopped. The camera: t = 1 − ticks/180; the point 3 from
+//!   it across toward Ratchet and 2 up; the view's place drawn to it, `+0x3b8 · ticks` away from it; looking at the
+//!   creature (yaw, pitch) rolled 15° · sin(2πt). In sub 8 the script camera lets go (`0x457118(1)`, the pose kept:
+//!   the follow camera takes it from there, on the body).
+//! * **Sub 8, taken over**: the lease; out of the moby loop while the body plays (crate::hero::hypno); the player no
+//!   longer on it (another body or Ratchet) and its wait out: with Ratchet the meter off, no capture running, its
+//!   idle fence and area, no path, not taken over, its walk limits, shown, its blast (2 across, its damage byte
+//!   `+0x35`, 5 embers, 2 billows, 9 flares, flashes 6 / 4, size 1.1, its death sound, shaking, lod −2, flags
+//!   0x850001: [`release_blast`]), state 11 (gone, or back on its lift).
+//!
+//! While taken over the body's states drive it (crate::hero::hypno): its gun ([`shoot`]), its bite
+//! ([`controlled_attack`]: `0x429c28` with timer byte 1 — a new □ press (`0x138324`) holds the wait at 90, its own
+//! countdown of the wait, the kill height, the bite; the wait out ends it).
+//!
+//! Not ported: the capture's stats (`0x18c360 + 0x294..`), the body's gun aim record `0x2571a0` (cleared at the
+//! switch), `0x1b2564`, the help texts on L19 / L20 at the switch (`0x18c958 + 0x504`, `0x13965e`); the debug prints
+//! (`0x2c27f0`); the paths' lengths into their points' `w` (`0x35ea60`, read by nothing here); a taken-over 0x0ed4's
+//! attack (no level places one).
 
 use crate::hero::physics::{add, atan2, dist, dist2, rot_dist, set_len, sub, turn_ease, V3};
 use crate::moby::classes::props::{seq, set_seq, wrapped};
@@ -130,13 +155,19 @@ const LIVES: usize = 0x3b1;
 const WAS_KIN: usize = 0x3b2;
 const KIN: usize = 0x3b3;
 const LIFT_L: usize = 0x3b4;
+const SWIRL_SPEED: usize = 0x3b8;
+/// `+0x3bc` / `+0x3be`: its time left while taken over and its whole (crate::hero::hypno).
+pub const TIME: usize = 0x3bc;
+const TIME_FULL: usize = 0x3be;
 const LIMITS: usize = 0x3c0;
 const UPDATE_DIST: usize = 0x3e0;
+/// `+0x3ec`: the height under which its body dies.
+pub const KILL_Z: usize = 0x3ec;
 const ASLEEP: usize = 0x3e8;
 const MISSION_KILL: usize = 0x3e9;
 const LIFT_RESERVE: usize = 0x3ea;
 const SOUND: usize = 0x3f0;
-const PVARS: usize = 0x400;
+pub const PVARS: usize = 0x400;
 
 /// `$gp+0x21c8..+0x21dc` (`0x1b11b8`): the walk limits (`+0x3c4`, `+0x3c0`), the run's (`+0x3cc`, `+0x3c8`) and the
 /// turns (`+0x3d4` / `+0x3dc`, `+0x3d0` / `+0x3d8`) when a creature has none.
@@ -166,6 +197,16 @@ const GUN_RANGE: [f32; 2] = [30.0, 30.0];
 const SHOT_SPEED: [f32; 2] = [10.0, 20.0];
 /// `$gp+0x2270`: the hits' push.
 const PUSH: f32 = 2.0;
+/// `$gp+0x2240..+0x224c`: the capture's swirl — its ticks, the camera's end across from the creature and up, its
+/// roll (degrees).
+const SWIRL_TICKS: i16 = 180;
+const SWIRL_NEAR: f32 = 3.0;
+const SWIRL_UP: f32 = 2.0;
+const SWIRL_ROLL: f32 = 15.0;
+/// The prompt's lease the capture holds (`0x342248(6, 0, 20)`).
+const LEASE: i32 = 6;
+/// The time a taken-over biter's □ press keeps its bite going (`$gp+0x21f0`).
+const BITE_HOLD: i16 = BITE_TICKS;
 
 fn seq_a(w: &MobyWorld, id: usize, ctx: &Ctx) -> u8 { ctx.host.anim(&w.mobys[id]).map_or(0xff, |a| a.seq_a) }
 fn gone(s: u8) -> bool { s == 0xfe || s == 0xfd }
@@ -545,7 +586,7 @@ fn head(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         crate::moby::joint_aim::aim(w, id, AIM, id, 4, 1.0, 1.0);
     }
     let m = &w.mobys[id];
-    if m.sub_state != 8 && m.timer != 1 && m.sub_state != 7 && ctx.hero.state != 0x6f {
+    if m.sub_state != 8 && m.timer != 1 && m.sub_state != 7 && !ctx.hero.hypno.capturing && ctx.hero.state != 0x6f {
         let hit = ai::take_damage(w, id, ctx, false);
         if hit != 0 {
             release_held(w, id);
@@ -562,6 +603,8 @@ fn head(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         ai::find_target(w, id, ctx, 0.0, 0.0, area, None, false);
         let t = ai::link(&w.mobys[id], T_MOBY).and_then(|k| w.mobys.get(k)).map(|t| t.o_class);
         w.mobys[id].set_pv_b(KIN, matches!(t, Some(BITER | GUNNER_B | GUNNER)) as u8);
+        let m = &w.mobys[id];
+        if m.timer == 0 && m.sub_state != 7 && m.once & 4 != 0 { hooked(w, id, ctx); }
     }
     w.mobys[id].hit_slot = -1;
     let m = &w.mobys[id];
@@ -574,6 +617,152 @@ fn head(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         replace(w, id, ctx);
         w.mobys[id].set_state(11, 10);
     }
+}
+
+/// The head's branch on a hooked creature (module docs): the capture begins.
+fn hooked(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    w.mobys[id].update_dist = 0xff;
+    ctx.hero.hypno.meter = false;
+    release_held(w, id);
+    let (cp, ce) = ctx.game.cameras.view_euler();
+    ctx.game.cameras.camera_script(cp, ce, crate::script_camera::MODE_SNAP, 0, false, ctx.hero);
+    ctx.game.cameras.camera_script_targets(Some(cp), Some(ce));
+    if matches!(ctx.hero.state, 1 | 0x1d) { ctx.hero.request_state(0, true); }
+    ctx.hero.land_lag = 20;
+    let m = &mut w.mobys[id];
+    m.set_pv_f(SWIRL_SPEED, (dist2(m.pos, cp) - SWIRL_NEAR) / SWIRL_TICKS as f32);
+    m.once &= !4;
+    m.set_pv_s(COOL, SWIRL_TICKS);
+    anim_to(w, id, ctx, 16, 10);
+    ctx.hero.hypno.capturing = true;
+    ctx.game.prompt.request(LEASE, 0, 20);
+    w.mobys[id].set_state(0, 7);
+}
+
+/// `0x33b560` = L00 `0x320440`: an angle wrapped to [−π, π).
+fn wrap(a: f32) -> f32 { use std::f32::consts::PI; ((a + PI) * 0.159_154_94).rem_euclid(1.0) * std::f32::consts::TAU - PI }
+
+/// `0x32a7f0`: the first time since the last sub-state change.
+fn first_sub(m: &mut crate::moby::Moby) -> bool {
+    if m.once & 2 != 0 { return false; }
+    m.once |= 2;
+    true
+}
+
+/// Sub-state 7, the swirl (module docs).
+fn swirl(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    ctx.game.prompt.request(LEASE, 0, 20);
+    if first_sub(&mut w.mobys[id]) { ctx.host.play_sound_of(&w.mobys[id], GUNNER, 6, 0); }
+    let h = w.mobys[id].pv_i(SOUND);
+    if h == -1 || !ctx.host.sound_playing(h) {
+        let h = ctx.host.play_sound_of(&w.mobys[id], GUNNER, 9, 4);
+        w.mobys[id].set_pv_i(SOUND, h);
+    }
+    ai::flash(&mut w.mobys[id], REACT);
+    let yaw = yaw_to(w, id, ctx.hero.pos);
+    {
+        let m = &mut w.mobys[id];
+        let (a, b, c) = (m.pv_f(MV + 0x14), m.pv_f(MV + 0x18), m.pv_f(MV + 0x1c));
+        let (mut r, mut v) = (m.rot[2], m.pv_f(MV + 0xb4));
+        turn_ease(yaw, a, b, c, &mut r, &mut v, 0);
+        m.rot[2] = r;
+        m.set_pv_f(MV + 0xb4, v);
+    }
+    let (view, _) = ctx.game.cameras.view_euler();
+    ctx.hero.damage.invincible = 5;
+    ctx.hero.land_lag = 10;
+    let mut cool = w.mobys[id].pv_s(COOL) as i32;
+    let out = countdown(&mut cool);
+    w.mobys[id].set_pv_s(COOL, cool as i16);
+    if out {
+        ctx.hero.hypno.meter = true;
+        let m = &mut w.mobys[id];
+        m.set_pv_s(TIME, m.pv_s(TIME_FULL));
+        let yaw = m.rot[2];
+        if ctx.hero.mode == 4 { ctx.hero.body_back_keep(true, ctx.game.scenes.mode == crate::scene::SCENE); }
+        // `0x428288`: the flash off, grey.
+        let m = &mut w.mobys[id];
+        m.set_pv_s(REACT, 0);
+        m.set_pv_s(REACT + 2, 1);
+        ai::flash(m, REACT);
+        for k in 4..7 { m.set_pv_b(REACT + k, 0x80); }
+        m.ambient = [0x80; 3];
+        m.timer = 1;
+        m.set_pv_i(MV + 0x3c, -1);
+        m.set_pv_s(WAIT, 30);
+        let (pos, rot, class, time, kill_z) = (m.pos, m.rot, m.o_class, m.pv_s(TIME), m.pv_f(KILL_Z));
+        ctx.hero.hypno_switch(id, pos, rot, class, time, kill_z);
+        ctx.hero.rot[2] = yaw;
+        w.mobys[id].rot[2] = yaw;
+        ctx.hero.hypno.capturing = false;
+        w.mobys[id].set_state(7, 8);
+        let h = w.mobys[id].pv_i(SOUND);
+        if h != -1 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
+        w.mobys[id].set_pv_i(SOUND, -1);
+    }
+    let m = &w.mobys[id];
+    let t = (1.0 - m.pv_s(COOL) as f32 / SWIRL_TICKS as f32).clamp(0.0, 1.0);
+    let mut b = sub(ctx.hero.pos, m.pos);
+    b[2] = 0.0;
+    let mut b = add(set_len(b, SWIRL_NEAR), m.pos);
+    b[2] += SWIRL_UP;
+    let a = add(set_len(sub(view, b), m.pv_f(SWIRL_SPEED) * m.pv_s(COOL) as f32), b);
+    let p = m.pos;
+    let ang = [
+        SWIRL_ROLL * (wrap(t * f32::from_bits(0x40c9_0fdb)).sin() * 0.017_453_294),
+        -atan2(dist2(a, p), p[2] - a[2]),
+        atan2(p[0] - a[0], p[1] - a[1]),
+    ];
+    ctx.game.cameras.camera_script_targets(Some(a), Some(ang));
+    if w.mobys[id].sub_state == 8 { ctx.game.cameras.camera_script2(crate::script_camera::RELEASE_KEEP, ctx.hero); }
+}
+
+/// Sub-state 8, taken over (module docs): let go once the player is no longer on it and its wait is out.
+fn taken(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    ctx.game.prompt.request(LEASE, 0, 20);
+    let on = ctx.hero.mode == 4 && ctx.hero.body.moby == Some(id);
+    if on || w.mobys[id].pv_s(WAIT) != 0 { return; }
+    if ctx.hero.mode != 4 { ctx.hero.hypno.meter = false; }
+    ctx.hero.hypno.capturing = false;
+    let m = &mut w.mobys[id];
+    m.set_pv_i(MV + 0x3c, m.pv_i(FENCE_B));
+    m.set_pv_i(AREA, m.pv_i(AREA_IDLE));
+    m.set_pv_i(PATH, -1);
+    m.timer = 0;
+    limits(w, id, LIMITS);
+    w.mobys[id].mode &= !0x41;
+    release_blast(w, id, ctx);
+    w.mobys[id].set_state(11, -1);
+}
+
+/// The blast of a creature let go (sub 8) or of its body's death (crate::hero::hypno's 0x91): `0x33b658(m, …, 2, its
+/// damage byte, 5, 2, 9, 6, 4, 9, 1.1, its death sound, 0, 1, 1, −2, 0, 0x850001)`.
+pub(crate) fn release_blast(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let m = &w.mobys[id];
+    let e = crate::moby::blast::Explosion {
+        radius: 2.0, damage: m.pv_b(0x35) as f32, embers: 5, billows: 2, flares: 9, flash: 6.0, flash2: 4.0, near: 9.0, size: 1.1,
+        sound: death_sound(m.o_class), shake: true, debris: 1, lod: -2, flags: 0x85_0001, ..Default::default()
+    };
+    crate::moby::blast::explode(w, ctx, Some(id), None, &e);
+}
+
+/// `0x429bc0`: a taken-over biter's bite begins (its wait 90).
+pub(crate) fn bite_start(w: &mut MobyWorld, id: usize) {
+    if w.mobys[id].o_class == BITER { w.mobys[id].set_pv_s(WAIT, BITE_HOLD); }
+}
+
+/// `0x429c28` while taken over (the bite 0x93 of crate::hero::hypno; module docs): true when it is over.
+pub(crate) fn controlled_attack(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
+    // Only the biter bites from the body (0x0ee1 has no bite; 0x0ed4 is placed nowhere).
+    if w.mobys[id].o_class != BITER { return true; }
+    if ctx.hero.items.pressed & crate::pad::button::SQUARE != 0 { w.mobys[id].set_pv_s(WAIT, BITE_HOLD); }
+    tick_s(w, id, WAIT);
+    if w.mobys[id].pos[2] < w.mobys[id].pv_f(REACT + 0x40) {
+        bolts::drop(w, id, 0, 3, ctx);
+        w.mobys[id].set_state(12, -1);
+    }
+    bite(w, id, ctx);
+    w.mobys[id].pv_s(WAIT) == 0
 }
 
 /// `0x429538`: alerted, its patience at least 600..1000 (under 300 drawn again); its wait, cooldown and count; its
@@ -622,7 +811,9 @@ fn in_reach(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
 /// `0x429828`: the bite — in sequence 0xa, the line from its joint 2 to 3 (`0x338348` = L01 `0x3132c8`, flags
 /// 0x4000001, its damage, pushed 2).
 fn bite(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
-    if seq_a(w, id, ctx) != 0xa { return; }
+    // Taken over, its sequence is the body's (the hero's animation).
+    let s = if ctx.hero.body.moby == Some(id) { ctx.hero_view.seq_a } else { seq_a(w, id, ctx) };
+    if s != 0xa { return; }
     let m = &w.mobys[id];
     let (Some(a), Some(b)) = (ctx.host.joint(m, 2), ctx.host.joint(m, 3)) else { return };
     let flags = if m.timer == 1 { 0x0401_0000 } else { 0x0400_0001 };
@@ -634,7 +825,7 @@ fn bite(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
 /// (flags 0x10000, kinds 1 / 3) — then a small blast there (5 embers, 2 billows, 9 flares, size 1.1, its death sound)
 /// and a sphere of 1 (flags 0x10) of its damage (flags 0x810001, up 2); else a shot ([`fire`]) along its forward row
 /// at its speed (0x0ee1 20, else 10 a second), dropping toward its target's height over the distance, its range 30.
-fn shoot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, side: usize) {
+pub(crate) fn shoot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, side: usize) {
     let m = &w.mobys[id];
     let (range, speed) = if m.o_class == GUNNER { (GUN_RANGE[1], SHOT_SPEED[1]) } else { (GUN_RANGE[0], SHOT_SPEED[0]) };
     let Some(pos) = ctx.host.joint(m, side + 2) else { return };
@@ -960,6 +1151,8 @@ fn subs(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 w.mobys[id].set_state(2, 2);
             }
         }
+        7 => swirl(w, id, ctx),
+        8 => taken(w, id, ctx),
         14 => {
             w.mobys[id].alpha = 0x80;
             if class_scale(w, id) <= w.mobys[id].scale {

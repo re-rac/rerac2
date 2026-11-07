@@ -71,12 +71,22 @@ impl Hero {
         if NO_ITEMS.contains(&id) { self.items.no_use = 1; }
         // `0x2c9b20` case 0 with Giant Clank's body: his idle instead (`0x2ce468(0)`).
         if id == 0 && self.mode == 2 { return self.set_state(anim, env, 0x56, true); }
+        // L18 `0x2e02e8` case 0 with the Hypnomatic's body: its idle instead (`0x2e4310(0)`).
+        if id == 0 && self.mode == 4 {
+            self.set_state(anim, env, 0x8d, true);
+            return true;
+        }
         let entry = match module_of(id) {
             Module::Ground => self.ground_entry(anim, env, id, play),
             Module::Walk => self.walk_entry(anim, env, id, play),
             Module::Air => self.fall_entry(anim, env, id, play),
             Module::Jump => self.jump_entry(anim, env, id, play),
-            Module::Melee => self.melee_entry(anim, env, id, play),
+            Module::Melee => {
+                let e = self.melee_entry(anim, env, id, play);
+                // L18 `0x2e02e8` case 0x93 with the Hypnomatic's body: the biter's bite (crate::hero::hypno).
+                if id == 0x93 && self.mode == 4 { self.hypno_bite_entry(anim); }
+                e
+            }
             Module::Ledge => self.ledge_entry(anim, env, id, play),
             Module::Damage => self.damage_entry(anim, env, id, play),
             Module::Pack => self.pack_entry(anim, env, id, play),
@@ -85,6 +95,7 @@ impl Hero {
             Module::Water => self.water_entry(anim, env, id, play),
             Module::Clank => self.clank_entry(anim, env, id, play),
             Module::Giant => self.giant_entry(anim, env, id, play),
+            Module::Hypno => self.hypno_entry(anim, env, id, play),
             Module::Script => self.script_entry(anim, env, id, play),
             Module::Gear => self.gear_entry(anim, env, id, play),
             Module::Grind => self.grind_entry(anim, env, id, play),
@@ -163,6 +174,7 @@ impl Hero {
             Module::Walk => self.phys_walk(env, anim),
             Module::Air => self.phys_fall(env, anim),
             Module::Jump => self.phys_jump(env, anim),
+            Module::Melee if self.state == 0x93 && self.mode == 4 => self.phys_hypno(env, anim),
             Module::Melee => self.phys_melee(env, anim),
             Module::Ledge => self.phys_ledge(env, anim),
             Module::Damage => self.phys_damage(env, anim),
@@ -172,6 +184,7 @@ impl Hero {
             Module::Water => self.phys_water(env, anim),
             Module::Clank => self.phys_clank(env, anim),
             Module::Giant => self.phys_giant(env, anim),
+            Module::Hypno => self.phys_hypno(env, anim),
             Module::Script => self.phys_script(env, anim),
             Module::Gear => self.phys_gear(env, anim),
             Module::Grind => self.phys_grind(env, anim),
@@ -187,6 +200,8 @@ impl Hero {
     pub fn transitions(&mut self, env: &Env, anim: &mut dyn AnimCtl) {
         // Giant Clank (`0x18c0d4` = 2): his hit intake and states (crate::hero::giant).
         if self.mode == 2 { return self.giant_transitions(env, anim); }
+        // The Hypnomatic's body (`0x18c0d4` = 4): its hit intake and states (crate::hero::hypno).
+        if self.mode == 4 { return self.hypno_transitions(env, anim); }
         // The prologue: the hit intake, no health, the fall out of the level; the item trigger (`0x2c96d0`: the wrench).
         if self.transitions_prologue(env, anim) { return; }
         if self.swingshot_trigger(env, anim) { return; }
@@ -212,7 +227,7 @@ impl Hero {
             Module::Swing => self.trans_swing(env, anim),
             Module::Water => self.trans_water(env, anim),
             Module::Clank => self.trans_clank(env, anim),
-            Module::Giant => None,
+            Module::Giant | Module::Hypno => None,
             Module::Script => self.trans_script(env, anim),
             Module::Gear => self.trans_gear(env, anim),
             Module::Grind => self.trans_grind(env, anim),

@@ -1,5 +1,5 @@
-//! Damosel orbit's targets, parts of its opponent 0x0f7f's fight (L23 addresses; the opponent's own update `0x417888`
-//! is not ported, so the words it keeps — crate::moby::classes::level23::Globals — stay as the level starts them):
+//! Damosel orbit's targets, parts of its opponent 0x0f7f's fight (L23 addresses; the words they read are the
+//! opponent's, crate::moby::classes::level23::boss, kept in crate::moby::classes::level23::Globals):
 //!
 //! * **0x0f7e** ([`update_0f7e`], `0x417498` → `0x4174c8` + `0x417590`, the decomp's `func_L23_00415FC8` /
 //!   `func_L23_004160B0` / `func_L23_00416090`; 10 placed) and **0x120f** ([`update_120f`], `0x428cb8` → `0x428ce8`
@@ -30,14 +30,14 @@ pub const T120F: i16 = 0x120f;
 pub const OPPONENT: i16 = 0x0f7f;
 const SHOT: i16 = 0x118f;
 
-/// `$gp+0x2444`: the opponent (found by its class: its update, which sets the word, is not ported).
-fn opponent(w: &MobyWorld) -> Option<usize> { w.mobys.iter().position(|m| m.o_class == OPPONENT && m.state < 0xfd) }
+/// `$gp+0x2444`: the opponent (its set-up sets the word, crate::moby::classes::level23::boss).
+pub(super) fn opponent(w: &MobyWorld) -> Option<usize> { w.level23.boss.filter(|&b| w.mobys.get(b).is_some_and(|m| m.o_class == OPPONENT && m.state < 0xfd)) }
 
 /// `0x41ce48`: the opponent's guard up (`+0x604`).
-fn guarded(w: &MobyWorld, o: Option<usize>) -> bool { o.is_some_and(|o| w.mobys[o].pv_i(0x604) != 0) }
+pub(super) fn guarded(w: &MobyWorld, o: Option<usize>) -> bool { o.is_some_and(|o| w.mobys[o].pv_i(0x604) != 0) }
 
 /// `0x41fa70`: the opponent's hurt sound (0x10) unless its wait `0x1b3694` runs; the wait `$gp+0x23a8` (60).
-fn hurt_sound(w: &mut MobyWorld, ctx: &mut Ctx, o: Option<usize>) {
+pub(super) fn hurt_sound(w: &mut MobyWorld, ctx: &mut Ctx, o: Option<usize>) {
     if w.level23.hurt_wait == 0 {
         if let Some(o) = o { ctx.host.play_sound(&w.mobys[o], 0x10, 0); }
     }
@@ -45,7 +45,7 @@ fn hurt_sound(w: &mut MobyWorld, ctx: &mut Ctx, o: Option<usize>) {
 }
 
 /// `0x41da78(hitter)` (module docs).
-fn blast_at(w: &mut MobyWorld, ctx: &mut Ctx, src: usize, o: Option<usize>) {
+pub(super) fn blast_at(w: &mut MobyWorld, ctx: &mut Ctx, src: usize, o: Option<usize>) {
     use crate::moby::blast::{burst, Blast};
     if ctx.hero_moby == Some(src) {
         let at = add(crate::gravity::to_world([1.3, 0.0, 4.5], &w.mobys[src].rows), ctx.hero.pos);
@@ -60,7 +60,7 @@ fn blast_at(w: &mut MobyWorld, ctx: &mut Ctx, src: usize, o: Option<usize>) {
 }
 
 /// `0x41d370(hit)`: the hit handed on to the opponent (module docs).
-fn hand_on(w: &mut MobyWorld, o: Option<usize>, src: Option<usize>, dmg: f32) {
+pub(super) fn hand_on(w: &mut MobyWorld, o: Option<usize>, src: Option<usize>, dmg: f32) {
     let Some(o) = o else { return };
     let m = &w.mobys[o];
     let to = match m.pv_i(0x60c) {

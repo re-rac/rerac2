@@ -248,7 +248,7 @@ fn take_tie(w: &mut MobyWorld, id: usize) {
         if 1.0 <= dist2(cp, tp) { continue; }
         let d = sub(tp, cp);
         let rows = [0, 1, 2].map(|r| { let v = [t[r][0], t[r][1], t[r][2]]; [dot(v, cr[0]), dot(v, cr[1]), dot(v, cr[2])] });
-        let member = Member { kind: Kind::Tie, index: i as usize, offset: [dot(d, cr[0]), dot(d, cr[1]), dot(d, cr[2])], rows };
+        let member = Member { kind: Kind::Tie, index: i as usize, offset: [dot(d, cr[0]), dot(d, cr[1]), dot(d, cr[2])], rows, turn: None };
         w.attached.insert(id, Carrier { members: vec![member], use_rows: false });
         return;
     }

@@ -50,6 +50,8 @@ pub(crate) fn spec(o_class: i16) -> Option<Spec> {
         WINGMAN => Spec { health: 10.0, scale: 0.02, scatter: false, lead: 5.0, wait: 0x19, shot: (0.6, 1.0, 0x6080_0000), shot_alt: Some(0x6080_0080), engine: Some((WINGMAN, 3)), death: Some((WINGMAN, 1)), gun_sound: Some((WINGMAN, 0, false)), ..base },
         STATION => Spec { health: 2.0, scale: 0.16, scatter: false, engine: Some((STATION, 0)), ..base },
         BEACON => Spec { health: 1.0, scatter: false, ..base },
+        // 0x0cbe (crate::moby::classes::level10::tethered): its leader word `+0x268`.
+        super::tethered::CLASS => Spec { health: 2.0, scatter: false, leads: 0x268, ..base },
         _ => return None,
     })
 }

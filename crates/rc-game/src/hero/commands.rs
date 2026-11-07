@@ -39,16 +39,34 @@
 //!
 //! **The command word** (`0x18c304`): read by every robot in the moby loop of the next frame, then the body's tick
 //! (`0x2a65d8`, [`tick`]) plays Clank's class sound `0x10 + command`, starts the antenna's signal (`0x18c340` = 0x39,
-//! its command `0x18c342`) and clears it. The antenna (`0x2ac520`): the signal's countdown and, past 0x31 on its odd
-//! frames, the sound again.
+//! its command `0x18c342`) and clears it.
 //!
-//! Not ported: the antenna's moby 0x04b4 at Clank's joint 7 and its glow (`0x18b684`, `0x18c344`: the colours by the
-//! command, G-HERO-004), the screen's timers `+0x6c` / `+0x7c` and the paused mode's frame count `gp−0x6240`
-//! (`0x2f5238`), the record's copy at the close (`0x1b27bc`, `gp+0x37d0`), the table's other sets (`gp−0x5f58` is
-//! always 0 here).
+//! **The antenna** (`0x2ac520` = L00 `0x2a5cb0`, the body tick's with Clank's body on the 19 levels that carry it;
+//! [`antenna_signal`], [`antenna`]): the signal's countdown and, past 0x31 on its odd frames, the sound again. Its
+//! moby **0x04b4** (`0x18b684`; the class has no update of its own on any level — the hero code makes, places and
+//! colours it; the same class is the head glow on Clank's back, crate::hero::back) is made once (`0x311320`): its glow
+//! word `0x801432d7` (the kept colour `0x18c344` `0x301432d7`), at the player's place and angles, drawn, update
+//! distance 0, draw distance 0x40, mode 0 then glowing (0x10), its scale × 1.7. While the body moby is shown, joint 7's
+//! place is the head point `0x18be30` (the Clank Zapper's lines start there, crate::hero::back) and the antenna takes
+//! joint 7's matrix (`0x312728`), its scale easing 0.02 a tick to its class's × 1.7 (3.1 with the Clank head cheat,
+//! `0x1a7a4b`; × 1.4 while the signal runs). Its colour: the phase (`0x18b688`) turns 0.0495 a tick (0.2036 more
+//! while the signal runs) and the colour is between `0x281414c8` and `0x1e00004b` — by the signal's command 1
+//! `0x2814c814` / `0x1e004b00`, 2 `0x2814c8c8` / `0x1e004b4b`, 3 `0x323232fa` / `0x1e000078`, 4 `0x28f01414` /
+//! `0x1e4b0000` — by sin(phase)·0.5 + 0.5 (`0x2f0000`); the glow word and the kept colour each 0.1 of the way to it.
+//! The way back to Ratchet (`0x2b8718`) deletes it.
+//!
+//! Not ported: the head point's glow draw (`0x2a7a88` / `0x2a7ac8`, the kept colour's reader), the screen's timers
+//! `+0x6c` / `+0x7c` and the paused mode's frame count `gp−0x6240` (`0x2f5238`), the record's copy at the close
+//! (`0x1b27bc`, `gp+0x37d0`), the table's other sets (`gp−0x5f58` is always 0 here).
 
 use crate::hud::{lerp_rgba, Align, Draw};
+use crate::moby::{mode, Ctx, MobyWorld};
 use crate::pad::{button, PadState};
+
+/// Clank's antenna (`0x18b684`).
+pub const ANTENNA_CLASS: i16 = 0x4b4;
+/// Clank's joint the antenna sits at (`0x3127c8` / `0x312728(clank, 7)`).
+const ANTENNA_JOINT: usize = 7;
 
 /// The table's rows (`0x282450`): the icon set, its frame, the d-pad's neighbours left / right / up / down, the
 /// command.
@@ -119,12 +137,22 @@ pub struct Commands {
     pub signal: i16,
     pub signal_command: i16,
     pub robots: Robots,
+    /// `0x18b684`: the antenna's moby (and its creation serial); one the way back gave up, for the world to delete.
+    pub antenna: Option<usize>,
+    pub antenna_serial: u32,
+    pub antenna_drop: Option<usize>,
+    /// `0x18b688`: the antenna's phase; `0x18c344`: its kept colour.
+    pub antenna_phase: f32,
+    pub antenna_colour: u32,
     screen: Option<Screen>,
     /// `0x1aa1d4`: the pulse's frame counter (`0x31f038` mode 0).
     pulse: i32,
 }
 
 impl Commands {
+    /// `0x2b8718`: the antenna given up (deleted by crate::hero::body::after).
+    pub fn antenna_gone(&mut self) { self.antenna_drop = self.antenna.take().or(self.antenna_drop); }
+
     /// `0x2f79d8(0x23, …)` with Clank's init `0x2fa5a8`: the ring opens (once).
     pub fn open(&mut self) {
         if self.screen.is_none() { self.screen = Some(Screen { fade: 0, name_fade: 0, selected: -2, reset: 0x1e }); }
@@ -264,15 +292,77 @@ pub fn frame_start(body: u8, c: &mut Commands) {
     if body == 1 && !c.is_open() { c.robots = Robots::default(); }
 }
 
-/// The body's tick (`0x2a65d8` with Clank's body): the antenna (`0x2ac520`: the signal counted down, and past 0x31 on
-/// its odd frames its sound again), then the command word's sound and signal, and the word cleared.
-pub fn tick(hero: &mut super::Hero) {
-    if hero.mode != 1 { return; }
+/// `0x2ac520`'s signal (module docs): counted down, and past 0x31 on its odd frames its sound again. Returns whether
+/// it still runs.
+pub fn antenna_signal(hero: &mut super::Hero) -> bool {
+    if hero.mode != 1 { return false; }
     let c = &mut hero.body.commands;
     let mut t = c.signal as i32;
     let out = crate::moby::countdown(&mut t);
     c.signal = t as i16;
     if !out && SIGNAL_SOUND < c.signal && c.signal & 1 != 0 { hero.sounds.push((c.signal_command as i32 + 0x10, 0)); }
+    !out
+}
+
+/// `0x2ac520`'s moby (module docs): made once, at Clank's joint 7 while he is shown, its scale and colour; `running`:
+/// the signal still runs ([`antenna_signal`]).
+pub fn antenna(world: &mut MobyWorld, ctx: &mut Ctx, running: bool) {
+    let c = &mut ctx.hero.body.commands;
+    if c.antenna.is_some_and(|id| world.mobys.get(id).is_none_or(|m| m.state >= 0xfe || m.serial != c.antenna_serial)) { c.antenna = None; }
+    if c.antenna.is_none() && world.class(ANTENNA_CLASS).is_some() {
+        let id = world.create(ANTENNA_CLASS);
+        let (hp, hr) = (ctx.hero.pos, ctx.hero.rot);
+        let m = &mut world.mobys[id];
+        m.glow = 0x8014_32d7;
+        (m.pos, m.rot) = (hp, hr);
+        m.draw_dist = 0x40;
+        m.drawn = 1;
+        m.update_dist = 0;
+        m.mode = 0;
+        m.scale *= 1.7;
+        m.mode |= mode::GLOW;
+        world.rebuild(id, &*ctx.host);
+        let c = &mut ctx.hero.body.commands;
+        c.antenna = Some(id);
+        c.antenna_serial = world.mobys[id].serial;
+        c.antenna_colour = 0x3014_32d7;
+    }
+    if let Some(b) = ctx.hero_moby.filter(|&b| world.mobys.get(b).is_some_and(|m| m.mode & 1 == 0)) {
+        if let Some(p) = ctx.host.joint(&world.mobys[b], ANTENNA_JOINT) { ctx.hero.back.head_point = p; }
+        let at = ctx.host.joint_matrix(&world.mobys[b], ANTENNA_JOINT);
+        if let (Some(a), Some((rows, pos))) = (ctx.hero.body.commands.antenna, at) {
+            let mut k = if ctx.game.cheat(crate::cheats::cheat::CLANK_HEAD) { 3.1 } else { 1.7 };
+            if ctx.hero.body.commands.signal != 0 { k *= 1.4; }
+            let class_scale = world.class(ANTENNA_CLASS).map_or(1.0, |c| c.scale);
+            let m = &mut world.mobys[a];
+            (m.pos, m.rows) = (pos, rows);
+            m.mode |= mode::KEEP_ROWS;
+            crate::hero::physics::approach(class_scale * k, 0.02, &mut m.scale);
+            world.rebuild(a, &*ctx.host);
+        }
+    }
+    let c = &mut ctx.hero.body.commands;
+    c.antenna_phase = crate::hero::physics::add_rot(c.antenna_phase, 0.049_451_005);
+    let (mut first, mut second) = (0x2814_14c8, 0x1e00_004b);
+    if running {
+        c.antenna_phase = crate::hero::physics::add_rot(c.antenna_phase, 0.203_621_77);
+        match c.signal_command {
+            1 => (first, second) = (0x2814_c814, 0x1e00_4b00),
+            2 => (first, second) = (0x2814_c8c8, 0x1e00_4b4b),
+            3 => (first, second) = (0x3232_32fa, 0x1e00_0078),
+            4 => (first, second) = (0x28f0_1414, 0x1e4b_0000),
+            _ => {}
+        }
+    }
+    let colour = lerp_rgba(c.antenna_phase.sin() * 0.5 + 0.5, first, second);
+    if let Some(m) = c.antenna.and_then(|a| world.mobys.get_mut(a)) { m.glow = lerp_rgba(0.1, m.glow, colour); }
+    c.antenna_colour = lerp_rgba(0.1, c.antenna_colour, colour);
+}
+
+/// The body's tick (`0x2a65d8` with Clank's body), after the antenna: the command word's sound and signal, and the
+/// word cleared.
+pub fn tick(hero: &mut super::Hero) {
+    if hero.mode != 1 { return; }
     let c = &mut hero.body.commands;
     if c.command != 0 {
         let k = c.command;

@@ -62,6 +62,8 @@ pub const MINI_TURRET_CLASS: i16 = crate::moby::classes::turret::HAND_CLASS;
 pub const SYNTHENOID: i32 = 0x1f;
 /// The Lava Gun: item 0x1d, class 0x5c9 (L00 row `0x263e60`; crate::moby::classes::lava_gun).
 pub const LAVA: i32 = 0x1d;
+/// The Thermanator: item 0x27, class 0xfb0 (L00 row `0x264720`; crate::moby::classes::thermanator).
+pub const THERMANATOR: i32 = crate::moby::classes::thermanator::ITEM;
 /// The Seeker Gun: item 0x18, class 0x5ce (L00 row `0x263a00`; crate::moby::classes::seeker).
 pub const SEEKER: i32 = 0x18;
 pub const SEEKER_CLASS: i16 = crate::moby::classes::seeker::HAND_CLASS;
@@ -93,6 +95,8 @@ pub const SHEEPINATOR_CLASS: i16 = crate::moby::classes::sheepinator::HAND_CLASS
 /// The Clank Zapper: item 9 (L00 row `0x262ce0`; not held: asked for, it turns on, crate::moby::classes::zapper). Its
 /// row's class is the zap 0x0ed8.
 pub const ZAPPER: i32 = crate::moby::classes::zapper::ITEM;
+/// The Hypnomatic: item 0x37, class 0x950 (L18 row `0x26eca0`; crate::moby::classes::hypnomatic).
+pub const HYPNOMATIC: i32 = crate::moby::classes::hypnomatic::ITEM;
 
 /// An item record (`0x262500 + 0xe0·row`, row `0x139568[item]`: crate::upgrades): the fields the port reads.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -125,8 +129,8 @@ pub struct ItemRow {
 /// Electrolyzer's and the Spiderbot Glove's from L02's; the Swingshot's from L03's; the Chopper's L00 `0x263840`; the
 /// Blitz Gun's L00 `0x263bc0`; the Pulse Rifle's L00 `0x263920`; the Mini-Turret Glove's L00 `0x2648e0`; the
 /// Synthenoids' L00 `0x264020`; the Lava Gun's L00 `0x263e60`; the Seeker Gun's L00 `0x263a00`; the Bouncer's L00 `0x264560`;
-/// the Minirocket Tube's L00 `0x263ca0`; the Plasma Coil's L00 `0x263d80`; the Hoverbomb Gun's L00 `0x263ae0`; the Shield Charger's L00 `0x264c60`; the Zodiac's L00 `0x264aa0`; the RYNO II's L00 `0x264b80`; the Sheepinator's L00 `0x263300`).
-pub const ROWS: [ItemRow; 24] = [
+/// the Minirocket Tube's L00 `0x263ca0`; the Plasma Coil's L00 `0x263d80`; the Hoverbomb Gun's L00 `0x263ae0`; the Shield Charger's L00 `0x264c60`; the Zodiac's L00 `0x264aa0`; the RYNO II's L00 `0x264b80`; the Sheepinator's L00 `0x263300`; the Thermanator's L00 `0x264720`; the Hypnomatic's L18 `0x26eca0`).
+pub const ROWS: [ItemRow; 26] = [
     ItemRow { item: WRENCH, attach: 0, class: WRENCH_CLASS, stance: 0, icon: 0, use_seq: 0, keep: false, fire_seq: [0, 0], speed: 0.0, rate: 0.0, damage: 1.0, ammo: false, max_ammo: 0, start_ammo: 0 },
     ItemRow { item: LANCER, attach: 0, class: LANCER_CLASS, stance: 1, icon: 0xea64, use_seq: 0x38, keep: true, fire_seq: [-1, 0x3e], speed: 60.0, rate: 7.0, damage: 0.5, ammo: true, max_ammo: 200, start_ammo: 200 },
     ItemRow { item: DYNAMO, attach: 1, class: DYNAMO_CLASS, stance: 1, icon: 0xea7f, use_seq: 0x8d, keep: false, fire_seq: [0x8e, 0x8d], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
@@ -151,6 +155,8 @@ pub const ROWS: [ItemRow; 24] = [
     ItemRow { item: RYNO, attach: 0, class: RYNO_CLASS, stance: 2, icon: 0xea6c, use_seq: 0x36, keep: false, fire_seq: [-1, 0x46], speed: 0.0, rate: 6.5, damage: 100.0, ammo: true, max_ammo: 100, start_ammo: 100 },
     ItemRow { item: SHEEPINATOR, attach: 0, class: SHEEPINATOR_CLASS, stance: 1, icon: 0xea77, use_seq: 0x38, keep: true, fire_seq: [-1, 0x3e], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
     ItemRow { item: ZAPPER, attach: 5, class: crate::moby::classes::zapper::ZAP, stance: 0, icon: 0xea99, use_seq: -1, keep: false, fire_seq: [-1, -1], speed: 30.0, rate: 2.4, damage: 16.0, ammo: true, max_ammo: 30, start_ammo: 10 },
+    ItemRow { item: THERMANATOR, attach: 0, class: crate::moby::classes::thermanator::HAND_CLASS, stance: 1, icon: 0xea82, use_seq: 0x38, keep: true, fire_seq: [0x39, 0x3e], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
+    ItemRow { item: HYPNOMATIC, attach: 1, class: crate::moby::classes::hypnomatic::HAND_CLASS, stance: 1, icon: 0xea84, use_seq: 0x38, keep: true, fire_seq: [-1, 0x3e], speed: 0.0, rate: 0.0, damage: 0.0, ammo: false, max_ammo: 0, start_ammo: 0 },
 ];
 
 /// The upgraded rows the port has (L00 `0x262500 + 0xe0·row`; their item in brackets): the Heavy Lancer 0x3c and the
@@ -505,6 +511,8 @@ impl ItemBlock {
 /// lock `0x18c0d5` — his items hidden (`0x2d3208`: the hand, head and feet; the wrench in flight stays), and the
 /// first-person weapon (`0x2d54f8`, [`first_person_weapon`]).
 pub fn item_pass(world: &mut MobyWorld, ctx: &mut Ctx) {
+    // What a body's way back left for the world (crate::hero::body::after).
+    crate::hero::body::after(world, ctx);
     // `0x2a6dd0`'s head: the hand item's glow queue emptied (crate::fx::HeroGlow).
     world.hero_glows.clear();
     hand_pass(world, ctx);

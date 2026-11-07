@@ -601,6 +601,8 @@ pub struct MobyWorld {
     pub pulse: classes::pulse_rifle::Mem,
     /// The liquid grid's unit: its records, buffers and clock (crate::water::grid).
     pub liquid: crate::water::grid::Grid,
+    /// Todano's mesh water's meshes as they wave (crate::water::mesh).
+    pub water_mesh: crate::water::mesh::Meshes,
     /// The Minirocket Tube's rockets' trail slots (classes::minirocket).
     pub rockets: classes::minirocket::Trails,
     /// The RYNO II's missiles' trail slots (classes::ryno).
@@ -627,6 +629,8 @@ pub struct MobyWorld {
     pub zodiac: classes::zodiac::Arcs,
     /// The Sheepinator's globals: its light, loop sound, beam and the flock (classes::sheepinator).
     pub sheep: classes::sheepinator::Mem,
+    /// The Thermanator's hot shots' flames and puffs (classes::thermanator).
+    pub therm: classes::thermanator::Mem,
     /// The talking NPCs' level globals (talk).
     pub talk: talk::Mem,
     /// The camera's rows (`0x1b8f70`: forward, left, up) as the last moby loop saw them, for the particles that read
@@ -663,6 +667,8 @@ pub struct MobyWorld {
     pub convoy: classes::level07::train::Globals,
     /// Level 11's globals (classes::level11::Globals).
     pub level11: classes::level11::Globals,
+    /// The hoverbike races' words (classes::race::Globals; levels 4 and 11).
+    pub race: classes::race::Globals,
     /// Level 18's director's globals (classes::level18::director::Globals).
     pub level18: classes::level18::director::Globals,
     /// Level 19's globals (classes::level19::Globals).

@@ -28,6 +28,7 @@ pub mod damage;
 pub mod extras;
 pub mod frame;
 pub mod giant;
+pub mod hypno;
 pub mod grind;
 pub mod ground;
 pub mod items;
@@ -425,6 +426,8 @@ pub struct Hero {
     pub body: body::BodyBlock,
     /// Giant Clank's block (`0x18b694`, `0x18a002`, `0x18aa1c`, the level's record `0x1b18a0`: [`giant`]).
     pub giant: giant::GiantBlock,
+    /// The Hypnomatic's body's block (its time, Ratchet's place, the capture's flag: [`hypno`]).
+    pub hypno: hypno::HypnoBlock,
     /// The vehicle block (`0x18b650..0x18b668`: [`vehicle`]).
     pub vehicle: vehicle::VehicleBlock,
 }
@@ -466,6 +469,7 @@ impl Hero {
             ground_yaw: 0.0, slide_yaw: 0.0, slide_bank: 0.0, slide_hold: 0, slide_vel: [0.0; 2], slide_speed: 0.0, stagger: 0, rot_vel: [0.0; 2], bonk_yaw: 0.0, push: [0.0; 3], gravity: Default::default(), swing: Default::default(), swing_cooldown: 0, gear: Default::default(), grind: Default::default(), water: Default::default(), no_menu: 0, rng: Default::default(), state_req: None, anim_req: None, walk_to: Default::default(), fidget_rest: [0; 4], fidget_gap: 0, no_update: false, hits_out: Vec::new(), sounds: Vec::new(), level_sounds: Vec::new(), loops: Vec::new(), loop_stops: Vec::new(), loops_off: false, posture: Default::default(), layers: Default::default(), aim_point: [0.0; 3], unported_seen: Vec::new(), warps: 0,
             body: Default::default(),
             giant: Default::default(),
+            hypno: Default::default(),
             vehicle: Default::default(),
         }
     }
@@ -682,6 +686,8 @@ pub fn hero_update(hero: &mut Hero, env: &Env, anim: &mut dyn AnimCtl) -> HeroTi
         hero.rail_probe(env);
         hero.pole_probe(env);
     }
+    // L18 `0x2c41f0`: the Hypnomatic's body's time (crate::hero::hypno), before its transitions.
+    hero.hypno_tick(env, anim);
     hero.transitions(env, anim);
     hero.posture_tick(env, anim);
     HeroTick::Ran

@@ -1353,21 +1353,28 @@ fn along_path(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     m.pos = add(m.pos, scale(up, q));
 }
 
+/// `0x3f9a40(owner, pos)` (L23 `0x400c08`, the same code): the shadow mover 0x0d55 at `pos` for `owner`; its place
+/// is kept by the owner (`0x3f9ae0`: its `+0x00`).
+pub fn make_shadow(w: &mut MobyWorld, owner: usize, pos: V3) -> usize {
+    let s = w.create(SHADOW);
+    let sc = w.class(SHADOW).map_or(1.0, |c| c.scale);
+    let m = &mut w.mobys[s];
+    (m.drawn, m.state, m.pos) = (1, 0, pos);
+    m.scale = sc * f32::from_bits(0x3da3_d70a);
+    (m.update_dist, m.draw_dist) = (0xff, 0xff);
+    m.pvars.resize(m.pvars.len().max(0x20), 0);
+    m.set_pv_v(0, pos);
+    ai::set_link(m, 0x10, Some(owner));
+    m.set_pv_i(0x14, 0);
+    s
+}
+
 /// The tail after the states (module docs).
 fn after(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let pos = w.mobys[id].pos;
     match part(w, id, 0x388, SHADOW) {
         None => {
-            let s = w.create(SHADOW);
-            let sc = w.class(SHADOW).map_or(1.0, |c| c.scale);
-            let m = &mut w.mobys[s];
-            (m.drawn, m.state, m.pos) = (1, 0, pos);
-            m.scale = sc * f32::from_bits(0x3da3_d70a);
-            (m.update_dist, m.draw_dist) = (0xff, 0xff);
-            m.pvars.resize(m.pvars.len().max(0x20), 0);
-            m.set_pv_v(0, pos);
-            ai::set_link(m, 0x10, Some(id));
-            m.set_pv_i(0x14, 0);
+            let s = make_shadow(w, id, pos);
             ai::set_link(&mut w.mobys[id], 0x388, Some(s));
         }
         Some(s) => w.mobys[s].set_pv_v(0, pos),

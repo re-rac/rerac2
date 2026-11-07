@@ -4,9 +4,10 @@
 //!
 //! The talking NPCs 0x0c38, 0x0d3e and 0x0da8: [`talkers`]. The liquid grid 0x0960 (`0x3e9320`): crate::water::grid.
 //!
+//! The hoverbike race (Ratchet's hoverbike 0x0bbc, the racers 0x0b2d, the boost jets 0x0474 / 0x0cef, shared with level
+//! 11): crate::moby::classes::race.
+//!
 //! Not ported yet (level 4's own list; docs/plan/gaps.md has the systems):
-//! * **0x0bbc** (`0x41b020`, Ratchet's hoverbike), **0x0474** / **0x0cef** (`0x3c9760`, its flames), **0x0b2d** (`0x405aa0`, the
-//!   racers): the hoverbike race (G-LVL-010).
 //! * **0x0c26** (`0x423a38`): the level's help-text controller (help texts 0x9b5..0x9de and 0xa3c on its cuboids,
 //!   over many of Ratchet's and the game's words not yet named).
 //! * **0x02f8** (`0x3c4f80`), **0x0b37** (`0x4084c0`), **0x0b54** (`0x409440`): draw-callback effects (strips and

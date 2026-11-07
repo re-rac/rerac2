@@ -40,6 +40,7 @@
 //! | 0x28 | [`vapour`] (`0x338478`) | (`0x338648`) | vapour: puffs flying, growing, splitting once, bouncing off the world and shrinking away (L17's vents) |
 //! | 0x6a, 0x6b, 0x6c | [`meteor`] (`0x341890`, `0x341bc8`, `0x342028`) | (`0x341a18`, `0x341dc0`, `0x342230`) | the Meteor Gun's burst streaks and embers, its burning's smoke |
 //! | 0x45 | [`arc`] (L08 `0x34b3b8`) | `0x34b4e0` (L00 `0x33cb10`) | the beams' sparks (crate::fx::beams): moving, turning at random, fading over the life |
+//! | 0x60 | [`frost`] (`0x340608`) | (`0x340748`) | the Thermanator's cold shot's trail: slowing, falling, fading over the last half |
 //!
 //! Any other type kills itself on its first update. The gravity direction (`0x18a0e0`) is (0, 0, −1): normal gravity.
 //! Not ported: the gravity-boots bend of the positions (`0x380e08`, `+0x1c` = 2).
@@ -49,6 +50,7 @@ pub mod ash;
 pub mod cinder;
 pub mod dust;
 pub mod foot_dust;
+pub mod frost;
 pub mod keyed;
 pub mod lava;
 pub mod line;
@@ -1163,6 +1165,7 @@ pub fn update_parts(sys: &mut Particles, mobys: &crate::moby::MobyWorld, cam: [f
             lava::DROP => lava::update_drop(sys, i),
             line::LINE => line::update(sys, i),
             plasma::PUFF => plasma::update(sys, i, rng),
+            frost::FROST => frost::update(sys, i),
             meteor::STREAK => meteor::update_streak(sys, i),
             meteor::EMBER => meteor::update_ember(sys, i),
             meteor::SMOKE => meteor::update_smoke(sys, i),

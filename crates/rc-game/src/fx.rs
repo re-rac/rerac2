@@ -30,6 +30,7 @@
 //! | `0x3eecd0` | the Synthenoids' shot 0x0cbb | its streaks ([`crate::moby::classes::synthenoid::draw`]) |
 //! | `0x3ddaa8` | the Meteor Gun's meteor 0x0b2e | its trail, glow and scorches ([`crate::moby::classes::meteor::draw`]) |
 //! | `0x41c328` | the Lava Gun in the hand 0x05c9 drawn | its stream, muzzle glows and burning pools ([`crate::moby::classes::lava_gun::draw`]) |
+//! | `0x410b58` | the Thermanator in the hand 0x0fb0 aimed at a grid mover | the landing marker at its arc's end ([`crate::moby::classes::thermanator::draw`]) |
 //! | `0x3c5c98` (first list) | the Shield Charger's shield 0x0a5c holding | its arcs, sphere, halo and comets ([`crate::moby::classes::shield::draw`]) |
 //! | `0x3e9f18` / `0x3cd2d8` | the Plasma Coil in the hand 0x0c4a / its ball 0x0a9b | the hand's lightning and glints; the ball's arcs, rays and glow ([`crate::moby::classes::plasma_coil::draw_hand`], [`crate::moby::classes::plasma_coil::draw_ball`]) |
 //! | `0x3ec108` | the Mini-Turret Glove in the hand 0x0c5a | where its throw lands ([`crate::moby::classes::turret::draw_marker`]) |
@@ -66,6 +67,7 @@
 //! | `0x3b02e8` (L09; L16, L18, L19, L20; first list) | the bolt 0x05de | its strips, glow and sparks ([`crate::moby::classes::level09::bolt::draw`]) |
 //! | `0x42fce0` (L08; L09 `0x423498`, L19 `0x4223e8`; first list) | the liquid lids 0x11fe / 0x12af / 0x12b4 | the frame's lids' layers and sheens ([`crate::water::lid::draw`]) |
 //! | `0x3e94a0` → `0x3a35e8` (L04; L06 `0x3c1100`, L08 `0x3d1440` → `0x38e260`, L18, L20; first list, the second under water) | the liquid grid's mover of record 0 | every drawn patch's water and sheen ([`crate::water::grid::draw`]) |
+//! | `0x421db8` / `0x38abf0` (L12; first list) | Todano's mesh water 0x1113 / 0x1350 | its mesh's two layers ([`crate::water::mesh::draw`]) |
 //! | `0x390d60` (L14; L19 `0x383a18`; the world's list `0x2e77e0`, here the first) | the sinking pit 0x135f | its 7 × 7 waving cells (crate::moby::classes::level14::pit::draw) |
 //! | `0x432150` (L14) | the energy field 0x1164 | its halo, rings, core and rays (crate::moby::classes::level14::energy::draw) |
 //! | `0x41e3b8` (L16, first list) | the sweeping laser 0x1162 | its beam (crate::moby::classes::level16::laser::draw) |
@@ -394,6 +396,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::vaporizer::SHOT => crate::moby::classes::vaporizer::draw(w, id, hero_state, cam, out),
         crate::moby::classes::synthenoid::SHOT => crate::moby::classes::synthenoid::draw(w, id, cam, out),
         crate::moby::classes::lava_gun::HAND_CLASS => crate::moby::classes::lava_gun::draw(w, id, &mut game.rng, cam, out),
+        crate::moby::classes::thermanator::HAND_CLASS => crate::moby::classes::thermanator::draw(w, id, hero_state, game.scenes.mode, game.frame, out),
         crate::moby::classes::meteor::METEOR => crate::moby::classes::meteor::draw(w, id, &mut game.rng, cam, out),
         crate::moby::classes::plasma_coil::HAND_CLASS => crate::moby::classes::plasma_coil::draw_hand(w, host, id, &mut game.rng, cam, out),
         crate::moby::classes::plasma_coil::BALL => crate::moby::classes::plasma_coil::draw_ball(w, id, &mut game.rng, cam, out),
@@ -412,6 +415,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         c if crate::water::ocean::CLASSES.contains(&c) => crate::water::ocean::draw(w, id, game, hero_state, cam, host.camera_rows(), out),
         c if first && crate::water::lid::CLASSES.contains(&c) => crate::water::lid::draw(w, id, game.frame, cam, out),
         c if crate::water::grid::CLASSES.contains(&c) => crate::water::grid::draw(w, view, cam, out),
+        c if crate::water::mesh::CLASSES.contains(&c) => crate::water::mesh::draw(w, id, out),
         crate::vendor::CLASS => crate::moby::classes::vendor::draw(w, id, game, host.camera_rows(), out),
         // 0x0d5c is in the flocks' class switches but runs Damosel's traffic (L18 `0x3fcb78`, its only level): the flocks'
         // draw (`0x38ee50`) is a callback their leader's update registers, which no 0x0d5c runs, and its groups hold no
@@ -465,7 +469,8 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
                 || level14::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
                 || level16::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
                 || level26::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
-                || level20::draw(w, host, game, hero_state, view, cam, id, first, out, frame);
+                || level20::draw(w, host, game, hero_state, view, cam, id, first, out, frame)
+                || crate::moby::classes::level10::draw(w, host, game, hero_state, view, cam, id, first, out, frame);
         }
     }
 }

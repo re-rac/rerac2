@@ -21,8 +21,8 @@
 //! * **Else**: on its first tick its sound (class 0x08a1's sound 0, `0x37c980` = L00 `0x360698`); its glow
 //!   0x80208010.
 //!
-//! Not ported: the checkpoint with a body playing (the original takes Ratchet's own moby `+0xc18`: only the
-//! Hypnomatic's body 4 plays on these levels, and it is not ported).
+//! The checkpoint is at Ratchet's own moby (`+0xc18`): with the Hypnomatic's body playing (crate::hero::hypno) where
+//! he stands, not the creature.
 
 use crate::moby::{Ctx, MobyWorld};
 
@@ -73,7 +73,11 @@ pub fn update_0ed0(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let t = flag(w, 0xa);
             if t != 0xff { w.poke_group(group, t); }
         }
-        if flag(w, 0x12) != 0 && touched { ctx.game.save_checkpoint(ctx.hero.pos, ctx.hero.rot); }
+        if flag(w, 0x12) != 0 && touched {
+            let h = &ctx.hero;
+            let (p, r) = if h.mode == 4 { (h.hypno.ratchet_pos, h.hypno.ratchet_rot) } else { (h.pos, h.rot) };
+            ctx.game.save_checkpoint(p, r);
+        }
     }
     let v = (((phase.sin() * 4.0 - 3.0) * 128.0) as i32).clamp(32, 128) as u32;
     w.mobys[id].glow = 0x8000_0000 | v << 16 | v << 8 | v;

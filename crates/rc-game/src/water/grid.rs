@@ -27,7 +27,8 @@
 //!   copies of the class's collision, their faces' type bits `0x3a28a8(0)` / `(7)`, swapped by `0x3a2968`). The moby
 //!   of record 0 (`+0x10` = 0): its update distance 0xff and the unit's init ([`Grid::init`]), with two drops on every
 //!   record at `randf(±6)` (radius 2, 0.2) unless frozen. Its draw distance 0 (the model is not drawn); 1, and on to 1.
-//! * **1** (`0x3a3088`): with `+0xbc` (the Thermanator's hits, `0x41e180` = L00 `0x3e3400`) at `+0x15` or more: 2, the
+//! * **1** (`0x3a3088`): with `+0xbc` (the Thermanator's hits: its cold shot's `0x41e180` = L00 `0x3e3400` on water,
+//!   its hot shot's `0x3e1c18` on ice, crate::moby::classes::thermanator) at `+0x15` or more: 2, the
 //!   hits 0, the timer 60, frozen flipped (its faces with it); thawed, a drop on each of its records (radius 1,
 //!   −0.05, added). Frozen: nothing more. Else Ratchet in cuboid `+0x20`: his water height `0x18a150` its height; its
 //!   height `low + h·cos(phase) + h` (`h` half of high less low), the phase moved by the rate unless Ratchet's group is
@@ -76,8 +77,7 @@
 //! the half way, else `(Cs·FIX) + Cd` with `(2b − 1)·170` (170.5 freezing)). Both test Z without writing it (TEST
 //! 0x53001). Here the FIX is the quads' alpha (the effects' blend, as crate::water::lid's).
 //!
-//! Not ported: the Thermanator (`0x41e180`, whose hits count up `+0xbc` and ripple the liquid), the target list
-//! `0x3a7020` (`0x231e40`: the moby and its `+0x28` factor; for the Thermanator), the edge pins `+0x44` (0 on every
+//! Not ported: the target list `0x3a7020` (`0x231e40`: the moby and its `+0x28` factor; for the Thermanator), the edge pins `+0x44` (0 on every
 //! record: nothing sets them), the camera +0x2c0's second cuboid test on Notak reads the under-water flag.
 
 use crate::fx::FxQuad;
@@ -235,11 +235,22 @@ pub struct Grid {
     pub clock: Pf,
     /// `0x1ad850`.
     light: [f32; 3],
+    /// The water plane beside the unit's globals (`0x1b2c7c..`; crate::water::plane), kept by the init.
+    pub plane: super::plane::Plane,
 }
 
 impl Grid {
     /// The unit is on (`0x1b2c78` ≠ 0: the height query asks it).
     pub fn on(&self) -> bool { !self.patches.is_empty() }
+
+    /// The water's height query `0x31d7a0` (L12 `0x3211a0`): with the unit on, a drawn patch's rippled height there
+    /// ([`Grid::height`]); else the water plane's (crate::water::plane::Plane::height); None: the point's own.
+    pub fn surface(&self, p: V3) -> Option<f32> {
+        if self.on() {
+            if let Some(h) = self.height(p) { return Some(h); }
+        }
+        self.plane.height(p)
+    }
 
     /// The init (module docs).
     pub fn init(&mut self, t: &Tables) {
@@ -298,7 +309,7 @@ impl Grid {
         }
         let a = t.light[1].atan2(t.light[0]);
         let k = f32::from_bits(0x3f13_cd36);
-        *self = Grid { patches, cur: 0, prev: 1, render: 2, clock: Pf::b(0x3f8c_cccd), light: [a.cos() * k, a.sin() * k, -k] };
+        *self = Grid { patches, cur: 0, prev: 1, render: 2, clock: Pf::b(0x3f8c_cccd), light: [a.cos() * k, a.sin() * k, -k], plane: self.plane };
     }
 
     /// Writes `v` to cell (r, c) of buffer `b` of patch `p` and the halos it feeds, the links counted from `base`.
