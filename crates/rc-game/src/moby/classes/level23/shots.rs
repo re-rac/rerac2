@@ -44,6 +44,7 @@
 use super::boss;
 use crate::hero::physics::{add, add_rot, cross, dist, dot, scale, set_len, sub, unit, V3};
 use crate::moby::blast::{burst, Blast};
+use crate::moby::classes::planetoid::down_at;
 use crate::moby::hits::HitTemplate;
 use crate::moby::{countdown, Ctx, MobyWorld};
 use crate::quat::{axis_angle, turn_rows};
@@ -56,8 +57,6 @@ pub const WAVE: i16 = 0x11df;
 
 /// `0x5627.9248`: the hit way's "no limit" w.
 const NO_LIMIT: f32 = f32::from_bits(0x45af_df66);
-
-fn down_at(ctx: &Ctx, p: V3) -> V3 { scale(ctx.hero.gravity.up_at(p), -1.0) }
 
 /// The target word `+0x18`: none, a moby (index + 1), or the straight-down shot's 1 (here −1).
 const DOWN: i32 = -1;

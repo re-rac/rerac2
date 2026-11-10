@@ -11,7 +11,7 @@
 //! * Shared with others: the pad 0x0efc (`0x41c768`, crate::moby::classes::pads), the breakables 0x130b / 0x130f
 //!   (crate::moby::classes::breakables), the kill cuboids 0x040f (crate::moby::classes::kill_zone), the targets 0x0c86 /
 //!   0x0c87 (crate::moby::classes::hit_targets), the updraft 0x08e2 / 0x123a (crate::moby::classes::updraft), the
-//!   light 0x0cfd (crate::moby::classes::hue_light).
+//!   light 0x0cfd (crate::moby::classes::hue_light), level 12's guide 0x0fec (`0x41eea0`, crate::moby::classes::guide).
 
 pub mod breakables;
 pub mod clock;
@@ -40,8 +40,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x12ed => Some(props::update_12ed),
         0x0f20 => Some(props::update_0f20),
         0x0efa => Some(props::update_0efa),
-        // The guide of level 12's launcher (`0x41eea0` = L12 `0x41b2a8`): only the scenes show it here.
-        super::level12::launcher::GUIDE => Some(super::level12::launcher::update_0fec),
         0x11b0 => Some(props::update_11b0),
         0x1225 => Some(props::update_1225),
         lift::CLASS => Some(lift::update),

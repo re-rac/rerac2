@@ -1,4 +1,4 @@
-//! The orbits' floating debris (L22 / L23 addresses). Any hit breaks it.
+//! The orbits' floating debris (L22 / L23 addresses; 0x0dce and 0x0cb6 are Dobbo orbit's only). Any hit breaks it.
 //!
 //! * **0x0aa9** (`0x3d5878`, 127 placed on level 22) and **0x1213** (L23 `0x4291b0`, 196 placed): [`update_rock`]
 //!   (the decomp's `func_L22_003D4428` → `0x3d5770`). Updated from any distance. Hit by anything, it:

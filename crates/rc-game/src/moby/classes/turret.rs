@@ -31,7 +31,7 @@
 //!   place; not Ratchet nor the glove): off a wall (less than 0.5556 up) or a moby of class type 5 it bounces (the
 //!   normal speed ×0.45); stopped on another turret (0x00cb, 0x1366, 0x1367) it flies on 1.1 times as fast. Landed:
 //!   still, the moby under it kept, by the surface's kind (`0x3813b0`): water (0, 0xd, 0xe) — it sinks (**7**, 0.025 a
-//!   tick); 1 / 3 / 0xb / 0xc — **8**; else a slot in the table (`0x381048`), the ready set (`0x3810f8`), ready: class
+//!   tick; on 0 the splash moby 0x307, crate::moby::classes::splash); 1 / 3 / 0xb / 0xc — **8**; else a slot in the table (`0x381048`), the ready set (`0x3810f8`), ready: class
 //!   sound 1, sequence 1, **2**; else **6**. Its collision on.
 //! * **2** (unfolding): its frame at 6 → sequence 2, **3** (searching, [`search`] `0x3889a8`): the aim search all round
 //!   within 15 of its joint 0 (crate::moby::aim::search, no crates) — a target: **4**, the cooldown 0; with none and a
@@ -110,7 +110,7 @@
 //! search's class list (`$gp−0x90`: {0, 0x1367}, of no class of type 5). (The turret's flight keeps a tracker, `+0x4f`,
 //! rides the level's moving frame and falls along the frames' up: crate::gravity.) The level's moving frame (`0x1adb0c`, the tables `0x238730` / `0x2388c0` by the turret's
 //! index: what it lands on carries it with its turn; null on the ported levels), the water's ripple (`0x37d5a0`, with
-//! the ripple module: G-REN-009) and splash moby (`0x39f938`: class 0x307, in no level), the water's patch and plane
+//! the ripple module: G-REN-009), the water's patch and plane
 //! heights for the bubbles (`0x31d7a0`: the bubble's own height here, as the port's water does); the shots' line through the gravity frames (`0x380e58`). The original keeps the table's
 //! moby pointers and the shots' owners as pointers; the port keeps moby indices.
 
@@ -634,6 +634,11 @@ fn fly(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             v[2] = f32::from_bits(0xbccc_ccce);
             m.set_pv_v(pv::VEL, v);
             m.state = 7;
+            // On the plain water (surface 0) its ripple (not ported) and the splash moby (`0x39f938(at, 2)`), alpha 0x70.
+            if surface == 0 {
+                let at = w.mobys[id].pos;
+                if let Some(k) = super::splash::spawn(w, ctx, at, 2.0) { w.mobys[k].alpha = 0x70; }
+            }
         }
         1 => w.mobys[id].state = 8,
         _ => {

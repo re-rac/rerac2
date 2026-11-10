@@ -302,7 +302,7 @@ fn reset(w: &mut MobyWorld, id: usize) {
                     m.rows = euler_rows(m.rot);
                     m.set_state(0, -1);
                 }
-                super::breeder::CLASS => {
+                super::super::breeder::CLASS => {
                     m.set_pv_b(0x2e, 1);
                     m.set_pv_f(0x20, m.pv_s(0x24) as f32);
                     m.drops = 0;

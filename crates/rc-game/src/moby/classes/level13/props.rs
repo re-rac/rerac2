@@ -10,7 +10,7 @@
 //! * **0x12ed** ([`update_12ed`], `0x38d8b8`, 1 placed): two cuboids that each ask for their music.
 //! * **0x0f20** ([`update_0f20`], `0x38d770`, 1 placed): hides the level's enemies in its scene 3.
 //! * **0x0efa** ([`update_0efa`], `0x41c6f0`, 3 placed): two cuboids that set the death height.
-//! * **0x0fec** (`0x41eea0`, 1 placed): shown out of the scenes — level 12's guide, crate::moby::classes::level12::launcher.
+//! * **0x0fec** (`0x41eea0`, 1 placed): shown out of the scenes — level 12's guide, crate::moby::classes::guide.
 //! * **0x11b0** ([`update_11b0`], `0x425c00`, 1 placed): flag bytes set by cuboids.
 //! * **0x1225** ([`update_1225`], `0x427c88`, 1 placed): gone with another moby once its mission is done.
 //!

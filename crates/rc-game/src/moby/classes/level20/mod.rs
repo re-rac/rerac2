@@ -1,6 +1,11 @@
 //! Level 0x14's own classes (Yeedil; L20 addresses, the engine functions they call named by their L20 addresses with
 //! the L00 ones the port knows them by). Each class's update is registered in [`update_for`];
 //! crate::moby::classes::update_for asks it after its own.
+//!
+//! Shared with other levels: the fading field 0x119b (crate::moby::classes::fading_field, L19's 0x1204), the floating
+//! platform 0x1257 (crate::moby::classes::floe, L19's 0x0f4b), the arc glow 0x1212 (crate::moby::classes::arc_glow,
+//! L18), the breeding critter 0x0b69 (crate::moby::classes::breeder) and the step pad 0x0ed0
+//! (crate::moby::classes::pads; L18, L19).
 
 pub mod biter;
 pub mod boss;
@@ -35,7 +40,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         strafer::CLASS => Some(strafer::update_12f8),
         props::SLIDER => Some(props::update_124f),
         props::CRYSTAL => Some(props::update_1269),
-        props::FIELD => Some(props::update_119b),
         props::NEST => Some(props::update_11ec),
         // `0x446c78`: `jr ra`.
         misc::SLAB => Some(misc::update_11ef),
@@ -53,8 +57,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         prize::CLASS => Some(prize::update_12d3),
         effects::SCENE_FX => Some(effects::update_0f2a),
         effects::RISING => Some(effects::update_0548),
-        // `0x449298`: L19's floating platform `0x4168b8`, the same code.
-        0x1257 => Some(super::level19::floe::update_0f4b),
         _ => None,
     }
 }

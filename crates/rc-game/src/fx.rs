@@ -385,6 +385,7 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         crate::moby::classes::gunship_bolt::CLASS if first => crate::moby::classes::gunship_bolt::draw(w, id, &mut game.rng, cam, out),
         crate::moby::classes::sinking_pit::CLASS => crate::moby::classes::sinking_pit::draw(w, id, out),
         crate::moby::classes::lobber::SHOT => crate::moby::classes::lobber::draw_0ea5(w, id, &mut game.rng, cam, out),
+        crate::moby::classes::electric_fence::CLASS => crate::moby::classes::electric_fence::draw(w, id, cam, out),
         crate::moby::classes::level07::laser::CLASS => crate::moby::classes::level07::laser::draw(w, id, cam, out),
         crate::moby::classes::level07::boss::GLOW => crate::moby::classes::level07::boss::draw_0d45(w, id, &mut game.rng, cam, out),
         crate::moby::classes::shot::SHOT_CLASS => crate::moby::classes::shot::draw_trail(w, id, cam, &mut game.trail_phase, out),

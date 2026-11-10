@@ -2,7 +2,7 @@
 //! Ratchet rides (his state 0x31 with `0x18b650` set, crate::hero::vehicle) it keeps a camera tweak (crate::camera::
 //! CamTweaks, priority 5, `0x2d4da8`) looking at 10 ahead of the vehicle along its yaw and half its pitch reversed
 //! (`0x322b18`): for the vehicle 0x0905 the distance 7 (`$gp+0x2e44..`), the pitch and look height left alone;
-//! for the others (the hovership 0x0eef, crate::moby::classes::level08::hovership) the distance 6, the pitch 0.1
+//! for the others (the hovership 0x0eef, crate::moby::classes::hovership) the distance 6, the pitch 0.1
 //! and the look height 0; the face-after-rest flag on, the way it faces the point less the camera's place. Off the
 //! vehicle the tweak is let go (`0x2d4e48`).
 //!

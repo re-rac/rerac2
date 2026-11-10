@@ -2,8 +2,9 @@
 //! with the port's). Each class's update is registered in [`update_for`]; crate::moby::classes::update_for asks it
 //! after its own.
 //!
-//! Shared with other levels: Ratchet's glider 0x0905 (crate::moby::classes::glider; L09, L19) and the crystals'
-//! counter 0x09f3 (crate::moby::classes::gem_counter; L19's moonstones).
+//! Shared with other levels: Ratchet's glider 0x0905 (crate::moby::classes::glider; L09, L19) and its launch pad
+//! 0x0988 (crate::moby::classes::glider_pad), the crystals' counter 0x09f3 (crate::moby::classes::gem_counter; L19's
+//! moonstones), the hovership 0x0eef and its raritanium 0x099a (crate::moby::classes::hovership; L19).
 
 pub mod arcer;
 pub mod breakables;
@@ -12,7 +13,6 @@ pub mod breather;
 pub mod burrower;
 pub mod crystal;
 pub mod geyser;
-pub mod hovership;
 pub mod lift;
 pub mod mission;
 pub mod props;
@@ -22,7 +22,7 @@ pub mod tabora_ai;
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
-        // Also level 19's (L19 `0x42afa8`, the same code and data).
+        // Level 19's table runs the same code (L19 `0x42afa8`), but there 0x0e3e is only a scene actor (no update).
         buyer::CLASS => Some(buyer::update_0e3e),
         breakables::CLASS_12AA | breakables::CLASS_129C | breakables::CLASS_129E => Some(breakables::update_12aa),
         breakables::CLASS_12D0 => Some(breakables::update_12d0),
@@ -33,14 +33,10 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         arcer::MANAGER => Some(arcer::update_1006),
         breather::CLASS => Some(breather::update_09c6),
         props::PLATFORM => Some(props::update_090e),
-        props::GLOWING => Some(props::update_0988),
         props::PICKUP => Some(props::update_0e5b),
         // Also levels 9 (0x0d49, L09 `0x401350`) and 19 (0x1176, L19 `0x41fcb8`): the same code.
         lift::CLASS | 0x0d49 | 0x1176 => Some(lift::update_0aaa),
         mission::CLASS => Some(mission::update_0c2a),
-        // Also level 19's (L19 `0x414848` / `0x3c1cc8`, the same code and data).
-        hovership::HOVERSHIP => Some(hovership::update_0eef),
-        hovership::RARITANIUM => Some(hovership::update_099a),
         seesaw::CLASS => Some(seesaw::update_090d),
         crystal::CRYSTAL => Some(crystal::update_096a),
         crystal::LEFT => Some(crystal::update_08c4),

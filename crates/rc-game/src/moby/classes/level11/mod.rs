@@ -3,7 +3,7 @@
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
 //!
 //! * [`movers`]: the floors, columns and blocks the Dynamo's targets and the hologram lift move.
-//! * [`beams`]: the electric fence 0x0ee0.
+//! * the electric fence 0x0ee0 (L13's too): crate::moby::classes::electric_fence.
 //! * [`critters`]: the birds 0x1105.
 //! * [`stalks`]: the sparked stalks 0x10ea / 0x118c.
 //! * [`props`]: the small objects (the Hacker's gate, the help texts, the sparks, ...).
@@ -20,7 +20,6 @@
 //! deaths make skill point 0x12 (props::update_12c7).
 
 pub mod arena;
-pub mod beams;
 pub mod bosses;
 pub mod brutes;
 pub mod carrier;
@@ -52,8 +51,6 @@ pub struct Globals {
     pub g904c: i32,
     pub g9050: i32,
     pub g338: i32,
-    /// The electric fence's state (`$gp+0x3600..`, beams::Fence).
-    pub fence: beams::Fence,
     /// `$gp+0x1764`: the frame the light shafts' draw was last asked for (props::update_0e49).
     pub shafts_frame: i32,
     /// Joba's arena (arena): the ring's polygon (the path `0x1ff580[master +0x1c8]` the original rescales), the gravity
@@ -91,7 +88,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x1105 => Some(critters::update_1105),
         0x12c7 => Some(props::update_12c7),
         0x10ea | 0x118c => Some(stalks::update),
-        0x0ee0 => Some(beams::update),
         0x0e49 => Some(props::update_0e49),
         sellers::SELLER => Some(sellers::update_0e95),
         sellers::BOOTS => Some(sellers::update_0b7c),
@@ -127,7 +123,6 @@ pub fn draw(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crat
     match w.mobys[id].o_class {
         0x0dfd => props::draw_0dfd(w, id, &mut game.rng, cam, out),
         0x10ea | 0x118c => stalks::draw(w, id, &mut game.rng, cam, out),
-        0x0ee0 => beams::draw(w, id, cam, out),
         0x0e49 => props::draw_0e49(w, id, game.frame, view, out),
         arena::DF4 => fighters::draw_df4(w, id, &mut game.rng, cam, out),
         _ => return false,

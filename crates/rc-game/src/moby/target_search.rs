@@ -1,6 +1,6 @@
 //! The decoy-aware target search `func_L04_003429F8` (L04 `0x343c18` = L06 `0x362ca8` = L08 `0x330678` = L17
 //! `0x323c88`): the copy levels 4, 6, 8 and 17 carry for their mobys that lob things at Ratchet (crate::moby::classes::
-//! launcher's 0x0a58, crate::moby::classes::level17::mortar's 0x0c1a). Level 8's ground enemies have their
+//! launcher's 0x0a58, crate::moby::classes::mortar's 0x0c1a). Level 8's ground enemies have their
 //! own, wider search (crate::moby::classes::level08::tabora_ai::find_target, `0x330a10`).
 //!
 //! **The target:** Ratchet, unless he is in the movement group 0x18 or the state 0x6f; or (with `n` areas) in one of

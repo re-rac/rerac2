@@ -4,8 +4,6 @@
 //!   Its set-up keeps its place (`+0x90`), sets its block's flags bit 1 (`+0x8c`) and `+0x3e` = 15, points its pvar
 //!   words at its platform block (`+0x50`) and health block (`+0x20`), and gives it mode 0x20. Each tick it writes
 //!   the tick's move into its platform block (`0x318730`) and keeps its new place.
-//! * **0x0988** ([`update_0988`], `0x3d5310`, also L09 / L19): its glow pulses (`0x335a18` = L01 `0x31cf58`, as
-//!   crate::moby::classes::oozla::update_0fa0) from 0x80aaaad2 to 0x80396464, its phase on 0.0611 a tick.
 //! * **0x0e5b** ([`update_0e5b`], `0x40ff80`; the decomp's v2.00 `func_US2_L08_0040FF80`): the item 0x15's pickup.
 //!   It is gone once item 13 is had. Otherwise it is raised 0.75, scaled 1.5 against its class, and spins 4.5° a
 //!   tick. With Ratchet in cuboid `+4` it starts scene 0x5b; when the scene is over it puts Ratchet at cuboid `+8`'s
@@ -18,7 +16,6 @@
 use crate::moby::{platform, Ctx, MobyWorld};
 
 pub const PLATFORM: i16 = 0x090e;
-pub const GLOWING: i16 = 0x0988;
 pub const PICKUP: i16 = 0x0e5b;
 
 pub fn update_090e(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
@@ -38,14 +35,6 @@ pub fn update_090e(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
     platform::write(m, 0x50, mv, rot, rot);
     let pos = m.pos;
     m.set_pv_v(0x90, pos);
-}
-
-pub fn update_0988(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
-    let m = &mut w.mobys[id];
-    if m.pvars.len() < 0x10 { return; }
-    let phase = m.pv_f(0xc);
-    m.set_pv_f(0xc, crate::hero::physics::add_rot(phase, 0.061_086_536));
-    m.glow = crate::hud::lerp_rgba(phase.sin() * 0.5 + 0.5, 0x80aa_aad2, 0x8039_6464);
 }
 
 pub fn update_0e5b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {

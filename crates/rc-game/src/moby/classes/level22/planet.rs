@@ -46,21 +46,9 @@
 use crate::hero::physics::{add, cross, dist, dot, len, scale, set_len, sub, unit, V3};
 use crate::moby::{Ctx, MobyWorld};
 
-/// `0x3a3db8(p, h)`: `p` moved along its line from the sphere's centre to `h` above the surface (radius + `h` from
-/// the centre).
-pub fn surface(ctx: &Ctx, radius: f32, p: V3, h: f32) -> V3 {
-    let c = ctx.hero.gravity.centre;
-    add(set_len(sub(p, c), h + radius), c)
-}
+/// `0x3a3db8`, the down and the turn to a way (crate::moby::classes::planetoid).
+pub use crate::moby::classes::planetoid::{down_at, surface, turn_to};
 
-/// `0x32b440(p, out, 0)` (L00 `0x326448`): the down at `p` (world −z with the frames off).
-pub fn down_at(ctx: &Ctx, p: V3) -> V3 { scale(ctx.hero.gravity.up_at(p), -1.0) }
-
-/// `0x32b9d0(m, v, 0)`: the turn from the moby's facing to `v` (its yaw in the moby's frame, made positive).
-pub fn turn_to(rows: &[V3; 3], v: V3) -> f32 {
-    let l = crate::gravity::to_local(v, rows);
-    crate::hero::physics::atan2(l[0], l[1]).abs()
-}
 
 /// The slots' pvars (the opponent's `+0x2a0`).
 pub const SLOTS: usize = 0x2a0;

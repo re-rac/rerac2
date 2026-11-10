@@ -1,7 +1,7 @@
 //! Type 0x67: a spot (L04 `0x364f80` / `0x365030`, L06 `0x3824b0`, L09 `0x33e328`, L10 `0x3559e8`, L12 `0x3467c0`,
 //! L13 `0x34b058`, L14 `0x34b990`, L16 `0x339418`, L17 `0x344980`; the decomp's `func_L04_00363CA0` and its update
 //! `func_L00_003402B8`): a camera-facing sprite (record kind 0) shown for two ticks — the glows the tie waves 0x1137
-//! put on their ties each tick (crate::moby::classes::level04::tie_wave) and Hrugis's cloud glints 0x11b9
+//! put on their ties each tick (crate::moby::classes::tie_wave) and Hrugis's cloud glints 0x11b9
 //! (crate::moby::classes::level10::glints).
 //!
 //! **A spot** ([`spot`], `0x364f80(pos, rgba, size)`): ALPHA 0x48 (additive), `+0x09` `(int)2.0 − 0x10` (near 2 / far

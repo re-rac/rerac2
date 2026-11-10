@@ -25,6 +25,8 @@
 use crate::hero::physics::{add, dist, dot, len, set_len, smooth_step, sub, V3};
 use crate::moby::{Ctx, MobyWorld};
 
+pub const CLASS: i16 = 0x1137;
+
 fn group(w: &MobyWorld, id: usize) -> Option<Vec<usize>> {
     usize::try_from(w.mobys[id].pv_i(0)).ok().and_then(|g| w.tie_groups.get(g)).filter(|g| !g.is_empty()).map(|g| g.iter().map(|&t| t as usize).collect())
 }

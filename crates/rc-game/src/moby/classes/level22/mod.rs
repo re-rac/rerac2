@@ -1,10 +1,11 @@
 //! Level 0x16's own classes (Dobbo's orbit; L22 addresses, the engine functions they call named by their L22
 //! addresses with the port's). Each class's update is registered in [`update_for`]; crate::moby::classes::update_for
-//! asks it after its own.
+//! asks it after its own. Shared with Damosel orbit (level 23): the debris (crate::moby::classes::orbit_debris: 0x0aa9's
+//! update is L23's 0x1213's; 0x0dce and 0x0cb6 there too), the asteroid clusters 0x0d3d (crate::moby::classes::asteroid_cluster) and
+//! their rocks 0x0a80 (crate::moby::classes::thrown_rock), the pickups 0x0e3a / 0x0e3b / 0x0e3d
+//! (crate::moby::classes::orbit_pickups), and the classes crate::moby::classes::update_for lists for both orbits.
 
-pub mod asteroid;
 pub mod boss;
-pub mod debris;
 pub mod director;
 pub mod drone;
 pub mod pickups;
@@ -64,15 +65,11 @@ impl Default for Globals {
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
-        debris::ROCK | debris::ROCK_B | debris::ICE => Some(debris::update_rock),
-        debris::DUST => Some(debris::update_0cb6),
-        asteroid::CLUSTER => Some(asteroid::update),
-        asteroid::WATCHER => Some(asteroid::update_12db),
+        props::WATCHER => Some(props::update_12db),
         props::HIDDEN => Some(props::update_0a6c),
         director::CLASS => Some(director::update_133a),
         boss::CLASS => Some(boss::update_0e0b),
         drone::CLASS => Some(drone::update),
-        pickups::HEALTH | pickups::GUN | pickups::SPECIAL => Some(pickups::update),
         shot::CLASS => Some(shot::update),
         special::CLASS => Some(special::update),
         _ => None,

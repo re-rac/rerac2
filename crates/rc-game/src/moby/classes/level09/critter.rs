@@ -35,8 +35,8 @@
 //!
 //! The L09 engine functions with the port's: `0x327070` / `0x327048` the sub's / state's first tick, `0x32a218` senses,
 //! `0x324590` take_damage, `0x3252d8` flight, `0x3275b8` find_target, `0x328fe8` / `0x329040` the moves (move_step /
-//! move_toward), `0x3292a8` / `0x32a0d8` = L02 `0x333980` the turn (crate::moby::ai::face_at), `0x32a138`
-//! face_point, `0x326ec0` keep_in_path, `0x326d30` spread, `0x320048` reached, `0x3195f0` attack_joint, `0x316fe8` the
+//! move_toward), `0x3292a8` = L00 `0x32ceb8` the turn in place (crate::moby::ai::turn_in_place), `0x32a0d8` = L02
+//! `0x333980` the turn (crate::moby::ai::face_at), `0x32a138` face_point, `0x326ec0` keep_in_path, `0x326d30` spread, `0x320048` reached, `0x3195f0` attack_joint, `0x316fe8` the
 //! bolts, `0x31d518` = L00 `0x3210a8` (smoke_burst), `0x3238a8` = L00 `0x327498` (break_into), `0x3206a0` /
 //! `0x323718` the aims, `0x323128` the glow sprite, `0x30d900` delete.
 //!
@@ -372,7 +372,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let m = &w.mobys[id];
             let t = ai::link(m, T_MOBY).and_then(|t| w.mobys.get(t)).map_or(ctx.hero.pos, |t| t.pos);
             let yaw = atan2(t[0] - m.pos[0], t[1] - m.pos[1]);
-            crate::moby::ai::face_at(&mut w.mobys[id], MV, yaw);
+            ai::turn_in_place(w, id, ctx, yaw);
             if !wrapped(w, id, ctx) { return; }
             let m = &mut w.mobys[id];
             m.set_pv_f(MV + 0x14, f32::from_bits(0x3be4_c38a));

@@ -17,7 +17,7 @@
 //!   start at `4·h / t²` a tick², at most that times `t`), then 2. **2**: the wait `+0x78`, 3. **3**: the trip down
 //!   (the wait `+0x7c`), 4. **4**: the wait `+0x80`, 1. Not hooked with `+0x8c` above 0, each live breeder 0x0b69 of
 //!   its group (`+0x21`) gives its bolts and dies (`0x448b88`: `0x32fd10(e, 0, 1)` and L18 `0x3f8928`,
-//!   crate::moby::classes::level18::breeder::drop_and_die), `+0x8c` −1000. Its move into its platform block (`0x3378b8`
+//!   crate::moby::classes::breeder::drop_and_die), `+0x8c` −1000. Its move into its platform block (`0x3378b8`
 //!   = L00 `0x322668`) and Ratchet carried.
 //! * **0x131a** ([`update_131a`], `0x3a16e8`, 2 placed; the decomp's `func_L20_003A0320`): a breakable. **0**: 1.
 //!   **1**: a hit with flags 0x4010000 (`0x332e28` = L00 `0x31dce8`) while `+0x00` is 0 breaks it; its hit let go;
@@ -181,8 +181,8 @@ pub fn update_1246(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         if group != 0xff {
             let members = w.groups.get(group as usize).cloned().unwrap_or_default();
             for e in members {
-                let live = w.mobys.get(e).is_some_and(|k| k.o_class == crate::moby::classes::level18::breeder::CLASS && k.state != 0xfe && k.state != 0xfd);
-                if live { crate::moby::classes::level18::breeder::drop_and_die(w, e, ctx); }
+                let live = w.mobys.get(e).is_some_and(|k| k.o_class == crate::moby::classes::breeder::CLASS && k.state != 0xfe && k.state != 0xfd);
+                if live { crate::moby::classes::breeder::drop_and_die(w, e, ctx); }
             }
         }
         w.mobys[id].set_pv_f(0x8c, -1000.0);

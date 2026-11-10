@@ -23,7 +23,7 @@
 //!
 //! **His weapons' counts** are the level's record 1 at `0x1b1890` (L22 `0x1b18a0`, L23 `0x1b1f20`; the hero's
 //! `0x18b6a8` points at it): `+0` a timer (set: strong shots), `+8` the gun's charge, `+0xc` the specials. The
-//! level's pickups fill them (crate::moby::classes::level22::pickups: full at the fight's set-up, raised by the
+//! level's pickups fill them (crate::moby::classes::orbit_pickups, crate::moby::classes::level22::pickups: full at the fight's set-up, raised by the
 //! pickups), and his health.
 //!
 //! **His gun** (`0x2aa678`, the body tick's last, not in a landing lag): ○ pressed within 8 with charge left, no

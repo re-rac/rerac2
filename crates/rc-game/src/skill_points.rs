@@ -80,7 +80,7 @@ pub mod point {
     /// Damosel's cuboids (L18 0x0c34, crate::moby::classes::level18::hints; [`super::watch`]).
     pub const DAMOSEL: usize = 0x07;
     /// Dobbo's orbit's asteroid clusters 0x0d3d all shot down (L22 0x12db `0x387310`,
-    /// crate::moby::classes::level22::asteroid::update_12db).
+    /// crate::moby::classes::level22::props::update_12db).
     pub const CLUSTERS: usize = 0x18;
 }
 

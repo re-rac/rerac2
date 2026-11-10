@@ -1,7 +1,7 @@
 //! Level 14's electric strand **0x0f80** (`0x423798`, 18 placed; the decomp's `func_L14_004221D8`): the vents'
 //! sequencer's light (crate::moby::classes::level14::steam, `0x3e66c8`: it sets the strand's colours `+0x48` /
 //! `+0x4c`, its path `+0x34` and turns it on, `+0x3c` = 1; its ramp sets the core's widths `+0x40` / `+0x44`; it turns
-//! it off again). L11's fence 0x0ee0 (crate::moby::classes::level11::beams) is the same strand.
+//! it off again). The electric fence 0x0ee0 (crate::moby::classes::electric_fence) is the same strand.
 //!
 //! Its pvars: `+0x00` / `+0x10` the ends of its line (its place, and 6..177 along y from it), `+0x20` the line's
 //! length, `+0x2c` the points drawn, `+0x34` its path, `+0x38` its row of the strand buffer (`0x259470`, 0x280 a
@@ -24,7 +24,7 @@
 //! Not ported: the point light its first tick takes (`0x3053a0(0, 0, place, 0)`, never set again).
 
 use crate::hero::physics::{add, add_rot, atan2, set_len, sub, wrap, V3};
-use crate::moby::classes::level11::beams::Strands;
+use crate::moby::classes::electric_fence::Strands;
 use crate::moby::{Ctx, MobyWorld};
 
 pub const CLASS: i16 = 0x0f80;

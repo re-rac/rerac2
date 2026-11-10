@@ -1,4 +1,4 @@
-//! The Insomniac Museum's two hovercraft, the hovership's earlier siblings (crate::moby::classes::level08::hovership,
+//! The Insomniac Museum's two hovercraft, the hovership's earlier siblings (crate::moby::classes::hovership,
 //! whose shared pieces they are built on): **0x085c** ([`update_085c`], the decomp's `func_US2_L08_003C7F00`: L21
 //! `0x3b6008`, also in the overlays of L08 `0x3c7f00` and L19 `0x3b7610`, the class placed on the museum only) and
 //! **0x0f2f** ([`update_0f2f`], `0x40c018`, its flight `0x40c8b0`; the decomp's `func_US2_L30_0040C018` /
@@ -13,7 +13,7 @@
 //! timer; 0x0f2f: `+0x68` the power, `+0x6e` the hit's rest, `+0x80` the flash, `+0x90` the last hitter, `+0x94` /
 //! `+0x98` the HUD's, `+0x9c` the jump's timer.
 //!
-//! * **Each tick** (crate::moby::classes::level08::hovership::prologue): the hit's rest counted down; past state 0 its
+//! * **Each tick** (crate::moby::classes::hovership::prologue): the hit's rest counted down; past state 0 its
 //!   height put back under the bob and a hit (not from its own class, 0x0942 or 0x0fff) taken; its scale (1.4 / 1 of
 //!   its class's). Ridden, the HUD's bar `0x18b668` its health (`0x18b65c`) of 30 × 200.
 //! * **0**: home here, still, its health and `0x18b65c` / `0x18b660` 30, the power and the jump 0, the HUD's words
@@ -72,7 +72,7 @@
 //!   the class is placed on the museum only.
 //! * The hero moby's `+0x9c`, `0x189f28` (1/6 at 0x085c's way off).
 
-use super::super::level08::hovership::{self as hs, Bob, Drive, Hull, Settle, Strike, DEG, PER_TICK, PER_TICK2};
+use super::super::hovership::{self as hs, Bob, Drive, Hull, Settle, Strike, DEG, PER_TICK, PER_TICK2};
 use crate::collision::{coll_sphere_m, QueryFlags};
 use crate::hero::physics::{add, add_rot, len, set_len, sub, sub_rot};
 use crate::moby::{Ctx, MobyWorld};

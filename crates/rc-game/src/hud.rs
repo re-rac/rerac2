@@ -300,7 +300,7 @@ pub enum ScreenDraw {
 }
 
 /// The FX textures the class screen draws take ([`ScreenDraw::Fx`]; the engine loads them into the HUD's layer): the
-/// hovership's radar dot 60 (crate::moby::classes::level08::hovership::draw_radar), the museum hovercraft's dials and
+/// hovership's radar dot 60 (crate::moby::classes::hovership::draw_radar), the museum hovercraft's dials and
 /// needle (`0x3f` / `0x40` + the set `+0x64`, 10 on the museum: crate::moby::classes::level21::hovercraft::draw_hud).
 pub const SCREEN_FX: [u16; 3] = [60, 0x3f + 10, 0x40 + 10];
 
@@ -457,7 +457,7 @@ pub enum SlotCallback {
     /// it through `$gp+0x1448`, which the counter sets to itself; crate::moby::classes::gem_counter::draw).
     Counter { moby: usize },
     /// L08 `0x41edd0` / L19 `0x413438`: the hovership `moby`'s HUD — its health bar, the vacuum's texts, the nearest
-    /// raritanium's distance and the raritanium's radar (crate::moby::classes::level08::hovership::draw_hud).
+    /// raritanium's distance and the raritanium's radar (crate::moby::classes::hovership::draw_hud).
     Hovership { moby: usize },
 }
 
@@ -466,7 +466,7 @@ pub enum SlotCallback {
 /// the screen callback's, and non-zero takes the counters' place. Cleared with the level's state.
 ///
 /// Their callers: Tabora's and Grelbin's counter 0x09f3 (slot 2, crate::moby::classes::gem_counter) and the
-/// hovership 0x0eef while ridden (slot 1, crate::moby::classes::level08::hovership::draw_hud).
+/// hovership 0x0eef while ridden (slot 1, crate::moby::classes::hovership::draw_hud).
 ///
 /// Not ported: the argument (0 from every caller; the draws do not read it), the second set of two slots
 /// (`+0x3fa18`, no setter found on these levels), the counters' L08 / L19 extra when a callback takes their place
@@ -494,7 +494,7 @@ impl HudSlots {
                     out.extend(d.into_iter().map(ScreenDraw::Hud));
                     r
                 }
-                SlotCallback::Hovership { moby } => crate::moby::classes::level08::hovership::draw_hud(w, moby, inp, out),
+                SlotCallback::Hovership { moby } => crate::moby::classes::hovership::draw_hud(w, moby, inp, out),
             };
         }
         taken

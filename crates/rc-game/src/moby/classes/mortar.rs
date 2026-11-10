@@ -1,6 +1,6 @@
 //! The mortar **0x0c1a** ([`update_0c1a`], L17 `0x3f1f48`, 4 placed; the same code as L08 `0x3f7ab0`, 10 placed;
 //! the decomp's `func_US2_L08_003F7AB0`, its helpers v1.01 `func_L08_003F6348` / `003F6568` / `003F6018` at our L17
-//! `0x3f1c80` / `0x3f1ea0` / `0x3f1950`): a pot that lobs the members of its group at Ratchet one by one — Smolg's
+//! `0x3f1c80` / `0x3f1ea0` / `0x3f1950`; the addresses below are L17's): a pot that lobs the members of its group at Ratchet one by one — Smolg's
 //! hatchlings (crate::moby::classes::level17::hatchling), Tabora's burrowers and breathers (crate::moby::classes::
 //! level08::burrower / breather, which fly in along the knock it gives them, their start mode 2). Level 4's launcher
 //! (crate::moby::classes::launcher) of another design: the pool, the target search, the landing cuboids.

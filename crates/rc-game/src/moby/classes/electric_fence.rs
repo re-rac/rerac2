@@ -1,11 +1,12 @@
-//! Level 11's electric fence **0x0ee0** (`0x46d4a8`, 3 placed; the Hacker's gate's beams, deleted by
-//! crate::moby::classes::level11::props::update_117e): two crackling strands along its path, the path's segments
-//! hurting what they meet.
+//! The electric fence **0x0ee0** (L11 `0x46d4a8`, 3 placed, the Hacker's gate's beams, deleted by
+//! crate::moby::classes::level11::props::update_117e; the same code at L13 `0x41aa48`, 35 placed; the decomp's
+//! `func_L11_0046B9F0`): two crackling strands along its path, the path's segments hurting what they meet.
 //!
 //! Its pvars: `+0x00` / `+0x10` the ends of its line (its place, and 6..177 along y from it), `+0x20` the line's
 //! length, `+0x2c` the points drawn, `+0x34` its path, `+0x38` its strands' slot (the beam buffer `0x2647e0`, 0x280 a
 //! slot: the strand `+0x000` and the glow strand `+0x140`, 20 points each; kept here in [`Strands`]), `+0x3c` on
-//! anywhere. The strands' phases and counts are the level's (`$gp+0x3600..0x3694`, [`super::Globals`]).
+//! anywhere. The strands' phases and counts are the level's (L11 `$gp+0x3600..0x3694`; crate::moby::MobyWorld::fence,
+//! [`Fence`]). The addresses below are L11's.
 //!
 //! Each tick (on levels 4 and 0xb, or anywhere once `+0x3c` is set, which a slot of 20 or more sets; with a slot
 //! under 20 or Ratchet at 85 or lower):
@@ -26,6 +27,8 @@
 use crate::hero::physics::{add, add_rot, atan2, set_len, sub, wrap, V3};
 use crate::moby::{Ctx, MobyWorld};
 
+pub const CLASS: i16 = 0x0ee0;
+
 const POINTS: usize = 20;
 
 /// The beam buffer's slot (`0x2647e0 + 0x280·slot`): the strand and the glow strand.
@@ -35,7 +38,7 @@ pub struct Strands {
     pub glow: Vec<V3>,
 }
 
-/// The level's fence state (`$gp+0x3600..`).
+/// The level's fence state (L11 `$gp+0x3600..`).
 #[derive(Clone, Debug)]
 pub struct Fence {
     /// `+0x3600` the points, `+0x3604` the straight lay still to do, `+0x3620` / `+0x3628` / `+0x363c` the phases,
@@ -73,7 +76,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let path = usize::try_from(w.mobys[id].pv_i(0x34)).ok().and_then(|p| ctx.level.paths.get(p)).cloned().unwrap_or_default();
     let point = |k: usize| -> V3 { path.get(k).map_or([0.0; 3], |p| [p[0], p[1], p[2]]) };
     w.mobys[id].set_pv_i(0x2c, count);
-    let f = &mut w.level11.fence;
+    let f = &mut w.fence;
     f.count = count;
     let s = f.strands.entry(id).or_insert_with(|| Strands { core: vec![[0.0; 3]; POINTS], glow: vec![[0.0; 3]; POINTS] });
     // `0x46d6c0`.
@@ -132,7 +135,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// the farther one, lengthened by the third number of it at each end) a quad of FX 0x10 (`$gp+0x3694`) the second
 /// number across, 0x803040 at the second alpha, its ends faded. Additive (ALPHA 0x48; crate::fx::trails::strand).
 pub fn draw(w: &mut MobyWorld, id: usize, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
-    let f = &mut w.level11.fence;
+    let f = &mut w.fence;
     let t = f.scroll - 0.3;
     f.scroll = if t <= -8.0 { t + 8.0 } else { t };
     let n = w.mobys[id].pv_i(0x2c);

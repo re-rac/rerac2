@@ -3,7 +3,8 @@
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
 //!
 //! Shared with other levels: the lobber 0x0bbf and its glob 0x0ea5 (crate::moby::classes::lobber, L12's too), the
-//! field gate 0x031a (crate::moby::classes::field_gate), the updraft pad 0x08e2 (crate::moby::classes::updraft).
+//! field gate 0x031a (crate::moby::classes::field_gate), the updraft pad 0x08e2 (crate::moby::classes::updraft), the
+//! mortar 0x0c1a (crate::moby::classes::mortar, L08's too), the tie wave 0x1137 (crate::moby::classes::tie_wave).
 
 pub mod carrier;
 pub mod brute;
@@ -14,7 +15,6 @@ pub mod hatchling;
 pub mod hazard;
 pub mod lifts;
 pub mod misc;
-pub mod mortar;
 pub mod props;
 pub mod seller;
 pub mod shuttle;
@@ -39,8 +39,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         floaters::BUOY => Some(floaters::update_08af),
         floaters::TIPPER => Some(floaters::update_0937),
         gate::CLASS => Some(gate::update_1305),
-        // Also level 8's (L08 `0x3f7ab0`).
-        mortar::CLASS => Some(mortar::update_0c1a),
         brute::CLASS => Some(brute::update_0bcb),
         carrier::CARRIER => Some(carrier::update_08b1),
         carrier::PLATFORM => Some(carrier::update_093b),

@@ -44,7 +44,7 @@
 //!
 //! Not ported: the ripple disturbances (`0x37d5a0`, crate::water::grid::Grid::disturb, which the swim does not call yet), the fast swim's jets
 //! (`0x18a858`: four bubbles a time from Clank's joints 0 / 1 while the back item is class 0x261 — the back slot's moby
-//! is not ported), the splash moby 0x307 (in no level's class table: the game spawns none either), the scripted no-jump
+//! is not ported), the splash moby 0x307 of the big splash (crate::moby::classes::splash; every level's class list has it, but the hero's splash has no moby world here), the scripted no-jump
 //! / no-dive flags `0x18a018` / `0x18a01e` (always allowed here; Oozla's swamp water 0x0a17 sets `0x18a01e` to 2 out of
 //! its dry cuboids, but Oozla has no water to swim in),
 //! the swim's voice `0x2d6cc8(0x16)`, the swim stats counters (G-HERO-005), the help flag `0x18cf10`, the body lean's
@@ -229,7 +229,8 @@ impl Hero {
     /// `0x2aac58(rings, drops, big)`: `rings` rings within 0.3 of him on the water level (sizes 0.3..0.6) and `drops`
     /// drops (a random direction at up to 0.05 a tick, 0.05..0.133 up, from up to 0.2 under the level, kinds 0 / 1,
     /// 90..120 ticks). The game moves a drop's start by 8 × its x velocity on both axes; kept. `big`: the splash moby
-    /// 0x307 (`0x39f938(2.25, (x, y, level))`) — the class is in no level's table, so the game spawns none either.
+    /// 0x307 (`0x39f938(2.25, (x, y, level))`, crate::moby::classes::splash::spawn; every level's class list has it): not
+    /// made here (no moby world).
     pub(super) fn splash(&mut self, rings: i32, drops: i32, _big: bool) {
         let (p, wz) = (self.pos, self.surf.water_z);
         for _ in 0..rings.max(0) {

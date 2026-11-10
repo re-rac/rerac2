@@ -788,6 +788,10 @@ pub struct MobyWorld {
     pub fence14: classes::level14::fence::Globals,
     /// The sinking pits' samples and grids (classes::sinking_pit::Globals).
     pub pit: classes::sinking_pit::Globals,
+    /// The electric fences' state (L11 `$gp+0x3600..`; classes::electric_fence).
+    pub fence: classes::electric_fence::Fence,
+    /// The orbit pickups' class words (classes::orbit_pickups).
+    pub orbit_pickups: classes::orbit_pickups::Words,
     /// Level 14's energy field's rays (classes::level14::energy::Globals).
     pub energy14: classes::level14::energy::Globals,
     /// Level 26's veil's quads (classes::level26::veil::Mesh), read by the engine at the level's start.
@@ -885,7 +889,7 @@ impl MobyWorld {
             m.group = b.group as i8;
             // `0x30d810` (L08; the loop's `*(u16 *)(class + 0x44) |= record[0x1c]`): the record's mode bits go into
             // its class's header too, so the class's later mobys (`InitMobyInstance` reads `+0x44`: the created and
-            // the thrown, as crate::moby::classes::level17::mortar's) carry them — the framework's 0x20 among them.
+            // the thrown, as crate::moby::classes::mortar's) carry them — the framework's 0x20 among them.
             if let Some(c) = self.classes.iter_mut().find(|c| c.o_class == b.o_class as i16) { c.mode |= b.mode_bits as u16; }
             m.mode |= b.mode_bits as u16;
             (m.light, m.ambient) = (b.light_word(), b.ambient_rgb());

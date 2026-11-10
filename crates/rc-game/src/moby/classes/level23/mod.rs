@@ -2,8 +2,11 @@
 //! addresses with the port's). Each class's update is registered in [`update_for`]; crate::moby::classes::update_for
 //! asks it after its own. The classes this level shares with Dobbo's orbit (the same code at its own places): Giant
 //! Clank's body 0x027d (crate::moby::classes::giant_body), the opponent's pointer 0x0d55
-//! (crate::moby::classes::opponent_pointer), the drone shot's update the 0x118e runs (crate::moby::classes::orbit_shot);
-//! the pickups 0x0e3a / 0x0e3b / 0x0e3d are crate::moby::classes::level22's.
+//! (crate::moby::classes::opponent_pointer), the drone shot's update the 0x118e runs (crate::moby::classes::orbit_shot),
+//! the pickups 0x0e3a / 0x0e3b / 0x0e3d (crate::moby::classes::orbit_pickups), the debris 0x1213
+//! (crate::moby::classes::orbit_debris), the asteroid clusters 0x0d3d (crate::moby::classes::asteroid_cluster) and their
+//! rocks 0x0a80 (crate::moby::classes::thrown_rock). Dobbo orbit's Giant Clank shot 0x0100 and special 0x05f3 are in
+//! this level's tables too, the same code; only Dobbo orbit's opponent's update (`0x3a3170` here, no class) makes them.
 //!
 //! The fight: the opponent 0x0f7f ([`boss`]) hovers over the planetoid ([`paths`]) circling Giant Clank, its shield
 //! of five generators 0x0f7e and its core 0x120f ([`targets`]) taking his hits for it, its turret firing 0x118e and

@@ -315,8 +315,6 @@ fn set_up(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         w.level23.radius = dist(p, c);
     }
     let r = w.level23.radius;
-    // The orbits' shared pickup code (crate::moby::classes::level22::pickups::update) reads this level's radius.
-    w.level22.radius = r;
     w.level23.middle = paths::surface(ctx, r, [500.0, 500.0, 430.0], 0.0);
     w.level23.top = paths::surface(ctx, r, [500.0, 500.0, 552.0], 0.0);
     w.mobys[id].pos = paths::surface(ctx, r, [537.0, 511.0, 533.0], H_LAND);

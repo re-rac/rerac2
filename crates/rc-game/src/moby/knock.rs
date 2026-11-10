@@ -1,7 +1,7 @@
 //! The knock-and-fall block (`func_L06_0035EA68` and its starts: L06 `0x35fde0` = L08 `0x32d388` = L17 `0x320fc8`,
 //! 2112 bytes; the starts L08 `0x32d250` / `0x32b648` = L17 `0x320e90` / `0x31f288`): the knock a hit gives a moby
 //! that is not on the L00 framework's reaction (crate::moby::ai::flight), and its fall to the ground — level 6 / 8 /
-//! 17's mortar 0x0c1a (crate::moby::classes::level17::mortar) hurt and dying. The decomp adapts it from R&C1's
+//! 17's mortar 0x0c1a (crate::moby::classes::mortar) hurt and dying. The decomp adapts it from R&C1's
 //! `mine_fall`.
 //!
 //! **The block** (`b`, in the pvars): `+0x00` the velocity (w 1), `+0x10` the gravity (a tick²), `+0x14` the brake of
@@ -22,7 +22,7 @@
 //! 0x100 out of the world): the gravity off the rise; the speed across eased (by the brake) to `+0x4c` (none on the
 //! ground); the rise at most `+0x1c`. The ground under its centre (`0x31e048` = L00 `0x31ce20`): over water
 //! (`0x2e3518` = L00 `0x2e23e0` 0) its first fall through the surface starts the water count (and a splash,
-//! `0x3a2c20` = L00 `0x39f938`, whose class no level has), the ground then the one under its feet without water
+//! `0x3a2c20` = L00 `0x39f938`, crate::moby::classes::splash::spawn), the ground then the one under its feet without water
 //! (`0x31e0c0` = L00 `0x31ce98`); else with option 0x10 or on the ground, a step whose ground falls more than 0.25
 //! stops it across. Wet: the speed × 0.7 for 3 ticks, the gravity × 0.75 for 6. Its sequence's speed (with both
 //! keys): rising, to reach `+0x50` in the ticks the rise has left; falling, `+0x54` in the ticks to the ground
@@ -128,14 +128,16 @@ pub fn fall(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, b: usize) -> u32 {
     let lift = m.pv_f(b + LIFT);
     let c = add(m.pos, [0.0, 0.0, lift]);
     let (mut gz, water) = ground(ctx, c, 0);
-    let m = &mut w.mobys[id];
     if water {
+        let m = &mut w.mobys[id];
         if m.pv_f(b + WET) == 0.0 && gz <= c[2] && c[2] + v[2] < gz {
-            // The splash at the surface (`0x3a2c20(c at gz, 3)`) makes nothing.
             m.set_pv_f(b + WET, 1.0);
+            // The splash at the surface (`0x3a2c20(c at gz, 3)`, crate::moby::classes::splash).
+            crate::moby::classes::splash::spawn(w, ctx, [c[0], c[1], gz], 3.0);
         }
-        gz = ground(ctx, m.pos, 0x20).0;
-    } else if m.pv_i(b + OPTIONS) & 0x10 != 0 || phase == 2 {
+        gz = ground(ctx, w.mobys[id].pos, 0x20).0;
+    } else if w.mobys[id].pv_i(b + OPTIONS) & 0x10 != 0 || phase == 2 {
+        let m = &mut w.mobys[id];
         let next = add(m.pos, v);
         if ground(ctx, next, 0x20).0 < gz - 0.25 { m.set_pv_v(b, set_len2(v, 0.0)); }
     }

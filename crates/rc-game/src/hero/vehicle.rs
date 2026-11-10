@@ -1,5 +1,5 @@
 //! The mobys Ratchet rides (his state 0x31 with `0x18b650` set): the vehicles of Tabora and Grelbin (the hovership
-//! 0x0eef, crate::moby::classes::level08::hovership; the glider 0x0905 of Tabora, Dobbo and Grelbin,
+//! 0x0eef, crate::moby::classes::hovership; the glider 0x0905 of Tabora, Dobbo and Grelbin,
 //! crate::moby::classes::glider, with Ratchet seen) and the mounted guns of level 16 (0x10ee,
 //! crate::moby::classes::level16::turret). Endako's crane (crate::moby::classes::endako_crane) uses the same state
 //! and the same word `0x18b650` for the crane it steers from its panel (kept there as its own `steered`).

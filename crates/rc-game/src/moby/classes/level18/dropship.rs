@@ -120,7 +120,7 @@ pub fn ease(t: f32, accel: f32, brake: f32, max: f32, x: &mut f32, v: &mut f32) 
     *v
 }
 
-/// `0x35e438(0, p, path)`: the path's point nearest `p` (as crate::moby::classes::level18::breeder's).
+/// `0x35e438(0, p, path)`: the path's point nearest `p` (as crate::moby::classes::breeder's).
 fn nearest_point(ctx: &Ctx, p: V3, path: i32) -> i16 {
     let Some(pts) = usize::try_from(path).ok().and_then(|i| ctx.level.paths.get(i)).filter(|v| !v.is_empty()) else { return -1 };
     let mut best = 1e11;

@@ -1,8 +1,8 @@
-//! The orbit fight's pickups (L22; the decomp's `func_L22_003A3CA0` … `func_L22_003A42E8` and the classes'
-//! `func_L22_003FB1F8` … `func_L22_003FD2D8`; the same code at L23's places, which L23's fight does not use). The
-//! opponent 0x0e0b (crate::moby::classes::level22::boss) runs them: health (kind 0, class [`HEALTH`]), gun charge
-//! (kind 1, [`GUN`]) and specials (kind 2, [`SPECIAL`]) lie about the planetoid, and Giant Clank or the opponent takes
-//! one by coming within 12 of it while short of its limit.
+//! Dobbo orbit's pickups (L22; the decomp's `func_L22_003A3CA0` … `func_L22_003A42E8`; the same code at L23's places,
+//! which L23's fight does not use; the classes are crate::moby::classes::orbit_pickups). The opponent 0x0e0b
+//! (crate::moby::classes::level22::boss) runs them: health (kind 0, class 0x0e3a), gun charge (kind 1, 0x0e3b) and
+//! specials (kind 2, 0x0e3d) lie about the planetoid, and Giant Clank or the opponent takes one by coming within 12 of
+//! it while short of its limit.
 //!
 //! **The rows** (`0x23b4b0`, three of 50 slots, 0xf0 bytes apart), their counts (`0x1b2a38`) and the total
 //! (`0x1b2a44`). **The records** (`0x1b1890 + 0x10·k`): the opponent's (k 0, `0x1b2a34` points at it) and Giant
@@ -25,68 +25,35 @@
 //! * **The spawn** ([`spawn`], `0x3a4f80` → `0x3a4df8`): its kind drawn (`0x320f00(3)`: 0 the gun, 1 a special, 2
 //!   health; health left out — a draw of 2 — while Giant Clank's sequence is the hurt or the opponent's is 4); the
 //!   first free slot of the row gets it (none: none made).
-//! * **The classes** ([`update`], `0x3fc810` / `0x3fdd70` / `0x3fe7d8`): each tick their distance from Giant Clank
-//!   (health `+0x2c`, always, alpha 255 past 12; the others `+0x44` while drawn, else 2000, alpha 127 past 12). At
-//!   rest: turned ¹⁄₅₃ rad a tick about their own z and stood up on the sphere. Taken: the level sound 0x12 on its
-//!   first tick toward Giant Clank; turned `((45 − t)·22 + 155)′` a tick, alpha down to 2, shrunk ×(45 − t/45)·0.99/45
-//!   a tick, set on the taker raised 7.5·t/45 above him; gone at 46 ticks (the first health pickup made instead
-//!   parked in state 0x62, which does nothing). Staggered ones (`+0x2a`) test every 32 ticks for the ground under
-//!   them (from 3 above to 6 below): with none they are put back on the surface, pushed 3.7 along a random row and
-//!   dropped onto the ground from 3 above (a line 0x12), and the test stops.
+//! * **The classes** (their make and update, Damosel orbit's too): crate::moby::classes::orbit_pickups.
 //!
-//! Not ported: the pickup message words `0x1b2a48` / `0x1b2a4c` / `0x1b2a50` (`0x3a5718`; the HUD's), the health
-//! pickups' sparkles (`0x3fd0f0` at their creation with the first one's direction tables, `0x3fd548` at rest, their
-//! random draws with them) and the light slots `+0x60..+0x80`, the arcs to Giant Clank while he takes one
-//! (`0x3fceb8` / `0x3fe408` / `0x3fee58`), the gun's scale ×1.2 on its first taken tick (the same tick's earlier
-//! once-test has always spent the flag), the owner word `+0x20`.
+//! Not ported: the pickup message words `0x1b2a48` / `0x1b2a4c` / `0x1b2a50` (`0x3a5718`; the HUD's).
 
 use super::planet::{down_at, surface};
-use crate::hero::physics::{add, dist, scale, set_len, V3};
-use crate::moby::attach::{rows_of, turn};
-use crate::moby::frames::upright;
+use crate::hero::physics::{add, dist, scale, V3};
+use crate::moby::classes::orbit_pickups::{create, hero_dist, PUSH, REACH};
 use crate::moby::{countdown, Ctx, MobyWorld};
-use crate::quat::turn_rows;
 
-pub const HEALTH: i16 = 0x0e3a;
-pub const GUN: i16 = 0x0e3b;
-pub const SPECIAL: i16 = 0x0e3d;
-
-/// The rows' classes (`0x3a4df8`: 0 `0x3fc6f8`, 1 `0x3fdc80`, 2 `0x3fe6e8`) and their scales (`$gp+0x360`,
-/// `+0x364`, `+0x36c`: × the class's).
-const CLASSES: [i16; 3] = [HEALTH, GUN, SPECIAL];
-const SCALES: [f32; 3] = [4.0, f32::from_bits(0x4069_999a), f32::from_bits(0x4069_999a)];
-/// `$gp+0x340`: the reach.
-const REACH: f32 = 12.0;
-/// `$gp+0x2c8` / `0x1af2b8`: the push.
-const PUSH: f32 = f32::from_bits(0x406c_cccd);
 const ROW: usize = 50;
 /// The set-up's paths left out (`0x3a4ad0`'s own list; the same as the skip table's start).
 const SKIPPED: [usize; 5] = [10, 27, 28, 31, 15];
-/// The at-rest turn (rad a tick) and the taken one's unit (rad an arc minute).
-const SPIN: f32 = 0.018_907_737;
-const MINUTE: f32 = 0.000_290_888_25;
-const FORTYFIFTH: f32 = 0.022_222_223;
 
-/// The rows, their counts and the stagger counter.
+/// The rows and their counts.
 #[derive(Clone, Debug)]
 pub struct Pickups {
     pub slots: [[Option<usize>; ROW]; 3],
     pub counts: [i32; 3],
     pub total: i32,
-    /// `0x1af32c`: the staggered ones made (their first tick count `(n + 2) % 31`).
-    pub staggered: i32,
-    /// `0x1b1cec` (the decomp's `D_L22_001B1D6C`): the first health pickup made.
-    pub first_health: Option<usize>,
 }
 
 impl Default for Pickups {
-    fn default() -> Self { Pickups { slots: [[None; ROW]; 3], counts: [0; 3], total: 0, staggered: 0, first_health: None } }
+    fn default() -> Self { Pickups { slots: [[None; ROW]; 3], counts: [0; 3], total: 0 } }
 }
 
 /// `0x3a50d0` + `0x3a4ad0` (module docs), from the opponent's set-up.
 pub fn set_up(w: &mut MobyWorld, boss: usize, ctx: &mut Ctx) {
     let (gun, special) = (w.mobys[boss].pv_s(0x32a) as i32, w.mobys[boss].pv_s(0x32e) as i32);
-    w.level22.pickups = Pickups { staggered: w.level22.pickups.staggered, first_health: w.level22.pickups.first_health, ..Default::default() };
+    w.level22.pickups = Pickups::default();
     w.level22.boss_counts = [0, 0, gun, special];
     ctx.hero.giant.counts = [0, 0, gun, special];
     // `0x320f00(3)`, its result unused.
@@ -125,9 +92,6 @@ pub fn set_up(w: &mut MobyWorld, boss: usize, ctx: &mut Ctx) {
 }
 
 fn path_of(ctx: &Ctx, id: i32) -> Vec<[f32; 4]> { usize::try_from(id).ok().and_then(|i| ctx.level.paths.get(i)).cloned().unwrap_or_default() }
-
-/// `0x3a7a10`: the pickup's distance from Giant Clank as its update left it.
-fn hero_dist(w: &MobyWorld, p: usize) -> f32 { w.mobys[p].pv_f(if w.mobys[p].o_class == HEALTH { 0x2c } else { 0x44 }) }
 
 /// The opponent's sequence (`+0x43`).
 fn seq(w: &MobyWorld, ctx: &Ctx, id: usize) -> u8 { ctx.host.anim(&w.mobys[id]).map_or(0, |a| a.seq_b) }
@@ -259,97 +223,4 @@ pub fn drop_at(w: &mut MobyWorld, pos: V3, kind: usize) {
     pk.slots[kind][k] = Some(id);
     pk.total += 1;
     pk.counts[kind] += 1;
-}
-
-/// `0x3fc6f8` / `0x3fdc80` / `0x3fe6e8(boss, pos, staggered, scale)`: the pickup at `pos`, update distance 0xff, draw
-/// distance 0x50, drawn, mode | 0x108 (the health's | 0x41 too), its scale × the kind's, its rows the identity;
-/// staggered ones flagged (`+0x2a`) and their tick count `(n + 2) % 31`. Damosel orbit's fight makes its pickups
-/// with the same code (L23 `0x4037b0` / `0x404d38` / `0x405700`, crate::moby::classes::level23::pickups).
-pub fn create(w: &mut MobyWorld, kind: usize, pos: V3, staggered: bool) -> usize {
-    let id = w.create(CLASSES[kind]);
-    let n = w.level22.pickups.staggered;
-    let m = &mut w.mobys[id];
-    m.pvars.resize(crate::moby::PVAR_BYTES, 0);
-    m.set_pv_s(0x2a, staggered as i16);
-    if staggered {
-        m.state_ticks = ((n + 2) % 31) as i16;
-    }
-    m.update_dist = 0xff;
-    m.mode |= 0x108;
-    m.draw_dist = 0x50;
-    m.drawn = 1;
-    m.state = 0;
-    m.scale *= SCALES[kind];
-    m.pos = pos;
-    m.rows = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]];
-    if kind == 0 {
-        m.mode |= 0x41;
-        // `0x3fd0f0`: the first health pickup made keeps the sparkles' direction tables.
-        if w.level22.pickups.first_health.is_none() { w.level22.pickups.first_health = Some(id); }
-    }
-    if staggered { w.level22.pickups.staggered = n + 1; }
-    id
-}
-
-/// 0x0e3a / 0x0e3b / 0x0e3d's update (module docs).
-pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let health = w.mobys[id].o_class == HEALTH;
-    if health && w.mobys[id].state == 0x62 { return; }
-    w.mobys[id].pvars.resize(crate::moby::PVAR_BYTES, 0);
-    let hero = ctx.hero.pos;
-    {
-        let m = &mut w.mobys[id];
-        if !health && m.first() && m.state == 0x10 { ctx.host.play_level_sound_after(None, 0x12, 0); }
-        if health || m.drawn != 0 {
-            let d = dist(hero, m.pos);
-            m.set_pv_f(if health { 0x2c } else { 0x44 }, d);
-            if REACH <= d { m.alpha = if health { 255 } else { 127 }; }
-        } else {
-            m.set_pv_f(0x44, 2000.0);
-        }
-    }
-    let mut down = down_at(ctx, w.mobys[id].pos);
-    if health && w.mobys[id].first() && w.mobys[id].state == 0x10 { ctx.host.play_level_sound_after(None, 0x12, 0); }
-    let (state, t) = (w.mobys[id].state, w.mobys[id].state_ticks as u16);
-    if state == 0 {
-        let m = &mut w.mobys[id];
-        m.rows = turn(&rows_of([0.0, 0.0, SPIN]), &m.rows);
-        m.rows = turn_rows(&m.rows, upright(&m.rows, scale(down, -1.0)));
-    } else {
-        let m = &mut w.mobys[id];
-        let a = ((45.0 - t as f32) * 22.0 + 155.0) * MINUTE;
-        if !health && m.first() {
-            m.alpha = 127;
-            if m.o_class == GUN { m.scale *= 1.2; }
-        }
-        if 3 <= m.alpha { m.alpha -= 1; }
-        let s = (45.0 - t as f32 * FORTYFIFTH) * (f32::from_bits(0x3f7d_70a4) * FORTYFIFTH);
-        m.rows = turn(&rows_of([0.0, 0.0, a]), &m.rows).map(|r| scale(r, s));
-        if 46 <= t {
-            if health && w.level22.pickups.first_health == Some(id) { w.mobys[id].state = 0x62; } else { w.delete(id); }
-            return;
-        }
-        let to = match (state, w.level22.boss) {
-            (0x10, _) | (_, None) => hero,
-            (_, Some(b)) => w.mobys[b].pos,
-        };
-        down = down_at(ctx, to);
-        let m = &mut w.mobys[id];
-        m.rows = turn_rows(&m.rows, upright(&m.rows, scale(down, -1.0)));
-        m.pos = add(to, set_len(down, -(t as f32 * FORTYFIFTH) * 7.5));
-    }
-    let m = &mut w.mobys[id];
-    m.state_ticks = if t < 0xffff { t + 1 } else { 0 } as i16;
-    if m.pv_s(0x2a) == 0 || m.state_ticks as u16 & 31 != 0 { return; }
-    let p = m.pos;
-    if w.coll_line(ctx, add(p, scale(down, -3.0)), add(p, scale(down, 6.0)), 0x12, None).is_some() { return; }
-    let radius = w.level22.radius;
-    let mut p = surface(ctx, radius, p, 0.0);
-    let axis = w.mobys[id].rows[ctx.game.rng.randi(2) as usize];
-    let s = if ctx.game.rng.randi(2) != 0 { PUSH } else { -PUSH };
-    p = surface(ctx, radius, add(p, scale(axis, s)), 0.0);
-    if let Some(hit) = w.coll_line(ctx, add(p, scale(down, -3.0)), add(p, scale(down, 3.0)), 0x12, None) { p = hit.point; }
-    let m = &mut w.mobys[id];
-    m.pos = p;
-    m.set_pv_s(0x2a, 0);
 }

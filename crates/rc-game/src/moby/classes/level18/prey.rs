@@ -1,5 +1,5 @@
 //! The breeders' prey **0x0ef4** (L18 `0x3f90e0`, 11 placed; the decomp's `func_L18_003F7C70`): a small walker the
-//! breeders 0x0b69 (crate::moby::classes::level18::breeder) hunt. Alarmed by one, it flees along its path, runs to
+//! breeders 0x0b69 (crate::moby::classes::breeder) hunt. Alarmed by one, it flees along its path, runs to
 //! Ratchet for cover or into a hatch 0x1151 (crate::moby::classes::level18::hatch), and goes back into its pool when it
 //! escapes or dies. On the framework (crate::moby::ai): health `+0x20` (16 by default; its status `+0x2e`), reaction
 //! `+0x60` (a hurt to state 9, sub 4; `+0x90` 0.8, `+0x94` 0.9, `+0x9c` 0.4), movement `+0x110` (radius 0.8, height
@@ -80,7 +80,8 @@ use crate::moby::classes::level08::tabora_ai::jitter;
 use crate::moby::classes::props::{seq, wrapped};
 use crate::moby::{ai, bolts, joint_aim, Ctx, MobyWorld};
 
-use super::{breeder, hatch};
+use super::hatch;
+use crate::moby::classes::breeder;
 
 pub const CLASS: i16 = 0x0ef4;
 /// A hit from it does 4 while this one is drawn, else none.

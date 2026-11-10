@@ -220,7 +220,7 @@ pub(super) fn face(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, p: V3, ring: boo
         frames::face_point(w, id, p);
     } else {
         let q = w.mobys[id].pos;
-        ai::move_step(w, id, ctx, atan2(p[0] - q[0], p[1] - q[1]), q);
+        ai::turn_in_place(w, id, ctx, atan2(p[0] - q[0], p[1] - q[1]));
     }
 }
 
@@ -619,8 +619,7 @@ pub fn update_d37(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         9 => {
             if !ring {
-                let p = w.mobys[id].pos;
-                ai::move_step(w, id, ctx, angle, p);
+                ai::turn_in_place(w, id, ctx, angle);
             }
             if wrapped(w, id, ctx) {
                 set_seq(w, id, ctx, 7, 4, 3);
@@ -873,8 +872,7 @@ pub fn update_dcf(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 set_seq(w, id, ctx, 9, 0, 10);
                 lim(w, id, 0.004_444_444_6, 0.133_333_34, 0.006_981_318, 0.837_758_2);
             }
-            let p = w.mobys[id].pos;
-            ai::move_step(w, id, ctx, angle, p);
+            ai::turn_in_place(w, id, ctx, angle);
             if wrapped(w, id, ctx) {
                 let (s, b) = (w.mobys[id].pv_s(BACK), w.mobys[id].pv_s(BACK + 2));
                 w.mobys[id].set_state(s as u8, b as i32);
@@ -1157,8 +1155,7 @@ pub fn update_df4(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 set_seq(w, id, ctx, 8, 0, 10);
                 lim(w, id, 0.004_444_444_6, 0.133_333_34, 0.003_490_659, 0.418_879_1);
             }
-            let p = w.mobys[id].pos;
-            ai::move_step(w, id, ctx, heading, p);
+            ai::turn_in_place(w, id, ctx, heading);
             if wrapped(w, id, ctx) { w.mobys[id].set_state(7, -1); }
         }
         7 => {

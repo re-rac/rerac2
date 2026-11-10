@@ -1,6 +1,6 @@
 //! Damosel's brood launcher **0x1158** (L18 `0x43d748`, 8 placed; the decomp's `func_L18_0043C258`): a hopping pod
 //! that, once Ratchet is near, bursts open and keeps throwing the breeding critters hidden in its group
-//! (crate::moby::classes::level18::breeder) at him. Health on its block at `+0x20` (25).
+//! (crate::moby::classes::breeder) at him. Health on its block at `+0x20` (25).
 //!
 //! **Its pvars:** `+0x50` its colour flash, `+0x60` / `+0x64` its tilts a tick, `+0x70` the cuboid that starts its
 //! hopping, `+0x74` the cuboid that opens it, `+0x78` its brood's group, `+0x7c` its resting height, `+0x80` its speed
@@ -19,7 +19,7 @@
 //!   up and back coming down; below it, a new hop. Its throw: shut and Ratchet in `+0x74`, it opens — the blast, its
 //!   class sound 1 and its pieces 0 and 2 (mask 5) thrown 5 a second along (−1, 0, 0.5) through its rows, jittered by
 //!   0.6 a second; open with the timer out, the last hidden critter of its group (`0x3f8a58`) thrown
-//!   (`0x3f8b60`, crate::moby::classes::level18::breeder::launch) from 0.7 up its rows at 6 a second along (−1, 0,
+//!   (`0x3f8b60`, crate::moby::classes::breeder::launch) from 0.7 up its rows at 6 a second along (−1, 0,
 //!   0.5) through them, jittered by 0.6 a second (`0x33c5e8` = L00 `0x3217d8`), itself its parent (`+0xb8`), and the
 //!   timer 45..120 (none hidden: the timer stays out); else the timer down.
 //! * **Every tick** its state's ticks.
@@ -60,7 +60,7 @@ const BLAST: Blast = Blast { size: 1.0, bursts: [0x19, 0x14, 0x14], puffs: 0x14,
 
 pub fn update_1158(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     use crate::moby::classes::level08::tabora_ai::jitter;
-    use crate::moby::classes::level18::breeder;
+    use crate::moby::classes::breeder;
     let hit = w.hit_message(id).filter(|h| h.tmpl.flags & 0x10000 != 0);
     let dmg = ai::damage_of(w, id, hit.as_ref(), false);
     let m = &mut w.mobys[id];

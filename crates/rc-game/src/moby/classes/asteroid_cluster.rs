@@ -1,6 +1,7 @@
 //! The orbits' asteroid cluster, class **0x0d3d** (L22 `0x3f5a78`, 124 placed; L23 `0x3fcc40`, 120 placed; the
-//! decomp's `func_L22_003F45D8`). The moby is a hidden carrier: what shows is the tie group it sits on, which it
-//! carries along (crate::moby::attach, its frame its rows), wrapped in a column of shield layers that take the hits.
+//! decomp's `func_L22_003F45D8`; L22 addresses below). The moby is a hidden carrier: what shows is the tie group it
+//! sits on, which it carries along (crate::moby::attach, its frame its rows), wrapped in a column of shield layers that
+//! take the hits. Level 22's skill point watcher 0x12db counts them (crate::moby::classes::level22::props::update_12db).
 //! Updated from any distance once set up.
 //!
 //! * **0** ([`set_up`]): the tie group with a tie nearest it in xy (under 2, else it goes) and that tie's class
@@ -48,7 +49,7 @@
 //! **The rocks** it throws when it breaks ([`throw_rocks`], `0x3f6778`, L23 `0x3fd940`, before the dust):
 //! (60 / the camera's distance; above 2.2, 2.7)² · height · 0.55 of them, at most the free moby slots (`0x1b1fc0`,
 //! crate::moby::MobyWorld::free_slots) · 0.15. Each one is a 0x0a80 (`0x3d1e68`, L23 `0x3d9518`,
-//! crate::moby::classes::level16::rocks::spawn) at its share of the height up the column, ±(that factor plus a tenth
+//! crate::moby::classes::thrown_rock::spawn) at its share of the height up the column, ±(that factor plus a tenth
 //! of its height) across, with random angles.
 //!
 //! Not ported:
@@ -409,7 +410,7 @@ fn throw_rocks(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let rot = [g.rand_angle(), g.rand_angle(), g.rand_angle()];
         let (rows, pos) = (w.mobys[id].rows, w.mobys[id].pos);
         let at = add(to_world([x, y, up], &rows), pos);
-        crate::moby::classes::level16::rocks::spawn(w, ctx, id, at, rot);
+        crate::moby::classes::thrown_rock::spawn(w, ctx, id, at, rot);
         i += 1;
     }
 }
@@ -439,26 +440,5 @@ fn dust(w: &MobyWorld, id: usize, ctx: &mut Ctx, full: bool) {
             crate::particles::staged(sys, &mut ctx.game.rng, at, [0.0, 0.0, 0.0, size], [0.0, 0.0, 0.0, size], c0, c1, fade_in as i16, ease as i16, 60, -1);
         }
         i += 1;
-    }
-}
-
-/// The clusters' skill point watcher.
-pub const WATCHER: i16 = 0x12db;
-
-/// 0x12db (`0x387310`, one placed; the decomp's `func_US2_L22_00387310`): **0** updated at any distance, 1. **1**
-/// every tick: no cluster 0x0d3d left on the moby list (`0x1b20a8`) but in its state 3 (broken up): skill point 0x18
-/// (`0x1a7a80`; the level sound 1 `0x3640e0`, the message 0x1233 `0x32c0f8`, `0x1a903c` 1:
-/// crate::game::GameState::award_skill_point).
-pub fn update_12db(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    match w.mobys[id].state {
-        0 => {
-            w.mobys[id].update_dist = 0xff;
-            w.mobys[id].set_state(1, -1);
-        }
-        1 => {
-            let left = w.mobys.iter().any(|m| m.o_class == CLUSTER && m.state < 0x80 && m.state != 3);
-            if !left { ctx.game.award_skill_point(crate::skill_points::point::CLUSTERS); }
-        }
-        _ => {}
     }
 }

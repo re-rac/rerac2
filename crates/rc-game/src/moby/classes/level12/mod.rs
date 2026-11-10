@@ -2,12 +2,14 @@
 //! the L00 ones the port knows them by where they differ). Each class's update is registered in [`update_for`] and
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
 //!
-//! The launcher system — the carrier 0x0fa5 (`0x41a510`), its critters 0x0bb8 (`0x3e0d78`) and its guide 0x0fec
-//! (`0x41b2a8`, level 13's too), with the walkers 0x0fb4 taking critters: [`launcher`]; its two counts in [`Globals`].
+//! The launcher system — the carrier 0x0fa5 (`0x41a510`) and its critters 0x0bb8 (`0x3e0d78`), with the walkers
+//! 0x0fb4 taking critters: [`launcher`]; its two counts in [`Globals`]. Its guide 0x0fec (`0x41b2a8`, level 13's too):
+//! crate::moby::classes::guide.
 //!
 //! Shared with other levels: the thrown pieces 0x0d66 / 0x0ff6 (crate::moby::classes::pieces), the blaster shot
 //! 0x03a6 (crate::moby::classes::blaster_shot), the breakables 0x0852 / 0x0884 (crate::moby::classes::breakables), the
-//! glow pulser 0x115f (crate::moby::classes::glow_pulse), the light 0x0cfd (crate::moby::classes::hue_light).
+//! glow pulser 0x115f (crate::moby::classes::glow_pulse), the light 0x0cfd (crate::moby::classes::hue_light), the hover
+//! pad 0x0e84 (crate::moby::classes::hover_pad, L09's).
 
 use crate::hero::physics::V3;
 use crate::moby::MobyWorld;
@@ -44,8 +46,6 @@ pub struct Globals {
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
         0x110c => Some(breakables::update_110c),
-        // The hover pad: Level 9's code (`0x408a28` = L09 `0x411ae8`).
-        super::level09::hover_pad::CLASS => Some(super::level09::hover_pad::update_0e84),
         0x1307 => Some(breakables::update_1307),
         0x1114 => Some(breakables::update_1114),
         0x0f69 => Some(props::update_0f69),
@@ -68,7 +68,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x0fb4 => Some(walker::update_0fb4),
         launcher::CRITTER => Some(launcher::update_0bb8),
         launcher::CARRIER => Some(launcher::update_0fa5),
-        launcher::GUIDE => Some(launcher::update_0fec),
         0x0f31 => Some(trooper::update_0f31),
         fence::CLASS => Some(fence::update_0fae),
         grid::CLASS => Some(grid::update_0f9f),

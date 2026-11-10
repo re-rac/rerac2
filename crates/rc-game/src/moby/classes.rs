@@ -139,6 +139,14 @@ pub mod sinking_pit;
 pub mod splash;
 pub mod tex_scroll;
 pub mod updraft;
+pub mod arc_glow;
+pub mod breeder;
+pub mod fading_field;
+pub mod floe;
+pub mod glider_pad;
+pub mod guide;
+pub mod hover_pad;
+pub mod hovership;
 pub mod endako_a;
 pub mod endako_a_enemies;
 pub mod endako_b;
@@ -152,6 +160,15 @@ pub mod ship_vendor;
 pub mod hacker_panel;
 pub mod sheep;
 pub mod sheepinator;
+// More class updates several levels share (out of levels 4, 11, 16, 17, 22).
+pub mod asteroid_cluster;
+pub mod electric_fence;
+pub mod mortar;
+pub mod orbit_debris;
+pub mod orbit_pickups;
+pub mod planetoid;
+pub mod thrown_rock;
+pub mod tie_wave;
 #[cfg(test)]
 mod update_audit;
 
@@ -464,6 +481,9 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         // The space levels' gate race (5, 10, 15): its gates (`0x426508`) and platinum bolt (`0x42db38`).
         space::gate::CLASS => Some(space::gate::update),
         space::platinum::CLASS => Some(space::platinum::update),
+        // The escort (L05, L10, L15) and Hrugis's wingman, Gorn's too (L10, L15; its numbers level10::ships's).
+        space::escort::CLASS => Some(space::escort::update),
+        level10::ships::WINGMAN => Some(space::update_fighter),
         // 0x0ae0: a placed pickup (L25 `0x3da5f8`, 1 placed), the same update.
         pickup::CLASS | 0x0ae0 => Some(pickup::update),
         nanotech::CLASS => Some(nanotech::update),
@@ -591,6 +611,33 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         giant_body::BODY => Some(giant_body::update_027d),
         opponent_pointer::CLASS => Some(opponent_pointer::update_0d55),
         level22::drone::SHOT | level23::shots::TURRET => Some(orbit_shot::update_0f5d),
+        // The orbits' debris (0x0aa9 / 0x1213 one update; 0x0dce, 0x0cb6 Dobbo orbit's), asteroid clusters and pickups.
+        orbit_debris::ROCK | orbit_debris::ROCK_B | orbit_debris::ICE => Some(orbit_debris::update_rock),
+        orbit_debris::DUST => Some(orbit_debris::update_0cb6),
+        asteroid_cluster::CLUSTER => Some(asteroid_cluster::update),
+        orbit_pickups::HEALTH | orbit_pickups::GUN | orbit_pickups::SPECIAL => Some(orbit_pickups::update),
+        // The thrown rocks (L16, L22, L23), the tie wave (L04, L06, L09, L12, L13, L14, L16, L17), the electric fence
+        // (L11, L13) and the mortar (L08, L17).
+        thrown_rock::CLASS => Some(thrown_rock::update_0a80),
+        tie_wave::CLASS => Some(tie_wave::update),
+        electric_fence::CLASS => Some(electric_fence::update),
+        mortar::CLASS => Some(mortar::update_0c1a),
+        // The hovership and its raritanium (L08, L19), the glider's launch pad (L08, L09, L19).
+        hovership::HOVERSHIP => Some(hovership::update_0eef),
+        hovership::RARITANIUM => Some(hovership::update_099a),
+        glider_pad::CLASS => Some(glider_pad::update_0988),
+        // The hover pad (L09, L12) and the launcher's guide (L12, L13).
+        hover_pad::CLASS => Some(hover_pad::update_0e84),
+        guide::CLASS => Some(guide::update_0fec),
+        // The breeding critter and the step pad (L18, L19, L20); the arc glow (L18, L20).
+        breeder::CLASS => Some(breeder::update_0b69),
+        pads::STEP_PAD => Some(pads::update_0ed0),
+        arc_glow::CLASS => Some(arc_glow::update_1212),
+        // The movers: the floating platform (L19 0x0f4b, L20 0x1257) and the scenery (L19 0x0edb / 0x1146, L18 0x10ed).
+        floe::CLASS | 0x1257 => Some(floe::update_0f4b),
+        floe::MOVER | floe::MOVER_B | floe::SOUNDED => Some(floe::update_0edb),
+        // The fading field (L20 0x119b, L19 0x1204).
+        fading_field::FIELD | fading_field::FIELD_L19 => Some(fading_field::update_119b),
         // The levels' own (their modules' lists).
         _ => race::update_for(o_class).or_else(|| level04::update_for(o_class)).or_else(|| level06::update_for(o_class)).or_else(|| level07::update_for(o_class)).or_else(|| level08::update_for(o_class)).or_else(|| level09::update_for(o_class)).or_else(|| level10::update_for(o_class)).or_else(|| level11::update_for(o_class)).or_else(|| level13::update_for(o_class)).or_else(|| level14::update_for(o_class)).or_else(|| level16::update_for(o_class)).or_else(|| level12::update_for(o_class)).or_else(|| level17::update_for(o_class)).or_else(|| level18::update_for(o_class)).or_else(|| level19::update_for(o_class)).or_else(|| level20::update_for(o_class)).or_else(|| level21::update_for(o_class)).or_else(|| level22::update_for(o_class)).or_else(|| level26::update_for(o_class)).or_else(|| level05::update_for(o_class)).or_else(|| level15::update_for(o_class)).or_else(|| level23::update_for(o_class)),
     }

@@ -1,7 +1,7 @@
 //! Damosel's stalker **0x0f0a** (L18 `0x431738`, 38 placed; the decomp's `func_L18_00430248`): legs that carry a
 //! body 0x0f0b on their joint 0 (its own update the shadow alone, L09's `0x3f85e8`: crate::moby::classes::
 //! trooper::update_turret) with a gun on the body's joint 2 — a beam 0x0f0e, or with `+0x7fc` set a lobber 0x0f0d.
-//! It hunts Ratchet and the breeders 0x0b69 (crate::moby::classes::level18::breeder) of a group; some come in hidden
+//! It hunts Ratchet and the breeders 0x0b69 (crate::moby::classes::breeder) of a group; some come in hidden
 //! on a dropship 0x0ede (crate::moby::classes::level18::dropship) that calls [`carried`], [`release`] and [`die`]. On
 //! the framework (crate::moby::ai): health `+0x20` (16 by default; its status `+0x2e`, its damage byte `+0x34`, its
 //! bite's `+0x36`, the last hitter `+0x38`), reaction `+0x50` (a hurt to 13, sub 2), movement `+0x100` (radius 1.25,
@@ -111,7 +111,7 @@ const SPIT: i16 = 0x0f9e;
 /// Standing on it kills it.
 const KILL_FLOOR: i16 = 0x0f59;
 /// The prey of state 7.
-const PREY: i16 = super::breeder::CLASS;
+const PREY: i16 = super::super::breeder::CLASS;
 /// A hitter that knocks it from its hurt into the second bite.
 const KNOCKER: i16 = 0x0047;
 

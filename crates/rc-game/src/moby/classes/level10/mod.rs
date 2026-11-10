@@ -3,9 +3,9 @@
 //! after its own.
 //!
 //! Ported here: 0x0cbe ([`tethered`]), 0x11c9 ([`sky`]), the carrier 0x0f85 ([`carrier`]), the cloud glints 0x11b9
-//! ([`glints`]); the escort 0x0f82
-//! (`0x417600`) is the shared crate::moby::classes::space::escort, the mission 0x1155 the shared
-//! crate::moby::classes::space::mission.
+//! ([`glints`]); the escort 0x0f82 (`0x417600`) is the shared crate::moby::classes::space::escort, the mission 0x1155
+//! the shared crate::moby::classes::space::mission; the wingman 0x0f93 (Gorn's too, L15 `0x421538`) is registered with
+//! crate::moby::classes::update_for (its numbers stay in [`ships`]).
 
 pub mod carrier;
 pub mod glints;
@@ -20,8 +20,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         sky::LIGHT => Some(sky::update_11c9),
         glints::CLASS => Some(glints::update),
         tethered::CLASS => Some(tethered::update),
-        // 0xf93 is Gorn's too (the same code, L15 `0x421538`).
-        ships::FIGHTER | ships::WINGMAN => Some(super::space::update_fighter),
+        ships::FIGHTER => Some(super::space::update_fighter),
         ships::STATION => Some(ships::update_station),
         ships::BEACON => Some(ships::update_beacon),
         carrier::CLASS => Some(carrier::update),

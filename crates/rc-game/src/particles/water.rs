@@ -14,8 +14,8 @@
 //! (`0x1b8d58`, [`PartAux::cam_yaw`]); a kind-1 drop tests the world with a line (flags 2, [`PartAux::coll`]).
 //!
 //! Not ported: a kind-2 drop's splat on a non-water face (`0x33c390`, type 0x33: the hero spawns kinds 0, 1 and 3
-//! only), the splash moby 0x307 (`0x39f938`: the class is in no level's table, so `CreateMoby` returns 0 in the game
-//! too).
+//! only), the splash moby 0x307 (`0x39f938`, crate::moby::classes::splash: every level's class list has it; the
+//! hero's splash `0x2aac58` does not make it here).
 
 use super::{dec_life, rec, Particles};
 use crate::collision::{coll_line_m, QueryFlags};

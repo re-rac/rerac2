@@ -14,7 +14,7 @@
 //! (`rand() & 1`) additive (ALPHA 0x48).
 //!
 //! The callers' rings ([`IDLE`] always while ridden, [`VACUUM_NEAR`] / [`VACUUM`] while the vacuum runs): the
-//! hovership (crate::moby::classes::level08::hovership) and the museum's two
+//! hovership (crate::moby::classes::hovership) and the museum's two
 //! (crate::moby::classes::level21::hovercraft).
 
 use super::{staged, Particles};

@@ -266,8 +266,7 @@ fn stride(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3) {
     let m = &mut w.mobys[id];
     m.pos = add(m.pos, scale(m.rows[0], step));
     let y = yaw_to(w, id, goal);
-    let p = w.mobys[id].pos;
-    ai::move_step(w, id, ctx, y, p);
+    ai::turn_in_place(w, id, ctx, y);
     let z = ai::ground_z(ctx, 0.5, w.mobys[id].pos, 0);
     w.mobys[id].pos[2] = z;
     let foot = match k { 5 => 3, 0xf => 2, _ => return };

@@ -1113,7 +1113,8 @@ pub fn update_0b0b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         w.delete(id);
         return;
     }
-    if w.mobys[id].state != 0xc && w.mobys[id].sub_state != 2 { ai::hold(w, id, ctx); }
+    // `0x32ceb8(m, +0xf8)`: the turn in place to its own yaw.
+    if w.mobys[id].state != 0xc && w.mobys[id].sub_state != 2 { let yaw = w.mobys[id].rot[2]; ai::turn_in_place(w, id, ctx, yaw); }
     if ai::scene_hide(&mut w.mobys[id], ctx) {
         // Its parts with it, while it has both.
         let ps = parts(w, id, 0x2a0);

@@ -21,7 +21,7 @@
 //! Users: the two aims of crate::moby::classes::level16::drone, crate::moby::classes::gunship and
 //! crate::moby::classes::level20::strafer; the head aims of crate::moby::classes::level19::lurker,
 //! crate::moby::classes::level14::rappeller and crate::moby::classes::level17::hatchling; the head aims of
-//! crate::moby::classes::level20::biter, crate::moby::classes::level18::breeder, crate::moby::classes::level18::stalker
+//! crate::moby::classes::level20::biter, crate::moby::classes::breeder, crate::moby::classes::level18::stalker
 //! (on its inner body, [`head_on`]) and crate::moby::classes::endako_a_enemies; the aims and head aims of
 //! crate::moby::classes::critter, crate::moby::classes::beast, the burrowers of crate::moby::classes::enemies,
 //! crate::moby::classes::level20::boss, crate::moby::classes::endako_boss and the troopers of

@@ -4,13 +4,13 @@
 //!
 //! Shared with other levels: the gunship 0x0cbc (crate::moby::classes::gunship) and its bolt 0x05de
 //! (crate::moby::classes::gunship_bolt), both also L20's; the pads 0x0efc and 0x0e80 (crate::moby::classes::pads); the texture
-//! scroller 0x0d06 (crate::moby::classes::tex_scroll, also L16's).
+//! scroller 0x0d06 (crate::moby::classes::tex_scroll, also L16's); the hover pad 0x0e84 (crate::moby::classes::hover_pad,
+//! also L12's); the glider's launch pad 0x0988 (crate::moby::classes::glider_pad).
 
 pub mod breakables;
 pub mod critter;
 pub mod director;
 pub mod flyer;
-pub mod hover_pad;
 pub mod lamp;
 pub mod leader;
 pub mod mission;
@@ -41,8 +41,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         talker::CLASS => Some(talker::update_0e5e),
         critter::CLASS => Some(critter::update_0d90),
         patrol::CLASS => Some(patrol::update_0d30),
-        // Also level 12's (L12 `0x408a28`, the same code and data).
-        hover_pad::CLASS => Some(hover_pad::update_0e84),
         breakables::CRYSTAL => Some(breakables::update_1298),
         breakables::BIG_CRYSTAL => Some(breakables::update_10e7),
         props::SPINNER => Some(props::update_0c21),

@@ -12,7 +12,8 @@
 //!
 //! Shared with other levels: the launcher 0x0a58 and its carrier 0x0e44 (crate::moby::classes::launcher), the
 //! breakable 0x1293 (crate::moby::classes::breakables), the beacons 0x0a99 / 0x0ab8 (crate::moby::classes::beacon),
-//! the light 0x0cfd (crate::moby::classes::hue_light).
+//! the light 0x0cfd (crate::moby::classes::hue_light), the tie group's wave of lights 0x1137
+//! (crate::moby::classes::tie_wave).
 
 use crate::hero::physics::V3;
 use crate::moby::MobyWorld;
@@ -25,7 +26,6 @@ pub mod platforms;
 pub mod rider;
 pub mod skitter;
 pub mod talkers;
-pub mod tie_wave;
 
 /// This level's class updates.
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
@@ -45,7 +45,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x09f0 => Some(ambush::update_09f0),
         0x0ce6 => Some(ambush::update_0ce6),
         0x1362 => Some(ambush::update_1362),
-        0x1137 => Some(tie_wave::update),
         0x0f61 => Some(misc::update_0f61),
         0x0968 => Some(platforms::update_0968),
         0x09eb => Some(platforms::update_09eb),

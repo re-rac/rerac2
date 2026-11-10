@@ -21,19 +21,9 @@
 //!   piece thrown (`0x340860` = L00 `0x32b580`, crate::moby::shards::throw_all: `$gp+0x3370` / `+0x3368` / `+0x3360`),
 //!   the blast 2 above it (`0x41b550` = L00 `0x3f8348`: size 0.5, sprites 0x19 / 0x14 / 0x14, 0x14 puffs, 0x2d
 //!   streaks, its flash ball), a 0x126a in its place (`0x33ccb0` = L00 `0x327898`), deleted.
-//! * **0x119b** ([`update_119b`], `0x43fe58`, 11 placed; the decomp's `func_L19_00422420`, shared with L19's 0x1204
-//!   `0x423750`): a field that fades away. Its pvars: `+0x00` a moby it watches (−1 none), `+0x04` its fade, `+0x08`
-//!   its scroll, `+0x0c` its size (its scale is that over 9.77; 6.2 for a 0x1204), `+0x14` its loop sound.
-//!   * **0**: alpha 0x50, mode | 0xb0c, its first row and its sphere scaled to its size, its second row by 0.8, the
-//!     ambient 0x80 grey; its mission done: 3.
-//!   * **1**: its loop sound 0 kept playing. The watched moby's uid counted (or the moby dead), or with none watched
-//!     hooked: 2.
-//!   * **2**: its sound stopped; it fades by 0.05 a tick (alpha 80 times the fade); faded out, 3.
-//!   * **3**: its uid marked gone (crate::game::GameState::uid_gone), deleted.
 //!
 //! Not ported for 0x124f: the switch back of the hero's form at its end (`0x2c5b50(0)`, with `+0x90`; level 20's
-//! own, which the port lacks). For 0x119b: the point light `+0x0a` freed at its end (`0x312160` = L00
-//! `0x2fdc48`; this code never takes one).
+//! own, which the port lacks).
 
 use crate::hero::physics::{add, scale, sub};
 use crate::moby::blast::{self, Blast};
@@ -165,75 +155,6 @@ pub fn update_1269(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
 }
 
-pub const FIELD: i16 = 0x119b;
-/// L19's class on the same code (its size's base 6.2).
-const FIELD_L19: i16 = 0x1204;
-
-/// 0x119b (module docs).
-pub fn update_119b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let base = if w.mobys[id].o_class == FIELD_L19 { 6.2 } else { 9.77 };
-    match w.mobys[id].state {
-        0 => {
-            let m = &mut w.mobys[id];
-            m.set_pv_i(0x14, -1);
-            m.alpha = 0x50;
-            m.state = 1;
-            m.mode |= 0xb0c;
-            let s = m.pv_f(0xc) / base;
-            m.rows[0] = scale(m.rows[0], s);
-            m.rows[1] = scale(m.rows[1], 0.8);
-            m.bsphere[3] *= s;
-            m.set_pv_s(0xa, -1);
-            m.set_pv_f(4, 1.0);
-            m.ambient = [0x80; 3];
-            if mission_done(ctx, m.mission) { m.set_state(3, -1); }
-        }
-        1 => {
-            let h = w.mobys[id].pv_i(0x14);
-            if h < 0 || !ctx.host.sound_playing(h) {
-                let h = ctx.host.play_sound(&w.mobys[id], 0, 4);
-                w.mobys[id].set_pv_i(0x14, h);
-            }
-            let watched = w.mobys[id].pv_i(0);
-            let on = if watched == -1 {
-                w.mobys[id].once & 4 != 0
-            } else {
-                // The watched moby's uid counted (`0x19b4a8 + level·0x400`, its nibble's low three bits); dead, on.
-                live(w, watched).is_none_or(|k| ctx.game.uid_count(w.mobys[k].uid) != 0)
-            };
-            if on {
-                let m = &mut w.mobys[id];
-                m.set_pv_f(4, 1.0);
-                m.state = 2;
-            }
-        }
-        2 => {
-            let h = w.mobys[id].pv_i(0x14);
-            if h >= 0 && ctx.host.sound_playing(h) { ctx.host.stop_sound(h); }
-            let m = &mut w.mobys[id];
-            let f = m.pv_f(4) - 0.05;
-            m.set_pv_i(0x14, -1);
-            m.set_pv_f(4, f);
-            if f < 0.0 { m.state = 3; } else { m.alpha = (f * 80.0) as i32 as u8; }
-        }
-        3 => {
-            let (uid, mission) = (w.mobys[id].uid, w.mobys[id].mission);
-            ctx.game.uid_gone(uid, mission);
-            w.delete(id);
-            return;
-        }
-        _ => {}
-    }
-    // Its scroll: on by 0x10 a tick, back by 0x1000 past it; its class's texture coordinates moved the same
-    // (`0x326a20` = L00 `0x310838`: 0x10 on s, −0xff0 at the wrap; every placed one moves the shared class).
-    let m = &mut w.mobys[id];
-    let (mut s, mut step) = (m.pv_s(8).wrapping_add(0x10), 0x10);
-    if 0x1000 < s { s -= 0x1000; step = -0xff0; } else if s < 0 { s += 0x1000; step = 0x1010; }
-    m.set_pv_s(8, s);
-    let class = m.o_class;
-    w.scroll_class(class, step, 0);
-}
-
 pub const NEST: i16 = 0x11ec;
 /// `$gp+0x3220` / `+0x3224` / `+0x3228`: the hop's most speed up (a second) and its most tilts (degrees a second).
 const NEST_HOP: f32 = 5.0;
@@ -242,7 +163,7 @@ const NEST_TILT: (f32, f32) = (20.0, 20.0);
 const NEST_GRAVITY: f32 = 30.0;
 
 /// 0x11ec (`0x446718`, 11 placed; the decomp's `func_L20_004451C0`): a hopping nest of the breeding critters
-/// (crate::moby::classes::level18::breeder). Its pvars: `+0x20` health (most `+0x24`, 1 when unset), `+0x50` its
+/// (crate::moby::classes::breeder). Its pvars: `+0x20` health (most `+0x24`, 1 when unset), `+0x50` its
 /// flash, `+0x60` / `+0x64` the hop's tilts, `+0x70` / `+0x74` the cuboids that start its hopping and burst it, `+0x78`
 /// its brood's group, `+0x7c` its resting height, `+0x80` the hop's speed, `+0x84` the throw's wait (45..120, read
 /// by nothing here), `+0x88` its loop sound.
@@ -351,10 +272,10 @@ pub fn update_11ec(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 }
 
 /// The nest's brood thrown as it bursts: each hidden one of the group `+0x78` (`0x3fd4f0` = L18 `0x3f8a58`,
-/// crate::moby::classes::level18::breeder::brood_pick) thrown (`0x3fd5f8` = L18 `0x3f8b60`) from 0.7 up its frame at
+/// crate::moby::classes::breeder::brood_pick) thrown (`0x3fd5f8` = L18 `0x3f8b60`) from 0.7 up its frame at
 /// 0.1 a tick along its −y, jittered by 0.01 (`0x336918` = L00 `0x3217d8`), the nest its parent (`+0xb8`).
 fn throw_brood(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    use crate::moby::classes::level18::breeder;
+    use crate::moby::classes::breeder;
     let group = w.mobys[id].pv_i(0x78);
     for _ in 0..64 {
         let (Some(k), _) = breeder::brood_pick(w, group) else { break };

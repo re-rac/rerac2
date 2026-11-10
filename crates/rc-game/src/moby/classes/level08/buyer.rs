@@ -1,5 +1,6 @@
-//! 0x0e3e (L08 `0x4370e0`; the same code is Grelbin's, L19 `0x42afa8`, with the same flags, scenes, texts and price):
-//! the crystal buyer. Ratchet's ship is not on the pad until he has paid the buyer in crystals; after that the
+//! 0x0e3e (L08 `0x4370e0`; the same code is in Grelbin's table, L19 `0x42afa8`, with the same flags, scenes, texts and
+//! price, but nothing places or creates the class there: it is only a scene actor, which does not update): the crystal
+//! buyer. Ratchet's ship is not on the pad until he has paid the buyer in crystals; after that the
 //! buyer takes every crystal he brings for bolts. On the shared NPC system crate::moby::talk.
 //!
 //! **Each tick**, first: the actors' big heads of its class in a scene (crate::moby::talk::actor_heads, 2.3; L08

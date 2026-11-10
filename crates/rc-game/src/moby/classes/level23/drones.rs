@@ -462,7 +462,7 @@ pub fn update_07e5(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].state != 13 {
         let h = ctx.hero.gravity.height(w.mobys[id].pos);
         let m = &w.mobys[id];
-        facing = super::super::level22::planet::turn_to(&m.rows, sub(hero, m.pos)) <= std::f32::consts::FRAC_PI_4;
+        facing = crate::moby::classes::planetoid::turn_to(&m.rows, sub(hero, m.pos)) <= std::f32::consts::FRAC_PI_4;
         let d = dist(hero, m.pos);
         let clear = d < SIGHT && paths::clear(w, ctx, id, w.mobys[id].pos, hero, true);
         let flat = paths::surface(ctx, w.level23.radius, w.mobys[id].pos, 0.0);

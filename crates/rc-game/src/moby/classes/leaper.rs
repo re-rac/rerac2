@@ -655,9 +655,7 @@ fn bank(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         1 => {
             if ctx.game.rng.randi(7) == 0 {
-                let yaw = w.mobys[id].rot[2];
-                let at = w.mobys[id].pos;
-                ai::move_step(w, id, ctx, yaw, at);
+                ai::hold(w, id, ctx);
             }
             if w.mobys[id].count_i(0x32c) {
                 if !wrapped(w, id, ctx) { return; }
@@ -783,16 +781,14 @@ fn bite(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     match target(w, id) {
         None => {
             if rand7 == 0 {
-                let (yaw, at) = (w.mobys[id].rot[2], w.mobys[id].pos);
-                ai::move_step(w, id, ctx, yaw, at);
+                ai::hold(w, id, ctx);
             }
         }
         Some((_, tp)) => {
             let m = &w.mobys[id];
             let face = atan2(tp[0] - m.pos[0], tp[1] - m.pos[1]);
             if rand7 == 0 {
-                let at = m.pos;
-                ai::move_step(w, id, ctx, face, at);
+                ai::turn_in_place(w, id, ctx, face);
             } else {
                 let m = &mut w.mobys[id];
                 let (a, b, most) = (m.pv_f(MV + 0x14), m.pv_f(MV + 0x18), m.pv_f(MV + 0x1c));

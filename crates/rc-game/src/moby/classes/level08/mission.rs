@@ -71,7 +71,7 @@ mod pv {
 
 /// The class a swapped moby becomes ([`swap`]).
 const SWAP_CLASS: i16 = 0x131d;
-/// The hovership (crate::moby::classes::level08::hovership).
+/// The hovership (crate::moby::classes::hovership).
 const HOVERSHIP: i16 = 0x0eef;
 /// The wrench's item.
 const WRENCH: i32 = 0xa;

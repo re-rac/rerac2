@@ -29,7 +29,7 @@
 //! * **2** watching `+0x748`: sequence 1 and `+0x96` 0..89 on its first tick; then facing the moby ([`face`],
 //!   `0x425380`); past 180 ticks `+0x96` again 0..89 and, 4 in 5, sequence 5.
 //! * **3** the path `+0x730`: its limits from `+0x720` / `+0x724`, sequence 6 + r (of 4), its point 0; after that a
-//!   step along it (`0x425290` = L18 `0x3f8ff0`, crate::moby::classes::level18::breeder::path_step_at, within 2):
+//!   step along it (`0x425290` = L18 `0x3f8ff0`, crate::moby::classes::breeder::path_step_at, within 2):
 //!   not past its last point, state 2. (What the code does: the state lasts two ticks.)
 //! * **4** watching the cuboid `+0x764`: sequence 4 or 3 at random (`+0xbc`); facing the cuboid's place; at its end
 //!   5 (sub 2).
@@ -62,7 +62,7 @@
 //! What sets it into states 3..7 besides its start is not in its own code.
 
 use crate::hero::physics::{atan2, dist2, len2, sub, V3};
-use crate::moby::classes::level18::breeder::{nearest_point, path_step_at};
+use crate::moby::classes::breeder::{nearest_point, path_step_at};
 use crate::moby::classes::props::{seq, wrapped};
 use crate::moby::{ai, bolts, joint_aim, Ctx, MobyWorld};
 

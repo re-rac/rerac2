@@ -803,8 +803,7 @@ pub fn update_0c3b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 ai::senses(&mut w.mobys[id], f32::from_bits(0x3b91_a2b4), f32::from_bits(0x3e08_8889), f32::from_bits(0x3b64_c38a), f32::from_bits(0x3ed6_7752));
             }
             // `0x332b50(yaw, m)`: turning in place.
-            let p = w.mobys[id].pos;
-            ai::move_step(w, id, ctx, yaw_t, p);
+            ai::turn_in_place(w, id, ctx, yaw_t);
             if wrapped(w, id, ctx) { w.mobys[id].set_state(7, -1); }
         }
         7 => {
@@ -1331,8 +1330,7 @@ pub fn update_09ca(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if wrapped(w, id, ctx) { standoff_09ca(w, id, ctx); }
         }
         6 => {
-            let p = w.mobys[id].pos;
-            ai::move_step(w, id, ctx, yaw_t, p);
+            ai::turn_in_place(w, id, ctx, yaw_t);
         }
         7 => {
             flags = ai::flight(w, id, ctx);
@@ -1389,13 +1387,11 @@ pub fn update_09ca(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if done {
                 w.mobys[id].set_state(10, -1);
                 set_seq(w, id, ctx, 6, 10);
-                let (r, p) = (w.mobys[id].rot[2], w.mobys[id].pos);
-                ai::move_step(w, id, ctx, r, p);
+                ai::hold(w, id, ctx);
             } else if 5.0 < ctx.host.frame_time(&w.mobys[id]) {
                 let keep = w.mobys[id].pv_f(0x130);
                 w.mobys[id].set_pv_f(0x130, f32::from_bits(0x3c8e_fa36));
-                let p = w.mobys[id].pos;
-                ai::move_step(w, id, ctx, yaw_t, p);
+                ai::turn_in_place(w, id, ctx, yaw_t);
                 w.mobys[id].set_pv_f(0x130, keep);
             }
         }
@@ -1422,15 +1418,13 @@ pub fn update_09ca(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 w.mobys[id].set_state(0xb, -1);
             }
             if turn {
-                let p = w.mobys[id].pos;
-                ai::move_step(w, id, ctx, yaw_t, p);
+                ai::turn_in_place(w, id, ctx, yaw_t);
             }
         }
         s @ (0xb | 0x13 | 0x14) => {
             if s == 0xb {
                 if w.mobys[id].first() { set_seq(w, id, ctx, 1, 10); }
-                let p = w.mobys[id].pos;
-                ai::move_step(w, id, ctx, yaw_t, p);
+                ai::turn_in_place(w, id, ctx, yaw_t);
             }
             if flags & 2 != 0 { guard_09ca(w, id, ctx); }
         }
@@ -1796,8 +1790,7 @@ pub fn update_0b22(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 set_seq(w, id, ctx, 10, 10);
                 ai::senses(&mut w.mobys[id], f32::from_bits(0x3b91_a2b4), f32::from_bits(0x3e08_8889), f32::from_bits(0x3be4_c38a), f32::from_bits(0x3f56_7752));
             }
-            let p = w.mobys[id].pos;
-            ai::move_step(w, id, ctx, yaw_t, p);
+            ai::turn_in_place(w, id, ctx, yaw_t);
             if wrapped(w, id, ctx) {
                 let (s, b) = (w.mobys[id].pv_s(0x4ec), w.mobys[id].pv_s(0x4ee));
                 w.mobys[id].set_state(s as u8, b as i32);

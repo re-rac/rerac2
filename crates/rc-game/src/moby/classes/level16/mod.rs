@@ -1,6 +1,7 @@
 //! Level 0x10's own classes (Snivelak; L16 addresses, the engine functions they call named by their L16 addresses
 //! with the port's). Each class's update is registered in [`update_for`]; crate::moby::classes::update_for asks it
-//! after its own.
+//! after its own. Shared with other levels: the thrown rocks 0x0a80 (crate::moby::classes::thrown_rock, L22's and
+//! L23's too), the tie wave 0x1137 (crate::moby::classes::tie_wave).
 
 pub mod bolts;
 pub mod boss;
@@ -46,7 +47,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         movers::MOVER_A | movers::MOVER_B | movers::MOVER_C => Some(movers::update_10fd),
         drawbridge::BRIDGE => Some(drawbridge::update_125d),
         movers::FLIPPER => Some(movers::update_114c),
-        rocks::ROCK => Some(rocks::update_0a80),
         rocks::FACE => Some(rocks::update_0e85),
         copter::CLASS => Some(copter::update_0ebb),
         copter::SHOT => Some(copter::update_0ebd),

@@ -1,13 +1,5 @@
 //! Damosel's props (L18 addresses; the engine functions by their L18 places with the L00 ones the port knows them by).
 //!
-//! * **0x1212** ([`update_1212`], `0x43fc50`, 12 placed; level 20's 11 at `0x447010`; the decomp's
-//!   `func_L18_0043E760`): a bobbing glow with two arcs. Its pvars: `+0x140` its place at the start, `+0x150` /
-//!   `+0x154` its bob's phase and last offset, `+0x158` / `+0x15c` its pulse and its facing (for its draws). **0**: the
-//!   bob's phase random (`0x336af0` = L00 `0x31bb00`), its start kept, its arcs set up (`0x4402d8`), 1. **Drawn**: the
-//!   pulse's phase `(frame mod 60)/60·2π − π`; its glow (`+0x78`) the pulse (`sin·½ + ½`, `0x341d10`) of 0x80202080 /
-//!   0x20202040 and of 0x80400000 / 0x20000000 blended (`0x338d30` = L00 `0x31dc10`, crate::hud::lerp_rgba) by the
-//!   square of how square its first row faces the camera (`0x1b9740`). **Each tick** it bobs 0.1 about its start's
-//!   height at 300° a second (`0x33f1b0` = L00 `0x324430`, `$gp+0x2be8` / `+0x2bec`).
 //! * **0x12a6** ([`update_12a6`], `0x4427e0`, 5 placed; the decomp's `func_L18_004412F0`): a breakable. **0**: 1.
 //!   **1**: a hit with flags 0x4010000 (`0x338e08` = L00 `0x31dce8`) while `+0x68`[0] = 0 breaks it (2); its hit let
 //!   go. **2**: every piece thrown (`0x346658` = L00 `0x32b580`, crate::moby::shards::throw_all: `$gp+0x2cf0` /
@@ -26,19 +18,19 @@
 //!   * **2** (out): its step on until the run's ticks. One frame in 16 its back test ([`back`], `0x3ff1d8`) → 1.
 //!     Hooked: the hook cleared, 1.
 //! * **0x0f06** ([`update_0f06`], `0x4310c0`, 4 placed; the decomp's `func_L18_0042FBC8`): a hopping nest of the
-//!   breeding critters (crate::moby::classes::level18::breeder) that throws its brood and settles. Its pvars: `+0x00`
+//!   breeding critters (crate::moby::classes::breeder) that throws its brood and settles. Its pvars: `+0x00`
 //!   its turns (a tick), `+0x10` / `+0x14` the cuboids that start its hopping and its throw, `+0x18` its brood's group,
 //!   `+0x1c` its resting height, `+0x20` its speed up, `+0x24` / `+0x28` its wobble's period and size, `+0x2c` how
 //!   many it throws.
 //!   * **0**: its resting height kept; 1.
 //!   * **1**: Ratchet in the first cuboid (`0x33c668` = L00 `0x321858`) with 4 or more of its brood hidden in the nest
-//!     (`0x3f8a58`, crate::moby::classes::level18::breeder::brood_pick): 2.
+//!     (`0x3f8a58`, crate::moby::classes::breeder::brood_pick): 2.
 //!   * **2**: each hop starts level at its resting height with up to 10 a second more up and new tilts (up to 90° a
 //!     second), its class sound 0 (`0x37c8d8` = L00 `0x3605f0`); above its rest it rises by its speed under 30 a
 //!     second², tilting one way going up and back coming down; below it, a new hop. Ratchet in the second cuboid with
 //!     4 or more hidden: 3.
 //!   * **3**: on its first tick level, it throws up to `+0x2c` of its brood (each the last hidden, while any are left;
-//!     `0x3f8b60`, crate::moby::classes::level18::breeder::launch) from 0.4 above it, 10 a second up jittered by 5 a
+//!     `0x3f8b60`, crate::moby::classes::breeder::launch) from 0.4 above it, 10 a second up jittered by 5 a
 //!     second (`0x33c5e8` = L00 `0x3217d8`), itself their parent (`+0xb8`); then a blast (size 1, 0x19 / 0x14 / 0x14
 //!     sprites, 0x14 puffs, 0x2d streaks, the flash, the shake), its sound 0, 25..27 a second more up and on each axis
 //!     no turn or a whole one over the flight (`0x4316e0` = L11 `0x43b5b8`: its ticks to land). It flies, turning; down
@@ -81,10 +73,6 @@
 //!
 //! Not ported for 0x0f54: its particles (`0x436e98` each tick of 1, 2 and 4: the level particle `0x35b6b8`, which the
 //! port lacks, on the place `0x1b36a0`).
-//!
-//! Not ported for 0x1212: its arcs (`0x4402d8` the set-up, `0x440430` each drawn tick: two ribbons from random points
-//! of the table `0x2bd9b0`, their waves) and its three draws (`0x301f28(0x43ff80)`, `(0x43fe28)`, `(0x43fea0)`),
-//! which are a render path of their own.
 
 use crate::hero::physics::{add, add_rot, dot, set_len, sub, wrap_turn, V3};
 use crate::moby::blast::{self, Blast};
@@ -94,40 +82,6 @@ use crate::moby::{shards, Ctx, MobyWorld};
 fn mission_done(ctx: &Ctx, mission: u8) -> bool {
     let g = &ctx.game;
     mission != 0xff && g.missions.get(g.level.max(0) as usize * 0x10 + mission as usize).is_some_and(|b| b & 0x80 != 0)
-}
-
-pub const ARCS: i16 = 0x1212;
-/// `$gp+0x2bd8..+0x2be4`: the pulses' colours (the first pair, the second pair).
-const ARC_GLOW: [u32; 4] = [0x8020_2080, 0x2020_2040, 0x8040_0000, 0x2000_0000];
-/// `$gp+0x2be8` / `+0x2bec`: the bob's height and speed (degrees a second).
-const ARC_BOB: (f32, f32) = (0.1, 300.0);
-
-/// 0x1212 (module docs).
-pub fn update_1212(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    if w.mobys[id].state == 0 {
-        let ph = ctx.game.rng.rand_angle();
-        let m = &mut w.mobys[id];
-        m.set_pv_f(0x150, ph);
-        let p = m.pos;
-        m.set_pv_v(0x140, p);
-        m.set_state(1, -1);
-    }
-    if w.mobys[id].drawn != 0 {
-        let phase = (ctx.game.frame % 60) as f32 * std::f32::consts::TAU / 60.0 - std::f32::consts::PI;
-        let s = phase.sin() * 0.5 + 0.5;
-        let a = crate::hud::lerp_rgba(s, ARC_GLOW[0], ARC_GLOW[1]);
-        let b = crate::hud::lerp_rgba(s, ARC_GLOW[2], ARC_GLOW[3]);
-        let cam = ctx.host.camera_pos();
-        let m = &mut w.mobys[id];
-        m.set_pv_f(0x158, phase.cos() * 0.5 + 0.5);
-        let f = dot(set_len(sub(cam, m.pos), 1.0), m.rows[0]).abs();
-        let f = f * f;
-        m.set_pv_f(0x15c, f);
-        m.glow = crate::hud::lerp_rgba(f, b, a);
-    }
-    let m = &mut w.mobys[id];
-    let base = m.pv_f(0x148);
-    crate::moby::classes::props::bob(m, ARC_BOB.0, ARC_BOB.1 * 0.000_290_888_24, base, 0x150, 0x154);
 }
 
 pub const PANEL: i16 = 0x12a6;
@@ -499,7 +453,7 @@ fn nest_fly(w: &mut MobyWorld, id: usize) -> bool {
 
 /// 0x0f06 (module docs).
 pub fn update_0f06(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    use crate::moby::classes::level18::breeder;
+    use crate::moby::classes::breeder;
     let hero = ctx.hero.pos;
     let group = w.mobys[id].pv_i(0x18);
     let brood = |w: &MobyWorld| breeder::brood_pick(w, group).1;

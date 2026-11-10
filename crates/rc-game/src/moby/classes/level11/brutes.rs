@@ -720,7 +720,7 @@ fn stride(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, p: V3) {
     let m = &mut w.mobys[id];
     m.pos = add(m.pos, scale(m.rows[0], k));
     let q = w.mobys[id].pos;
-    ai::move_step(w, id, ctx, atan2(p[0] - q[0], p[1] - q[1]), q);
+    ai::turn_in_place(w, id, ctx, atan2(p[0] - q[0], p[1] - q[1]));
 }
 
 /// `0x2b6d10`: the walk's step per frame of its sequence 3.

@@ -451,7 +451,7 @@ pub(crate) fn bob_sway(m: &mut crate::moby::Moby, b: &Bob, power: f32) {
     m.set_pv_f(pv::BOB, bob);
     m.pos[2] += bob * power;
     let k = power * DEG_TICK;
-    super::super::props::sway(m, b.sway.0 * DEG, b.sway.1 * k, b.sway.2 * k, pv::SWAY_A, pv::SWAY_B);
+    super::props::sway(m, b.sway.0 * DEG, b.sway.1 * k, b.sway.2 * k, pv::SWAY_A, pv::SWAY_B);
     m.rot[2] = m.pv_f(pv::YAW);
     m.rot[0] = add_rot(m.rot[0], m.pv_f(pv::ROLL));
     m.rot[1] = add_rot(m.rot[1], m.pv_f(pv::PITCH));

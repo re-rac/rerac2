@@ -2,7 +2,8 @@
 //! the decomp's `func_L23_0041CA58` … `func_L23_0041E220`): the opponent 0x0f7f (crate::moby::classes::level23::boss)
 //! runs them. The pickups themselves are the orbit fights' shared classes and code (health 0x0e3a, gun charge 0x0e3b,
 //! specials 0x0e3d: made `0x4037b0` / `0x404d38` / `0x405700`, their update `0x4038c8` / `0x404e28` / `0x4057f0`,
-//! crate::moby::classes::level22::pickups); here only Giant Clank takes them.
+//! crate::moby::classes::orbit_pickups; the distance `0x41f720` the update leaves is its `hero_dist`); here only Giant
+//! Clank takes them.
 //!
 //! * **The set-up** ([`set_up`], `0x41df58`; `0x41e1c0` first): the rows emptied; Giant Clank's record (`0x1b1f20`,
 //!   crate::hero::giant::GiantBlock::counts) its timers 0 and its gun (`+0x2fa`) and specials (`+0x2fe`) full. Seven
@@ -23,7 +24,7 @@
 
 use super::paths;
 use crate::hero::physics::{add, dist, scale};
-use crate::moby::classes::level22::pickups::create;
+use crate::moby::classes::orbit_pickups::{create, hero_dist};
 use crate::moby::{Ctx, MobyWorld};
 
 const ROW: usize = 50;
@@ -69,11 +70,6 @@ pub fn set_up(w: &mut MobyWorld, boss: usize, ctx: &mut Ctx) {
         let Some(&p) = paths::slot(w, j).get((pick - cumulative[j]).max(0) as usize) else { continue };
         if !SKIPPED.contains(&j) { spawn(w, ctx, p, false); }
     }
-}
-
-/// `0x41f720`: the pickup's distance from Giant Clank as its update left it.
-fn hero_dist(w: &MobyWorld, p: usize) -> f32 {
-    w.mobys[p].pv_f(if w.mobys[p].o_class == crate::moby::classes::level22::pickups::HEALTH { 0x2c } else { 0x44 })
 }
 
 /// `0x41e258` (module docs).
