@@ -17,6 +17,10 @@
 //! The water creature that grabs Ratchet, 0x0fe6 (`0x45bbc8`, on the liquid grid's water): [`grabber`]. The wrench
 //! crank 0x0b57 (`0x41b200`, Ratchet's state 0x37 and the script camera): [`crank`]. The hint manager 0x0cdd
 //! (`0x4321e8`): [`hints`].
+//!
+//! Shared with other levels: the field gate 0x031a (crate::moby::classes::field_gate), the pole's splash 0x0307
+//! (crate::moby::classes::splash), the area switch 0x0dda (crate::moby::classes::area_switch), the light 0x0cfd
+//! (crate::moby::classes::hue_light).
 
 pub mod arc_shot;
 pub mod barrel;
@@ -24,7 +28,6 @@ pub mod brawler;
 pub mod crank;
 pub mod breakables;
 pub mod power_core;
-pub mod gate;
 pub mod glowbug;
 pub mod grabber;
 pub mod hints;
@@ -71,7 +74,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x0912 => Some(breakables::update_0912),
         0x0faa => Some(breakables::update_0faa),
         0x0fd2 | 0x0fd4 | 0x0fe9 => Some(breakables::update_0fd2),
-        0x0dda => Some(props::update_0dda),
         0x086b | 0x086d => Some(traffic::update_086b),
         0x089d => Some(props::update_089d),
         0x0948 => Some(props::update_0948),
@@ -89,8 +91,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         brawler::SWITCH_CLASS => Some(brawler::update_0fdc),
         arc_shot::CLASS => Some(arc_shot::update_0fe5),
         pole::CLASS => Some(pole::update_12c4),
-        gate::CLASS => Some(gate::update_031a),
-        0x0307 => Some(pole::update_0307),
         barrel::CLASS => Some(barrel::update_08b8),
         host::CLASS => Some(host::update_0ccf),
         spinners::CLASS_0FC1 => Some(spinners::update_0fc1),

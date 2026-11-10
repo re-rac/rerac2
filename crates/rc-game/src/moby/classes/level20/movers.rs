@@ -90,11 +90,9 @@ pub fn update_1170(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if w.mobys[id].timer as i32 != w.mobys[id].pv_i(0x7c) {
                 if ai::link(&w.mobys[id], PROJECTION).filter(|&c| c < w.mobys.len()).is_none() {
                     let c = w.create(w.mobys[id].o_class);
+                    w.adopt(c, None, &*ctx.host);
                     let cm = &mut w.mobys[c];
-                    cm.update_dist = 0xff;
-                    cm.draw_dist = 0xff;
-                    cm.drawn = 1;
-                    cm.mode = (cm.mode & 0xfff8) | crate::moby::mode::NO_UPDATE;
+                    cm.mode |= crate::moby::mode::NO_UPDATE;
                     cm.has_collision = false;
                     cm.alpha = 0;
                     ai::set_link(&mut w.mobys[id], PROJECTION, Some(c));

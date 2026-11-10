@@ -113,15 +113,12 @@ const CLIMB: f32 = 0.058_333_337;
 /// `0x3cda80(m, _, vel, ticks)`: a copy of the barrier (`0x32be48`: updated and drawn at any distance, its parent, place,
 /// angles and light), hidden, with its class's collision, moving `vel` a tick for `ticks` ticks (state 5). The place
 /// the callers pass is not read.
-fn climber(w: &mut MobyWorld, id: usize, vel: V3, ticks: i32) {
-    let src = &w.mobys[id];
-    let (class, pos, rot, light, ambient) = (src.o_class, src.pos, src.rot, src.light, src.ambient);
+fn climber(w: &mut MobyWorld, id: usize, ctx: &Ctx, vel: V3, ticks: i32) {
+    let class = w.mobys[id].o_class;
     let coll = w.class(class).is_some_and(|c| c.has_collision);
     let c = w.create(class);
+    w.adopt(c, Some(id), &*ctx.host);
     let m = &mut w.mobys[c];
-    (m.update_dist, m.draw_dist, m.parent, m.pos, m.rot, m.light, m.ambient) = (0xff, 0xff, Some(id), pos, rot, light, ambient);
-    m.rows = crate::hero::physics::euler_rows(rot);
-    m.mode &= !7;
     m.drawn = 0;
     m.mode |= 1;
     m.has_collision = coll;
@@ -152,7 +149,7 @@ pub fn update_barrier(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             ctx.host.set_anim(&w.mobys[id], 1, 0, 0);
             w.mobys[id].has_collision = false;
             w.changed = true;
-            climber(w, id, [0.0, 0.0, k * CLIMB], 0x3c);
+            climber(w, id, ctx, [0.0, 0.0, k * CLIMB], 0x3c);
         }
         2 => {
             if !wrapped(w, id, ctx) { return; }
@@ -163,7 +160,7 @@ pub fn update_barrier(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if w.mobys[id].once & 4 != 0 { return; }
             w.mobys[id].set_state(4, -1);
             ctx.host.set_anim(&w.mobys[id], 3, 0, 0);
-            climber(w, id, [0.0, 0.0, k * CLIMB], 0x3c);
+            climber(w, id, ctx, [0.0, 0.0, k * CLIMB], 0x3c);
             let coll = w.class(w.mobys[id].o_class).is_some_and(|c| c.has_collision);
             w.mobys[id].has_collision = coll;
             w.changed = true;

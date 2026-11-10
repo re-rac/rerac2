@@ -1168,7 +1168,7 @@ fn h_clear(w: &MobyWorld, id: usize, ctx: &Ctx, from: V3) -> bool {
     }
 }
 
-/// A glob (crate::moby::classes::level17::lobber::fire, `0x40e240`) from the launcher's joint 0 at the target point,
+/// A glob (crate::moby::classes::lobber::fire, `0x40e240`) from the launcher's joint 0 at the target point,
 /// `k` a tick; `test`: only along a clear line ([`h_clear`]). True when it went.
 fn h_lob(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, k: f32, test: bool) -> bool {
     let from = match gun(w, id) { Some(g) => ctx.host.joint(&w.mobys[g], 0).unwrap_or(w.mobys[g].pos), None => w.mobys[id].pos };
@@ -1176,7 +1176,7 @@ fn h_lob(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, k: f32, test: bool) -> boo
     let v = set_len(sub(m.pv_v(T_POINT), from), k);
     let dmg = m.pv_b(DAMAGE) as f32;
     if test && !h_clear(w, id, ctx, from) { return false; }
-    crate::moby::classes::level17::lobber::fire(w, ctx, dmg, id, v, from);
+    crate::moby::classes::lobber::fire(w, ctx, dmg, id, v, from);
     true
 }
 
@@ -1214,7 +1214,7 @@ fn h_throw(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// `func_US2_L13_0040BC84` with no body, its v1.01 `func_L13_0040A720` the same code but for the two calls the v2
 /// trooper renames too; its helpers v1.01 `func_L13_0040C3A0` / `0040CA00` / `0040CA70` / `0040A638` at our L13
 /// `0x40d820` / `0x40de80` / `0x40def0` / `0x40bba0`): the trooper's big brother, lobbing globs
-/// (crate::moby::classes::level17::lobber's 0x0ea5) from the launcher 0x0ea9 it carries at its joint 0. Health `+0x20`
+/// (crate::moby::classes::lobber's 0x0ea5) from the launcher 0x0ea9 it carries at its joint 0. Health `+0x20`
 /// (its kill byte `+0x2e`: 2 deletes it), movement `+0x50` (steps 0.4), reaction `+0x140` (a hurt to state 26, sub
 /// 3), target `+0x1f0`, as the trooper's.
 ///
@@ -1303,12 +1303,9 @@ fn h_head(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
         let g = w.create(LAUNCHER);
         ai::set_link(&mut w.mobys[id], H_GUN, Some(g));
         if w.mobys[g].o_class == LAUNCHER {
-            let (pos, rot, light, dd) = { let o = &w.mobys[id]; (o.pos, o.rot, o.light, o.draw_dist) };
+            w.adopt(g, Some(id), &*ctx.host);
+            let dd = w.mobys[id].draw_dist;
             let x = &mut w.mobys[g];
-            x.update_dist = 0xff;
-            x.drawn = 1;
-            x.parent = Some(id);
-            (x.pos, x.rot, x.light) = (pos, rot, light);
             x.draw_dist = dd;
             x.mode |= mode::KEEP_ROWS;
             x.drive = true;

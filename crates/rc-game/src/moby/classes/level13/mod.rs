@@ -5,9 +5,13 @@
 //! Not ported (level 13's other classes):
 //! * Shared: the museum's pad 0x0f51 (`0x41cb00`, crate::moby::classes::museum_pad), the creature 0x11eb (`0x4263f0`, crate::moby::classes::critter), the troopers 0x0ea3 / 0x0ea4 and the
 //!   barrier 0x112e (crate::moby::classes::thugs / barrier); the ferry 0x0330 (`0x3ac360`, crate::moby::classes::ferry).
-//! * Not reached: 0x0efc (`0x41c768`: a pad lit by the uid bits `0x19b4a8` and the table `0x21ecc4`).
 //! * Shared with level 6: the barrier 0x08a0 (`0x3c6108`) and its field 0x0431 (`0x3ae168`):
-//!   crate::moby::classes::strands; 0x08a1 (`0x3c6a18`) and 0x031a (`0x3a98d0`) run level 6's.
+//!   crate::moby::classes::strands; 0x08a1 (`0x3c6a18`); the field gate 0x031a (`0x3a98d0`,
+//!   crate::moby::classes::field_gate).
+//! * Shared with others: the pad 0x0efc (`0x41c768`, crate::moby::classes::pads), the breakables 0x130b / 0x130f
+//!   (crate::moby::classes::breakables), the kill cuboids 0x040f (crate::moby::classes::kill_zone), the targets 0x0c86 /
+//!   0x0c87 (crate::moby::classes::hit_targets), the updraft 0x08e2 / 0x123a (crate::moby::classes::updraft), the
+//!   light 0x0cfd (crate::moby::classes::hue_light).
 
 pub mod breakables;
 pub mod clock;
@@ -16,7 +20,6 @@ pub mod lift;
 pub mod movers;
 pub mod powerline;
 pub mod props;
-pub mod targets;
 pub mod walkway;
 
 use crate::hero::physics::V3;
@@ -27,9 +30,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
         0x0ee7 => Some(powerline::update_0ee7),
         0x1150 => Some(powerline::update_1150),
-        0x130b => Some(breakables::update_130b),
         0x130a => Some(breakables::update_130a),
-        0x130f => Some(breakables::update_130f),
         0x130d => Some(breakables::update_130d),
         0x0d97 | 0x0d95 => Some(movers::update_0d97),
         0x0d65 => Some(movers::update_0d65),
@@ -38,10 +39,7 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         0x0ef2 | 0x113c => Some(props::update_0ef2),
         0x12ed => Some(props::update_12ed),
         0x0f20 => Some(props::update_0f20),
-        0x040f => Some(props::update_040f),
         0x0efa => Some(props::update_0efa),
-        0x0c86 => Some(targets::update_0c86),
-        0x0c87 => Some(targets::update_0c87),
         // The guide of level 12's launcher (`0x41eea0` = L12 `0x41b2a8`): only the scenes show it here.
         super::level12::launcher::GUIDE => Some(super::level12::launcher::update_0fec),
         0x11b0 => Some(props::update_11b0),

@@ -19,7 +19,7 @@
 //!   1; the class sound 2 on the opponent, a generator or the core, else 0); none, the timer counts down and it goes
 //!   at 0. Stopped, the same hit to what is within 2 of it (without the owner), and it goes.
 //! * **0x118e, the turret's shot** ([`turret_shot`], `0x423a40(at, way, &damage)`, the decomp's `func_L23_00422540`):
-//!   the drone shot of Dobbo orbit (its update `0x423980` the same code, crate::moby::classes::level22::drone's
+//!   the drone shot of Dobbo orbit (its update `0x423980` the same code, crate::moby::classes::orbit_shot's
 //!   `update_0f5d`), 60 ticks, its rows along its way. **Its hit** ([`turret_hit`], `0x423b68`, `func_L23_00422668`):
 //!   the line it moved meeting a walker 0x07e5 goes on; any other moby: Giant Clank alone takes the damage (flags
 //!   0x8b0003, the kind `class << 16 | 0x305`), a small blast; the world: a small blast; then it goes.

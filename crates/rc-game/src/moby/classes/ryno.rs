@@ -176,8 +176,6 @@ pub struct Trails {
 /// The RYNO II's row as `0x139568[0x2c]` gives it.
 fn cur_row(game: &crate::game::GameState) -> Option<&'static ItemRow> { row(game, ITEM) }
 
-/// `0x2eef88(out, a, b)` = b × a.
-fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
 
 /// `0x31fe98` + `0x321b28`: `v` turned by `a` about `axis`.
 fn turn(v: V3, axis: V3, a: f32) -> V3 {
@@ -208,10 +206,8 @@ fn cooldown(w: &mut MobyWorld, id: usize) {
 
 /// The muzzle light let go (`0x2fdc48`) and its ticks cleared.
 fn free_light(w: &mut MobyWorld, id: usize) {
-    let s = w.mobys[id].pv_s(hv::LIGHT);
-    if s != -1 {
-        if 0 <= s { w.point_lights.free(s as usize); }
-        w.mobys[id].set_pv_s(hv::LIGHT, -1);
+    if w.mobys[id].pv_s(hv::LIGHT) != -1 {
+        crate::point_lights::free_pv_s(w, id, hv::LIGHT);
         w.mobys[id].set_pv_s(hv::TICKS, 0);
     }
 }
@@ -419,8 +415,8 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, muzzle: V3, aimh: f3
             }
         };
         let r0 = set_len(sub(to, pos), 1.0);
-        let r1 = set_len(cross_ba(r0, up), 1.0);
-        [r0, r1, cross_ba(r1, r0)]
+        let r1 = set_len(cross(up, r0), 1.0);
+        [r0, r1, cross(r0, r1)]
     } else if ctx.hero.items.raised {
         [set_len(hrows[1], -1.0), scale(hrows[0], -1.0), hrows[2]]
     } else {
@@ -428,8 +424,8 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, muzzle: V3, aimh: f3
             Some(p) => (set_len(sub(p, pos), 1.0), up),
             None => (ctx.hero.rows[0], ctx.hero.rows[2]),
         };
-        let r1 = set_len(cross_ba(r0, up), 1.0);
-        [r0, r1, cross_ba(r1, r0)]
+        let r1 = set_len(cross(up, r0), 1.0);
+        [r0, r1, cross(r0, r1)]
     };
     let g = &mut ctx.game.rng;
     let tilt = g.randf(4.0, 10.0);
@@ -508,8 +504,8 @@ pub fn update_missile(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     {
         let m = &mut w.mobys[id];
         let r0 = m.pv_v(pv::DIR);
-        let r1 = set_len(cross_ba(r0, up), 1.0);
-        m.rows = [r0, r1, cross_ba(r1, r0)];
+        let r1 = set_len(cross(up, r0), 1.0);
+        m.rows = [r0, r1, cross(r0, r1)];
         let tilt = m.pv_f(pv::TILT);
         if 0.0021 < tilt.abs() {
             let f0 = m.rows[0];

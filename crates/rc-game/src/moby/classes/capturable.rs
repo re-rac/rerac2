@@ -107,7 +107,7 @@ const GUNNER_B: i16 = 0x0ed4;
 /// The gunners' shot.
 pub const SHOT: i16 = 0x1263;
 /// The turning lift its reserves come back on.
-const LIFT: i16 = super::super::level19::props::TURN_LIFT;
+const LIFT: i16 = super::level19::props::TURN_LIFT;
 
 const H: usize = 0x20;
 const STATUS: usize = 0x2e;
@@ -320,14 +320,9 @@ fn turn_back(w: &mut MobyWorld, id: usize, ctx: &Ctx) -> bool {
     true
 }
 
-/// `0x428580` (= L09 `0x3f8f18`): the walk along the path, or within its stop distance of the last point.
-fn walk_done(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, path: i32) -> bool {
-    let r = ai::follow_path(w, id, ctx, path);
-    r || path_pts(ctx, path).is_some_and(|p| {
-        let m = &w.mobys[id];
-        dist2(m.pos, pt(p, m.pv_s(LAST) as i32)) < m.pv_f(MV + 0x34)
-    })
-}
+/// `0x428580` (= L09 `0x3f8f18`): the walk along the path, or within its stop distance of the last point: the
+/// troopers' (crate::moby::classes::trooper::walk_done; the same movement block `+0x100`, its last point `+0x1ca`).
+fn walk_done(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, path: i32) -> bool { super::trooper::walk_done(w, id, ctx, path) }
 
 /// `0x35e8b8(&out, from, to, path, 0)` → `0x35e908`: the point of the path nearest `to` (each segment's nearest point,
 /// `0x35e548`), a tie within 0.1 to the one nearer `from`.
@@ -991,7 +986,7 @@ fn walk(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 in_reach(w, id, ctx);
             }
         } else {
-            super::super::leaper::wander(w, id, ctx, HOME);
+            super::leaper::wander(w, id, ctx, HOME);
             if w.mobys[id].pv_s(WAIT) == 0 {
                 w.mobys[id].set_pv_s(WAIT, WANDER_WAIT);
                 anim_rand(w, id, ctx, 0, 10);
@@ -1298,7 +1293,7 @@ pub fn fire(w: &mut MobyWorld, ctx: &mut Ctx, pos: V3, owner: usize, vel: V3, a:
 ///
 /// Not ported: its sparks (`0x354f20` = L00 `0x339848`, crate::particles::spark, and `0x350d20` = L00 `0x335780`, from
 /// the table `0x2bd9c0..`, every other frame when the frame is slow, `$gp+0x335c`) and their random draws; its trail
-/// (`0x356130`, as crate::moby::classes::level12::shot's).
+/// (`0x356130`, as crate::moby::classes::blaster_shot's).
 pub fn update_1263(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let m = &w.mobys[id];
     let (pos, vel) = (m.pos, m.pv_v(VEL));

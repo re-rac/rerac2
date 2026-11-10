@@ -4,12 +4,15 @@
 //!
 //! The launcher system — the carrier 0x0fa5 (`0x41a510`), its critters 0x0bb8 (`0x3e0d78`) and its guide 0x0fec
 //! (`0x41b2a8`, level 13's too), with the walkers 0x0fb4 taking critters: [`launcher`]; its two counts in [`Globals`].
+//!
+//! Shared with other levels: the thrown pieces 0x0d66 / 0x0ff6 (crate::moby::classes::pieces), the blaster shot
+//! 0x03a6 (crate::moby::classes::blaster_shot), the breakables 0x0852 / 0x0884 (crate::moby::classes::breakables), the
+//! glow pulser 0x115f (crate::moby::classes::glow_pulse), the light 0x0cfd (crate::moby::classes::hue_light).
 
 use crate::hero::physics::V3;
 use crate::moby::MobyWorld;
 
 pub mod breakables;
-pub mod debris;
 pub mod fence;
 pub mod field;
 pub mod grid;
@@ -21,7 +24,6 @@ pub mod mine;
 pub mod misc;
 pub mod props;
 pub mod robot;
-pub mod shot;
 pub mod towers;
 pub mod trader;
 pub mod tractor;
@@ -46,10 +48,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         super::level09::hover_pad::CLASS => Some(super::level09::hover_pad::update_0e84),
         0x1307 => Some(breakables::update_1307),
         0x1114 => Some(breakables::update_1114),
-        0x0852 | 0x0884 => Some(breakables::update_0852),
         0x0f69 => Some(props::update_0f69),
         0x087f => Some(props::update_087f),
-        0x115f => Some(props::update_115f),
         0x1351 => Some(props::update_1351),
         0x0fc4 | 0x0fc5 => Some(tractor::update_0fc4),
         0x0fbc => Some(lifts::update_0fbc),
@@ -70,8 +70,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         launcher::CARRIER => Some(launcher::update_0fa5),
         launcher::GUIDE => Some(launcher::update_0fec),
         0x0f31 => Some(trooper::update_0f31),
-        0x0d66 => Some(debris::update_0d66),
-        0x03a6 => Some(shot::update_03a6),
         fence::CLASS => Some(fence::update_0fae),
         grid::CLASS => Some(grid::update_0f9f),
         robot::CLASS => Some(robot::update_1169),

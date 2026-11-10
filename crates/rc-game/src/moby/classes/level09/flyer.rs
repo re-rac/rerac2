@@ -57,7 +57,7 @@
 //! `0x317cc0` = L00 `0x31ba98` (crate::rng).
 //!
 //! Not ported: the flag `$gp−0x5fb0` cleared when the moby that last hurt it (`+0xc0`) is neither Ratchet nor one of
-//! the states `0x3280e0` names (as crate::moby::classes::level09::trooper); the floor moby's class `+0x46` (the
+//! the states `0x3280e0` names (as crate::moby::classes::trooper); the floor moby's class `+0x46` (the
 //! port has no class header byte for it: any other moby counts as 11 or more); the debug print at its death.
 
 use crate::hero::physics::{dist2, dot, len, scale, set_len, sub, V3};

@@ -57,6 +57,21 @@ impl PointLights {
     pub fn active(&self) -> impl Iterator<Item = &PointLight> { self.slots.iter().flatten() }
 }
 
+/// The light slot an owner keeps in its word pvar `off` (−1 none) let go: [`PointLights::free`] (`0x2fdc48`, boot
+/// `func_00291450`) when it holds one, the word −1. (The weapons' muzzle lights, the shells' and the riders'.)
+pub fn free_pv_i(w: &mut crate::moby::MobyWorld, id: usize, off: usize) {
+    let s = w.mobys[id].pv_i(off);
+    if 0 <= s { w.point_lights.free(s as usize); }
+    w.mobys[id].set_pv_i(off, -1);
+}
+
+/// [`free_pv_i`] on a slot kept in the s16 pvar at `off`.
+pub fn free_pv_s(w: &mut crate::moby::MobyWorld, id: usize, off: usize) {
+    let s = w.mobys[id].pv_s(off);
+    if 0 <= s { w.point_lights.free(s as usize); }
+    w.mobys[id].set_pv_s(off, -1);
+}
+
 /// The world instances' bounding spheres the attachment tests, in the game's run-time records: ties and shrubs
 /// `(centre, radius)` in game units (record +0x00, `tie_light::instance_centre` / `shrub_light::instance_centre`),
 /// tfrags the header's sphere in raw units (1024 per game unit, header +0x00). Index = instance / tfrag index.

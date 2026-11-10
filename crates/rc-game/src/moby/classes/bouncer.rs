@@ -178,8 +178,6 @@ fn spin_rows(w: &mut MobyWorld, id: usize, q: Q) {
     m.rows = m.rows.map(|r| qrot(q, r));
 }
 
-/// `0x2eef88(out, a, b)` = b × a.
-fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
 
 /// `0x3813b0(surface)`: 2 for 0 / 0xd / 0xe (the waters), 1 for 1 / 3 / 0xb / 0xc, else 0.
 fn surface_kind(s: i32) -> i32 {
@@ -422,7 +420,7 @@ pub fn update_bomb(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
             if 0 < s.res {
                 let v = w.mobys[id].pv_v(pv::VEL);
-                let axis = unit(cross_ba([v[0], v[1], 0.0], world_up));
+                let axis = unit(cross(world_up, [v[0], v[1], 0.0]));
                 let spin = ctx.game.rng.randf(SPIN_MIN, SPIN_MAX);
                 w.mobys[id].set_pv_q(pv::SPIN, axis_angle(spin, axis));
                 ctx.host.play_sound(&w.mobys[id], 1, 0);
@@ -479,7 +477,7 @@ fn burst(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     // The frame about the up (`0x37ecc0`): (z, z, −(x + y)) made unit, the up × it, the up.
     let n = crate::gravity::up(ctx.hero, pos);
     let a = unit([n[2], n[2], -(n[0] + n[1])]);
-    let b = cross_ba(a, n);
+    let b = cross(n, a);
     for k in 0..BOMBLETS {
         let g = &mut ctx.game.rng;
         let yaw = g.rand_angle();
@@ -633,7 +631,7 @@ fn hop(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, up: V3) {
         }
     }
     let v = w.mobys[id].pv_v(pv::VEL);
-    let mut axis = unit(cross_ba([v[0], v[1], 0.0], up));
+    let mut axis = unit(cross(up, [v[0], v[1], 0.0]));
     let a = ctx.game.rng.randf_signed(0.0, f32::from_bits(0x3f06_0a93));
     if a.abs() < 1e-5 { axis = qrot(axis_angle(a, up), axis); }
     let spin = ctx.game.rng.randf(SPIN_MIN, SPIN_MAX);

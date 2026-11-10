@@ -69,7 +69,7 @@ pub fn update_0e4c(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 let vel = set_len(r[0], SPEED / 60.0);
                 let damage = m.pv_b(0x34) as i32;
                 ctx.host.play_sound(&w.mobys[id], 0, 0);
-                spawn_tracer(w, id, at, vel, damage);
+                spawn_tracer(w, &*ctx.host, id, at, vel, damage);
             }
         }
         _ => {}

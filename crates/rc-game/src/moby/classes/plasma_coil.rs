@@ -225,8 +225,6 @@ fn cur_row(game: &crate::game::GameState) -> Option<&'static ItemRow> { row(game
 /// The arc's damage (the row's `+0x64`; crate::hero::items::ItemRow keeps only `+0x60`).
 const ARC_DAMAGE: f32 = 12.0;
 
-/// `0x2eef88(out, a, b)` = b × a.
-fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
 
 /// A moby's aim point (`0x31fa20` + `0x326520(m, out, 1)`): its place raised along the up there by its aim height
 /// when the enemy framework runs it.
@@ -785,7 +783,7 @@ pub(crate) fn strip(out: &mut Vec<crate::fx::FxQuad>, points: &[V3], cam: V3, fx
     if n < 3 { return; }
     let across = |i: usize| {
         let d = unit(sub(points[i + 1], points[i]));
-        unit(cross_ba(sub(cam, points[i]), d))
+        unit(cross(d, sub(cam, points[i])))
     };
     let edge = |i: usize, w: f32| {
         let c = across(i);
@@ -865,7 +863,7 @@ fn draw_ray(r: &Ray, g: &mut crate::rng::Rng, pos: V3, size: f32, cam: V3, out: 
     let alpha = ((phase - std::f32::consts::PI).cos() * k * 0.5 + k * 0.5) as i32 as u32;
     let wide = size * 0.25;
     let d = unit(sub(to, pos));
-    let c = unit(cross_ba(sub(cam, pos), d));
+    let c = unit(cross(d, sub(cam, pos)));
     let corners = [add(pos, scale(c, wide)), sub(pos, scale(c, wide)), add(to, scale(c, wide * 0.5)), sub(to, scale(c, wide * 0.5))];
     let s = r.scroll;
     let st = [[s, 0.0], [s, 1.0], [s + 1.0, 0.0], [s + 1.0, 1.0]];
@@ -937,11 +935,11 @@ pub fn draw_hand(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, id: usize,
     let r = spin * 0.35;
     let step = std::f32::consts::TAU / 11.0;
     let c = [step, add_rot(step, step)].map(|a| crate::gravity::to_world([0.0, a.cos() * r, -a.sin() * r], &rows));
-    let normal = unit(cross_ba(c[0], c[1]));
+    let normal = unit(cross(c[1], c[0]));
     for (k, p) in prongs.into_iter().enumerate() {
         let d = unit(sub(ball, p));
-        let d = unit(cross_ba(d, normal));
-        let d = unit(cross_ba(d, normal));
+        let d = unit(cross(normal, d));
+        let d = unit(cross(normal, d));
         let beside = add(scale(d, spin * 0.45), ball);
         hand_strip(out, g, p, beside, &arcs[k + 1], cam);
         glints(out, g, beside, true, cam);

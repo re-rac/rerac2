@@ -1,6 +1,6 @@
 //! The mobys Ratchet rides (his state 0x31 with `0x18b650` set): the vehicles of Tabora and Grelbin (the hovership
 //! 0x0eef, crate::moby::classes::level08::hovership; the glider 0x0905 of Tabora, Dobbo and Grelbin,
-//! crate::moby::classes::level08::glider, with Ratchet seen) and the mounted guns of level 16 (0x10ee,
+//! crate::moby::classes::glider, with Ratchet seen) and the mounted guns of level 16 (0x10ee,
 //! crate::moby::classes::level16::turret). Endako's crane (crate::moby::classes::endako_crane) uses the same state
 //! and the same word `0x18b650` for the crane it steers from its panel (kept there as its own `steered`).
 //!
@@ -39,7 +39,7 @@ pub struct VehicleBlock {
     /// `0x1382ac`: □'s pressure (0..1) as the hero tick last read the pad (the hovership's brake).
     pub square: f32,
     /// `0x138290..0x13829c`: the d-pad's pressures (0..1: →, ←, ↑, ↓) as the hero tick last read the pad (the glider's
-    /// steering, crate::moby::classes::level08::glider).
+    /// steering, crate::moby::classes::glider).
     pub dpad: [f32; 4],
     /// L16 `$gp+0x2b00` / `0x1b1af4`: the mounted gun's filtered stick (one pair for all the guns).
     pub stick_filter: [f32; 2],

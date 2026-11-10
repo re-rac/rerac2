@@ -77,16 +77,17 @@ fn play(w: &MobyWorld, id: usize, ctx: &mut Ctx, s: u8, blend: u8) {
 
 fn yaw_to(w: &MobyWorld, id: usize, p: V3) -> f32 { let q = w.mobys[id].pos; atan2(p[0] - q[0], p[1] - q[1]) }
 
-/// `0x32e328(yaw, −1, −1, m, goal, opts)` / `0x32e408(offset, …)` (with the weave): the frame's move with the movement
-/// options `opts` for its length.
+/// `0x32e328(yaw, −1, −1, m, goal, opts)` (= L02 `0x3327f0`, crate::moby::ai::move_with) / `0x32e408(offset, …)` (with
+/// the weave): the frame's move with the movement options `opts` for its length.
 fn move_opts(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3, opts: i32, weave: Option<f32>) -> i32 {
+    let Some(off) = weave else {
+        let y = yaw_to(w, id, goal);
+        return ai::move_with(w, id, ctx, y, goal, opts, -1.0, -1.0);
+    };
     let o = MV + 0x38;
     let kept = w.mobys[id].pv_i(o);
     w.mobys[id].set_pv_i(o, opts);
-    let r = match weave {
-        Some(off) => ai::move_toward(w, id, ctx, off, goal),
-        None => { let y = yaw_to(w, id, goal); ai::move_step(w, id, ctx, y, goal) }
-    };
+    let r = ai::move_toward(w, id, ctx, off, goal);
     w.mobys[id].set_pv_i(o, kept);
     r
 }

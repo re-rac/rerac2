@@ -20,7 +20,7 @@
 //! (crate::moby::slide::slide), `0x35c2a0` = `0x31c078` (crate::moby::ai::turn_to), `0x35cb88` = `0x31c970`
 //! (crate::moby::MobyWorld::poke_group), `0x365278` / `0x365330` = `0x324430` / `0x3244e8` (crate::moby::classes::props
 //! bob / sway), `0x383d50` = L01 `0x3377c8` (the path's lengths: crate::level::LevelData::walked_path), `0x383e90` =
-//! L00 `0x342b50` (crate::paths::advance), `0x41eeb8` = L00 `0x3e1118` (crate::moby::classes::level07::gunner's
+//! L00 `0x342b50` (crate::paths::advance), `0x41eeb8` = L00 `0x3e1118` (crate::moby::classes::fireball's
 //! fireball 0x0b7f), `0x440a40` = L00 `0x3fabe8` (crate::moby::classes::explosion), `0x31b598` = L00 `0x2dbdb0`
 //! (crate::moby::shards), `0x35adb8` = L00 `0x31adc0` (crate::moby::bolts::drop), `0x365050` = L00 `0x324208`
 //! (crate::moby::joint_aim::aim), `0x33ad98` = L00 `0x335bb8` (crate::particles::puff).
@@ -403,7 +403,7 @@ fn fight(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if (4.0..f32::from_bits(0x408c_cccd)).contains(&f) {
                 let v = set_len(sub(tp, muzzle), f32::from_bits(0x3eaa_aaab));
                 let dmg = w.mobys[id].pv_f(DAMAGE);
-                crate::moby::classes::level07::gunner::shot(w, id, ctx, dmg, v, muzzle);
+                crate::moby::classes::fireball::shot(w, id, ctx, dmg, v, muzzle);
                 let m = &mut w.mobys[id];
                 m.set_pv_f(SHOTS, m.pv_f(SHOTS) + 1.0);
             }

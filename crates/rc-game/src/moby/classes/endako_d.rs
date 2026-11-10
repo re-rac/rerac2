@@ -321,10 +321,7 @@ pub const PLATE: i16 = 0x0f4d;
 /// The movement block's fields: radius, walk accel / most, stop distance, options, fence path, push moby, floor moby,
 /// floor height, stuck ticks, velocity, goal distance, turn limits and speed.
 const RADIUS: usize = MOVE;
-const WALK_ACCEL: usize = MOVE + 0x20;
-const WALK_MOST: usize = MOVE + 0x28;
 const STOP: usize = MOVE + 0x34;
-const OPTS: usize = MOVE + 0x38;
 const FENCE: usize = MOVE + 0x3c;
 const STUCK: usize = MOVE + 0x80;
 const PUSHER: usize = MOVE + 0x84;
@@ -548,17 +545,8 @@ fn back_off(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let to = add_rot(atan2(v[0], v[1]), std::f32::consts::PI);
         turn_to(&mut w.mobys[id], to);
     }
-    let m = &mut w.mobys[id];
-    let saved = (m.pv_i(OPTS), m.pv_f(WALK_MOST), m.pv_f(WALK_ACCEL));
-    m.set_pv_i(OPTS, 0x10);
-    m.set_pv_f(WALK_MOST, PUSH.0 * 0.016_666_668);
-    m.set_pv_f(WALK_ACCEL, PUSH.1 * 0.000_277_777_78);
-    let (yaw, pos) = (m.rot[2], m.pos);
-    crate::moby::ai::move_step(w, id, ctx, yaw, pos);
-    let m = &mut w.mobys[id];
-    m.set_pv_i(OPTS, saved.0);
-    m.set_pv_f(WALK_MOST, saved.1);
-    m.set_pv_f(WALK_ACCEL, saved.2);
+    let (yaw, pos) = (w.mobys[id].rot[2], w.mobys[id].pos);
+    crate::moby::ai::move_with(w, id, ctx, yaw, pos, 0x10, PUSH.0 * 0.016_666_668, PUSH.1 * 0.000_277_777_78);
     let nodes = net_nodes(w, net_of(w, id));
     let mut at = w.mobys[id].pv_i(AT);
     crate::path_network::locate(ctx.level, &nodes, w.mobys[id].pos, &mut at);
@@ -584,20 +572,9 @@ fn robot_init(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let child_class = if class == ROBOT_964 { CHILD_964 } else { CAGE };
     if w.class(child_class).is_some() {
         let c = w.create(child_class);
-        let (pos, rot, light, ambient) = { let m = &w.mobys[id]; (m.pos, m.rot, m.light, m.ambient) };
-        let x = &mut w.mobys[c];
-        x.update_dist = 0xff;
-        x.draw_dist = 0xff;
-        x.drawn = 1;
-        x.parent = Some(id);
-        x.pos = pos;
-        x.rot = rot;
-        x.light = light;
-        x.ambient = ambient;
-        w.rebuild(c, &*ctx.host);
+        w.adopt(c, Some(id), &*ctx.host);
         let base = w.class(child_class).map_or(1.0, |k| k.scale);
         let x = &mut w.mobys[c];
-        x.mode &= 0xfff8;
         if child_class == CAGE { set_7c(x, CAGE_PIECES); }
         x.draw_dist = 0x30;
         if class == ROBOT_93C { x.scale = base * 1.2; }

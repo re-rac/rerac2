@@ -1,16 +1,17 @@
 //! Level 0x08's own classes (Tabora; L08 addresses, the engine functions they call named by their L08 addresses
 //! with the port's). Each class's update is registered in [`update_for`]; crate::moby::classes::update_for asks it
 //! after its own.
+//!
+//! Shared with other levels: Ratchet's glider 0x0905 (crate::moby::classes::glider; L09, L19) and the crystals'
+//! counter 0x09f3 (crate::moby::classes::gem_counter; L19's moonstones).
 
 pub mod arcer;
 pub mod breakables;
 pub mod buyer;
 pub mod breather;
 pub mod burrower;
-pub mod counter;
 pub mod crystal;
 pub mod geyser;
-pub mod glider;
 pub mod hovership;
 pub mod lift;
 pub mod mission;
@@ -41,14 +42,9 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         hovership::HOVERSHIP => Some(hovership::update_0eef),
         hovership::RARITANIUM => Some(hovership::update_099a),
         seesaw::CLASS => Some(seesaw::update_090d),
-        // Also levels 9 and 19's (L09 `0x3bfb08`, L19 `0x3bded8`; the counter L19 `0x3c5b50`): the same code and data.
-        glider::CLASS => Some(glider::update_0905),
-        counter::CLASS => Some(counter::update_09f3),
         crystal::CRYSTAL => Some(crystal::update_096a),
         crystal::LEFT => Some(crystal::update_08c4),
         crystal::CARRIER => Some(crystal::update_0e78),
-        // The chips: the same code as Level 12's (`0x3d49b8` = L12 `0x400850`).
-        crystal::CHIP | crystal::CHIP_B => Some(super::level12::debris::update_0d66),
         c if geyser::CLASSES.contains(&c) => Some(geyser::update),
         // The liquid lid 0x11fe is crate::water::lid.
         _ => None,

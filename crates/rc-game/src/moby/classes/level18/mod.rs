@@ -1,9 +1,9 @@
 //! Level 0x12's own classes (Damosel; L18 addresses, the engine functions they call named by their L18 addresses
 //! with the port's). Each class's update is registered in [`update_for`]; crate::moby::classes::update_for asks it
-//! after its own. The chain is global, so a class whose code levels 19 and 20 share is registered here once.
+//! after its own. The chain is global, so a class whose code levels 19 and 20 share is registered here once. The
+//! Hypnomatic's creatures 0x0ec0 / 0x0ee1 and their shot 0x1263: crate::moby::classes::capturable.
 
 pub mod breakables;
-pub mod capturable;
 pub mod breeder;
 pub mod director;
 pub mod dropship;
@@ -53,9 +53,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         director::CLASS => Some(director::update_0f01),
         // Also levels 19 and 20's (L19 `0x40efd0`, L20 `0x432580`, the same code).
         pad::CLASS => Some(pad::update_0ed0),
-        // Also levels 19 and 20's (L19 `0x40ced0` / `0x424148`, L20 `0x438588` / `0x44a268`, the same code).
-        capturable::BITER | capturable::GUNNER => Some(capturable::update),
-        capturable::SHOT => Some(capturable::update_1263),
         launcher::CLASS => Some(launcher::update_1158),
         hints::CLASS => Some(hints::update_0c34),
         spinner::CLASS => Some(spinner::update_10f8),

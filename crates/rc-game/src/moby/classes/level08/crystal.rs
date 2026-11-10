@@ -36,10 +36,10 @@
 //!   else a sphere of 0.3 0.3 up) it is put on the face, its velocity bounced off it and cut to 3/4 (under 0.01 long:
 //!   deleted); its velocity falls by its gravity; it turns about its y by its spin. With its cluster gone or out of
 //!   [2, 1021]³ it is deleted; else the cluster is put at its place and angles.
-//! * **0x096d** / **0x096e** (`0x3d49b8` = L12 `0x400850`): the chips, crate::moby::classes::level12::debris.
+//! * **0x096d** / **0x096e** (`0x3d49b8` = L12 `0x400850`): the chips, crate::moby::classes::pieces.
 //!
 //! **The shared pieces**: [`emit`] (L03 `0x327c38`, also L08 `0x335bf0`, L17 `0x3292e8`: chips from a moby), its
-//! spawn `0x336230` = L12 `0x32ad40` (crate::moby::classes::level12::debris::spawn), [`glitter`] (also L19
+//! spawn `0x336230` = L12 `0x32ad40` (crate::moby::classes::pieces::spawn), [`glitter`] (also L19
 //! `0x3c1a30`), [`crack`] and [`leave`] (with Grelbin's ice).
 //!
 //! The engine functions: `0x31f7c8` = L00 `0x3127c8` (a joint), `0x328518` the sequence cut in at a frame,
@@ -60,7 +60,7 @@
 use crate::collision::QueryFlags;
 use crate::hero::physics::{add, add_rot, dist2, dot, len, scale, set_len, sub, V3};
 use crate::moby::blast::{self, Explosion};
-use crate::moby::classes::level12::debris;
+use crate::moby::classes::pieces as debris;
 use crate::moby::classes::props::set_seq;
 use crate::moby::hits::HitRecord;
 use crate::moby::{ai, Ctx, MobyWorld};
@@ -135,7 +135,7 @@ pub fn leave(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, class: i16) -> Option<
 }
 
 /// `0x335bf0(m, first, count, pick, picks, most, alt, offset)` (L03 `0x327c38`): chips (crate::moby::classes::
-/// level12::debris::spawn, life 60..120, no spin given) off moby `id`, each moving a random way 1/15..1/10 a tick
+/// pieces::spawn, life 60..120, no spin given) off moby `id`, each moving a random way 1/15..1/10 a tick
 /// (its z made upward and half again) plus `offset`; with `alt` their flags 2. `count` of the classes `first`,
 /// `first + 1`, … at its place and angles; then, at up to `most` points of its body (crate::moby::shards::
 /// random_points, density 1000), one each of `pick + randi(picks)` at random angles. A class not loaded makes none.

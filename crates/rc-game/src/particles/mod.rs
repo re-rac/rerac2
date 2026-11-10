@@ -29,7 +29,7 @@
 //! | 0x42 | [`dust`] (L02 `0x342ed8`, L00 `0x33c390`) | (L02 `0x343040`) | dust puffs: drifting, growing, fading (Maktar's footsteps, crate::moby::classes::maktar::update_0a57) |
 //! | 0x19, 0x6d | [`lava`] (`0x336148`, `0x3424d0`) | (`0x3362d0`, `0x3425e8`) | the Lava Gun's sparks (falling, cooling, stopping on the world) and drops (sinking, then rising as smoke) |
 //! | 0x6e | [`plasma`] (`0x342740`) | (`0x342988`) | the upgraded Mini-Turret's plasma shots' smoke: rising, growing, fading |
-//! | 0x68 | crate::moby::classes::level07::snow::flake (L07 `0x337a30`) | (L07 `0x337bc0`) | Siberius's snowflakes: fading in and out, drifting with the view |
+//! | 0x68 | crate::moby::classes::level07::snow::flake (L07 `0x337a30`) | [`snow::update`] (L07 `0x337bc0`) | Siberius's snowflakes: fading in and out, drifting with the view |
 //! | 0x13 | [`line`] (`0x3352c0`) | (`0x3353d8`) | lines (record kind 3) moving with their velocity, fading a step a tick (the Minirocket Tube's muzzle burst) |
 //! | 0x66 | [`ash`] (`0x3412e8`) | (`0x341438`) | ash: dark flakes falling and swaying across the view (the Zodiac's kills) |
 //! | 0x4e | [`swirl`] (`0x33d968`) | (`0x33daf8`) | swirls: twinkles flying their way, circling and closing on a moby they follow (the Sheepinator's beam) |
@@ -74,6 +74,7 @@ pub mod plasma;
 mod pool;
 pub mod rain;
 pub mod smoke;
+pub mod snow;
 pub mod spot;
 pub mod swirl;
 pub mod type23;
@@ -1215,7 +1216,7 @@ pub fn update_parts(sys: &mut Particles, mobys: &crate::moby::MobyWorld, cam: [f
             water::DROP => water::update_drop(sys, i, rng, aux),
             water::RING => water::update_ring(sys, i, aux),
             water::SPRAY => water::update_spray(sys, i, aux),
-            crate::moby::classes::level07::snow::FLAKE => crate::moby::classes::level07::snow::update_flake(sys, i, mobys, cam),
+            snow::FLAKE => snow::update(sys, i, mobys, cam),
             _ => sys.kill_part(i),
         }
     }

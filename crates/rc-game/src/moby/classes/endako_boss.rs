@@ -659,7 +659,7 @@ fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, g: usize) {
     let vel = set_len(rows[0], tune::TRACER_SPEED / 60.0);
     ctx.host.play_sound(&w.mobys[id], 3, 0);
     let dmg = w.mobys[id].pv_b(pv::DMG_TRACER) as i32;
-    if let Some(s) = spawn_tracer(w, id, from, vel, dmg) {
+    if let Some(s) = spawn_tracer(w, &*ctx.host, id, from, vel, dmg) {
         // `0x3f7f28`: kept for the streaks, thirty at most.
         let m = &mut w.mobys[id];
         let n = m.pv_i(pv::N_TRACERS);
@@ -972,9 +972,7 @@ fn crates_back(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 fn pilot(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let Some(p) = ai::link(&w.mobys[id], pv::PILOT) else {
         let p = w.create(PILOT);
-        let x = &mut w.mobys[p];
-        (x.update_dist, x.draw_dist, x.drawn) = (0xff, 0xff, 1);
-        x.mode &= 0xfff8;
+        w.adopt(p, None, &*ctx.host);
         ai::set_link(&mut w.mobys[id], pv::PILOT, Some(p));
         w.changed = true;
         return;
@@ -1141,15 +1139,12 @@ pub fn draw_tracers(w: &MobyWorld, id: usize, cam: V3, out: &mut Vec<crate::fx::
 /// `0x3dae28(owner, pos, vel, damage)`: a tracer at `pos` with the owner's angles and light (`0x32be48`), facing
 /// `vel`; 90 ticks, its damage, scale twice its class's. pvars: `+0x00` velocity, `+0x10` ticks left (16 bits), `+0x12`
 /// its trail (16 bits, to 12), `+0x14` the owner + 1, `+0x18` the damage.
-pub fn spawn_tracer(w: &mut MobyWorld, owner: usize, pos: V3, vel: V3, damage: i32) -> Option<usize> {
+pub fn spawn_tracer(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, owner: usize, pos: V3, vel: V3, damage: i32) -> Option<usize> {
     let scale = w.class(TRACER).map_or(1.0, |c| c.scale) * 2.0;
     let s = w.create(TRACER);
-    let (rot, light) = (w.mobys[owner].rot, w.mobys[owner].light);
+    w.adopt(s, Some(owner), host);
+    let rot = w.mobys[owner].rot;
     let x = &mut w.mobys[s];
-    (x.update_dist, x.draw_dist, x.drawn) = (0xff, 0xff, 1);
-    x.parent = Some(owner);
-    x.light = light;
-    x.mode &= 0xfff8;
     x.pos = pos;
     x.rot = [rot[0], -atan2(len2(vel), vel[2]), atan2(vel[0], vel[1])];
     x.set_pv_v(0, vel);

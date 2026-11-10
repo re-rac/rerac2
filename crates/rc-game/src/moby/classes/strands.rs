@@ -2,7 +2,7 @@
 //! `0x3c64c8`; L17 `0x3c3ab8` / `0x3c3e78`; the decomp's `func_L06_004005F8` / `func_L06_004009B8`; 1 placed on
 //! Notak, 1 on Siberius, 12 on Grelbin) drawn from the jittering strands of a field **0x0431** (L06 `0x3e7268`, L13
 //! `0x3ae168`, L17 `0x3a68a8`; the decomp's `func_L06_003E5D30`, asm only; one a level). R&C1's Orxon has the same
-//! pair (its classes 1067 / 1073). A gate (crate::moby::classes::level06::gate, 0x031a and its kin) switches a
+//! pair (its classes 1067 / 1073). A gate (crate::moby::classes::field_gate, 0x031a and its kin) switches a
 //! barrier off (state 2) and deletes it.
 //!
 //! **The field 0x0431** keeps 4 layers × 10 strands × 20 points (positions `+0x00` + layer·0x2580 + strand·0x10 +

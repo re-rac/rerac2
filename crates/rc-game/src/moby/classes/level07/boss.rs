@@ -26,7 +26,7 @@
 //! while dying, and the class word `+0x46` = 5.
 
 use crate::hero::physics::{add, add_rot, atan2, dist2, dot, len, set_len, sub, sub_rot, through, V3};
-use crate::moby::classes::level04::launcher::carry;
+use crate::moby::classes::launcher::carry;
 use crate::moby::classes::props::wrapped;
 use crate::moby::{ai, countdown, Ctx, Moby, MobyWorld};
 

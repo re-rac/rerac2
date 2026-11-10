@@ -195,8 +195,6 @@ fn lerp3(t: f32, a: V3, b: V3) -> V3 { add(a, scale(sub(b, a), t)) }
 /// `0x31e8d8(a, b, t)`.
 fn lerp(a: f32, b: f32, t: f32) -> f32 { a + (b - a) * t }
 
-/// `0x2eef88(out, a, b)` = b × a.
-fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
 
 /// `0x325100(r, yaw, pitch)`.
 fn polar(r: f32, yaw: f32, pitch: f32) -> V3 { [yaw.cos() * r * pitch.cos(), yaw.sin() * r * pitch.cos(), pitch.sin() * r] }
@@ -573,11 +571,11 @@ pub fn beam(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let l = len(q);
         b.points[i] = if l == 0.0 { b.points[i - 1] } else { add(b.points[i - 1], scale(q, b.spacing / l)) };
         let s = sub(b.points[i], b.points[i - 1]);
-        let r = set_len(cross_ba(s, down), f32::from_bits(0x3d4c_cccd) + (f32::from_bits(0x3f9d_f3b6) - f32::from_bits(0x3d4c_cccd)) * f);
+        let r = set_len(cross(down, s), f32::from_bits(0x3d4c_cccd) + (f32::from_bits(0x3f9d_f3b6) - f32::from_bits(0x3d4c_cccd)) * f);
         for k in 0..RING { b.rings[i][k] = add(crate::camera::rot(r, k as f32 * f32::from_bits(0x3ea0_d97a), s), b.points[i]); }
         let r0 = set_len(s, 1.0);
         let r1 = set_len(r, 1.0);
-        let r2 = cross_ba(r1, r0);
+        let r2 = cross(r0, r1);
         let amp = 0.01 + (0.5 - 0.01) * f;
         let ang = add_rot(b.wave, f32::from_bits(0x3ecc_a2ea) * i as f32);
         let (y, z) = (amp * ang.sin(), amp * ang.cos());
@@ -614,7 +612,7 @@ fn sparks(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, reach: f32, target: Optio
     let a = g.randf_signed(0.0, f32::from_bits(0x3e86_0a93));
     let bb = g.randf_signed(0.0, f32::from_bits(0x3e86_0a93));
     let v = crate::camera::rot(d, bb, down);
-    let v = crate::camera::rot(v, a, cross_ba(d, down));
+    let v = crate::camera::rot(v, a, cross(down, d));
     let mut n = ((reach * 1.2) / 0.2) as i32;
     if target.is_some() { n *= 3; }
     // Both follow the target (`t2` = `+0x10` for each call), its aim height kept (`+0x3c`, read by nothing).
@@ -687,8 +685,8 @@ pub fn draw(w: &mut MobyWorld, _id: usize, cam: V3, out: &mut Vec<crate::fx::FxQ
     {
         let c = add(b.points[0], set_len(b.gun_row1, -0.5));
         let to_cam = set_len(sub(cam, c), 1.0);
-        let side = set_len(cross_ba(to_cam, b.down), -1.0);
-        let up = cross_ba(side, to_cam);
+        let side = set_len(cross(b.down, to_cam), -1.0);
+        let up = cross(to_cam, side);
         for (size, rgba) in [(0.4f32, if black { 0x60ff_0000 } else { 0x7f20_7f7fu32 }), (0.1, 0xffff_ffff)] {
             let corners = SQUARE.map(|[y, z]| add(c, add(scale(side, y * size), scale(up, z * size))));
             quad(out, 0xb, corners, ST, [rgba; 4]);
@@ -739,7 +737,7 @@ fn strips(out: &mut Vec<crate::fx::FxQuad>, p: &[V3; POINTS], phase: f32, rgb: u
     let white = 0x80u32 << 24 | 0x7f_7f7f;
     let mut c = [white; 4];
     let st = [[phase, 0.0], [phase, 1.0], [phase + 1.0, 0.0], [phase + 1.0, 1.0]];
-    let side = |a: V3, b: V3| { let s = cross_ba(sub(b, a), sub(a, cam)); let l = len(s); scale(s, 0.05 * if l == 0.0 { 1.0 } else { 1.0 / l }) };
+    let side = |a: V3, b: V3| { let s = cross(sub(a, cam), sub(b, a)); let l = len(s); scale(s, 0.05 * if l == 0.0 { 1.0 } else { 1.0 / l }) };
     let s0 = side(p[0], p[1]);
     let mut near = [add(p[0], s0), sub(p[0], s0)];
     for k in 1..n - 1 {
@@ -772,7 +770,7 @@ fn strips(out: &mut Vec<crate::fx::FxQuad>, p: &[V3; POINTS], phase: f32, rgb: u
         let stretch = scale(sub(s2, s0), 0.9);
         s0 = sub(s0, stretch);
         s2 = add(s2, stretch);
-        let wv = cross_ba(sub(cam, s0), sub(s2, s0));
+        let wv = cross(sub(s2, s0), sub(cam, s0));
         let l = len(wv);
         let wv = scale(wv, 0.4 * if l == 0.0 { 1.0 } else { 1.0 / l });
         if k == 0 {
@@ -794,8 +792,8 @@ fn draw_pulses(out: &mut Vec<crate::fx::FxQuad>, b: &Beam) {
     for p in b.pulses.iter().filter(|p| p.live) {
         let c = (p.alpha as i32 as u32) << 24 | 0x7f;
         let up = scale(b.down, -1.0);
-        let r1 = set_len(cross_ba(p.way, up), 1.0);
-        let r2 = cross_ba(r1, p.way);
+        let r1 = set_len(cross(up, p.way), 1.0);
+        let r2 = cross(p.way, r1);
         let corners = SQUARE.map(|[y, z]| add(p.pos, add(scale(r1, y * p.size), scale(r2, z * p.size))));
         quad(out, 8, corners, ST, [c; 4]);
     }

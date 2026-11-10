@@ -28,14 +28,8 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let rot = w.mobys[id].rot;
         for i in 0..5 {
             let c = w.create(child);
-            {
-                let cm = &mut w.mobys[c];
-                cm.update_dist = 0xff;
-                cm.draw_dist = 0xff;
-                cm.drawn = 1;
-                cm.mode &= 0xfff8;
-                cm.rot = rot;
-            }
+            w.adopt(c, None, &*ctx.host);
+            w.mobys[c].rot = rot;
             crate::moby::ai::set_link(&mut w.mobys[id], CHILDREN + 4 * i, Some(c));
             w.mobys[id].set_pv_f(OFFSETS + 4 * i, at);
             at += spacing;

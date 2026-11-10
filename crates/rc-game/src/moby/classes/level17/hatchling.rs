@@ -433,11 +433,7 @@ fn turn(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
 fn back_to(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, p: V3) {
     let q = w.mobys[id].pos;
     let yaw = atan2(p[0] - q[0], p[1] - q[1]);
-    let o = ai::mv(&w.mobys[id]) + 0x38;
-    let kept = w.mobys[id].pv_i(o);
-    w.mobys[id].set_pv_i(o, 0x10);
-    ai::move_step(w, id, ctx, yaw, p);
-    w.mobys[id].set_pv_i(o, kept);
+    ai::move_with(w, id, ctx, yaw, p, 0x10, -1.0, -1.0);
 }
 
 /// The states (module docs); true when it is drawn in and goes.

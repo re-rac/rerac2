@@ -404,7 +404,7 @@ pub fn update_11e8(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     let o = &w.mobys[k];
                     if o.o_class == CRUSHED && o.state != 0xfe && o.state != 0xfd {
                         // `0x4130f8` (L09 `0x3ec3d0`): the gunship's death.
-                        crate::moby::classes::level09::gunship::die(w, k, ctx);
+                        crate::moby::classes::gunship::die(w, k, ctx);
                     }
                 }
             }

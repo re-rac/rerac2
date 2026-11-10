@@ -167,11 +167,7 @@ fn spot_side(w: &mut MobyWorld, id: usize, ctx: &Ctx) -> bool {
 /// `0x3327f0(yaw, −1, −1, m, goal, 0x10)`: the move with its options `0x10` for the tick.
 fn strafe_to(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3) -> i32 {
     let yaw = yaw_to(w, id, goal);
-    let o = w.mobys[id].pv_i(MV + 0x38);
-    w.mobys[id].set_pv_i(MV + 0x38, 0x10);
-    let f = ai::move_step(w, id, ctx, yaw, goal);
-    w.mobys[id].set_pv_i(MV + 0x38, o);
-    f
+    ai::move_with(w, id, ctx, yaw, goal, 0x10, -1.0, -1.0)
 }
 
 /// `0x332798(m, goal)`: the move toward `goal`.
@@ -197,18 +193,14 @@ fn muzzle(w: &MobyWorld, id: usize, ctx: &Ctx) -> Option<([V3; 3], V3)> {
     ctx.host.joint_matrix(&w.mobys[g], 0).or_else(|| Some((w.mobys[g].rows, w.mobys[g].pos)))
 }
 
-/// A launcher (`0x315438(0xa20 / 0xa21)`, `0x3303c0`): drawn (update and draw distance 0xff), at the keeper with its
+/// A launcher (`0x315438(0xa20 / 0xa21)`, `0x3303c0` = L00 `0x32a748`): drawn (update and draw distance 0xff), at the keeper with its
 /// light, its rows kept (mode 0x100).
-fn make_gun(w: &mut MobyWorld, id: usize) -> Option<usize> {
+fn make_gun(w: &mut MobyWorld, id: usize, ctx: &Ctx) -> Option<usize> {
     let class = LAUNCHER[(w.mobys[id].pv_s(0x310) != 0) as usize];
     w.class(class)?;
     let g = w.create(class);
-    let (pos, rot, light, ambient) = { let m = &w.mobys[id]; (m.pos, m.rot, m.light, m.ambient) };
-    let x = &mut w.mobys[g];
-    (x.update_dist, x.draw_dist, x.drawn) = (0xff, 0xff, 1);
-    x.parent = Some(id);
-    (x.pos, x.rot, x.light, x.ambient) = (pos, rot, light, ambient);
-    x.mode = (x.mode & !7) | mode::KEEP_ROWS;
+    w.adopt(g, Some(id), &*ctx.host);
+    w.mobys[g].mode |= mode::KEEP_ROWS;
     ai::set_link(&mut w.mobys[id], GUN, Some(g));
     w.changed = true;
     Some(g)
@@ -244,7 +236,7 @@ fn senses(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
         m.set_pv_b(0x65, 0x13);
         m.set_pv_b(0x28, 3);
         m.set_pv_f(0x30, 1.25);
-        if make_gun(w, id).is_none() { return true; }
+        if make_gun(w, id, ctx).is_none() { return true; }
         let (a, b) = (ctx.game.rng.rand_angle(), ctx.game.rng.rand_angle());
         let m = &mut w.mobys[id];
         m.set_pv_f(0x38c, a);
@@ -323,7 +315,7 @@ fn senses(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
 
 /// `0x3cecb0`, its death's end: with no comebacks left (`+0x338`) it and its launcher go; else one fewer, hidden and
 /// not solid at home with its health back (`+0x24`), waiting (0x17, sub 4).
-fn gone(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
+fn gone(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].pv_i(0x338) == 0 {
         if let Some(g) = gun(w, id) { w.delete(g); }
         w.delete(id);
@@ -332,7 +324,7 @@ fn gone(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
     let mut n = w.mobys[id].pv_i(0x338);
     countdown(&mut n);
     w.mobys[id].set_pv_i(0x338, n);
-    if gun(w, id).is_none() && make_gun(w, id).is_none() {
+    if gun(w, id).is_none() && make_gun(w, id, ctx).is_none() {
         w.delete(id);
         return;
     }

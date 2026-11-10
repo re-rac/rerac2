@@ -1,7 +1,7 @@
 //! The prison's rope enemy **0x09b4** (L14 `0x3d0610`, 26 placed; L00 `0x3bec28`; the boot ELF's v2 `0x319190`; the
 //! decomp's `func_US2_L00_003BEC28`, its helpers the decomp's `func_00319780`.. `func_0031AB18`, here by their L00
 //! places): it hangs on a rope above the floor and comes down it to fight (or walks in along a path), shooting
-//! fireballs (crate::moby::classes::level07::gunner's 0x0b7f, made by L00 `0x3e1118`). On the framework
+//! fireballs (crate::moby::classes::fireball's 0x0b7f, made by L00 `0x3e1118`). On the framework
 //! (crate::moby::ai): target block `+0x20` (`+0x30` the moby, `+0x34` found), health `+0x40` (`+0x46` its wait, its
 //! damage byte `+0x54`), the flash `+0x70`, reaction `+0x80` (a hurt to state 17, sub 4; radius and centre 0.5,
 //! bounce 0.4), movement `+0x130` (radius 0.8, height 0.5, steps 0.4 / 0.4, options 5).
@@ -78,7 +78,7 @@ use std::f32::consts::{FRAC_PI_2, PI};
 
 use crate::hero::physics::{add, atan2, dist, dist2, dot, ease, scale, set_len, spring, sub, turn_ease, V3};
 use crate::moby::attach::{angles_of, pivot_turn, rows_of, turn};
-use crate::moby::classes::level07::gunner;
+use crate::moby::classes::fireball;
 use crate::moby::classes::props::{group_alive, set_seq, sway, wrapped};
 use crate::moby::{ai, bolts, countdown, mode, Ctx, Moby, MobyWorld};
 
@@ -531,7 +531,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 /// A fireball (`0x3e1118(m, vel, at, 0, 0, damage)`) along `v` at 1/3 a tick, its damage byte `+0x54`.
 fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, v: V3, at: V3) {
     let damage = w.mobys[id].pv_b(DAMAGE) as f32;
-    gunner::shot(w, id, ctx, damage, set_len(v, SHOT_SPEED), at);
+    fireball::shot(w, id, ctx, damage, set_len(v, SHOT_SPEED), at);
 }
 
 /// The rope's sound (module docs).

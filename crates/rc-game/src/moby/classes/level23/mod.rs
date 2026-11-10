@@ -1,8 +1,9 @@
 //! Level 0x17's own classes (Damosel's orbit; L23 addresses, the engine functions they call named by their L23
 //! addresses with the port's). Each class's update is registered in [`update_for`]; crate::moby::classes::update_for
-//! asks it after its own. The classes this level shares with Dobbo's orbit (the same code at its own places: Giant
-//! Clank's body 0x027d, the pickups 0x0e3a / 0x0e3b / 0x0e3d, the shadow mover 0x0d55, the drone shot's update the
-//! 0x118e runs) are crate::moby::classes::level22's.
+//! asks it after its own. The classes this level shares with Dobbo's orbit (the same code at its own places): Giant
+//! Clank's body 0x027d (crate::moby::classes::giant_body), the opponent's pointer 0x0d55
+//! (crate::moby::classes::opponent_pointer), the drone shot's update the 0x118e runs (crate::moby::classes::orbit_shot);
+//! the pickups 0x0e3a / 0x0e3b / 0x0e3d are crate::moby::classes::level22's.
 //!
 //! The fight: the opponent 0x0f7f ([`boss`]) hovers over the planetoid ([`paths`]) circling Giant Clank, its shield
 //! of five generators 0x0f7e and its core 0x120f ([`targets`]) taking his hits for it, its turret firing 0x118e and
@@ -122,7 +123,6 @@ pub struct Globals {
 pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
     match o_class {
         // Giant Clank's body (L23 `0x3ae5c8`).
-        super::level22::giant::BODY => Some(super::level22::giant::update_027d),
         boss::CLASS => Some(boss::update_0f7f),
         targets::F7E => Some(targets::update_0f7e),
         targets::T120F => Some(targets::update_120f),
@@ -130,7 +130,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         effects::C1252 => Some(effects::update_1252),
         drones::CLASS => Some(drones::update_07e5),
         // The turret's shot (L23 `0x423980`: the drone shot's update, its hit L23's own).
-        shots::TURRET => Some(super::level22::drone::update_0f5d),
         shots::SHOT => Some(shots::update_118f),
         shots::MISSILE => Some(shots::update_1230),
         shots::DRONE_MISSILE => Some(shots::update_1237),

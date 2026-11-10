@@ -1,8 +1,6 @@
 //! Level 6's small classes (L06 addresses; the engine functions named by their L06 addresses with the L00 ones the
-//! port knows them by).
+//! port knows them by). The area switch 0x0dda (`0x4462a8`, nine more levels): crate::moby::classes::area_switch.
 //!
-//! * **0x0dda** ([`update_0dda`], `0x4462a8`, 16 placed; the same code on levels 11 `0x4526f8`, 12, 13, 14, 16, 17,
-//!   18, 19, 21): the area switch of crate::moby::classes::area_switch by areas.
 //! * **0x089d** ([`update_089d`], `0x4019e0`, 17 placed): bobs up and down.
 //! * **0x0948** ([`update_0948`], `0x4054b0`, 2 placed): rises and falls with a linked moby's travel.
 //! * **0x0fe2** ([`update_0fe2`], `0x459b80`, 2 placed): a chain turned by a linked moby's travel.
@@ -32,41 +30,6 @@
 
 use crate::hero::physics::add_rot;
 use crate::moby::{Ctx, MobyWorld};
-
-/// 0x0dda (`0x4462a8`; L11 `0x4526f8`): an area switch (crate::moby::classes::area_switch's 0x0102 with areas). Its
-/// update distance `+0x30` 0xff each tick. Inside: Ratchet (`0x189ea0`; with `+0x7e` set the camera, L06 `0x1b9840`,
-/// L11 `0x1ba940`) in any of its four areas `+0x68`[0..0x10] (−1 none; `0x36b6d0`, L11 `0x33d5d8` = L00 `0x32a848`,
-/// crate::level::LevelData::in_area); `+0x95` other than 0 forces it (1 inside, else outside). When that changes
-/// from `+0xbc` (or in state 0): `+0xbc` the result, the state that + 1, and the members of its thirteen groups
-/// `[0x10..0x44]` (`0x446238` over `0x1fb3a0`'s lists) and its fourteen mobys `[0x44..0x7c]` (−1 none) switched by
-/// the flags `[0x7c]` / `[0x7d]` / `[0x7f]` (`0x446010`, L11 `0x452460`: area_switch::switch, the same code).
-pub fn update_0dda(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let m = &mut w.mobys[id];
-    m.update_dist = 0xff;
-    let inside = match m.sub_state {
-        0 => {
-            let p = if m.pv_b(0x7e) == 0 { ctx.hero.pos } else { ctx.host.camera_pos() };
-            (0..4).map(|k| m.pv_i(4 * k)).any(|a| a != -1 && ctx.level.in_area(a, p))
-        }
-        s => s == 1,
-    };
-    if m.state != 0 && (m.timer != 0) == inside { return; }
-    m.timer = inside as u8;
-    m.state = m.timer + 1;
-    let m = &w.mobys[id];
-    let flags = [m.pv_b(0x7c) as i8, m.pv_b(0x7d) as i8, m.pv_b(0x7f) as i8];
-    let mut targets: Vec<usize> = Vec::new();
-    for k in 0..13 {
-        let g = m.pv_i(0x10 + 4 * k);
-        if g == -1 { continue; }
-        if let Some(members) = usize::try_from(g).ok().and_then(|g| w.groups.get(g)) { targets.extend(members); }
-    }
-    for k in 0..14 {
-        if let Ok(i) = usize::try_from(m.pv_i(0x44 + 4 * k)) { targets.push(i); }
-    }
-    for i in targets { super::super::area_switch::switch(w, i, flags, inside); }
-    w.changed = true;
-}
 
 /// `$gp+0xe00`: 0x089d's turn, 240°/s.
 const BOB_TURN: f32 = 240.0 * 0.000_290_888_25;

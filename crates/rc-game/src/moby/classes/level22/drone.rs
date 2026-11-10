@@ -42,7 +42,7 @@
 //! 0.416 a tick about z.
 //!
 //! **The shots** ([`shoot`], `0x40f020`, none with the opponent dead): from its joints 2 and 3 at ⅔ a tick toward the
-//! point, `damage` (6 when 0): 0x0f5d ([`update_0f5d`]) 80 ticks; each tick its move; the line it moved (flags 0)
+//! point, `damage` (6 when 0): 0x0f5d (its update crate::moby::classes::orbit_shot) 80 ticks; each tick its move; the line it moved (flags 0)
 //! meeting a moby not a drone nor the opponent — Giant Clank only under 50 — takes the damage (50.1 at most; flags
 //! 0x8b0003, the kind `class << 16 | 0x305`), a small blast (`0x40e2b0`: 0.8..1.2), and it goes.
 //!
@@ -446,30 +446,8 @@ fn make_shot(w: &mut MobyWorld, ctx: &Ctx, pos: V3, vel: V3, damage: f32) {
     m.mode |= crate::moby::mode::KEEP_ROWS;
 }
 
-/// 0x0f5d (`0x40f240`, module docs).
-pub fn update_0f5d(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    if w.mobys[id].pvars.len() < 0x40 { w.mobys[id].pvars.resize(0x40, 0); }
-    match w.mobys[id].state {
-        0 | 1 => {
-            w.mobys[id].state = 1;
-            let m = &mut w.mobys[id];
-            let from = m.pos;
-            m.pos = add(m.pos, m.pv_v(0));
-            shot_hit(w, id, ctx, from);
-            let m = &mut w.mobys[id];
-            let mut k = m.pv_i(0x10);
-            if countdown(&mut k) { m.state = 2; }
-            m.set_pv_i(0x10, k);
-        }
-        2 => w.delete(id),
-        _ => {}
-    }
-}
-
-/// `0x40f428(m, from)` (module docs).
-fn shot_hit(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, from: V3) {
-    // Damosel orbit's turret shot runs this update with its own hit (L23 `0x423b68`).
-    if w.mobys[id].o_class == crate::moby::classes::level23::shots::TURRET { return crate::moby::classes::level23::shots::turret_hit(w, id, ctx, from); }
+/// `0x40f428(m, from)` (module docs): the hit of crate::moby::classes::orbit_shot's update on this level.
+pub fn shot_hit(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, from: V3) {
     let to = w.mobys[id].pos;
     let Some(h) = w.coll_line(ctx, from, to, 0, Some(id)) else { return };
     let Some(o) = h.moby else { return };

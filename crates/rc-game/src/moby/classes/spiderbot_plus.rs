@@ -534,9 +534,7 @@ pub fn update_lob(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 
 /// The shell gone: its light let go (`0x2fdc48`), deleted.
 fn lob_gone(w: &mut MobyWorld, id: usize) {
-    let s = w.mobys[id].pv_i(0x18);
-    if 0 <= s { w.point_lights.free(s as usize); }
-    w.mobys[id].set_pv_i(0x18, -1);
+    crate::point_lights::free_pv_i(w, id, 0x18);
     crate::gravity::untrack(w, w.mobys[id].pv_i(0x30));
     w.delete(id);
 }

@@ -244,10 +244,7 @@ fn roll(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     let hc = hm.map(|h| w.mobys[h].has_collision);
     if let Some(h) = hm { w.mobys[h].has_collision = false; }
     let yaw = w.mobys[id].rot[2];
-    let kept = w.mobys[id].pv_i(MV + 0x38);
-    w.mobys[id].set_pv_i(MV + 0x38, 0x10);
-    ai::move_step(w, id, ctx, yaw, [0.0; 3]);
-    w.mobys[id].set_pv_i(MV + 0x38, kept);
+    ai::move_with(w, id, ctx, yaw, [0.0; 3], 0x10, -1.0, -1.0);
     // The original gives him his class's collision back; the port gives back what he had.
     if let (Some(h), Some(c)) = (hm, hc) { w.mobys[h].has_collision = c; }
     let m = &mut w.mobys[id];

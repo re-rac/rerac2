@@ -1,7 +1,7 @@
 //! Yeedil's strafing gunship **0x12f8** (`0x39f730`, 2 placed; the decomp's `func_L20_0039E368`, its head and tail
 //! `func_L20_0039E5F0` / `0039E770` at our `0x39f9b8` / `0x39fb38`): a gunship (its set-up makes it class 0x0cbc,
-//! crate::moby::classes::level09::gunship's model) that slides to and fro along a cuboid's x axis, turning round at
-//! each end, its head and gun aimed at its target, firing bolts (0x05de, crate::moby::classes::level09::bolt) in
+//! crate::moby::classes::gunship's model) that slides to and fro along a cuboid's x axis, turning round at
+//! each end, its head and gun aimed at its target, firing bolts (0x05de, crate::moby::classes::gunship_bolt) in
 //! bursts. Health `+0x20` (30 by default), the bolts' damage `+0x34`, target block `+0x50` (`+0x60` the moby), the
 //! search's area `+0x80`, the cuboid `+0x84`, its joint aims `+0x90` / `+0x110` (lists 0 and 1:
 //! crate::moby::joint_aim), `+0x190` the way it slides (±1), `+0x194` / `+0x198` its place along the cuboid (−1..1) and
@@ -77,7 +77,7 @@ pub fn update_12f8(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 if let (Some(p), Some((rows, _))) = (ctx.host.joint(m, 2), ctx.host.joint_matrix(m, 2)) {
                     let vel = set_len(rows[0], SHOT_SPEED * f32::from_bits(0x3c88_8889));
                     let damage = m.pv_b(DAMAGE) as f32;
-                    crate::moby::classes::level09::bolt::fire(w, ctx, p, id, damage, RANGE, 1.0, vel, 1, 1, 1.0);
+                    crate::moby::classes::gunship_bolt::fire(w, ctx, p, id, damage, RANGE, 1.0, vel, 1, 1, 1.0);
                 }
             }
             let m = &mut w.mobys[id];

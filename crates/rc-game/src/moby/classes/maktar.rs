@@ -1103,12 +1103,7 @@ pub fn update_0c1b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             }
             if w.class(0x0e43).is_some() {
                 let c = w.create(0x0e43);
-                let (pos, rot, light, ambient) = { let m = &w.mobys[id]; (m.pos, m.rot, m.light, m.ambient) };
-                let x = &mut w.mobys[c];
-                (x.update_dist, x.draw_dist, x.drawn) = (0xff, 0xff, 1);
-                (x.pos, x.rot, x.light, x.ambient) = (pos, rot, light, ambient);
-                x.mode &= !7;
-                w.rebuild(c, ctx.host);
+                w.adopt(c, Some(id), ctx.host);
             }
             crate::moby::shards::break_into(w, id, ctx, (3.0, 6.0), (3.0, 6.0), 0x3fff, [0.0; 3], 0xff);
             ctx.host.play_sound(&w.mobys[id], 0, 0);

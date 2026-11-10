@@ -245,16 +245,10 @@ fn die(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         v[2] = v[2].abs() * 1.5;
         shards::spawn_ball(w, ctx, o_class, Some(id), pos, rot, 30.0, 15.0, k, v, 0xff);
     }
-    // `0x322bd8` (L00 `0x32a748`): at its place, angles and light; then on the ground.
-    let (light, amb) = (w.mobys[id].light, w.mobys[id].ambient);
+    // `0x322bd8` (L00 `0x32a748`, crate::moby::MobyWorld::adopt): at its place, angles and light; then on the ground.
     let k = w.create(SCORCH);
-    let s = &mut w.mobys[k];
-    (s.update_dist, s.draw_dist, s.drawn) = (0xff, 0xff, 1);
-    s.parent = Some(id);
-    (s.pos, s.rot) = (pos, rot);
-    (s.light, s.ambient) = (light, amb);
-    s.mode &= 0xfff8;
-    s.pos[2] = ai::ground_z(ctx, 0.5, pos, 0);
+    w.adopt(k, Some(id), &*ctx.host);
+    w.mobys[k].pos[2] = ai::ground_z(ctx, 0.5, pos, 0);
     hero_light(w, k, ctx);
     w.rebuild(k, &*ctx.host);
     let b = blast::Blast { size: 1.0, bursts: [45, 40, 40], puffs: 40, streaks: 45, light: true, shake: false };

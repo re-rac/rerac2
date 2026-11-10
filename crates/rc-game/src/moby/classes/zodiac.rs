@@ -338,8 +338,6 @@ fn hits(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, gun: V3) {
     ctx.hero.items.take_ammo(ctx.game, 1);
 }
 
-/// `0x2eef88(out, a, b)` = b × a.
-fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
 
 /// `0x418468(at, kind, hand)` (module docs), when the class is loaded.
 pub fn make_effect(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, kind: i32, hand: Option<usize>) -> Option<usize> {
@@ -347,8 +345,8 @@ pub fn make_effect(w: &mut MobyWorld, ctx: &mut Ctx, at: V3, kind: i32, hand: Op
     let id = w.create(EFFECT);
     let to_cam = set_len(sub(ctx.host.camera_pos(), at), 1.0);
     let up = ctx.hero.gravity.up_at(at);
-    let r1 = set_len(cross_ba(to_cam, up), 1.0);
-    let r2 = cross_ba(r1, to_cam);
+    let r1 = set_len(cross(up, to_cam), 1.0);
+    let r2 = cross(to_cam, r1);
     let m = &mut w.mobys[id];
     m.pvars.resize(crate::moby::PVAR_BYTES, 0);
     m.draw_dist = 0xff;

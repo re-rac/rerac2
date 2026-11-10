@@ -454,7 +454,7 @@ pub fn screen_quads(draws: &[ScreenDraw], sprites: &HashMap<u32, Sprite>, fonts:
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SlotCallback {
     /// L08 `0x3dc980` / L19 `0x3c5780`: the crystals' / moonstones' counter of the moby 0x09f3 `moby` (the draw reads
-    /// it through `$gp+0x1448`, which the counter sets to itself; crate::moby::classes::level08::counter::draw).
+    /// it through `$gp+0x1448`, which the counter sets to itself; crate::moby::classes::gem_counter::draw).
     Counter { moby: usize },
     /// L08 `0x41edd0` / L19 `0x413438`: the hovership `moby`'s HUD — its health bar, the vacuum's texts, the nearest
     /// raritanium's distance and the raritanium's radar (crate::moby::classes::level08::hovership::draw_hud).
@@ -465,7 +465,7 @@ pub enum SlotCallback {
 /// L00's `0x30e200`) runs after the screen callback ([`ScreenCallback`]), in their order; the results are or'd with
 /// the screen callback's, and non-zero takes the counters' place. Cleared with the level's state.
 ///
-/// Their callers: Tabora's and Grelbin's counter 0x09f3 (slot 2, crate::moby::classes::level08::counter) and the
+/// Their callers: Tabora's and Grelbin's counter 0x09f3 (slot 2, crate::moby::classes::gem_counter) and the
 /// hovership 0x0eef while ridden (slot 1, crate::moby::classes::level08::hovership::draw_hud).
 ///
 /// Not ported: the argument (0 from every caller; the draws do not read it), the second set of two slots
@@ -490,7 +490,7 @@ impl HudSlots {
             taken |= match *f {
                 SlotCallback::Counter { moby } => {
                     let mut d = Vec::new();
-                    let r = crate::moby::classes::level08::counter::draw(w, moby, inp.game, &mut d);
+                    let r = crate::moby::classes::gem_counter::draw(w, moby, inp.game, &mut d);
                     out.extend(d.into_iter().map(ScreenDraw::Hud));
                     r
                 }

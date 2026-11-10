@@ -1,4 +1,5 @@
-//! Level 6's gate **0x031a** (L06 `0x3e29d0`; its field `0x3e26d8`): a plane across its frame that hurts what
+//! The field gate **0x031a** (L06 `0x3e29d0`, 1 placed; L13 `0x3a98d0`, 1; L17 `0x3a3010`, 6; the decomp's
+//! `func_L06_003E1498`; its field L06 `0x3e26d8`; L06 addresses below): a plane across its frame that hurts what
 //! crosses it while any of five watched mobys lives, then lets its target go (a state set, a fade, its deletion).
 //!
 //! Its pvars: `+0x00` / `+0x04` the plane's width (across) and height (up), `+0x08` its flags, `+0x0c` the fade's
@@ -15,7 +16,7 @@
 //! The engine functions: `0x320c98` = crate::collision::coll_sphere_mobys (flags 0x10), `0x35d838` a hit on a moby
 //! (crate::moby::MobyWorld::deliver_hit_any), `0x32ec90` = crate::hero::physics::euler_rows.
 //!
-//! Not ported: on level 0xd its first row cut to half its length each tick (`0x32e710`; this is level 6's).
+//! Not ported: on level 0xd its first row cut to half its length each tick (`0x32e710`).
 
 use crate::hero::physics::{add, dot, euler_rows, scale, V3};
 use crate::moby::{countdown, Ctx, MobyWorld};

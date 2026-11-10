@@ -223,13 +223,6 @@ fn throw_rider(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     ai::set_link(&mut w.mobys[id], RIDER, None);
 }
 
-fn free_light(w: &mut MobyWorld, id: usize) {
-    let l = w.mobys[id].pv_i(LIGHT);
-    if 0 <= l {
-        w.point_lights.free(l as usize);
-        w.mobys[id].set_pv_i(LIGHT, -1);
-    }
-}
 
 /// The flame's light at `p` (one up): red, radius 5.
 fn light_at(w: &mut MobyWorld, id: usize, p: V3) {
@@ -450,7 +443,7 @@ fn senses(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     let kind = ai::take_damage(w, id, ctx, false);
     if kind != 0 {
         w.mobys[id].set_pv_i(FLAMES, 0);
-        free_light(w, id);
+        crate::point_lights::free_pv_i(w, id, LIGHT);
         if kind == 5 {
             let m = &mut w.mobys[id];
             m.set_pv_f(REACT + 0x90, 0.0);
@@ -877,11 +870,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let m = &w.mobys[id];
             let goal = add(scale(m.rows[0], -5.5), m.pos);
             let y = yaw_to(w, id, goal);
-            let o = MV + 0x38;
-            let kept = w.mobys[id].pv_i(o);
-            w.mobys[id].set_pv_i(o, 0x10);
-            ai::move_step(w, id, ctx, y, goal);
-            w.mobys[id].set_pv_i(o, kept);
+            ai::move_with(w, id, ctx, y, goal, 0x10, -1.0, -1.0);
             if 0x79 <= w.mobys[id].state_ticks as u16 { charge_or_fire(w, id, ctx); }
         }
         _ => {}
@@ -1018,7 +1007,7 @@ fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     } else if t <= 15.0 || a != 10 {
         return;
     }
-    free_light(w, id);
+    crate::point_lights::free_pv_i(w, id, LIGHT);
 }
 
 /// `0x3e67c8` (with a rider): the flame from `+0x260` to `+0x270` in its three layers ([`FIRE`]), each a quad across

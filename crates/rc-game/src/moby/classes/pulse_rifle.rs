@@ -183,8 +183,6 @@ impl Mem {
 /// The Pulse Rifle's row as `0x139568[0x17]` gives it (crate::upgrades).
 fn cur_row(game: &crate::game::GameState) -> Option<&'static ItemRow> { row(game, PULSE) }
 
-/// `0x2eef88(out, a, b)` = b × a.
-fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
 
 /// `0x2eeb40(+0x04)`: the cooldown down a frame (1/60 s); true when out.
 fn cooldown(w: &mut MobyWorld, id: usize) -> bool {
@@ -196,13 +194,6 @@ fn cooldown(w: &mut MobyWorld, id: usize) -> bool {
         w.mobys[id].set_pv_f(4, 0.0);
         true
     }
-}
-
-/// The muzzle light let go (`0x2fdc48`).
-fn free_light(w: &mut MobyWorld, id: usize) {
-    let s = w.mobys[id].pv_i(0x10);
-    if 0 <= s { w.point_lights.free(s as usize); }
-    w.mobys[id].set_pv_i(0x10, -1);
 }
 
 /// The way out (put away, the state 0x6f): the view turn's globals back (when they were saved), the play's field of
@@ -219,14 +210,14 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if ctx.hero.items.ready == 3 {
         if w.mobys[id].state == 0 { return; }
         put_back(w, id, ctx, true);
-        free_light(w, id);
+        crate::point_lights::free_pv_i(w, id, 0x10);
         return;
     }
     if ctx.hero.state == 0x6f {
         let was = w.mobys[id].state;
         if was == 4 { return; }
         w.mobys[id].state = 4;
-        free_light(w, id);
+        crate::point_lights::free_pv_i(w, id, 0x10);
         put_back(w, id, ctx, was != 0);
         return;
     }
@@ -415,7 +406,7 @@ fn light(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let out = countdown(&mut n);
     w.mobys[id].set_pv_i(0x14, n);
     if out {
-        free_light(w, id);
+        crate::point_lights::free_pv_i(w, id, 0x10);
         return;
     }
     if w.mobys[id].pv_i(0x10) == -1 {
@@ -441,7 +432,7 @@ pub fn view_aim(ctx: &Ctx, muzzle: V3, speed: f32, far: f32, most: f32) -> V3 {
     let d = unit(sub(end, muzzle));
     let fwd = ctx.hero.rows[0];
     if dot(d, fwd) < most.cos() {
-        set_len(crate::camera::rot(fwd, most, cross_ba(d, fwd)), speed)
+        set_len(crate::camera::rot(fwd, most, cross(fwd, d)), speed)
     } else {
         scale(d, speed)
     }
@@ -453,7 +444,7 @@ pub fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, fp: bool, speed: f32) {
     let muzzle = ctx.host.joint(&w.mobys[id], 0).unwrap_or(w.mobys[id].pos);
     let mut dir = if ctx.hero.items.raised { set_len(w.mobys[id].rows[1], -f) } else { set_len(ctx.hero.rows[0], f) };
     // `0x2fda20(15, 0, muzzle, 0x7f608060)`, 30 ticks (the last one is out by now: the cooldown is longer).
-    free_light(w, id);
+    crate::point_lights::free_pv_i(w, id, 0x10);
     let l = PointLight { color: [0.75, 1.0, 0.75], intensity: 0.0, pos: muzzle, radius: 15.0 };
     let s = w.point_lights.alloc(l).map_or(-1, |s| s as i32);
     w.mobys[id].set_pv_i(0x10, s);
@@ -491,8 +482,8 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, pos: V3, dir: V3, slot: i32, mode
     let life = (128.0 / (speed * 0.016_666_668)) as i32 as i16;
     let up = ctx.hero.gravity.up_at(pos);
     let r0 = unit(dir);
-    let r1 = unit(cross_ba(r0, scale(up, -1.0)));
-    let r2 = cross_ba(r1, r0);
+    let r1 = unit(cross(scale(up, -1.0), r0));
+    let r2 = cross(r0, r1);
     let mut b = w.pulse.next_beam;
     if 3 < b { b = 0; }
     w.pulse.next_beam = (b + 1) % 3;
@@ -530,10 +521,10 @@ fn make_beam(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
     let m = &w.mobys[id];
     let (pos, vel, slot, b) = (m.pos, m.pv_v(0), m.pv_s(0x1a) as usize, m.pv_s(0x18) as usize);
     let axis = unit(vel);
-    let s = unit(cross_ba(axis, ctx.hero.gravity.up_at(pos)));
+    let s = unit(cross(ctx.hero.gravity.up_at(pos), axis));
     let bm = &mut w.pulse.slot(slot).beams[b.min(BEAMS - 1)];
     bm.axis = axis;
-    bm.side = cross_ba(s, axis);
+    bm.side = cross(axis, s);
     bm.p[0] = pos;
     bm.p[1] = add(pos, vel);
     bm.p[2] = bm.p[1];
@@ -739,8 +730,8 @@ fn draw_puffs(s: &Slot, hero_state: i32, cam: V3, out: &mut Vec<crate::fx::FxQua
         let c = a << 24 | crate::hud::lerp_rgba(t, 0x60_4040, 0x40_8040);
         let size = p.size + (0.5 - p.size) * f;
         let to_cam = unit(sub(cam, p.pos));
-        let side = unit(cross_ba(to_cam, p.up));
-        let up2 = cross_ba(side, to_cam);
+        let side = unit(cross(p.up, to_cam));
+        let up2 = cross(to_cam, side);
         let (sn, cs) = p.roll.sin_cos();
         let lift = (1.0 - f) * 0.075;
         let world = |l: V3| add(p.pos, add(add(scale(to_cam, l[0]), scale(side, l[1])), scale(up2, l[2])));
@@ -784,7 +775,7 @@ fn draw_beams(s: &Slot, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
 pub fn draw_beam(b: &Beam, cam: V3, look: &BeamLook, out: &mut Vec<crate::fx::FxQuad>) {
     use crate::fx::FxQuad;
     let f = b.life as f32 * b.inv;
-    let across = cross_ba(b.axis, b.side);
+    let across = cross(b.side, b.axis);
     let rings: [[V3; 20]; 3] = std::array::from_fn(|k| std::array::from_fn(|i| add(b.p[k], add(scale(across, RING[i][0] * 0.2), scale(b.side, RING[i][1] * 0.2)))));
     let far = ((f * look.ring.1) as i32 as u32) << 24 | look.ring.0;
     let sc = b.scroll[0];
@@ -806,7 +797,7 @@ pub fn draw_beam(b: &Beam, cam: V3, look: &BeamLook, out: &mut Vec<crate::fx::Fx
     }
     let to_cam = sub(cam, b.p[0]);
     let strip = |out: &mut Vec<FxQuad>, fx: usize, wide: f32, c: u32, first: u32, s: [[f32; 2]; 2]| {
-        let wv = set_len(cross_ba(b.axis, to_cam), wide);
+        let wv = set_len(cross(to_cam, b.axis), wide);
         for k in 0..2 {
             let near = if k == 0 { first } else { c };
             let (p, q) = (b.p[k + 1], b.p[k]);

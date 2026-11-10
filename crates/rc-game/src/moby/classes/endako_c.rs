@@ -321,8 +321,7 @@ pub fn update_0ffd(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.set_pv_f(PHASE, phase);
             let to = yaw_to(w, id, ctx.hero.pos);
             let yaw = add_rot(to, phase.sin() * f32::from_bits(0x3db2_b8c4));
-            let pos = w.mobys[id].pos;
-            ai::move_step(w, id, ctx, yaw, pos);
+            ai::turn_in_place(w, id, ctx, yaw);
             beam(w, id, ctx);
             if 6 <= w.mobys[id].state_ticks as u16 { draw_prep(w, id, ctx); }
             if ctx.hero.mode != 1 { w.mobys[id].set_state(4, -1); }

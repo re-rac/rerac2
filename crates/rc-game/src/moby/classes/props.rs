@@ -739,13 +739,13 @@ pub fn update_1330(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     ctx.hero.request_state(0, true);
                 }
             }
-            // The ship at the path's start (`0x32a748`), facing its second point from here.
+            // The ship made on it (`0x32a748`, its angles and light), at the path's start, facing its second point
+            // from here.
             let path = usize::try_from(w.mobys[id].pv_i(0x14)).ok().and_then(|p| ctx.level.paths.get(p)).cloned().unwrap_or_default();
-            let (pos, dd) = (w.mobys[id].pos, w.mobys[id].draw_dist);
+            let pos = w.mobys[id].pos;
             let s = w.create(SHIP);
+            w.adopt(s, Some(id), &*ctx.host);
             let sm = &mut w.mobys[s];
-            (sm.drawn, sm.update_dist, sm.parent) = (1, 0xff, Some(id));
-            sm.draw_dist = dd;
             sm.pos = path.first().map_or(pos, |q| [q[0], q[1], q[2]]);
             if let Some(q) = path.get(1) { sm.rot[2] = atan2(q[0] - pos[0], q[1] - pos[1]); }
             sm.draw_dist = 0x28f;
@@ -1163,7 +1163,8 @@ fn lift(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, l: Lift) {
     let hp = ctx.hero.pos;
     let (vel, vol) = if l.aca { (0xa8, 0xa4) } else { (0xa4, 0xa8) };
     let pad = |w: &MobyWorld| usize::try_from(w.mobys[id].pv_i(0x9c)).ok().filter(|&i| i < w.mobys.len());
-    let on_pad = |w: &MobyWorld, ctx: &Ctx| pad(w).is_some_and(|p| ctx.hero.ground_moby == Some(p) && ctx.hero.air_ticks == 0);
+    // `0x325398(pad)`.
+    let on_pad = |w: &MobyWorld, ctx: &Ctx| pad(w).is_some_and(|p| crate::moby::ai::stands_on(ctx, p));
     let pad_at = |m: &crate::moby::Moby, up: f32| {
         if l.aca {
             let (s, c) = m.rot[2].sin_cos();
@@ -1383,7 +1384,7 @@ pub fn update_0ac1(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let ph = m.pv_f(0xa8);
             let p = pad(w);
             pad_pulse(w, p, ph);
-            let on = pad(w).is_some_and(|p| ctx.hero.ground_moby == Some(p) && ctx.hero.air_ticks == 0);
+            let on = pad(w).is_some_and(|p| crate::moby::ai::stands_on(ctx, p));
             if on && w.mobys[id].pv_i(0x80) != 0 {
                 w.mobys[id].set_state(2, -1);
                 w.mobys[id].set_pv_i(0xac, 0);

@@ -110,8 +110,6 @@ pub struct Mem {
     pub zap: super::shield_zap::Mem,
 }
 
-/// `0x2eef88(out, a, b)` = b × a.
-fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
 
 /// `0x37fa58(damage)`: what of a hit gets past the shield (module docs).
 pub fn absorb(shield: &mut f32, wait: &mut i32, damage: f32) -> f32 {
@@ -160,7 +158,7 @@ pub fn deploy(w: &mut MobyWorld, ctx: &mut Ctx) {
     };
     w.shield.moby = Some(id);
     let heads = [rows[0], rows[1], rows[2], add(rows[0], rows[2])].map(|v| set_len(v, REACH));
-    let axes = [rows[2], rows[0], rows[1], cross_ba(heads[3], rows[1])];
+    let axes = [rows[2], rows[0], rows[1], cross(rows[1], heads[3])];
     w.shield.comets = (0..COMETS).map(|k| {
         let mut trail = vec![[0.0; 3]; TRAIL];
         trail[0] = heads[k];
@@ -485,8 +483,8 @@ fn trail(out: &mut Vec<crate::fx::FxQuad>, pts: &[V3], cam: V3, rgb: u32) {
     if n < 3 { return; }
     let lerp = crate::hud::lerp_rgba;
     let step = 1.0 / (n - 1) as f32;
-    let side = |p: V3, prev: V3| set_len(cross_ba(sub(p, prev), sub(p, cam)), 0.02);
-    let s0 = set_len(cross_ba(sub(pts[1], pts[0]), sub(pts[0], cam)), 0.02);
+    let side = |p: V3, prev: V3| set_len(cross(sub(p, cam), sub(p, prev)), 0.02);
+    let s0 = set_len(cross(sub(pts[0], cam), sub(pts[1], pts[0])), 0.02);
     let (mut a, mut b) = (add(pts[0], s0), sub(pts[0], s0));
     let mut c0 = 0x7f_7f7fu32;
     let mut t = step;
@@ -516,7 +514,7 @@ fn trail(out: &mut Vec<crate::fx::FxQuad>, pts: &[V3], cam: V3, rgb: u32) {
         let k = scale(d, 1.3);
         p0 = sub(p0, k);
         p1 = add(p1, k);
-        let s = set_len(cross_ba(sub(cam, p0), d), 0.07);
+        let s = set_len(cross(d, sub(cam, p0)), 0.07);
         let c1 = lerp(t, 0x2000_0000, 0x2000_0000 | rgb);
         out.push(crate::fx::FxQuad { fx: 0xe, additive: true, corners: [add(p0, s), sub(p0, s), add(p1, s), sub(p1, s)], st: ST, rgba: [c0, c0, c1, c1] });
         c0 = c1;

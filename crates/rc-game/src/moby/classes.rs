@@ -113,6 +113,32 @@ pub mod vendor;
 pub mod weather;
 pub mod wrench;
 pub mod zodiac;
+// The class updates several levels share (out of the level modules).
+pub mod beacon;
+pub mod blaster_shot;
+pub mod breakables;
+pub mod capturable;
+pub mod field_gate;
+pub mod fireball;
+pub mod gem_counter;
+pub mod giant_body;
+pub mod glider;
+pub mod glow_pulse;
+pub mod gunship;
+pub mod gunship_bolt;
+pub mod hit_targets;
+pub mod hue_light;
+pub mod kill_zone;
+pub mod launcher;
+pub mod lobber;
+pub mod opponent_pointer;
+pub mod orbit_shot;
+pub mod pads;
+pub mod pieces;
+pub mod sinking_pit;
+pub mod splash;
+pub mod tex_scroll;
+pub mod updraft;
 pub mod endako_a;
 pub mod endako_a_enemies;
 pub mod endako_b;
@@ -217,7 +243,7 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         zodiac::EFFECT => Some(zodiac::update_effect),
         // The Sheepinator (`0x3c76e0`; the challenge mode's row 0x6d too) and its sheep (`0x404338`).
         sheepinator::HAND_CLASS => Some(sheepinator::update),
-        // The Hypnomatic (`0x3ba758`, every level): its beam hooks the capture's creatures (level18::capturable).
+        // The Hypnomatic (`0x3ba758`, every level): its beam hooks the capture's creatures (capturable).
         hypnomatic::HAND_CLASS => Some(hypnomatic::update),
         sheep::CLASS => Some(sheep::update),
         // The Plasma Coil (`0x3e9608`) and its ball (`0x3cbb78`).
@@ -511,6 +537,60 @@ pub fn update_for(o_class: i16) -> Option<UpdateFn> {
         ferry::CLASS => Some(ferry::update),
         // The camera's look target on Tabora's hovership levels (L08 `0x3d4e48`, L19 `0x3c1660`, museum `0x3c09d0`).
         look_targets::CLASS => Some(look_targets::update_0970),
+        // The launcher (L04 `0x3ef548`; L06 `0x40a4c8`, where 0x0a50 runs it) and its carrier (L04, L06, L07, L12).
+        launcher::CLASS | 0x0a50 => Some(launcher::update_0a58),
+        launcher::CARRIER => Some(launcher::update_0e44),
+        // The breakables several levels share (L04 / L20, L09 / L12, L13 / the museum).
+        0x1293 => Some(breakables::update_1293),
+        0x0852 | 0x0884 => Some(breakables::update_0852),
+        0x130b => Some(breakables::update_130b),
+        0x130f => Some(breakables::update_130f),
+        // The beacons (L04, L11) and the colour-cycling light (L04, L06, L07, L12, L13).
+        0x0a99 => Some(beacon::update_0a99),
+        0x0ab8 => Some(beacon::update_0ab8),
+        0x0cfd => Some(hue_light::update_0cfd),
+        // The splash (L00 `0x39f9e0`, every level's table but level 1's) and the field gate (L06, L13, L17).
+        splash::CLASS => Some(splash::update),
+        field_gate::CLASS => Some(field_gate::update_031a),
+        // The area switch by areas (L06 `0x4462a8` and nine more levels).
+        0x0dda => Some(area_switch::update_0dda),
+        // The fireball (L00 `0x3e0b90`; levels 6, 7, 11 and 14 make it).
+        fireball::SHOT => Some(fireball::update_0b7f),
+        // Ratchet's glider (L08, L09, L19) and the crystals' / moonstones' counter (L08, L19).
+        glider::CLASS => Some(glider::update_0905),
+        gem_counter::CLASS => Some(gem_counter::update_09f3),
+        // The gunship and its bolt (L09, L20).
+        gunship::CLASS => Some(gunship::update_0cbc),
+        gunship_bolt::CLASS => Some(gunship_bolt::update_05de),
+        // The pads (L09, L13; L09, L18, L22) and the texture scroller (L09, L16).
+        pads::PAD => Some(pads::update_0efc),
+        pads::LAUNCH_PAD => Some(pads::update_0e80),
+        tex_scroll::CLASS => Some(tex_scroll::update_0d06),
+        // The updraft pad (L11, L13, L14, L17) and its drain (L11, L13).
+        0x08e2 => Some(updraft::update_08e2),
+        0x123a => Some(updraft::update_123a),
+        // The glow pulser (L12, the museum).
+        0x115f => Some(glow_pulse::update_115f),
+        // The thrown pieces (L00 `0x3de708`, twelve levels) and the blaster shot (L09, L12, L20, L22, L23).
+        c if pieces::CLASSES.contains(&c) => Some(pieces::update_0d66),
+        blaster_shot::CLASS => Some(blaster_shot::update_03a6),
+        // The kill cuboids (L13, L14, L20) and the targets (L13, L14, L16).
+        0x040f => Some(kill_zone::update_040f),
+        0x0c86 => Some(hit_targets::update_0c86),
+        0x0c87 => Some(hit_targets::update_0c87),
+        // The sinking pit and its corners (L14, L19).
+        sinking_pit::CLASS => Some(sinking_pit::update_135f),
+        sinking_pit::CORNER => Some(sinking_pit::update_1130),
+        // The lobber (L12, L17) and its glob (L12, L13, L16, L17).
+        lobber::CLASS => Some(lobber::update_0bbf),
+        lobber::SHOT => Some(lobber::update_0ea5),
+        // The Hypnomatic's creatures and their shot (L18, L19, L20).
+        capturable::BITER | capturable::GUNNER => Some(capturable::update),
+        capturable::SHOT => Some(capturable::update_1263),
+        // The orbits' (L22, L23): Giant Clank's body, the opponent's pointer, the drones' / turret's shot.
+        giant_body::BODY => Some(giant_body::update_027d),
+        opponent_pointer::CLASS => Some(opponent_pointer::update_0d55),
+        level22::drone::SHOT | level23::shots::TURRET => Some(orbit_shot::update_0f5d),
         // The levels' own (their modules' lists).
         _ => race::update_for(o_class).or_else(|| level04::update_for(o_class)).or_else(|| level06::update_for(o_class)).or_else(|| level07::update_for(o_class)).or_else(|| level08::update_for(o_class)).or_else(|| level09::update_for(o_class)).or_else(|| level10::update_for(o_class)).or_else(|| level11::update_for(o_class)).or_else(|| level13::update_for(o_class)).or_else(|| level14::update_for(o_class)).or_else(|| level16::update_for(o_class)).or_else(|| level12::update_for(o_class)).or_else(|| level17::update_for(o_class)).or_else(|| level18::update_for(o_class)).or_else(|| level19::update_for(o_class)).or_else(|| level20::update_for(o_class)).or_else(|| level21::update_for(o_class)).or_else(|| level22::update_for(o_class)).or_else(|| level26::update_for(o_class)).or_else(|| level05::update_for(o_class)).or_else(|| level15::update_for(o_class)).or_else(|| level23::update_for(o_class)),
     }

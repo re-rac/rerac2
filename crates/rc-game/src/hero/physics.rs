@@ -288,7 +288,8 @@ pub fn sub(a: V3, b: V3) -> V3 { [a[0] - b[0], a[1] - b[1], a[2] - b[2]] }
 pub fn scale(a: V3, s: f32) -> V3 { [a[0] * s, a[1] * s, a[2] * s] }
 pub fn dot(a: V3, b: V3) -> f32 { a[0] * b[0] + a[1] * b[1] + a[2] * b[2] }
 pub fn len(a: V3) -> f32 { dot(a, a).sqrt() }
-/// `0x2eef88`: a × b.
+/// `0x2eef88`: a × b. (The game's `0x2eef88(out, a, b)` writes **b × a** — `vopmula ACC, b, a; vopmsub out, a, b` —
+/// so its call is `cross(b, a)` here.)
 pub fn cross(a: V3, b: V3) -> V3 { [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]] }
 /// `0x2eefd0`: the xy length.
 pub fn len2(a: V3) -> f32 { (a[0] * a[0] + a[1] * a[1]).sqrt() }

@@ -169,8 +169,6 @@ fn flat_angle(a: V3, b: V3, up: V3) -> Option<f32> {
     Some(std::f32::consts::FRAC_PI_2 - (dot(fa, fb) / (la * lb)).clamp(-1.0, 1.0).asin())
 }
 
-/// `0x2eef88(out, a, b)` = b × a.
-fn cross_ba(a: V3, b: V3) -> V3 { crate::hero::physics::cross(b, a) }
 
 /// The camera classes the activation counts over (`0x428188`: 0 the follow camera, 2, 10, 14).
 fn counts_over(class: i16) -> bool { matches!(class, 0 | 2 | 10 | 14) }
@@ -236,8 +234,8 @@ impl FirstPerson {
         self.d = [0.0; 7];
         let up = set_len(hero.rows[2], 1.0);
         self.pos = eye(hero);
-        let left = set_len(cross_ba(prev_fwd, up), 1.0);
-        self.rows = [cross_ba(up, left), left, up];
+        let left = set_len(crate::hero::physics::cross(up, prev_fwd), 1.0);
+        self.rows = [crate::hero::physics::cross(left, up), left, up];
     }
 
     /// `0x427bf8`. `blending`: `0x1b8e90` ≠ 0; `pitch_normal`: the Camera page's option `0x1a7bac`; `blocked(c)`: the
@@ -276,7 +274,7 @@ impl FirstPerson {
         v2 = interp(v2, v, tune.k, tune.d, 0.0, &mut v3);
         (d[2], d[3]) = (v2, v3);
         if d[2] != 0.0 {
-            let left = cross_ba(fwd, up);
+            let left = crate::hero::physics::cross(up, fwd);
             let mut step = rate * d[2];
             let a = add_rot(d[4], step).abs();
             if 1.117_010_8 < a && d[4].abs() < a { step += -step * sub_rot(a, 1.117_010_7) * 2.864_788_5; }
@@ -297,8 +295,8 @@ impl FirstPerson {
             d[4] = add_rot(d[4], step);
         }
         let fwd = set_len(fwd, 1.0);
-        let left = set_len(cross_ba(fwd, up), 1.0);
-        self.rows = [fwd, left, cross_ba(left, fwd)];
+        let left = set_len(crate::hero::physics::cross(up, fwd), 1.0);
+        self.rows = [fwd, left, crate::hero::physics::cross(fwd, left)];
         lock
     }
 }

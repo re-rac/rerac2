@@ -123,13 +123,6 @@ fn light_at(w: &mut MobyWorld, id: usize, p: V3) {
     if s < 0 { return; }
     w.point_lights.set(s as usize, PointLight { color: [1.0, 0.0, 0.0], intensity: 0.0, pos: [p[0], p[1], p[2] + 1.0], radius: 5.0 });
 }
-fn free_light(w: &mut MobyWorld, id: usize) {
-    let s = w.mobys[id].pv_i(LIGHT);
-    if s >= 0 {
-        w.point_lights.free(s as usize);
-        w.mobys[id].set_pv_i(LIGHT, -1);
-    }
-}
 
 /// `0x433590`: the flash, the timers down, its ticks.
 fn tail(w: &mut MobyWorld, id: usize) {
@@ -201,7 +194,7 @@ fn senses(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if kind != 0 {
         if source.is_some_and(|c| !matches!(c, 0x0ed8 | 0x0047 | 0x0dd9 | 0x0d1b | 0x0ce7 | CLASS | 0)) { w.level11.g904c = 0; }
         w.mobys[id].set_pv_i(BEAMS, 0);
-        free_light(w, id);
+        crate::point_lights::free_pv_i(w, id, LIGHT);
         if kind == 5 {
             let m = &mut w.mobys[id];
             m.set_pv_i(0xf0, 0);
@@ -450,10 +443,7 @@ fn muzzle_twinkles(ctx: &mut Ctx, v: V3, k: f32) {
 /// `0x3327f0(yaw, −1, −1, m, goal, 0x10)` (L02 `0x331440`): the move with its options 0x10 for the tick.
 fn strafe_to(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, goal: V3) {
     let yaw = t::yaw_to(w, id, goal);
-    let o = w.mobys[id].pv_i(MV + 0x38);
-    w.mobys[id].set_pv_i(MV + 0x38, 0x10);
-    ai::move_step(w, id, ctx, yaw, goal);
-    w.mobys[id].set_pv_i(MV + 0x38, o);
+    ai::move_with(w, id, ctx, yaw, goal, 0x10, -1.0, -1.0);
 }
 
 /// The chase's end: with a rider the beam's wind-up (0x12, sequences 9 / 6), else the chase (0xf, 6 / 5); the walk
@@ -486,8 +476,8 @@ fn walk_to(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, target: V3) {
     let m = &mut w.mobys[id];
     m.pos = add(scale(m.rows[0], step), m.pos);
     w.changed = true;
-    let (y, pos) = (t::yaw_to(w, id, target), w.mobys[id].pos);
-    ai::move_step(w, id, ctx, y, pos);
+    let y = t::yaw_to(w, id, target);
+    ai::turn_in_place(w, id, ctx, y);
     if k != 5 && k != 15 { return; }
     let Some(j) = ctx.host.joint(&w.mobys[id], if k == 5 { 3 } else { 2 }) else { return };
     let mut origin = add(j, scale(w.mobys[id].rows[0], 0.5));
@@ -877,10 +867,10 @@ fn beam(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             head_twinkles(ctx, head, None);
             light_at(w, id, head);
         } else {
-            free_light(w, id);
+            crate::point_lights::free_pv_i(w, id, LIGHT);
         }
     } else if 15.0 < f && firing {
-        free_light(w, id);
+        crate::point_lights::free_pv_i(w, id, LIGHT);
     }
 }
 

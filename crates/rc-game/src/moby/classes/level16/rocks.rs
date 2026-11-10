@@ -38,15 +38,7 @@ const MINUTE: f32 = f32::from_bits(0x3998_825c);
 pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, owner: usize, pos: V3, rot: V3) -> Option<usize> {
     w.class(ROCK)?;
     let id = w.create(ROCK);
-    let (opos, orot, light, ambient) = { let o = &w.mobys[owner]; (o.pos, o.rot, o.light, o.ambient) };
-    let m = &mut w.mobys[id];
-    m.update_dist = 0xff;
-    m.draw_dist = 0xff;
-    m.drawn = 1;
-    m.parent = Some(owner);
-    (m.pos, m.rot, m.light, m.ambient) = (opos, orot, light, ambient);
-    w.rebuild(id, &*ctx.host);
-    w.mobys[id].mode &= !7;
+    w.adopt(id, Some(owner), &*ctx.host);
     let base = w.class(ROCK).map_or(1.0, |c| c.scale);
     let rng = &mut ctx.game.rng;
     let s = rng.randf(f32::from_bits(0x3f2a_7efa), 1.0);

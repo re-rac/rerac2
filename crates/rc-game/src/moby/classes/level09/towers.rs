@@ -6,7 +6,7 @@
 //!   nodes, an arc between each pair.
 //!   * **Its pvars**: health `+0x20` (f32; `+0x26` its hold-off, s16), the flash `+0x70`, the target block `+0x50`
 //!     (`+0x64` found), the area it watches `+0x8c` (from `+0xa4` while it fires, `+0xa8` while it waits), the
-//!     timer `+0x92` (s16) and `+0x90`, the nodes' reach `+0x80`, spread `+0x94`, speed `+0x98` (a second), the
+//!     timer `+0x92` (s16) and `+0x90` (a byte), the nodes' reach `+0x80`, spread `+0x94`, speed `+0x98` (a second), the
 //!     reload `+0x9c` and rest `+0x9e` (u16), the lives `+0xa0 · k + +0xa2` (s16), their damage `+0x34` (byte).
 //!   * **Each tick** (`0x3f17e8` first): in sub 0 armed (`0x3f1740`: health 10 (`+0x24` 10), `+0x28` 3, `+0x30` 1,
 //!     `+0x2f` 1, the area `+0xa4`; sub 1); else a hit with the flags 0x10000 (`0x31a158`) while its hold-off is under
@@ -101,14 +101,6 @@ const RISE: f32 = 0.8;
 
 /// `0x3fc960`.
 pub fn update_0d12(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) { beams::step(w, id, ctx, Kind::Dobbo); }
-
-fn down_s(w: &mut MobyWorld, id: usize, off: usize) -> bool {
-    let m = &mut w.mobys[id];
-    let mut t = m.pv_s(off) as u16 as i32;
-    let r = countdown(&mut t);
-    m.set_pv_s(off, t as i16);
-    r
-}
 
 fn anim(w: &MobyWorld, id: usize, ctx: &mut Ctx, s: u8, blend: u8) {
     if seq(w, id, ctx) != s { ctx.host.set_anim(&w.mobys[id], s, 0, blend); }
@@ -238,8 +230,9 @@ pub fn update_0cea(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     // `0x3f17a0`.
     let m = &mut w.mobys[id];
     if (m.state_ticks as u16) < 0xffff { m.state_ticks = m.state_ticks.wrapping_add(1); }
-    down_s(w, id, TIMER);
-    down_s(w, id, TIMER_B);
+    // `0x2ead98` = L00 `0x2eeae0` on the s16 `+0x92`, `0x2eadc8` = L00 `0x2eeb10` on the byte `+0x90`.
+    w.mobys[id].count_s(TIMER);
+    w.mobys[id].count_b(TIMER_B);
 }
 
 /// `0x3f7cb0(pos, way, tower, partner, life, spread, damage, reach)`: a node (module docs); None when none is made.

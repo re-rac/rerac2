@@ -7,7 +7,7 @@
 //! |---|---|---|
 //! | `0x3d8340` | 0x0b0a | its three glows ([`glow`]: the pilot light at `+0x3a0`, the nozzle `+0x3b0` and the mouth `+0x3c0`); climbing, its wire (`0x3d8498`) |
 //! | `0x3dc220` | 0x0b0b (and Maktar's 0x0b22, level 7's 0x0d29: L07 `0x3eb968`) | its three glows ([`glow`]: the visor at joint 4, the chest at joint 5, below it joint 6 at (0.25, 0, 0)) |
-//! | `0x3cbcc8` (L07) | the gunner's fireball 0x0b7f | its two glows ([`crate::moby::classes::level07::gunner::draw_0b7f`]) |
+//! | `0x3cbcc8` (L07) | the gunner's fireball 0x0b7f | its two glows ([`crate::moby::classes::fireball::draw_0b7f`]) |
 //! | `0x3f6060` (L07) | the boss's laser 0x0e28 | its strips and beads ([`crate::moby::classes::level07::laser::draw`]) |
 //! | `0x3f0590` (L07) | the boss's charge glow 0x0d45 | its four glows ([`crate::moby::classes::level07::boss::draw_0d45`]) |
 //! | `0x3f4998` | 0x0ce9 in glow mode | a glow at each tie of its group ([`crate::moby::classes::tie_lights::draw`]) |
@@ -61,19 +61,19 @@
 //! | `0x3fac68` (L02) | the Spiderbot 0x0b58 | its blast's sphere ([`FrameQuad`], [`crate::moby::classes::spiderbot::draw_blast`]) |
 //! | `0x4034c8` | the upgraded Spiderbot 0x0e79 | its blast's sphere and its charge's marker ([`crate::moby::classes::spiderbot_plus::draw_marker`]) |
 //! | `0x405658` / `0x406038` | its shot 0x0eaa / shell 0x0eab | sprites and streaks ([`crate::moby::classes::spiderbot_plus::draw_shot`], [`crate::moby::classes::spiderbot_plus::draw_lob`]) |
-//! | `0x40d968` (L17; L12 `0x409640`, L13 `0x40e3e8`) | the lobbers' glob 0x0ea5 | its bolt ([`trails::bolt`], crate::moby::classes::level17::lobber::draw_0ea5) |
+//! | `0x40d968` (L17; L12 `0x409640`, L13 `0x40e3e8`) | the lobbers' glob 0x0ea5 | its bolt ([`trails::bolt`], crate::moby::classes::lobber::draw_0ea5) |
 //! | `0x406ad0` / `0x4152f0` (L16) | the gunship's shot 0x0ebd / the drone's shot 0x0f7a | their bolts ([`trails::shot_bolt`]) |
 //! | `0x3d5ff8` (L26, first list) | the motes 0x0c00 of a group | their trails ([`trails::history`], crate::moby::classes::level26::props::draw_0c00) |
 //! | `0x42b550` (L08) / `0x3fd428` (L09) | the beam managers 0x1006 / 0x0d12 with a beam shaped | every slot's strips and ends ([`beams::draw_tabora`], [`beams::draw_dobbo`]) |
 //! | `0x423e80` (L14) | the electric strand 0x0f80 on | its strands ([`trails::strand`], crate::moby::classes::level14::fence::draw) |
-//! | `0x3b02e8` (L09; L16, L18, L19, L20; first list) | the bolt 0x05de | its strips, glow and sparks ([`crate::moby::classes::level09::bolt::draw`]) |
+//! | `0x3b02e8` (L09; L16, L18, L19, L20; first list) | the bolt 0x05de | its strips, glow and sparks ([`crate::moby::classes::gunship_bolt::draw`]) |
 //! | `0x42fce0` (L08; L09 `0x423498`, L19 `0x4223e8`; first list) | the liquid lids 0x11fe / 0x12af / 0x12b4 | the frame's lids' layers and sheens ([`crate::water::lid::draw`]) |
 //! | `0x3e94a0` → `0x3a35e8` (L04; L06 `0x3c1100`, L08 `0x3d1440` → `0x38e260`, L18, L20; first list, the second under water) | the liquid grid's mover of record 0 | every drawn patch's water and sheen ([`crate::water::grid::draw`]) |
 //! | `0x421db8` / `0x38abf0` (L12; first list) | Todano's mesh water 0x1113 / 0x1350 | its mesh's two layers ([`crate::water::mesh::draw`]) |
 //! | `0x4080c0` (first list) / `0x409040` (L04) | Barlow's ripple water 0x0b37 / 0x0b54 | its two strips twice ([`crate::water::ripple::draw`]) |
 //! | `0x3c5430` (L04; L19 `0x39d640`) | the quad fountain 0x02f8 | its quads, drops and cap ([`fountain::draw`]) |
 //! | `0x384b38` (L21, first list) | the museum's pool 0x1198 | its grid's refraction and reflection layers (crate::moby::classes::level21::ripples::draw) |
-//! | `0x390d60` (L14; L19 `0x383a18`; the world's list `0x2e77e0`, here the first) | the sinking pit 0x135f | its 7 × 7 waving cells (crate::moby::classes::level14::pit::draw) |
+//! | `0x390d60` (L14; L19 `0x383a18`; the world's list `0x2e77e0`, here the first) | the sinking pit 0x135f | its 7 × 7 waving cells (crate::moby::classes::sinking_pit::draw) |
 //! | `0x432150` (L14) | the energy field 0x1164 | its halo, rings, core and rays (crate::moby::classes::level14::energy::draw) |
 //! | `0x41e3b8` (L16, first list) | the sweeping laser 0x1162 | its beam (crate::moby::classes::level16::laser::draw) |
 //! | `0x3e0cf8` (L26, first list) | the veil 0x0c91 | its 64 quads in two layers (crate::moby::classes::level26::veil::draw) |
@@ -380,7 +380,11 @@ fn one(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::ga
         0x0944 => crate::moby::classes::endako_c::draw_0944(w, id, out),
         0x0b0a => draw_0b0a(w, id, &mut game.rng, cam, out),
         0x0b0b | 0x0b22 | crate::moby::classes::level07::prowler::CLASS | crate::moby::classes::level14::lift_guard::CLASS => draw_0b0b(w, host, id, &mut game.rng, cam, out),
-        crate::moby::classes::level07::gunner::SHOT => crate::moby::classes::level07::gunner::draw_0b7f(w, id, &mut game.rng, cam, out),
+        crate::moby::classes::fireball::SHOT => crate::moby::classes::fireball::draw_0b7f(w, id, &mut game.rng, cam, out),
+        crate::moby::classes::launcher::CARRIER => crate::moby::classes::launcher::draw(w, id, game, cam, out),
+        crate::moby::classes::gunship_bolt::CLASS if first => crate::moby::classes::gunship_bolt::draw(w, id, &mut game.rng, cam, out),
+        crate::moby::classes::sinking_pit::CLASS => crate::moby::classes::sinking_pit::draw(w, id, out),
+        crate::moby::classes::lobber::SHOT => crate::moby::classes::lobber::draw_0ea5(w, id, &mut game.rng, cam, out),
         crate::moby::classes::level07::laser::CLASS => crate::moby::classes::level07::laser::draw(w, id, cam, out),
         crate::moby::classes::level07::boss::GLOW => crate::moby::classes::level07::boss::draw_0d45(w, id, &mut game.rng, cam, out),
         crate::moby::classes::shot::SHOT_CLASS => crate::moby::classes::shot::draw_trail(w, id, cam, &mut game.trail_phase, out),

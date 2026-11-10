@@ -1,6 +1,9 @@
 //! Level 0x11's own classes (level 17; L17 addresses, the engine functions they call named by their L17 addresses with
 //! the L00 ones the port knows them by where they differ). Each class's update is registered in [`update_for`] and
 //! its draw callback, if any, in [`draw`]; crate::moby::classes::update_for and crate::fx ask these after their own.
+//!
+//! Shared with other levels: the lobber 0x0bbf and its glob 0x0ea5 (crate::moby::classes::lobber, L12's too), the
+//! field gate 0x031a (crate::moby::classes::field_gate), the updraft pad 0x08e2 (crate::moby::classes::updraft).
 
 pub mod carrier;
 pub mod brute;
@@ -9,7 +12,6 @@ pub mod floaters;
 pub mod gate;
 pub mod hatchling;
 pub mod hazard;
-pub mod lobber;
 pub mod lifts;
 pub mod misc;
 pub mod mortar;
@@ -40,9 +42,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         // Also level 8's (L08 `0x3f7ab0`).
         mortar::CLASS => Some(mortar::update_0c1a),
         brute::CLASS => Some(brute::update_0bcb),
-        // Also level 12's (L12 `0x3e3838`) and its glob 0x0ea5.
-        lobber::CLASS => Some(lobber::update_0bbf),
-        lobber::SHOT => Some(lobber::update_0ea5),
         carrier::CARRIER => Some(carrier::update_08b1),
         carrier::PLATFORM => Some(carrier::update_093b),
         lifts::DOCK => Some(lifts::update_0935),
@@ -66,7 +65,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
 pub fn draw(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, hero_state: i32, view: &crate::particles::BSphereView, cam: V3, id: usize, first: bool, out: &mut Vec<crate::fx::FxQuad>, frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
     match w.mobys[id].o_class {
         carrier::CARRIER => { carrier::draw_08b1(w, id, cam, out); true }
-        lobber::SHOT => { lobber::draw_0ea5(w, id, &mut game.rng, cam, out); true }
         _ => false,
     }
 }

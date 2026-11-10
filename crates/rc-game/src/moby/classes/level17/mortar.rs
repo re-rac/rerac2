@@ -3,7 +3,7 @@
 //! `0x3f1c80` / `0x3f1ea0` / `0x3f1950`): a pot that lobs the members of its group at Ratchet one by one — Smolg's
 //! hatchlings (crate::moby::classes::level17::hatchling), Tabora's burrowers and breathers (crate::moby::classes::
 //! level08::burrower / breather, which fly in along the knock it gives them, their start mode 2). Level 4's launcher
-//! (crate::moby::classes::level04::launcher) of another design: the pool, the target search, the landing cuboids.
+//! (crate::moby::classes::launcher) of another design: the pool, the target search, the landing cuboids.
 //!
 //! **Its pvars:** health `+0x20` (1), the flash `+0x50`, its knock block `+0x60` (crate::moby::knock), the target
 //! block `+0xc0` (crate::moby::target_search: its moby `+0x100`, the result `+0x104`), the reach `+0x120`, the

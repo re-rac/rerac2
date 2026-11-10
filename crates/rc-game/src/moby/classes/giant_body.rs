@@ -9,7 +9,7 @@ use crate::moby::{Ctx, MobyWorld};
 
 pub const BODY: i16 = 0x027d;
 
-/// 0x027d (`0x3a9fd0`): the body switch within 4 of it, as Ratchet.
+/// 0x027d (L22 `0x3a9fd0`): the body switch within 4 of it, as Ratchet.
 pub fn update_027d(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if ctx.hero.mode != 0 { return; }
     if dist(ctx.hero.pos, w.mobys[id].pos) < 4.0 { ctx.hero.switch_body(2, 0x56, id); }

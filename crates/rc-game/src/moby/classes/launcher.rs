@@ -1,5 +1,7 @@
-//! Barlow's launcher **0x0a58** (L04 `0x3ef548`, 2 placed; level 6's 0x0a50 shares the unit) and the carrier
-//! **0x0e44** (`0x43d3f8`, made by `0x30d1d0`) that brings each of its mobys in: a glow lobbed on an arc from the
+//! The launcher **0x0a58** (L04 `0x3ef548`, 2 placed on Barlow; L06 `0x40a4c8`, where 0x0a50 runs it, 4 placed; the
+//! decomp's `func_L04_003EE090`) and the carrier **0x0e44** (`0x43d3f8`, L06 `0x4473b0`, L07 `0x3f7218`, L12
+//! `0x403098`; `func_L04_0043BC58`; made by `0x30d1d0`, L06 `0x32c110`, L07 `0x2e2d08`: [`carry`]; level 12 has the
+//! update but no maker) that brings each of its mobys in: a glow lobbed on an arc from the
 //! launcher to where the moby lands, a blast there, then the moby growing out of the ground.
 //!
 //! The launcher's pvars: health `+0x20`, the flash `+0x50`, its reach `+0x70`, the cuboid list `+0x74` and polygon

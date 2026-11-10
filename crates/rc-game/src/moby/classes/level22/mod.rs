@@ -5,7 +5,6 @@
 pub mod asteroid;
 pub mod boss;
 pub mod debris;
-pub mod giant;
 pub mod director;
 pub mod drone;
 pub mod pickups;
@@ -70,12 +69,9 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         asteroid::CLUSTER => Some(asteroid::update),
         asteroid::WATCHER => Some(asteroid::update_12db),
         props::HIDDEN => Some(props::update_0a6c),
-        giant::BODY => Some(giant::update_027d),
         director::CLASS => Some(director::update_133a),
         boss::CLASS => Some(boss::update_0e0b),
-        boss::SHADOW => Some(boss::update_0d55),
         drone::CLASS => Some(drone::update),
-        drone::SHOT => Some(drone::update_0f5d),
         pickups::HEALTH | pickups::GUN | pickups::SPECIAL => Some(pickups::update),
         shot::CLASS => Some(shot::update),
         special::CLASS => Some(special::update),

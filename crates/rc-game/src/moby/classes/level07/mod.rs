@@ -1,7 +1,7 @@
 //! Level 0x07's own classes (Siberius; L07 addresses, the engine functions they call named by their L07 addresses
 //! with the port's). Each class's update is registered in [`update_for`]; crate::moby::classes::update_for asks it
-//! after its own. Level 4's light 0x0cfd (crate::moby::classes::level04::misc::update_0cfd) is this level's
-//! `0x3e3698`.
+//! after its own. The light 0x0cfd (crate::moby::classes::hue_light) is this level's `0x3e3698`; the gunner's
+//! fireball 0x0b7f: crate::moby::classes::fireball.
 
 pub mod bomb;
 pub mod boss;
@@ -29,7 +29,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         can::CLASS => Some(can::update_12a1),
         prowler::CLASS => Some(prowler::update_0d29),
         gunner::CLASS => Some(gunner::update_0d2a),
-        gunner::SHOT => Some(gunner::update_0b7f),
         swarm::NEST => Some(swarm::update_0d1c),
         swarm::FLYER => Some(swarm::update_0d1d),
         turret::CLASS => Some(turret::update_0e4c),

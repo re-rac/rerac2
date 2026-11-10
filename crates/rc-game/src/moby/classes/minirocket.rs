@@ -202,20 +202,11 @@ fn blast_damage(r: &ItemRow) -> f32 {
     }
 }
 
-/// `0x2eef88(out, a, b)` = b × a.
-fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
 
 /// `0x2eeb40(+0x00)`: the cooldown down a frame (1/60 s).
 fn cooldown(w: &mut MobyWorld, id: usize) {
     let c = w.mobys[id].pv_f(hv::COOL);
     w.mobys[id].set_pv_f(hv::COOL, if 1.0 / 60.0 < c { c - 1.0 / 60.0 } else { 0.0 });
-}
-
-/// The muzzle light let go (`0x2fdc48`).
-fn free_light(w: &mut MobyWorld, id: usize) {
-    let s = w.mobys[id].pv_s(hv::LIGHT);
-    if 0 <= s { w.point_lights.free(s as usize); }
-    w.mobys[id].set_pv_s(hv::LIGHT, -1);
 }
 
 /// `0x3a5d00` (module docs).
@@ -388,11 +379,11 @@ fn light(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         }
         w.mobys[id].count_s(hv::TICKS);
     } else if w.mobys[id].pv_s(hv::LIGHT) != -1 {
-        free_light(w, id);
+        crate::point_lights::free_pv_s(w, id, hv::LIGHT);
         w.mobys[id].set_pv_s(hv::TICKS, 0);
     }
     if seq(ctx, w).1 == 2 {
-        free_light(w, id);
+        crate::point_lights::free_pv_s(w, id, hv::LIGHT);
         w.mobys[id].set_pv_s(hv::TICKS, 0);
     }
 }
@@ -504,8 +495,8 @@ pub(super) fn spawn_with(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, muzzle: 
             None if ctx.hero.items.fp.on => super::pulse_rifle::view_aim(ctx, muzzle, 1.0, 75.0, f32::from_bits(0x3f06_0a93)),
             None => ctx.hero.rows[0],
         };
-        let r1 = unit(cross_ba(r0, up));
-        [r0, r1, cross_ba(r1, r0)]
+        let r1 = unit(cross(up, r0));
+        [r0, r1, cross(r0, r1)]
     };
     let g = &mut ctx.game.rng;
     let r1c = g.randf(range.0, range.1);
@@ -565,8 +556,8 @@ fn exhaust_point(m: &crate::moby::Moby) -> V3 { add(m.pos, scale(m.rows[0], EXHA
 
 /// The rocket's rows from a way: row 1 the up × it, row 2 it × row 1.
 fn rows_from(r0: V3, up: V3) -> [V3; 3] {
-    let r1 = unit(cross_ba(r0, up));
-    [r0, r1, cross_ba(r1, r0)]
+    let r1 = unit(cross(up, r0));
+    [r0, r1, cross(r0, r1)]
 }
 
 /// Gone: its tracker given back (`0x37f5f8`), deleted (`0x311688`).
@@ -603,8 +594,8 @@ pub fn update_rocket(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let lr = len(rel);
         if lr != 0.0 && lm != 0.0 {
             let mut a = std::f32::consts::FRAC_PI_2 - (dot(rel, moved) / (lr * lm)).clamp(-1.0, 1.0).asin();
-            let axis = cross_ba(moved, rel);
-            if dot(rel, cross_ba(moved, axis)) < 0.0 { a = -a; }
+            let axis = cross(rel, moved);
+            if dot(rel, cross(axis, moved)) < 0.0 { a = -a; }
             let mut s = lm / speed * a.sin();
             if 100.0 < s.abs() { s = 0.0; }
             while 1.0 < s { s -= 1.0; }

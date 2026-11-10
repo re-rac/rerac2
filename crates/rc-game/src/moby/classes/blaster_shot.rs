@@ -1,5 +1,8 @@
-//! Level 12's blaster shot 0x03a6 (`0x3a7ae0`; fired by `0x3a7fb8`, the trooper's guns,
-//! crate::moby::classes::level12::trooper).
+//! The blaster shot **0x03a6** (L12 `0x3a7ae0`; L09 `0x3a1538`, L20 `0x3bfb70`, L22 `0x3acf58`, L23 `0x3b1550`: the
+//! decomp's `func_L09_003A01D8`), fired by [`fire`] (L12 `0x3a7fb8`, L09 `0x3a1a10`, L20 `0x3c0048`;
+//! `func_L09_003A06B0`): the troopers' guns (crate::moby::classes::trooper, crate::moby::classes::level12::trooper)
+//! and L20's fighters (crate::moby::classes::level20::fighter; L20's `0x443200` makes it too). Levels 22 and 23 have
+//! the update but no maker of it. L12 addresses below.
 //!
 //! The engine functions: `0x33ea28` = L00 `0x339848` (crate::particles::spark), `0x325618` = L00 `0x321c00` (a vector
 //! turned about an axis), `0x2e1e20` / `0x2e2e80` the line and sphere queries (crate::collision), `0x2e4a58` = L00

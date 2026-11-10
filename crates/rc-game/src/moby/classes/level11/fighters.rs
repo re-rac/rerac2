@@ -1079,7 +1079,7 @@ const DF4_AIM: f32 = 5.0;
 /// it within 90° the flame (sequence 12, crate::moby::classes::fighters' jet), stopped past 10; between 12 and 40
 /// now and then (60 ticks apart, the line to its target clear or ending on no fighter) the rocket (9: turned to it
 /// within 5°, sequence 17; past frame 17 a fireball 0x0b7f from joint 4 a third of the way to above its target a
-/// tick, crate::moby::classes::level07::gunner::shot; before it smoke), then the taunt (10, if it hurt Ratchet or one
+/// tick, crate::moby::classes::fireball::shot; before it smoke), then the taunt (10, if it hurt Ratchet or one
 /// in six) or the fight; else it walks to 2.8 of it round raised plates. Knocked (sub 4), dead (or one in 30 in its
 /// death sequence 15): in the ring now and then the spin out, else its bolts and back to the pool. It hits what it
 /// touches for 1 (1.3), and draws three glows ([`draw_df4`]).
@@ -1225,7 +1225,7 @@ pub fn update_df4(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                     let goal = add(up, t);
                     let vel = scale(sub(goal, at), 1.0 / 3.0);
                     let dmg = w.mobys[id].pv_b(0x35) as f32;
-                    super::super::level07::gunner::shot(w, id, ctx, dmg, vel, at);
+                    super::super::fireball::shot(w, id, ctx, dmg, vel, at);
                 } else if ft < 17.0 && seq(w, id, ctx) == 17 {
                     smoke(w, id, ctx);
                 }

@@ -891,8 +891,8 @@ pub fn update_09f8(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 let a = w.mobys[id].pv_v(AIM);
                 hover(w, id, yaw_t, 0.0, a);
             } else {
-                let (r, p) = (w.mobys[id].rot[2], w.mobys[id].pos);
-                ai::move_step(w, id, ctx, r, p);
+                let r = w.mobys[id].rot[2];
+                ai::turn_in_place(w, id, ctx, r);
             }
             if wrapped(w, id, ctx) {
                 let (s, b) = (w.mobys[id].pv_s(0x324), w.mobys[id].pv_s(0x326));
@@ -967,7 +967,7 @@ pub fn update_09f8(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 hover(w, id, yaw_t, 0.0, [p[0], p[1], FLOOR]);
             } else {
                 if seq_a(w, id, ctx) != 0x12 && seq(w, id, ctx) != 0x12 { ctx.host.set_anim(&w.mobys[id], 0x12, 0, 10); }
-                ai::move_step(w, id, ctx, yaw_t, p);
+                ai::turn_in_place(w, id, ctx, yaw_t);
             }
             if seq_a(w, id, ctx) == 0x12 && (w.mobys[id].pv_s(0x1d0) != 0 || w.mobys[id].pos[2] < FLOOR + 0.2) {
                 if w.mobys[id].pv_s(0x32c) == 0 {
@@ -1285,7 +1285,7 @@ fn move_a44(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
                 w.mobys[id].pos = approach_v(pos, PEN_A44, f32::from_bits(0x3e2a_aaab));
             } else {
                 let r = w.mobys[id].rot[2];
-                ai::move_step(w, id, ctx, r, pos);
+                ai::turn_in_place(w, id, ctx, r);
             }
         }
         1 => {
@@ -1298,7 +1298,7 @@ fn move_a44(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let foot = if 12.0 < ft && ft < 25.0 { Some(4) } else if 42.0 < ft && ft < 55.0 { Some(8) } else { None };
             if let Some(j) = foot {
                 let a = ctx.host.joint(&w.mobys[id], j);
-                ai::move_step(w, id, ctx, yaw_g, pos);
+                ai::turn_in_place(w, id, ctx, yaw_g);
                 let m = &mut w.mobys[id];
                 m.rows = crate::moby::attach::rows_of(m.rot);
                 if let (Some(a), Some(b)) = (a, ctx.host.joint(&w.mobys[id], j)) { w.mobys[id].pos = add(w.mobys[id].pos, sub(a, b)); }

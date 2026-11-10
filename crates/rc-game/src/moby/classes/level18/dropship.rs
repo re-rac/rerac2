@@ -11,7 +11,7 @@
 //!
 //! **Each tick** ([`update_0ede`]): from state 2 its loop sound 0 kept playing, before let go. The hit (flags
 //! 0x10000, `0x338e08` / `0x338e68` = L00 `0x31dce8` / `0x31dd48`, crate::moby::ai::damage_of, the record let go):
-//! from 2 off its health, its break pieces by it (crate::moby::classes::level18::stalker::part_break); dead (or its
+//! from 2 off its health, its break pieces by it (crate::moby::shards::part_break); dead (or its
 //! status 2) a blast at it (size 1), its stalkers gone ([`stalker::die`]), its sound let go, its pieces thrown
 //! (crate::moby::shards::break_into, all of 63, 3..6 / 3..6, its velocity plus a random 0.1..0.25) and it is gone.
 //! Its ticks after the state.
@@ -200,7 +200,7 @@ pub fn update_0ede(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if 2 <= w.mobys[id].state {
         let hp = w.mobys[id].pv_f(H) - dmg;
         w.mobys[id].set_pv_f(H, hp);
-        stalker::part_break(w, ctx, id, PIECES, id, H);
+        crate::moby::shards::part_break(w, ctx, id, PIECES, id, H);
         if w.mobys[id].pv_f(H) <= 0.0 || w.mobys[id].pv_b(STATUS) == 2 {
             let at = w.mobys[id].pos;
             blast::burst(w, ctx, at, &Blast { size: 1.0, bursts: [0x19, 0x14, 0x14], puffs: 0x14, streaks: 0x2d, light: true, shake: true });

@@ -687,7 +687,7 @@ fn waits(w: &mut MobyWorld, id: usize) {
 }
 
 /// `0x3fff78`: firing with the light within 3 of its target's moby: its patience; the waits out, a bolt (crate::moby::
-/// classes::level09::bolt::fire: its damage byte, range 30, size 0.5) from its gun (joint 4 / 5 by turns) at the
+/// classes::gunship_bolt::fire: its damage byte, range 30, size 0.5) from its gun (joint 4 / 5 by turns) at the
 /// light (held by its fence near its target's point: at that) at 20 a second, its sound 1 every 7th shot, 10 ticks to
 /// the next, after 6 the burst's 90. Not firing, between shots, the burst's count runs down a shot every 10 ticks.
 fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
@@ -703,7 +703,7 @@ fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         let to = if m.pv_b(HELD) != 0 && dist(m.pv_v(T_POINT), m.pv_v(LIGHT)) < 3.0 { m.pv_v(T_POINT) } else { m.pv_v(LIGHT) };
         let v = set_len(sub(to, from), SHOT_SPEED * 0.016_666_668);
         let damage = m.pv_b(DAMAGE) as f32;
-        super::bolt::fire(w, ctx, from, id, damage, SHOT_RANGE, 1.0, v, 1, 1, 0.5);
+        super::super::gunship_bolt::fire(w, ctx, from, id, damage, SHOT_RANGE, 1.0, v, 1, 1, 0.5);
         if w.mobys[id].pv_b(SHOTS) % SHOT_SOUND_EVERY == 0 { ctx.host.play_sound(&w.mobys[id], SOUND_SHOT, 0); }
         let m = &mut w.mobys[id];
         m.set_pv_b(GUN, m.pv_b(GUN) ^ 1);

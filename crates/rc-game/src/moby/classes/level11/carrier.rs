@@ -8,8 +8,8 @@
 //! event, `+0x0c` a moby (−1 none) that holds it back while in its state 3, `+0x10` its rider, `+0x14` the bob's phase,
 //! `+0x18` the bob's height.
 //!
-//! * **0**: the rider made (`0x33d4d8(rider, 0)`: update and draw distance 0xff, drawn; mode 6 more, sequence 0x10);
-//!   1.
+//! * **0**: the rider made (`0x33d4d8(rider, 0)` = L00 `0x32a748`, crate::moby::MobyWorld::adopt: update and draw
+//!   distance 0xff, drawn; mode 6 more, sequence 0x10); 1.
 //! * **1**: in an event (`$gp+0x185c`, the table `0x2b6e40`'s word `+4`) with the flag 0x10 and without `+0x08`,
 //!   it and its rider hidden (mode | 0x41), no collision, and nothing else. Else shown, solid; with its moby `+0x0c`
 //!   not in state 3 (or none) and Ratchet in its cuboid `+0x00`: 2.
@@ -50,25 +50,6 @@ const PVARS: usize = 0x20;
 /// `0x2b6e40`: the events' flags (the records' word `+4`, 0x40 apart).
 const EVENT_FLAGS: [u32; 5] = [0x1000_0019, 1, 5, 7, 7];
 
-/// `0x33d4d8(m, src)`: update and draw distance 0xff, drawn; at `src` (its place, angles and light; rebuilt); mode
-/// & 0xfff8.
-fn place_at(w: &mut MobyWorld, id: usize, src: Option<usize>, ctx: &Ctx) {
-    let s = src.map(|s| (w.mobys[s].pos, w.mobys[s].rot, w.mobys[s].light, w.mobys[s].ambient));
-    let m = &mut w.mobys[id];
-    m.update_dist = 0xff;
-    m.draw_dist = 0xff;
-    m.drawn = 1;
-    if let Some((p, r, l, a)) = s {
-        m.parent = src;
-        m.pos = p;
-        m.rot = r;
-        m.light = l;
-        m.ambient = a;
-        w.rebuild(id, &*ctx.host);
-    }
-    w.mobys[id].mode &= 0xfff8;
-}
-
 fn rider(w: &MobyWorld, id: usize) -> Option<usize> { crate::moby::ai::link(&w.mobys[id], RIDER).filter(|&r| r < w.mobys.len()) }
 
 /// 0x0e86 (module docs).
@@ -84,7 +65,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             m.set_pv_f(PHASE, 0.0);
             m.set_pv_f(BOB, 0.0);
             if let Some(r) = r {
-                place_at(w, r, None, ctx);
+                w.adopt(r, None, &*ctx.host);
                 let rm = &mut w.mobys[r];
                 rm.mode |= 6;
                 rm.drive = true;
@@ -164,7 +145,7 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 fn grenade(w: &mut MobyWorld, thrower: usize, ctx: &Ctx, at: V3, to: V3, g: f32) {
     if w.class(GRENADE).is_none() { return; }
     let s = w.create(GRENADE);
-    place_at(w, s, Some(thrower), ctx);
+    w.adopt(s, Some(thrower), &*ctx.host);
     let k = w.class(GRENADE).map_or(1.0, |c| c.scale);
     let m = &mut w.mobys[s];
     m.scale = k;

@@ -463,20 +463,16 @@ fn tail(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
 }
 
-/// `0x406500`: the rider made (`0x322bd8` = L00 `0x32a748`: update and draw distance 0xff, drawn, its place, angles
+/// `0x406500`: the rider made (`0x322bd8` = L00 `0x32a748`, crate::moby::MobyWorld::adopt: update and draw distance 0xff, drawn, its place, angles
 /// and light, mode & 0xfff8; then its draw distance and sequence 1), else kept on it, shown and hidden with it.
 fn rider(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let (pos, rot, hidden, dd, light, amb) = { let m = &w.mobys[id]; (m.pos, m.rot, m.mode & 1 != 0, m.draw_dist, m.light, m.ambient) };
+    let (pos, rot, hidden, dd) = { let m = &w.mobys[id]; (m.pos, m.rot, m.mode & 1 != 0, m.draw_dist) };
     match ai::link(&w.mobys[id], RIDER_LINK).filter(|&k| k < w.mobys.len()) {
         None => {
             let k = w.create(RIDER);
             ai::set_link(&mut w.mobys[id], RIDER_LINK, Some(k));
+            w.adopt(k, Some(id), &*ctx.host);
             let r = &mut w.mobys[k];
-            (r.update_dist, r.draw_dist, r.drawn) = (0xff, 0xff, 1);
-            r.parent = Some(id);
-            (r.pos, r.rot) = (pos, rot);
-            (r.light, r.ambient) = (light, amb);
-            r.mode &= 0xfff8;
             r.draw_dist = dd;
             r.drive = true;
             ctx.host.set_anim(&w.mobys[k], 1, 0, 0);

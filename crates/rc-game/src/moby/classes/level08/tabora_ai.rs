@@ -21,7 +21,7 @@
 //!
 //! * **The effects** shared by them: the sand puffs ([`puffs`]) and a death's sparkles ([`sparkles`]).
 //!
-//! Not ported: `0x189f00` (the port takes Ratchet's place 1 up, as crate::moby::classes::level04::launcher does for
+//! Not ported: `0x189f00` (the port takes Ratchet's place 1 up, as crate::moby::classes::launcher does for
 //! its copy of the search, L04 `0x343c18`); the decoy list itself (every moby of those classes is looked at).
 
 use crate::hero::physics::{add, dist2, len, scale, set_len, V3};

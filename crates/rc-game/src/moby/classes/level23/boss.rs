@@ -837,7 +837,7 @@ fn shadow(w: &mut MobyWorld, id: usize) {
     let pos = w.mobys[id].pos;
     match part(w, id, 0x40c) {
         None => {
-            let s = super::super::level22::boss::make_shadow(w, id, pos);
+            let s = super::super::opponent_pointer::make(w, id, pos);
             ai::set_link(&mut w.mobys[id], 0x40c, Some(s));
         }
         Some(s) => w.mobys[s].set_pv_v(0, pos),

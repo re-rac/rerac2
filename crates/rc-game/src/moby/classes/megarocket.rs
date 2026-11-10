@@ -292,11 +292,9 @@ fn burst(w: &MobyWorld, id: usize, ctx: &mut Ctx, n: i32) {
     }
 }
 
-/// The muzzle light let go (`0x2fdc48`).
+/// The muzzle light let go (`0x2fdc48`, crate::point_lights::free_pv_s) and its ticks cleared.
 fn free_light(w: &mut MobyWorld, id: usize) {
-    let s = w.mobys[id].pv_s(hv::LIGHT);
-    if 0 <= s { w.point_lights.free(s as usize); }
-    w.mobys[id].set_pv_s(hv::LIGHT, -1);
+    crate::point_lights::free_pv_s(w, id, hv::LIGHT);
     w.mobys[id].set_pv_s(hv::TICKS, 0);
 }
 

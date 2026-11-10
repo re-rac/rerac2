@@ -113,14 +113,8 @@ fn setup(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     m.set_pv_v(HINGE, hinge);
     if w.class(CLASS).is_none() { return; }
     let c = w.create(CLASS);
-    let (pos, rot, light, ambient, draw) = { let m = &w.mobys[id]; (m.pos, m.rot, m.light, m.ambient, m.draw_dist) };
-    let x = &mut w.mobys[c];
-    x.parent = Some(id);
-    x.pos = pos;
-    x.rot = rot;
-    x.light = light;
-    x.ambient = ambient;
-    w.rebuild(c, &*ctx.host);
+    w.adopt(c, Some(id), &*ctx.host);
+    let draw = w.mobys[id].draw_dist;
     let x = &mut w.mobys[c];
     x.draw_dist = draw;
     x.mode |= crate::moby::mode::NO_UPDATE;

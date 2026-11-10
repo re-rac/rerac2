@@ -2466,7 +2466,7 @@ fn draw_hud(
                 let menu = menu.chain((0..16).map(|f| (rc_game::ship::HUD_ICONS, f)));
                 // The boss bar's pictures (rc_game::hud::boss_bar, icon 0xeaa7 by boss).
                 let menu = menu.chain((0..8).map(|f| (0xeaa7, f)));
-                // The crystals' / moonstones' counter (rc_game::moby::classes::level08::counter, icon 0xeaa2).
+                // The crystals' / moonstones' counter (rc_game::moby::classes::gem_counter, icon 0xeaa2).
                 let menu = menu.chain([(0xeaa2, 1), (0xeaa2, 2)]);
                 // The hoverbike race's weapon icon (rc_game::moby::classes::race::hud::WEAPON_ICON, by the weapon).
                 let menu = menu.chain((0..3).map(|f| (rc_game::moby::classes::race::hud::WEAPON_ICON, f)));

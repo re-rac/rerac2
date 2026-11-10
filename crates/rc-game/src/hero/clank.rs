@@ -9,7 +9,6 @@
 //!
 //! Not ported: the idle's look-around timer `0x18c340` (0: never), the punch's sounds, the lean.
 
-use super::ledge::cross;
 use super::melee::SWINGS;
 use super::physics::*;
 use super::states::Entry;
@@ -193,7 +192,7 @@ impl Hero {
                 self.turn_to(0.02, 0.2, 0.078_539_82, 0);
                 self.vel = [0.0; 3];
                 let down = [0.0, 0.0, -1.0];
-                let side = if self.state == 0x49 { cross(down, w) } else { cross(w, down) };
+                let side = if self.state == 0x49 { cross(w, down) } else { cross(down, w) };
                 let p = add(self.pos, set_len(side, 0.2));
                 if self.ledge_probe(env, self.pos, false).is_some() {
                     if let Some(l) = self.ledge_probe(env, p, false) {

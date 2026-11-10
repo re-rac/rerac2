@@ -9,6 +9,10 @@
 //!
 //! The quad fountain 0x02f8 (`0x3c4f80`, also L19) and its clock 0x0329 (`0x3c83c8`, also L17 / L19):
 //! crate::fx::fountain. The ripple water 0x0b37 (`0x4084c0`) and 0x0b54 (`0x409440`): crate::water::ripple.
+//!
+//! Shared with other levels: the launcher 0x0a58 and its carrier 0x0e44 (crate::moby::classes::launcher), the
+//! breakable 0x1293 (crate::moby::classes::breakables), the beacons 0x0a99 / 0x0ab8 (crate::moby::classes::beacon),
+//! the light 0x0cfd (crate::moby::classes::hue_light).
 
 use crate::hero::physics::V3;
 use crate::moby::MobyWorld;
@@ -16,7 +20,6 @@ use crate::moby::MobyWorld;
 pub mod ambush;
 pub mod beast;
 pub mod hints;
-pub mod launcher;
 pub mod misc;
 pub mod platforms;
 pub mod rider;
@@ -30,13 +33,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         rider::CLASS => Some(rider::update),
         beast::CLASS => Some(beast::update),
         skitter::CLASS => Some(skitter::update),
-        // Level 6's 0x0a50 is the same unit (L06 `0x40a4c8`).
-        launcher::CLASS | 0x0a50 => Some(launcher::update_0a58),
-        launcher::CARRIER => Some(launcher::update_0e44),
-        0x1293 => Some(misc::update_1293),
-        0x0a99 => Some(misc::update_0a99),
-        0x0ab8 => Some(misc::update_0ab8),
-        0x0cfd => Some(misc::update_0cfd),
         0x0e8b | 0x0e8f | 0x0e90 => Some(misc::update_0e8b),
         0x0e8d => Some(misc::update_0e8d),
         0x1157 => Some(misc::update_1157),
@@ -68,7 +64,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
 pub fn draw(w: &mut MobyWorld, host: &dyn crate::moby::MobyHost, game: &mut crate::game::GameState, hero_state: i32, view: &crate::particles::BSphereView, cam: V3, id: usize, first: bool, out: &mut Vec<crate::fx::FxQuad>, frame: &mut Vec<crate::fx::FrameQuad>) -> bool {
     match w.mobys[id].o_class {
         beast::CLASS => { beast::draw(w, id, cam, out); true }
-        launcher::CARRIER => { launcher::draw(w, id, game, cam, out); true }
         _ => false,
     }
 }

@@ -2,7 +2,7 @@
 //! `func_L22_0039CDC0` / `func_L22_0039D198`): Giant Clank's gun (crate::hero::giant) and the opponent fire them.
 //!
 //! **Made** ([`fire`], `0x39e1f0(owner, at, target, mode, player)`): update and draw distance 0xff, drawn, the owner
-//! its parent with its angles and light (`0x32efc0` = L00 `0x32a748`), its scale × 3 × 2 (`$gp+0x270`), mode |
+//! its parent with its angles and light (`0x32efc0` = L00 `0x32a748`, crate::moby::MobyWorld::adopt), its scale × 3 × 2 (`$gp+0x270`), mode |
 //! 0x100 with the owner's rows; the turn speed `+0x1c` ⅓, the timer `+0x14` 150. Its target: the one given, else the
 //! opponent (`$gp+0x2d4`), else none (then mode and player 0); the owner Giant Clank makes it a player's. Without a
 //! mode it tests its target: the way to the target's point 5 up its up row (`+0x30`, unit) and the way on the
@@ -40,13 +40,12 @@ fn target_of(w: &MobyWorld, m: &crate::moby::Moby) -> Option<usize> { usize::try
 /// `0x39e1f0` (module docs).
 pub fn fire(w: &mut MobyWorld, ctx: &mut Ctx, owner: usize, at: V3, target: Option<usize>, mode: bool, player: bool) -> usize {
     let id = w.create(CLASS);
-    let (opos, orot, olight, orows) = { let o = &w.mobys[owner]; (o.pos, o.rot, o.light, o.rows) };
+    let (opos, orows) = { let o = &w.mobys[owner]; (o.pos, o.rows) };
     let target = target.or(w.level22.boss);
     let hero = ctx.hero_moby == Some(owner);
+    w.mobys[id].pvars.resize(crate::moby::PVAR_BYTES, 0);
+    w.adopt(id, Some(owner), &*ctx.host);
     let m = &mut w.mobys[id];
-    m.pvars.resize(crate::moby::PVAR_BYTES, 0);
-    (m.update_dist, m.draw_dist, m.drawn, m.parent) = (0xff, 0xff, 1, Some(owner));
-    (m.pos, m.rot, m.light) = (opos, orot, olight);
     m.scale *= 3.0;
     m.mode |= 0x100;
     m.set_pv_f(0x1c, f32::from_bits(0x3eaa_aaab));

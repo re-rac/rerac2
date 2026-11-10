@@ -1,6 +1,10 @@
 //! Level 0x0e's own classes (the prison on Aranos; L14 addresses, the engine functions they call named by their L14
 //! addresses with the port's). Each class's update is registered in [`update_for`]; crate::moby::classes::update_for
 //! asks it after its own.
+//!
+//! Shared with other levels: the sinking pit 0x135f and its corners 0x1130 (crate::moby::classes::sinking_pit, also
+//! L19's), the kill cuboids 0x040f (crate::moby::classes::kill_zone), the target 0x0c87
+//! (crate::moby::classes::hit_targets), the fireball 0x0b7f (crate::moby::classes::fireball).
 
 pub mod arcs;
 pub mod blocker;
@@ -14,7 +18,6 @@ pub mod hints;
 pub mod lift;
 pub mod lift_guard;
 pub mod movers;
-pub mod pit;
 pub mod plate;
 pub mod props;
 pub mod rappeller;
@@ -35,8 +38,6 @@ pub fn draw(w: &mut crate::moby::MobyWorld, host: &dyn crate::moby::MobyHost, ga
         field::CLASS => field::draw(w, id, cam, host.camera_rows(), frame),
         sheet::CLASS => sheet::draw(w, id, &mut game.rng, out),
         screen::CLASS => screen::draw(w, id, &mut game.rng, out),
-        // Also level 19's (L19 `0x383478`, the same code).
-        pit::CLASS => pit::draw(w, id, out),
         energy::CLASS => energy::draw(w, id, &mut game.rng, cam, out),
         blocker::CLASS | blocker::CLASS_B => blocker::draw(w, id, out),
         arcs::CLASS => {
@@ -57,10 +58,6 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         steam::SEQUENCER => Some(steam::update_0b19),
         fence::CLASS => Some(fence::update_0f80),
         field::CLASS => Some(field::update_0afe),
-        // Also level 19's (L19 `0x383478`, the same code).
-        pit::CLASS => Some(pit::update_135f),
-        // Its corners; also level 19's (L19 `0x41d710`, the same code).
-        pit::CORNER => Some(pit::update_1130),
         energy::CLASS => Some(energy::update_1164),
         sheet::CLASS => Some(sheet::update_0bff),
         screen::CLASS => Some(screen::update_12b9),

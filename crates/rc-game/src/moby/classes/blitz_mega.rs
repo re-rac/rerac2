@@ -42,10 +42,10 @@
 /// The upgraded row's id (the weapon mods' item, `0x3f9f70(m, 0x44, hand)`).
 pub const MEGA_ITEM: i32 = 0x44;
 
-use super::blitz::{cooldown, cross_ba, qturn, quad, ST};
+use super::blitz::{cooldown, qturn, quad, ST};
 use crate::collision::QueryFlags;
 use crate::hero::items::{row, BLITZ};
-use crate::hero::physics::{add, add_rot, len, scale, set_len, sub, unit, V3};
+use crate::hero::physics::{add, add_rot, cross, len, scale, set_len, sub, unit, V3};
 use crate::moby::hits::HitTemplate;
 use crate::moby::{countdown, Ctx, MobyWorld};
 use crate::rumble;
@@ -345,7 +345,7 @@ pub fn bolt(out: &mut Vec<crate::fx::FxQuad>, w1: f32, w2: f32, k: f32, points: 
     if n < 2 { return; }
     let c1 = INNER | a1 << 24;
     let side = |i: usize| {
-        let s = cross_ba(sub(points[i + 1], points[i]), sub(points[i], cam));
+        let s = cross(sub(points[i], cam), sub(points[i + 1], points[i]));
         let l = len(s);
         scale(s, if l != 0.0 { w1 / l } else { w1 })
     };
@@ -374,7 +374,7 @@ pub fn bolt(out: &mut Vec<crate::fx::FxQuad>, w1: f32, w2: f32, k: f32, points: 
         let t = scale(d, k);
         p = sub(p, t);
         q = add(q, t);
-        let s = cross_ba(sub(cam, p), d);
+        let s = cross(d, sub(cam, p));
         let l = len(s);
         let s = scale(s, if l != 0.0 { w2 / l } else { w2 });
         let mut rgba = [c2; 4];
@@ -416,8 +416,8 @@ pub fn draw(w: &mut MobyWorld, id: usize, g: &mut crate::rng::Rng, cam: V3, out:
         let f = if glare < GLARE { glare as f32 * m.pv_f(0x2c) } else { 1.0 };
         let c = ((f * 255.0) as i32 as u32) << 24 | 0x80_8080;
         let at = add(cam, scale(view, -0.1));
-        let a = set_len(cross_ba(view, up), 0.03);
-        let b = set_len(cross_ba(a, view), 0.03);
+        let a = set_len(cross(up, view), 0.03);
+        let b = set_len(cross(view, a), 0.03);
         let p = add(at, b);
         let q = sub(at, b);
         quad(out, 0xb, true, [add(p, a), sub(p, a), add(q, a), sub(q, a)], [[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]], [c; 4]);

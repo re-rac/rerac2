@@ -44,7 +44,7 @@ const COUNTED: [i16; 5] = [0x0d0f, 0x0d57, 0x0d30, 0x0cbc, 0x0d90];
 ///     shown fewer than 3 times (`+0x7d`), once a visit: the text 0x9e3 (slot 0x3a, if never shown) and `+0x7d` up.
 ///
 /// Not ported: the flag `0x1a9040` (1 as the level loads, cleared by a kill that was not Ratchet's — the enemies'
-/// part is not ported, crate::moby::classes::level09::trooper), so the census always runs; the stat `0x18c750`
+/// part is not ported, crate::moby::classes::trooper), so the census always runs; the stat `0x18c750`
 /// (G-HERO-005, read as never set); the skill point's reward flag `0x1a903c` (as crate::skill_points).
 pub fn update_0c2b(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].state == 0 {

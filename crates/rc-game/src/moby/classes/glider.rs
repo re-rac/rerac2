@@ -1,5 +1,5 @@
-//! Ratchet's glider **0x0905** ([`update_0905`], L08 `0x3cf3e8`, L09 `0x3bfb08`, L19 `0x3bded8`: the same code and
-//! data; the decomp's `func_US2_L08_003CF3E8`, its functional reconstruction `func_L08_003CDF98`). It waits on its
+//! Ratchet's glider **0x0905** ([`update_0905`], L08 `0x3cf3e8`, L09 `0x3bfb08`, L19 `0x3bded8`, one placed on each:
+//! the same code and data; the decomp's `func_US2_L08_003CF3E8`, its functional reconstruction `func_L08_003CDF98`). It waits on its
 //! launch pad 0x0988 (crate::moby::classes::level08::props), takes Ratchet off it in his state 0x31
 //! (crate::hero::vehicle; he is seen, in his sequences 0x80..0x88) and glides him down to a landing cuboid. L08
 //! addresses below; its tuning is `$gp+0xf90..+0x1100` (`0x1aff80..`, the same values on all three levels).

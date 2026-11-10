@@ -936,69 +936,11 @@ pub(super) fn throw_piece(w: &mut MobyWorld, src: usize, ctx: &mut Ctx, class: i
     Some(k)
 }
 
-/// 0x09d8 (`0x3d3f38` → `0x3d3f80` unless carried, `+0x3c`): a thrown shield tumbles — its rows turned by its spin
-/// about its centre, moving its velocity, falling `+0x38`; on touching the world (a sphere of `+0x2c` at its centre)
-/// it bounces off at half the way in (its speed kept) and spins about the new way. Its life over (1), it fades over
-/// 10 ticks (3) and goes.
+/// 0x09d8 (`0x3d3f38`): a thrown shield, unless still carried (`+0x3c`), runs the thrown pieces' update `0x3d3f80`
+/// (crate::moby::classes::pieces::update_0d66: it tumbles and bounces, fades at the end of its life and goes).
 pub fn update_shield(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].pv_i(0x3c) != 0 { return; }
-    match w.mobys[id].state {
-        1 | 3 => {
-            let mut t = w.mobys[id].pv_i(0x30);
-            let over = crate::moby::countdown(&mut t);
-            w.mobys[id].set_pv_i(0x30, t);
-            if w.mobys[id].state == 1 && over {
-                let m = &mut w.mobys[id];
-                m.state = 3;
-                m.set_pv_i(0x30, 10);
-                m.mode |= 0x2000;
-                return;
-            }
-            if w.mobys[id].state == 3 {
-                if over {
-                    w.delete(id);
-                    return;
-                }
-                w.mobys[id].alpha = (t as f32 * 12.8) as u8;
-            }
-        }
-        _ => {
-            w.delete(id);
-            return;
-        }
-    }
-    let m = &mut w.mobys[id];
-    let spin = m.pv_v(0x10);
-    let centre = m.pv_v(0x20);
-    let to = |c: V3, r: &[V3; 3]| [0, 1, 2].map(|k| c[0] * r[0][k] + c[1] * r[1][k] + c[2] * r[2][k]);
-    let before = to(centre, &m.rows);
-    m.rows = crate::moby::attach::turn(&crate::moby::attach::rows_of(spin), &m.rows);
-    m.rot = crate::moby::attach::angles_of(&m.rows);
-    let after = to(centre, &m.rows);
-    m.pos = sub(m.pos, sub(after, before));
-    let mut v = m.pv_v(0);
-    m.pos = add(m.pos, v);
-    v[2] -= m.pv_f(0x38);
-    m.set_pv_v(0, v);
-    let c = add(to(centre, &m.rows), m.pos);
-    let r = m.pv_f(0x2c);
-    let hit = ctx.coll.and_then(|col| crate::collision::coll_sphere_m(col, ctx.scene, c, r, crate::collision::QueryFlags(0), Some(id)));
-    let Some(h) = hit else { return };
-    let n = set_len(h.normal, 1.0);
-    let speed = crate::hero::physics::len(v);
-    let d = crate::hero::physics::dot(v, n);
-    if d < 0.0 {
-        // Off the face: the normal part turned back, half of the way in kept against it, the speed kept.
-        let r = sub(v, scale(n, 2.0 * d));
-        let v = set_len(add(r, scale(n, d * 0.5)), speed);
-        let m = &mut w.mobys[id];
-        m.set_pv_v(0, v);
-        let axis = set_len(crate::hero::physics::cross(n, v), 1.0);
-        let a = crate::hero::physics::len(spin);
-        let q = crate::quat::axis_angle(a, axis);
-        let rows = crate::quat::rows(q);
-        m.set_pv_v(0x10, crate::moby::attach::angles_of(&rows));
-    }
+    super::pieces::update_0d66(w, id, ctx);
 }
 
 /// `0x3d37a0(m, delay)`: out of the spawner, standing (3, sub 1) for `delay` ticks, with a new shield.

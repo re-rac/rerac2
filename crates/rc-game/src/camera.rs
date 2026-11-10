@@ -40,7 +40,8 @@
 //! crate::fog's. The shakes are [`Shakes`] (set by the Gravity Bomb's blast; the blast `0x320538` and the
 //! others that ask for one are not ported).
 
-use crate::hero::physics::{add, add_rot, dot, len, scale, sub, sub_rot, wrap_turn, V3};
+use crate::hero::physics::{add, add_rot, cross, dot, len, scale, sub, sub_rot, wrap_turn, V3};
+use crate::moby::countdown_s;
 use crate::hero::Hero;
 use rc_formats::collision::Collision;
 use crate::collision::mobys::MobyScene;
@@ -113,8 +114,6 @@ fn norm(v: V3, l: f32) -> V3 {
     let n = len(v);
     if n == 0.0 { [0.0; 3] } else { scale(v, l / n) }
 }
-/// `0x2eef88(out, a, b)` = **b × a** (R&C1's `FastVecCross` order).
-fn cross(a: V3, b: V3) -> V3 { [b[1] * a[2] - a[1] * b[2], b[2] * a[0] - a[2] * b[0], b[0] * a[1] - a[0] * b[1]] }
 fn asin(x: f32) -> f32 { x.clamp(-1.0, 1.0).asin() }
 
 /// `0x2d7e98(cur, tgt, k, d, max, &v)`: `v += k·(tgt − cur) − d·v`, clamped to ±max (max ≠ 0) and ±|tgt − cur|;
@@ -155,13 +154,6 @@ pub(crate) fn cos_interp(a: f32, b: f32, t: f32) -> f32 {
     if t == 0.0 { return a; }
     if t == 1.0 { return b; }
     a + (b - a) * (1.0 - (t * std::f32::consts::PI).cos()) * 0.5
-}
-
-/// `0x2eeae0` (s16): 1 when already 0, 2 when it just reached 0, else 0.
-fn dec_timer(t: &mut i16) -> i32 {
-    if *t == 0 { return 1; }
-    *t = (*t).max(1) - 1;
-    if *t > 0 { 0 } else { 2 }
 }
 
 /// `0x427990` / `0x427a70`: the point the camera looks at, the feet + Ratchet's up axis · 1.6 (Clank 0.75, Giant Clank
@@ -258,7 +250,7 @@ pub struct CamTweaks {
     pub follow_dist: Option<(f32, f32)>,
     pub follow_pivot: Option<(f32, f32)>,
     /// A moby's other asks this tick of the follow camera's setters ([`FollowAsks`]; the glider 0x0905's,
-    /// crate::moby::classes::level08::glider).
+    /// crate::moby::classes::glider).
     pub follow: FollowAsks,
     /// `$gp+0x3054` / `+0x3058` (L08; L00's in its code): the smoothed look's spring and damping (`0x423050`, 0.01 and
     /// 0.2), which the glider changes while it flies. Kept across ticks.
@@ -731,8 +723,8 @@ impl FollowCamera {
         self.pos = pos;
         let look = add(scale(self.up2, self.look_h), self.target);
         let fwd = norm(sub(look, pos), 1.0);
-        let left = norm(cross(fwd, self.up2), 1.0);
-        let up = cross(left, fwd);
+        let left = norm(cross(self.up2, fwd), 1.0);
+        let up = cross(fwd, left);
         self.rows = [fwd, left, up];
         self.saved_fwd = fwd;
     }
@@ -1043,7 +1035,7 @@ impl FollowCamera {
         let c = (dot(a, b) / (la * lb)).clamp(-1.0, 1.0);
         // `0x2ef478` is asin (π/2 − √(1 − x)·P(x)).
         let ang = c.asin();
-        let side = if 0.0 <= dot(cross(a, up), b) { 1.0 } else { -1.0 };
+        let side = if 0.0 <= dot(cross(up, a), b) { 1.0 } else { -1.0 };
         let f = std::f32::consts::FRAC_PI_2 - ang;
         let gap = crate::hero::physics::sub_rot(std::f32::consts::PI, f);
         if limit == 0.0 || gap.abs() <= limit {
@@ -1137,7 +1129,7 @@ impl FollowCamera {
             return;
         }
         if m == 9 && h.state != 0x14 { return set(self, 9, 10, 30); }
-        if m == 10 && dec_timer(&mut self.raise_t) != 0 { set(self, 10, 0, 20); }
+        if m == 10 && countdown_s(&mut self.raise_t) { set(self, 10, 0, 20); }
     }
 
     /// `0x421c88(look height)`: the signed angle between the view and the hero's look point (the left component
@@ -1204,7 +1196,7 @@ impl FollowCamera {
                 }
                 let v = self.vtarget;
                 self.target = hz(hero);
-                if dec_timer(&mut self.raise_t) != 0 {
+                if countdown_s(&mut self.raise_t) {
                     if self.mode == 6 {
                         self.mode = 7;
                         self.raise_t = 35;
@@ -1254,7 +1246,7 @@ impl FollowCamera {
         self.smooth = add(sh, sv);
         let lo = scale(up_s, self.look_h);
         if self.look_from_s == 0 {
-            dec_timer(&mut self.look_blend);
+            countdown_s(&mut self.look_blend);
             if self.look_blend < 0 { self.look_blend = 0; }
         } else {
             self.look_blend = (self.look_blend + 1).min(self.look_blend_len);
@@ -1262,7 +1254,7 @@ impl FollowCamera {
         let tt = self.look_blend as f32 / self.look_blend_len.max(1) as f32;
         self.look = add(lo, lerp(self.target, self.smooth, tt));
         // `0x423050`: the smoothed look, faster in modes 1 / 3 / 5 / 6 / 7 at the mode's start.
-        if dec_timer(&mut self.mode_t) != 0 { self.mode_prev = self.mode; }
+        if countdown_s(&mut self.mode_t) { self.mode_prev = self.mode; }
         let tm = self.mode_t as f32 * self.mode_inv;
         let tgt = add(lo, if self.mode == 1 { h.pos } else { self.target });
         let (k, dd) = if matches!(self.mode, 1 | 3 | 5 | 6 | 7) { (0.06 + (spring[0] - 0.06) * tm, 0.4 + (spring[1] - 0.4) * tm) } else { (spring[0], spring[1]) };
@@ -1339,7 +1331,7 @@ impl FollowCamera {
         self.off = rot(self.off, if yi == 0.0 { self.plat_yaw } else { self.yaw_step }, up_s);
         let e = dot(self.off, up_s);
         let l = len(self.off);
-        let ax = norm(cross(up_s, self.off), 1.0);
+        let ax = norm(cross(self.off, up_s), 1.0);
         let el = e.atan2(l);
         if el.abs() < tgt.abs() && rate == 0.01 { self.pitch_n = el / DEG40; }
         self.pitch_step = if el < tgt {
@@ -1391,11 +1383,11 @@ impl FollowCamera {
             rx < 0.3 && ry < 0.3
         };
         if rec {
-            if dec_timer(&mut self.rec_t) != 0 { self.fast_rec = 0; }
-            if self.fast_rec != 0 && dec_timer(&mut self.rec_t) != 0 { self.fast_rec = 0; }
+            if countdown_s(&mut self.rec_t) { self.fast_rec = 0; }
+            if self.fast_rec != 0 && countdown_s(&mut self.rec_t) { self.fast_rec = 0; }
             self.red = cos_interp(0.0, self.red, self.rec_t as f32 / 2000.0);
         } else if 2000 < self.rec_t {
-            dec_timer(&mut self.rec_t);
+            countdown_s(&mut self.rec_t);
         } else {
             self.rec_t = 2000;
         }
@@ -1431,7 +1423,7 @@ impl FollowCamera {
                 let flat = norm(sub(c, scale(self.up2, dot(self.up2, c))), 1.0);
                 let ang = (HALF_PI - asin(dot(flat, self.off) / (self.dist - self.red))).abs();
                 if ang < 0.436_332_35 {
-                    let side = norm(cross(self.off, self.up2), 1.0);
+                    let side = norm(cross(self.up2, self.off), 1.0);
                     let d = if 0.0 < dot(side, c) { -0.017_453_29 } else { 0.017_453_29 };
                     self.off = rot(self.off, d, self.up_s);
                 }
@@ -1607,9 +1599,9 @@ impl FollowCamera {
         let m = len(oh) * len(ph);
         let a = if 1e-4 <= m { HALF_PI - asin(dot(oh, ph) / m) } else { 0.0 };
         let mut ys = ang_interp(0.0, a, 0.015, 0.2, 0.0, &mut self.yaw_v);
-        if dot(cross(ph, up_s), oh) < 0.0 { ys = -ys; }
+        if dot(cross(up_s, ph), oh) < 0.0 { ys = -ys; }
         let v = rot(ph, ys, up_s);
-        let v = rot(v, el, cross(up_s, v));
+        let v = rot(v, el, cross(v, up_s));
         self.placed = norm(v, ln);
         let base = add(scale(up2, self.pivot_h), self.smooth);
         self.pos = add(base, self.placed);
@@ -1639,7 +1631,7 @@ impl FollowCamera {
         if self.yaw_off != 0.0 { hv = rot(hv, self.yaw_off, up_s); }
         let l = len(hv);
         if 0.05 <= l { fwd = scale(hv, 1.0 / l); }
-        let left = norm(cross(fwd, up_s), 1.0);
+        let left = norm(cross(up_s, fwd), 1.0);
         self.pivot_h_s = interp(self.pivot_h_s, self.pivot_h, 0.004, 0.2, 0.0, &mut self.pivot_h_v);
         self.look_h_s = interp(self.look_h_s, self.look_h, 0.004, 0.2, 0.0, &mut self.look_h_v);
         let dh = self.pivot_h_s - self.look_h_s;
@@ -1650,7 +1642,7 @@ impl FollowCamera {
         let lv = len(v);
         if lv != 0.0 {
             let mut pit = HALF_PI - asin(dot(fwd, v) / lv);
-            let up = cross(left, fwd);
+            let up = cross(fwd, left);
             if dot(up, v) < 0.0 { pit = -pit; }
             let mut tb = 0.0;
             if inp.hero.grounded_ticks != 0 {
@@ -1666,11 +1658,11 @@ impl FollowCamera {
             fwd = norm(rot(fwd, p, left), 1.0);
         }
         if self.row_blend != 0 {
-            dec_timer(&mut self.row_blend);
+            countdown_s(&mut self.row_blend);
             fwd = norm(lerp(fwd, self.saved_fwd, self.row_blend as f32 * self.row_blend_inv), 1.0);
         }
-        let left = norm(cross(fwd, up_s), 1.0);
-        let up = cross(left, fwd);
+        let left = norm(cross(up_s, fwd), 1.0);
+        let up = cross(fwd, left);
         self.rows = [fwd, left, up];
     }
 

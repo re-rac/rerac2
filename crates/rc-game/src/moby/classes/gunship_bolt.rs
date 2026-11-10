@@ -1,7 +1,7 @@
 //! The bolt shot **0x05de** (L09 `0x3afc38` / L20 `0x3cd670` makes it, the decomp's `func_L09_003AE8C8`; its update
-//! L09 `0x3afdf8` / L20 `0x3cd830`, `func_L09_003AEA88`): the gunship's shot (crate::moby::classes::level09::gunship)
-//! and L09 0x0d30's and L20 0x12f8's. It flies straight at its velocity for its range, hits what its way meets and
-//! bursts.
+//! L09 `0x3afdf8` / L20 `0x3cd830`, `func_L09_003AEA88`): the gunship's shot (crate::moby::classes::gunship) and
+//! L09 0x0d30's (crate::moby::classes::level09::patrol) and L20 0x12f8's (crate::moby::classes::level20::strafer).
+//! It flies straight at its velocity for its range, hits what its way meets and bursts.
 //!
 //! **Made** ([`fire`]): at `pos` with its velocity `vel` a tick, update distance 0xff, mode 0x100 (its rows kept: the
 //! velocity, `unit(vel × down)` with Ratchet's gravity `0x18a0e0`, and their cross), its life `range / |vel|` ticks

@@ -180,15 +180,6 @@ fn cur_row(game: &crate::game::GameState) -> Option<&'static ItemRow> { row(game
 /// The record's `+0x64` by row (the impact's sphere).
 fn blast_damage(r: &ItemRow) -> f32 { if r.item == 0x42 { 20.0 } else { 0.0 } }
 
-/// `0x2eef88(out, a, b)` = b × a.
-fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
-
-/// The muzzle light let go (`0x2fdc48`).
-fn free_light(w: &mut MobyWorld, id: usize) {
-    let s = w.mobys[id].pv_i(0x10);
-    if 0 <= s { w.point_lights.free(s as usize); }
-    w.mobys[id].set_pv_i(0x10, -1);
-}
 
 /// `0x3e4e98` (module docs).
 pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
@@ -199,14 +190,14 @@ pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if ctx.hero.items.ready == 3 {
         if w.mobys[id].state == 0 { return; }
         pulse_rifle::put_back(w, id, ctx, true);
-        free_light(w, id);
+        crate::point_lights::free_pv_i(w, id, 0x10);
         return;
     }
     if ctx.hero.state == 0x6f {
         let was = w.mobys[id].state;
         if was == 4 { return; }
         w.mobys[id].state = 4;
-        free_light(w, id);
+        crate::point_lights::free_pv_i(w, id, 0x10);
         pulse_rifle::put_back(w, id, ctx, was != 0);
         return;
     }
@@ -334,7 +325,7 @@ fn light(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     let out = countdown(&mut n);
     w.mobys[id].set_pv_i(0x14, n);
     if out {
-        free_light(w, id);
+        crate::point_lights::free_pv_i(w, id, 0x10);
         return;
     }
     if w.mobys[id].pv_i(0x10) == -1 {
@@ -355,7 +346,7 @@ fn fire(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, fp: bool, r: &ItemRow) {
     let f = r.speed * 0.016_666_668;
     let muzzle = ctx.host.joint(&w.mobys[id], 0).unwrap_or(w.mobys[id].pos);
     let mut dir = if ctx.hero.items.raised { set_len(w.mobys[id].rows[1], -f) } else { set_len(ctx.hero.rows[0], f) };
-    free_light(w, id);
+    crate::point_lights::free_pv_i(w, id, 0x10);
     let l = PointLight { color: [1.0, 0.0, 0.0], intensity: 0.0, pos: muzzle, radius: 10.0 };
     let s = w.point_lights.alloc(l).map_or(-1, |s| s as i32);
     w.mobys[id].set_pv_i(0x10, s);
@@ -393,8 +384,8 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, pos: V3, vel: V3, slot: i32, mode
     let life = (128.0 / (r.speed * 0.016_666_668)) as i32;
     let up = ctx.hero.gravity.up_at(pos);
     let r0 = unit(vel);
-    let r1 = unit(cross_ba(r0, scale(up, -1.0)));
-    let r2 = cross_ba(r1, r0);
+    let r1 = unit(cross(scale(up, -1.0), r0));
+    let r2 = cross(r0, r1);
     let mut b = w.vapor.next_beam;
     if 3 < b { b = 0; }
     w.vapor.next_beam = (b + 1) % 3;
@@ -435,10 +426,10 @@ fn make_beam(w: &mut MobyWorld, id: usize, ctx: &Ctx) {
     let m = &w.mobys[id];
     let (pos, vel, slot, b) = (m.pos, m.pv_v(0), m.pv_s(0x1a) as usize, m.pv_s(0x18) as usize);
     let axis = unit(vel);
-    let s = unit(cross_ba(axis, ctx.hero.gravity.up_at(pos)));
+    let s = unit(cross(ctx.hero.gravity.up_at(pos), axis));
     let bm = &mut w.vapor.slot(slot).beams[b.min(BEAMS - 1)];
     bm.axis = axis;
-    bm.side = cross_ba(s, axis);
+    bm.side = cross(axis, s);
     bm.p[0] = pos;
     bm.p[1] = add(pos, vel);
     bm.p[2] = bm.p[1];
@@ -662,7 +653,7 @@ fn draw_trail(t: &[Point], time: f32, scroll: f32, hero_state: i32, cam: V3, out
     let edge = |k: usize| {
         let p = t[k].pos;
         let d = if k == 0 { sub(t[1].pos, p) } else { sub(p, t[k - 1].pos) };
-        let s = set_len(cross_ba(d, sub(p, cam)), t[k].half);
+        let s = set_len(cross(sub(p, cam), d), t[k].half);
         let wide = scale(s, 3.0);
         ([add(p, s), sub(p, s)], [add(p, wide), sub(p, wide)])
     };
@@ -696,8 +687,8 @@ fn draw_puffs(s: &mut Slot, hero_state: i32, cam: V3, out: &mut Vec<crate::fx::F
         let (ws, wc) = p.phase.sin_cos();
         let (y_size, z_size) = (w + p.wobble[0] * w * wc, h + p.wobble[1] * h * ws);
         let to_cam = unit(sub(cam, p.pos));
-        let side = unit(cross_ba(to_cam, [0.0, 0.0, 1.0]));
-        let up2 = cross_ba(side, to_cam);
+        let side = unit(cross([0.0, 0.0, 1.0], to_cam));
+        let up2 = cross(to_cam, side);
         let (sn, cs) = p.roll.sin_cos();
         let corners = SQUARE.map(|[y, z]| {
             let (y, z) = (y * y_size, z * z_size);

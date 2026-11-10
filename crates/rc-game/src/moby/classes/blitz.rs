@@ -101,8 +101,6 @@ fn cur_row(game: &crate::game::GameState) -> Option<&'static ItemRow> { row(game
 /// `0x321b28(out, v, 0x31fe98(a, axis))`: `v` turned by the quaternion of `a` about `axis` (`q·v·q*`).
 pub(crate) fn qturn(v: V3, axis: V3, a: f32) -> V3 { crate::quat::qrot(crate::quat::axis_angle(a, axis), v) }
 
-/// `0x2eef88(out, a, b)` = b × a.
-pub(crate) fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
 
 /// `0x2db498(1.3, 0, 90, hand, colour, 0, 0x21, −1, 4)` in the twin 0x1d (the upgraded Blitz's the same): the
 /// crosshair at the screen's centre, red while the cooldown (`+0x00`) runs with shells left, else green
@@ -506,7 +504,7 @@ pub fn draw(w: &mut MobyWorld, id: usize, cam: V3, out: &mut Vec<crate::fx::FxQu
         let c = ((f * 255.0) as i32 as u32) << 24 | 0x20_40ff;
         let mut ray = qturn(scale(up, 4.0), to_cam, m.pv_f(0xc));
         for i in 0..8 {
-            let side = set_len(cross_ba(to_cam, ray), 0.1);
+            let side = set_len(cross(ray, to_cam), 0.1);
             let (a, b) = (add(muzzle, side), sub(muzzle, side));
             let side = scale(side, 0.5 / 0.1);
             let tip = add(muzzle, ray);
@@ -520,13 +518,13 @@ pub fn draw(w: &mut MobyWorld, id: usize, cam: V3, out: &mut Vec<crate::fx::FxQu
     let c = ((f * 20.0) as i32 as u32) << 24 | 0x80_80ff;
     let centre = add(muzzle, scale(m.pv_v(0x30), f * -16.0 + 16.0));
     let view = unit(sub(cam, centre));
-    let across = cross_ba(cross_ba(view, up), view);
+    let across = cross(view, cross(up, view));
     let size = 20.0 + (1.5 - 20.0) * f;
     for (k, spin) in [m.pv_f(0x28), m.pv_f(0x2c)].into_iter().enumerate() {
         let d = qturn(across, view, spin);
         // The first quad's half-width set to the size, the second's scaled by it (`0x2ef138` / `0x2eeee0`).
         let d = if k == 0 { set_len(d, size) } else { scale(d, size) };
-        let e = set_len(cross_ba(view, d), size);
+        let e = set_len(cross(d, view), size);
         let (p, q) = (add(centre, d), sub(centre, d));
         quad(out, 0x38, true, [add(p, e), sub(p, e), add(q, e), sub(q, e)], ST, [c; 4]);
     }

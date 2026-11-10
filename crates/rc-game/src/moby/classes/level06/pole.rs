@@ -1,4 +1,4 @@
-//! Level 6's falling pole **0x12c4** (L06 `0x466008`; its splash `0x466558`): shot down, it topples over (hitting
+//! Level 6's falling pole **0x12c4** (L06 `0x466008`; its splash `0x466558`, its splash moby crate::moby::classes::splash): shot down, it topples over (hitting
 //! what is under it), breaks and falls into the water.
 //!
 //! Its pvars: `+0x20` its health (6, a health block: `0x35df78` = crate::moby::ai::damage_of), the colour flash
@@ -18,8 +18,6 @@ use crate::moby::{ai, Ctx, MobyWorld};
 pub const CLASS: i16 = 0x12c4;
 /// `$gp+0x2d30` (`0x1b1d20`): its top in its frame.
 const TOP: V3 = [f32::from_bits(0x3f69_fbe7), 0.0, f32::from_bits(0x410d_1687)];
-/// The splash moby (`0x3e25e0`, class 0x307).
-const SPLASH: i16 = 0x0307;
 
 fn frame_point(w: &MobyWorld, id: usize, v: V3) -> V3 { add(through(&w.mobys[id].rows, v), w.mobys[id].pos) }
 
@@ -114,29 +112,14 @@ pub fn update_12c4(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     }
 }
 
-/// `0x466558`: its class sound 2; the splash moby 0x307 at its place (Ratchet's colour words, ambient (0x28, 0x28,
-/// 0x46), 11.25 its class's scale, a random yaw; [`update_0307`]); 90 drops of water (`0x378a58`) within 8 across of
-/// it from up to 0.2 under it, thrown up to 1/6 a tick across (`0x35bc10`) and 10..17.5 a second up, falling or ringing
+/// `0x466558`: its class sound 2; the splash moby 0x307 at its place, 11.25 its class's scale (`0x3e25e0` = L00
+/// `0x39f938`, crate::moby::classes::splash::spawn); 90 drops of water (`0x378a58`) within 8 across of it from up to
+/// 0.2 under it, thrown up to 1/6 a tick across (`0x35bc10`) and 10..17.5 a second up, falling or ringing
 /// the water at random, for 450..600 ticks, 4..6 times their size.
 fn splash(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     ctx.host.play_sound(&w.mobys[id], 2, 0);
     let p = w.mobys[id].pos;
-    if w.class(SPLASH).is_some() {
-        let k = w.create(SPLASH);
-        let light = ctx.hero_moby.and_then(|h| w.mobys.get(h)).map(|h| h.light);
-        let yaw = ctx.game.rng.rand_angle();
-        let m = &mut w.mobys[k];
-        if let Some(l) = light { m.light = l; }
-        m.ambient = [0x28, 0x28, 0x46];
-        m.update = Some(update_0307);
-        m.mode &= !crate::moby::mode::NO_UPDATE;
-        m.update_dist = 0xff;
-        m.draw_dist = 0x40;
-        m.scale *= 11.25;
-        m.pos = p;
-        m.rot[2] = yaw;
-        w.rebuild(k, &*ctx.host);
-    }
+    super::super::splash::spawn(w, ctx, p, 11.25);
     let rng = &mut ctx.game.rng;
     let Some(sys) = ctx.parts.as_deref_mut() else { return };
     for _ in 0..90 {
@@ -153,12 +136,4 @@ fn splash(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             crate::particles::rec::set_ff(&mut sys.pool.recs[i], 0xc, s);
         }
     }
-}
-
-/// 0x0307 (`0x3e2688`): the splash fades 3 a tick, growing 2.5%; under 4 gone.
-pub fn update_0307(w: &mut MobyWorld, id: usize, _ctx: &mut Ctx) {
-    let m = &mut w.mobys[id];
-    m.alpha = m.alpha.wrapping_sub(3);
-    m.scale *= 1.025;
-    if m.alpha < 4 { w.delete(id); }
 }

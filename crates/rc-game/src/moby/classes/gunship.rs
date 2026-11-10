@@ -2,7 +2,7 @@
 //! decomp's `func_L09_003EAB20`, its helpers `func_L09_003E99E0`.. `func_L09_003EAF60` at our `0x3eae50`..
 //! `0x3ec3d0`): a hovering craft on five jets that flies in along a path, patrols another back and forth, and once
 //! Ratchet is in its area follows that path toward him, firing bursts of bolts (0x05de,
-//! crate::moby::classes::level09::bolt) from its joint 2. It is L16's drone (crate::moby::classes::level16::drone)
+//! crate::moby::classes::gunship_bolt) from its joint 2. It is L16's drone (crate::moby::classes::level16::drone)
 //! with the paths: the same framework (crate::moby::ai), jets and joint aims. Health block `+0x20` (`+0x34` the
 //! bolts' damage, `+0x35` the jets'), movement `+0x50` (radius 3.5, the turn left 30°; its path `+0xc4`, the point
 //! `+0x118` and the last `+0x11a`), target block `+0x140` (found `+0x154`), reaction `+0x180` (a hurt to state 5, sub 2).
@@ -406,7 +406,7 @@ fn aims(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             if let (Some(p), Some((rows, _))) = (ctx.host.joint(m, 2), ctx.host.joint_matrix(m, 2)) {
                 let vel = set_len(rows[0], SHOT_SPEED * f32::from_bits(0x3c88_8889));
                 let damage = m.pv_b(DAMAGE) as f32;
-                super::bolt::fire(w, ctx, p, id, damage, range, 1.0, vel, 1, 1, 1.0);
+                super::gunship_bolt::fire(w, ctx, p, id, damage, range, 1.0, vel, 1, 1, 1.0);
             }
             let m = &mut w.mobys[id];
             let n = m.pv_b(SHOTS).wrapping_add(1);

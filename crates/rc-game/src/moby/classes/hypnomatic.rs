@@ -2,7 +2,7 @@
 //! stance 1, use sequence 0x38 (the firing arm's 0x3e crouched, none moving), the use keeps the stance, icon 0xea84,
 //! name 0x3305, no ammo): the hand moby **0x0950** (L00 `0x3ba758` through its class's `0x3bb100`, the same code on
 //! every level; L18 `0x3dcd30`; the decomp's `func_L00_003B9310`). Held ○ throws its beam at a creature of the
-//! capture (a gunner 0x0ee1 of endless lives, crate::moby::classes::level18::capturable) and the beam reaching it
+//! capture (a gunner 0x0ee1 of endless lives, crate::moby::classes::capturable) and the beam reaching it
 //! hooks it: the creature's capture begins.
 //!
 //! **Its pvars** (`0x3b9310`'s record): `+0x00` the target (a link), `+0x04` its class, `+0x06` the lock's rest,
@@ -42,7 +42,7 @@
 //! hold flag `0x1afc90` (0 on every level, never set); the body's branches (the beam from the body's joint 5 and its
 //! gun's aim record `0x25be10`: the item pass does not run while a body plays).
 
-use super::level18::capturable::{GUNNER, PVARS};
+use super::capturable::{GUNNER, PVARS};
 use crate::hero::physics::{add, dist, dist2, scale, set_len, sub, V3};
 use crate::moby::{ai, aim, countdown, keep_loop, lock_on, Ctx, MobyWorld};
 

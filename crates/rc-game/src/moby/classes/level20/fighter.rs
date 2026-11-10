@@ -1,9 +1,9 @@
 //! Yeedil's fighter **0x12f3** (`0x39e320`, 8 placed; the decomp's `func_L20_0039CF58`): a trooper on the player's
 //! side in the boss 0x11e0's fight (crate::moby::classes::level20::boss). Its set-up makes it class 0x0d0f (the Dobbo
-//! trooper's model, crate::moby::classes::level09::trooper, its update its own), with that trooper's turret 0x0d0e
+//! trooper's model, crate::moby::classes::trooper, its update its own), with that trooper's turret 0x0d0e
 //! (`+0x254`) and two guns 0x0d66 (`+0x258` / `+0x25c`) made as it comes in. It waits in state 6 until the boss
 //! brings it in ([`bring_in`]), then walks near its target and fires level 12's shots
-//! (crate::moby::classes::level12::shot) from its guns. On the framework (crate::moby::ai): health `+0x20` (10 by
+//! (crate::moby::classes::blaster_shot) from its guns. On the framework (crate::moby::ai): health `+0x20` (10 by
 //! default; its status `+0x2e`, its shot's damage byte `+0x34`), movement `+0x50` (radius 0.825, height 0.2, steps
 //! 0.4 / 0.4, slope 90°, the turn left 30°, stop 0.1), reaction `+0x140` (a hurt to 5, sub 9/4/7 …: its bytes as set
 //! below), target `+0x1f0` (`+0x200` the moby; the search's area `+0x230`).
@@ -43,7 +43,7 @@ use super::boss;
 use crate::hero::physics::{add_rot, atan2, dist2, len, rot_dist, scale, set_len2, sub, sub_rot, turn_ease, V3};
 use crate::moby::blast::{self, Blast};
 use crate::moby::classes::enemies::place_part;
-use crate::moby::classes::level12::shot;
+use crate::moby::classes::blaster_shot as shot;
 use crate::moby::classes::props::{seq, wrapped};
 use crate::moby::{ai, bolts, mode, Ctx, MobyWorld};
 

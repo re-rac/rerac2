@@ -131,8 +131,6 @@ impl Mem {
 /// The Lava Gun's row as `0x139568[0x1d]` gives it (crate::upgrades).
 fn cur_row(game: &crate::game::GameState) -> Option<&'static ItemRow> { row(game, LAVA) }
 
-/// `0x2eef88(out, a, b)` = b × a.
-fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
 
 /// A hit on `target` from the hand (`0x31d158` + `0x31d378`): along the hand to it, flags 0x910000, its kind the
 /// target's class `<< 16 | 0x0109`; Acid (`0x3f9f70(target, 0x1d, hand)`, crate::moby::weapon_mods); then the hand's
@@ -466,7 +464,7 @@ fn draw_stream(w: &MobyWorld, id: usize, rng: &mut crate::rng::Rng, cam: V3, out
     let pt = |k: i32| w.lava.points[k.clamp(0, POINTS as i32 - 1) as usize].pos;
     let across = |from: V3, to: V3| {
         let d = unit(sub(to, from));
-        unit(cross_ba(sub(cam, from), d))
+        unit(cross(d, sub(cam, from)))
     };
     let mut wide = 0.05f32;
     let mut half = wide * 0.5;
@@ -507,8 +505,8 @@ fn draw_pools(w: &MobyWorld, cam: V3, out: &mut Vec<crate::fx::FxQuad>) {
             let s = f.scroll;
             let st = if f.flip { [[s, 0.0], [s + 1.0, 0.0], [s, 1.0], [s + 1.0, 1.0]] } else { [[s, 1.0], [s + 1.0, 1.0], [s, 0.0], [s + 1.0, 0.0]] };
             let to_cam = unit(sub(cam, f.pos));
-            let side = unit(cross_ba(to_cam, [0.0, 0.0, 1.0]));
-            let up = cross_ba(side, to_cam);
+            let side = unit(cross([0.0, 0.0, 1.0], to_cam));
+            let up = cross(to_cam, side);
             let size = if p.phase == 1 { 0.5 } else { p.size };
             let c = col | 0x10_3080;
             out.push(quad(0x17, k == 1, [to_cam, side, up], f.pos, f.corners.map(|q| scale(q, size)), st, [c, 0x10_3080, c, 0x10_3080]));

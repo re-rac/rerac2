@@ -5,7 +5,7 @@
 //!   Their glow flashes as the buoys' (crate::moby::classes::level17::floaters::flash_glow); their platform words set
 //!   (`+0x8c` | 1, `+0x3e` | 8); their update distance 0.
 //! * **0x120d** ([`update_120d`], `0x420138`, 2 placed; the decomp's `func_US2_L17_00420138`): an updraft pad, the
-//!   sibling of L11's 0x08e2 (crate::moby::classes::level11::props::update_08e2). Its pvars: `+0x00` a fly-by camera
+//!   sibling of L11's 0x08e2 (crate::moby::classes::updraft::update_08e2). Its pvars: `+0x00` a fly-by camera
 //!   (−1 none), `+0x04` the glow's phase, `+0x08` a cuboid (−1 none), `+0x0c` a moby it hooks (−1 none), `+0x10` the
 //!   lift it gives (0: Ratchet's own). Its pulse: 6° a tick, its shade `sin·128` held to 32..128.
 //!   * **0**: on its first tick the glow on (mode | 0x10); 1.

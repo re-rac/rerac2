@@ -356,6 +356,14 @@ pub fn countdown(x: &mut i32) -> bool {
     *x < 1
 }
 
+/// `0x2eeae0` on an s16 outside the pvars ([`countdown`]; the game's 1 / 2 / 0 results as true / true / false).
+pub fn countdown_s(x: &mut i16) -> bool {
+    let mut t = *x as i32;
+    let out = countdown(&mut t);
+    *x = t as i16;
+    out
+}
+
 /// `0x2eeb40`: a countdown in seconds, a frame (1/60) at a time; true when out (it was, or it is now: then 0).
 pub fn count_secs(x: &mut f32) -> bool {
     if *x <= 1.0 / 60.0 {
@@ -492,6 +500,13 @@ impl Moby {
         let mut t = self.pv_f(off);
         let out = count_secs(&mut t);
         self.set_pv_f(off, t);
+        out
+    }
+    /// `0x2eeb10` (boot `func_002829A8`) on the byte pvar at `off` ([`countdown`] on an unsigned byte).
+    pub fn count_b(&mut self, off: usize) -> bool {
+        let mut t = self.pv_b(off) as i32;
+        let out = countdown(&mut t);
+        self.set_pv_b(off, t as u8);
         out
     }
     /// `0x3241d8(m, rgb)`: the ambient from a colour word (r in the low byte; `0x313300`).
@@ -771,14 +786,14 @@ pub struct MobyWorld {
     pub glints10: Vec<V3>,
     /// Level 14's electric strands (classes::level14::fence::Globals).
     pub fence14: classes::level14::fence::Globals,
-    /// The sinking pits' samples and grids (classes::level14::pit::Globals).
-    pub pit: classes::level14::pit::Globals,
+    /// The sinking pits' samples and grids (classes::sinking_pit::Globals).
+    pub pit: classes::sinking_pit::Globals,
     /// Level 14's energy field's rays (classes::level14::energy::Globals).
     pub energy14: classes::level14::energy::Globals,
     /// Level 26's veil's quads (classes::level26::veil::Mesh), read by the engine at the level's start.
     pub veil26: Option<std::sync::Arc<classes::level26::veil::Mesh>>,
     /// The 64 tie texture matrices' ST offsets (`$gp−0x1ba0`, L09 `0x1ad450`: each 0x40 bytes, `+0x30` / `+0x34`; the
-    /// identity at the level's start, `0x3692c8`; empty: all 0), scrolled by classes::level09::scroll. The engine's tie
+    /// identity at the level's start, `0x3692c8`; empty: all 0), scrolled by classes::tex_scroll. The engine's tie
     /// renderer moves the STs of the packets that use one (rc_formats::tie::TiePacket::tex_matrix).
     pub tex_matrices: Vec<[f32; 2]>,
     /// The classes' texture scrolls (`0x310838(class, ds, dt)`, L20 `0x326a20`: every ST of the class's packets moved

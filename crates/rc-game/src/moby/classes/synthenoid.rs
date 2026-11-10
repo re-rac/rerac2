@@ -119,8 +119,6 @@ fn turn(v: V3, axis: V3, a: f32) -> V3 {
     crate::gravity::rotate(v, set_len(axis, 1.0), a)
 }
 
-/// `0x2eef88(out, a, b)` = b × a.
-fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
 
 /// The drone of `class` in slot `k` (a live moby of the class holding it: `$gp+0x1758`'s for 0x0cb2, `$gp+0x1270`'s
 /// for the upgraded 0x0b02).
@@ -840,7 +838,7 @@ pub fn draw(w: &mut MobyWorld, id: usize, cam: V3, out: &mut Vec<crate::fx::FxQu
     let a = sub(pos, cam);
     let back = set_len(m.pv_v(0x20), -2.0);
     let tail = add(pos, back);
-    let side = set_len(cross_ba(a, back), 0.1);
+    let side = set_len(cross(back, a), 0.1);
     let (c0, c1) = (0x4010_8080u32, 0x4010_1080u32);
     out.push(FxQuad { fx: 0x17, additive: false, corners: [add(pos, side), sub(pos, side), add(tail, side), sub(tail, side)], st, rgba: [c0, c0, c1, c1] });
     let far = add(tail, back);

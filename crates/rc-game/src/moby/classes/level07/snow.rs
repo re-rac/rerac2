@@ -1,5 +1,5 @@
 //! Level 7's snow **0x12ec** (`0x379d50`, 1 placed; the decomp's `func_L07_00378AE0`) and its flakes, the particle
-//! type 0x68 ([`flake`] `0x337a30`, [`update_flake`] `0x337bc0`).
+//! type 0x68 ([`flake`] `0x337a30`; their tick `0x337bc0`, the engine's: crate::particles::snow).
 //!
 //! Its pvars: `[0]` the flakes' speed across (a second), `[1]` their fall (a second), `[3]` the drift's share, `[4]`
 //! an area no flake starts in (`0x320ca8`), `+0x14` its path along the convoy's, `+0x20..+0x50` its rows there and
@@ -23,20 +23,14 @@
 //! 0.1..0.24 × 210000, a random roll, `pos` and `vel`; kind 0 sways over `1 << 6..10` frames (`+0x0a`), kind 1
 //! (`+0x34` 1) lives 120 ticks; `+0x2c` 0..100. (`+0x34` is left as the record had it for kind 0, as the original
 //! leaves it.) The flakes' count `$gp+0x34c4` (nothing reads it) is not kept.
-//!
-//! **Each tick** ([`update_flake`]): more than 7 under the camera (`0x1b9188`), or a kind-1 flake's life out: its top
-//! one down (gone at 0) and its alpha that; else its alpha up by one to the top. It rolls 2 a tick (back on records
-//! whose address has bit 0x80: here the index's bit 1), moves by its velocity and the drift; a kind-0 flake sways
-//! `sin(2π · (frame mod period) / period) / 60` along the camera's left row (`0x1b93c0`).
 
 use crate::hero::physics::{add, len, scale, sub, V3};
 use crate::moby::{Ctx, MobyWorld};
+use crate::particles::snow::FLAKE;
 use crate::particles::{rec, Particles};
 use crate::rng::Rng;
 
 pub const CLASS: i16 = 0x12ec;
-/// The flakes' particle type.
-pub const FLAKE: u8 = 0x68;
 
 /// `$gp−0x428 + 8·k`: the second kind's lane along the origin's third row, by the ridden car (0x11d9 + k).
 const LANES: [(f32, f32); 5] = [(19.0, 27.0), (10.0, 25.0), (17.0, 30.0), (20.0, 38.0), (0.0, 10.0)];
@@ -171,39 +165,4 @@ pub fn flake(sys: &mut Particles, rng: &mut Rng, pos: V3, vel: V3, kind1: bool, 
     let k = rng.rand_range(0, 100);
     rec::set_ff(&mut sys.pool.recs[i], 0x2c, k as f32);
     Some(i)
-}
-
-/// `0x337bc0` (module docs): `cam` the camera (`0x1b9180`), `mobys` for its rows, the frame and the drift.
-pub fn update_flake(sys: &mut Particles, i: usize, mobys: &MobyWorld, cam: V3) {
-    let r = &mut sys.pool.recs[i];
-    let kind1 = rec::u32(r, 0x34) != 0;
-    let mut out = rec::ff(r, 0x18) - cam[2] < -7.0;
-    if !out && kind1 {
-        let mut t = rec::i16(r, 0xa) as i32;
-        out = crate::moby::countdown(&mut t);
-        rec::set_i16(r, 0xa, t as i16);
-    }
-    let c = rec::u32(r, 4);
-    if out {
-        let top = rec::u32(r, 0x30) as i32 - 1;
-        rec::set_u32(r, 0x30, top as u32);
-        if top < 1 {
-            sys.kill_part(i);
-            return;
-        }
-        rec::set_u32(r, 4, (c & 0xff_ffff).wrapping_add((top as u32) << 24));
-    } else if ((c as i32) >> 24) < rec::u32(r, 0x30) as i32 {
-        rec::set_u32(r, 4, c.wrapping_add(0x100_0000));
-    }
-    r[8] = if (i >> 1) & 1 == 0 { r[8].wrapping_add(2) } else { r[8].wrapping_sub(2) };
-    let mut p = add(add(rec::v3(r, 0x10), rec::v3(r, 0x20)), mobys.convoy.drift);
-    if !kind1 {
-        let period = rec::i16(r, 0xa) as i32;
-        if period != 0 {
-            let f = (mobys.frame & (period - 1)) as f32 / period as f32;
-            let s = (f * 6.283_185_5).sin();
-            p = add(p, scale(mobys.cam_rows[1], s * 0.016_666_668));
-        }
-    }
-    rec::set_v3(r, 0x10, p);
 }

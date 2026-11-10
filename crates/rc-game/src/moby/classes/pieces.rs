@@ -1,7 +1,16 @@
-//! Level 12's debris pieces: the spawn `0x32ad40` and the class 0x0d66 (`0x400850`; the trooper's guns,
-//! crate::moby::classes::level12::trooper, held on its turret until it loses them).
+//! The thrown pieces: the spawn (L12 `0x32ad40` = L00 `0x323ca8`, [`spawn`]) and their update ([`update_0d66`], L12
+//! `0x400850`; the decomp's `func_L00_003DD2B8`, on twelve levels). The classes that run it, by the levels' update
+//! tables ([`CLASSES`]): the troopers' guns 0x0d66 (L09 `0x405c58`, L12, L20 `0x425078`: crate::moby::classes::trooper,
+//! held on its turret until it loses them) and L12's 0x0ff6; Tabora's chips 0x096d..0x096f (L08 `0x3d49b8`:
+//! crate::moby::classes::level08::crystal); L17's 0x0931..0x0934 (thrown by crate::moby::classes::level17::hatchling
+//! through crystal::emit), 0x0802..0x0804, 0x0807..0x0809 and 0x08b6 / 0x08b7 / 0x08b9 (L17 `0x3b4d70`); L00's, L14's and
+//! L26's 0x0b31..0x0b35, 0x0b3b (and L00's 0x1012..0x1016, 0x0c0e / 0x0c0f; L00 `0x3de708`, L14 `0x3ebb30`, L26
+//! `0x3cfae0`); L02's gun 0x0a4c (`0x3d3f80`, crate::moby::classes::bosses: thrown as a shard, whose update is the
+//! shards'); L03's 0x0a0d..0x0a11 (`0x3d3cf8`, crate::moby::classes::endako_c: their maker `0x328278` not ported); L06's
+//! 0x06c5..0x06c7, 0x08ca / 0x08cb, 0x08cd..0x08cf (`0x3f45c8`). L02's thrown shield 0x09d8 runs it behind a wrapper
+//! (`0x3d3f38`, crate::moby::classes::fighters::update_shield).
 //!
-//! The engine functions: `0x2f2da0` the rows of Euler angles (crate::hero::physics::euler_rows), `0x2e2e80` the
+//! The engine functions (L12): `0x2f2da0` the rows of Euler angles (crate::hero::physics::euler_rows), `0x2e2e80` the
 //! sphere query (crate::collision::coll_sphere_m), `0x31f690` = L00 `0x31bbc0` (crate::rng::Rng::rand_vec),
 //! `0x323f50` = L00 `0x320538` (crate::moby::blast::explode).
 //!
@@ -68,7 +77,15 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, src: usize, class: i16, pos: V3, 
     k
 }
 
-/// 0x0d66 (`0x400850`). **0** / **1**: flying ([`fly`]); in 1 its life out → 3, ten ticks, mode | 0x2000. **2**: it
+/// The classes whose update is [`update_0d66`] (module docs).
+pub const CLASSES: &[i16] = &[
+    0x0d66, 0x0ff6, 0x096d, 0x096e, 0x096f, 0x0931, 0x0932, 0x0933, 0x0934, 0x0802, 0x0803, 0x0804, 0x0807, 0x0808, 0x0809,
+    0x08b6, 0x08b7, 0x08b9, 0x0b31, 0x0b32, 0x0b33, 0x0b34, 0x0b35, 0x0b3b, 0x1012, 0x1013, 0x1014, 0x1015, 0x1016, 0x0c0e,
+    0x0c0f, 0x0a4c, 0x0a0d, 0x0a0e, 0x0a0f, 0x0a10, 0x0a11, 0x06c5, 0x06c6, 0x06c7, 0x08ca, 0x08cb, 0x08cd, 0x08ce, 0x08cf,
+];
+
+/// 0x0d66 (L12 `0x400850`) and the others of [`CLASSES`]. **0** / **1**: flying ([`fly`]); in 1 its life out → 3,
+/// ten ticks, mode | 0x2000. **2**: it
 /// goes off at its sphere's centre (the flash 1 and 0.5, size 1/3, 5 embers, 3 billows, 5 flares) and goes. **3**:
 /// fading (alpha 12.8 a tick left), flying; out, gone.
 pub fn update_0d66(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {

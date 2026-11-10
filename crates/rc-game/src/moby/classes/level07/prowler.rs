@@ -280,11 +280,7 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             crate::moby::ai::face_at(&mut w.mobys[id], MV, yaw);
             let g = w.mobys[id].pv_v(GOAL);
             let yaw = yaw_to(w, id, g);
-            let o = MV + 0x38;
-            let keep = w.mobys[id].pv_i(o);
-            w.mobys[id].set_pv_i(o, 0x10);
-            let flags = ai::move_step(w, id, ctx, yaw, g);
-            w.mobys[id].set_pv_i(o, keep);
+            let flags = ai::move_with(w, id, ctx, yaw, g, 0x10, -1.0, -1.0);
             if !done(w, id, flags) { return; }
             3
         }

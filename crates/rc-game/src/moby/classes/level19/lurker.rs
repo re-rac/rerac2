@@ -173,10 +173,7 @@ fn go_to(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, p: V3) {
 /// tick (the limits −1: kept).
 fn go_to_opts(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, p: V3, opts: i32) {
     let yaw = yaw_to(w, id, p);
-    let kept = w.mobys[id].pv_i(MV + 0x38);
-    w.mobys[id].set_pv_i(MV + 0x38, opts);
-    ai::move_step(w, id, ctx, yaw, p);
-    w.mobys[id].set_pv_i(MV + 0x38, kept);
+    ai::move_with(w, id, ctx, yaw, p, opts, -1.0, -1.0);
 }
 
 /// 0x10d0 (module docs).

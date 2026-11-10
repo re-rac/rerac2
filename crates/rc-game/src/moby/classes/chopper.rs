@@ -155,8 +155,6 @@ fn cur_row(game: &crate::game::GameState) -> Option<&'static ItemRow> { row(game
 /// 3 the challenge mode's rows).
 pub fn level(game: &crate::game::GameState) -> u8 { game.upgrade_level(CHOPPER) }
 
-/// `0x2eef88(out, a, b)` = b × a.
-fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
 
 /// `0x3b7038`.
 pub fn update(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
@@ -299,7 +297,6 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, at: V3, look: bool, 
     let id = w.create(BLADE);
     let lv = level(ctx.game);
     {
-        let (hp, hrot, hlight) = (w.mobys[hand].pos, w.mobys[hand].rot, w.mobys[hand].light);
         let m = &mut w.mobys[id];
         m.pvars.resize(BLADE_PVARS, 0);
         m.set_pv_s(0x12, 10);
@@ -310,14 +307,10 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, hand: usize, at: V3, look: bool, 
         m.set_pv_i(0x68, first as i32);
         m.set_pv_i(0x50, hand_class as i32);
         m.set_pv_f(0x58, -1.221_730_6);
-        // `0x32a748(blade, hand)`: update and draw distance 0xff, drawn, the owner, its place, angles and light word.
-        m.update_dist = 0xff;
-        m.draw_dist = 0xff;
-        m.drawn = 1;
-        m.parent = Some(hand);
-        (m.pos, m.rot, m.light) = (hp, hrot, hlight);
-        m.glow = if lv == 0 { 0xff0a_0aff } else { 0xffff_0a0a };
     }
+    // `0x32a748(blade, hand)`.
+    w.adopt(id, Some(hand), &*ctx.host);
+    w.mobys[id].glow = if lv == 0 { 0xff0a_0aff } else { 0xffff_0a0a };
     let h = &*ctx.hero;
     let (hero_pos, hero_rows) = (h.pos, h.rows);
     if !first {
@@ -641,7 +634,7 @@ pub fn update_blade(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         if first_bounce && hit_moby.is_some() {
             // Off the first moby: 10..35° about its up row × its way.
             let m = &w.mobys[id];
-            let axis = cross_ba(m.pv_v(0), m.rows[2]);
+            let axis = cross(m.rows[2], m.pv_v(0));
             let a = ctx.game.rng.randf(0.174_532_95, 0.610_865_3);
             let v = crate::camera::rot(m.pv_v(0), -a, axis);
             w.mobys[id].set_pv_v(0, v);
@@ -687,8 +680,8 @@ pub fn update_blade(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     {
         let m = &mut w.mobys[id];
         let r0 = unit(m.pv_v(0));
-        let r1 = unit(cross_ba(r0, up));
-        let r2 = cross_ba(r1, r0);
+        let r1 = unit(cross(up, r0));
+        let r2 = cross(r0, r1);
         let mut rows = [r0, r1, r2];
         let mut t = -bend * 1.047_197_6;
         if t == 0.0 { t = if 0.0 < m.pv_f(0x58) { 0.069_813_18 } else { -0.069_813_18 }; }
@@ -737,7 +730,7 @@ pub fn update_blade(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         } else {
             let half = if m.pv_i(0x68) == 0 { 0.25 } else { 0.5 };
             let row2 = m.rows[2];
-            let side = set_len(cross_ba(sub(now, ctx.host.camera_pos()), row2), half);
+            let side = set_len(cross(row2, sub(now, ctx.host.camera_pos())), half);
             let g = &mut ctx.game.rng;
             let mut j = g.randf_signed(0.0, 0.1);
             let lift = |j: f32| scale(row2, j);
@@ -838,7 +831,7 @@ pub fn draw(w: &MobyWorld, id: usize, game: &mut crate::game::GameState, cam: V3
         let half = if split { 0.25 } else { 0.5 };
         let up = m.rows[2];
         let pt = |k: usize| m.pv_v(TRAIL + 0x10 * k);
-        let side = |d: V3| set_len(cross_ba(d, up), half);
+        let side = |d: V3| set_len(cross(up, d), half);
         let mut d = sub(m.pos, pt(0));
         let mut s = side(d);
         let (mut a0, mut b0) = (add(m.pos, s), sub(m.pos, s));

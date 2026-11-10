@@ -1,10 +1,11 @@
-//! Level 13's breakable targets on the enemy framework's health (L13 addresses; the engine functions named by their
-//! L13 addresses with the L00 ones the port knows them by). Both keep the framework's blocks: the health at `+0x20`
+//! The breakable targets on the enemy framework's health (L13 addresses; the engine functions named by their L13
+//! addresses with the L00 ones the port knows them by). Both keep the framework's blocks: the health at `+0x20`
 //! (`[0]` = 0x20; 20 for 0x0c86, 60 for 0x0c87), the reaction at `+0x50` (`[0x10]` = 0x50), the pieces' thresholds at
 //! `+0x100` (`[0x1c]`).
 //!
-//! * **0x0c86** ([`update_0c86`], `0x3ee240`, 26 placed): any hit hurts it; it blows up at no health.
-//! * **0x0c87** ([`update_0c87`], `0x3ee3a0`, 14 placed): takes the hits of flag 1 and half the flag-0x10000 ones; it
+//! * **0x0c86** ([`update_0c86`], `0x3ee240`, 26 placed; L16 `0x3dc640`, 5; the decomp's `func_L13_003ECD48`): any hit
+//!   hurts it; it blows up at no health.
+//! * **0x0c87** ([`update_0c87`], `0x3ee3a0`, 14 placed; L14 `0x3f9e88`, 4; L16 `0x3dc7a0`, 4; `func_L13_003ECEA8`): takes the hits of flag 1 and half the flag-0x10000 ones; it
 //!   blows up at no health.
 //!
 //! The engine functions: `0x330d20` = L00 `0x327e38` (crate::moby::ai::take_damage), `0x32a460` = L00 `0x3201e8`

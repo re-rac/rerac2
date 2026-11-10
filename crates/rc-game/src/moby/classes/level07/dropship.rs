@@ -26,7 +26,7 @@
 //! from the camera (`0x3f0768`), its class sound 2, deleted.
 
 use crate::hero::physics::{add, add_rot, dot, len, set_len, sub, V3};
-use crate::moby::classes::level04::launcher::carry;
+use crate::moby::classes::launcher::carry;
 use crate::moby::classes::props::group_alive;
 use crate::moby::{ai, countdown, platform, shards, Ctx, MobyWorld};
 
@@ -202,7 +202,7 @@ fn fly(w: &mut MobyWorld, id: usize) -> f32 {
 }
 
 /// `0x3e86c0` / `0x3ecf28`: a prowler (state 10) or gunner (state 8) shown with its class's collision and carried
-/// in (crate::moby::classes::level04::launcher::carry, `0x2e2c98`) from `from` to its place, lifted 0.4 of the drop
+/// in (crate::moby::classes::launcher::carry, `0x2e2c98`) from `from` to its place, lifted 0.4 of the drop
 /// either end, over 45..75 ticks; the arc's start rides the dropship.
 fn drop_in(w: &mut MobyWorld, ctx: &mut Ctx, e: usize, from: V3, ship: usize, support: Option<usize>) {
     let state = if w.mobys[e].o_class == super::prowler::CLASS { 10 } else { 8 };

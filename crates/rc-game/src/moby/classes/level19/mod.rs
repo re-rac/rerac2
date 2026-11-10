@@ -49,8 +49,8 @@ pub fn update_for(o_class: i16) -> Option<super::UpdateFn> {
         director::TRADER => Some(director::update_1313),
         ride_cam::CLASS => Some(ride_cam::update_1258),
         // The hovership 0x0eef and the raritanium 0x099a (L19 `0x414848` / `0x3c1cc8`) are in level 8's list.
-        // The liquid lid 0x12b4 (L19 `0x422c70`) is crate::water::lid, the sinking pit 0x135f (L19 `0x383478`) in level
-        // 14's.
+        // The liquid lid 0x12b4 (L19 `0x422c70`) is crate::water::lid, the sinking pit 0x135f (L19 `0x383478`) and its
+        // corners crate::moby::classes::sinking_pit.
         // Level 20's fading field 0x119b's code (L19 `0x423750`).
         0x1204 => Some(super::level20::props::update_119b),
         _ => None,

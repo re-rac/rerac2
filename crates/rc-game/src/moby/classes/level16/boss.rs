@@ -255,20 +255,6 @@ fn stop_aim_sound(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     w.mobys[id].set_pv_i(pv::AIM_SOUND, -1);
 }
 
-/// `0x322bd8(m, src)`: update and draw distances 0xff, drawn, `src`'s child at its place and angles with its light
-/// (its matrix rebuilt), mode & 0xfff8.
-fn adopt(w: &mut MobyWorld, ctx: &Ctx, k: usize, src: Option<usize>) {
-    let s = src.and_then(|s| w.mobys.get(s)).map(|s| (s.pos, s.rot, s.light));
-    let m = &mut w.mobys[k];
-    (m.update_dist, m.draw_dist, m.drawn) = (0xff, 0xff, 1);
-    if let Some((pos, rot, light)) = s {
-        m.parent = src;
-        (m.pos, m.rot, m.light) = (pos, rot, light);
-        w.rebuild(k, &*ctx.host);
-    }
-    w.mobys[k].mode &= 0xfff8;
-}
-
 /// `0x31cdd0` = L00 `0x31e048(a, b, _, speed, g)`: the vertical speed that lands a lob from `a` on `b` across at `speed`
 /// a tick under the gravity `g`.
 fn lob_z(a: V3, b: V3, speed: f32, g: f32) -> f32 {
@@ -831,7 +817,7 @@ fn set_up(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) -> bool {
     for arm in 0..2 {
         if w.class(ARM).is_none() { continue; }
         let c = w.create(ARM);
-        adopt(w, ctx, c, Some(id));
+        w.adopt(c, Some(id), &*ctx.host);
         w.mobys[c].mode |= 0x4100;
         ai::set_link(&mut w.mobys[id], pv::ARMS + 4 * arm, Some(c));
     }
@@ -1417,7 +1403,7 @@ fn make_missile(w: &mut MobyWorld, ctx: &mut Ctx, owner: usize, pts: [V3; 4]) {
     let scale = w.class(MISSILE).map_or(1.0, |c| c.scale);
     let k = w.create(MISSILE);
     w.mobys[k].set_pv_i(mv::SOUND, -1);
-    adopt(w, ctx, k, Some(owner));
+    w.adopt(k, Some(owner), &*ctx.host);
     w.mobys[k].pos = pts[0];
     blast::burst(w, ctx, pts[0], &blast::Blast { size: 2.0, bursts: [0; 3], puffs: 0x14, streaks: 0x2d, light: true, shake: false });
     let m = &mut w.mobys[k];
@@ -1542,7 +1528,7 @@ fn make_bomb(w: &mut MobyWorld, ctx: &mut Ctx, owner: Option<usize>, pos: V3, ve
     if w.class(BOMB).is_none() { return; }
     let scale = w.class(BOMB).map_or(1.0, |c| c.scale);
     let k = w.create(BOMB);
-    adopt(w, ctx, k, owner);
+    w.adopt(k, owner, &*ctx.host);
     let g = &mut ctx.game.rng;
     let rot = g.rand_vec(-std::f32::consts::PI, std::f32::consts::PI);
     let axis = g.rand_vec(1.0, 1.0);
@@ -1681,7 +1667,7 @@ mod rv {
 fn make_rock(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, aimed: bool) -> Option<usize> {
     w.class(ROCK)?;
     let k = w.create(ROCK);
-    adopt(w, ctx, k, Some(id));
+    w.adopt(k, Some(id), &*ctx.host);
     let m = &mut w.mobys[k];
     m.update = Some(update_rock);
     m.mode &= !crate::moby::mode::NO_UPDATE;

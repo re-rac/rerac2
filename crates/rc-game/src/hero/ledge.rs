@@ -184,7 +184,7 @@ impl Hero {
                 self.vel = [0.0; 3];
                 // Along the edge: the wall direction × down (0x19), down × the wall direction (0x1a), 0.2 long.
                 let down = [0.0, 0.0, -1.0];
-                let side = if self.state == 0x19 { cross(w, down) } else { cross(down, w) };
+                let side = if self.state == 0x19 { cross(down, w) } else { cross(w, down) };
                 let p = add(self.pos, scale(side, 0.2));
                 if self.ledge_probe(env, self.pos, false).is_some() {
                     if let Some(l) = self.ledge_probe(env, p, false) {
@@ -255,5 +255,3 @@ impl Hero {
 const FRAC_PI_2: f32 = std::f32::consts::FRAC_PI_2;
 const FRAC_PI_4: f32 = std::f32::consts::FRAC_PI_4;
 
-/// `0x2eef88(out, a, b)` = b × a.
-pub(super) fn cross(a: V3, b: V3) -> V3 { [b[1] * a[2] - a[1] * b[2], b[2] * a[0] - a[2] * b[0], b[0] * a[1] - a[0] * b[1]] }

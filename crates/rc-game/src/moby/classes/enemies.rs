@@ -917,26 +917,20 @@ pub(super) fn place_part(w: &mut MobyWorld, id: usize, p: usize, joint: usize, c
     pm.mode |= crate::moby::mode::NO_UPDATE | crate::moby::mode::NO_MATRIX | crate::moby::mode::KEEP_ROWS;
 }
 
-/// `0x3dbed0(on, owner + at, 0, 2)`: the two parts made (`0x32a748`: at `on`, its draw distance; scaled 0.75) at its
-/// joints, kept in `owner`'s pvars at `at` / `at + 4`.
+/// `0x3dbed0(on, owner + at, 0, 2)`: the two parts made (`0x32a748`, [`MobyWorld::adopt`]: at `on` with its light; then
+/// its draw distance, scaled 0.75) at its joints, kept in `owner`'s pvars at `at` / `at + 4`.
 pub(super) fn make_parts(w: &mut MobyWorld, on: usize, owner: usize, at: usize, ctx: &mut Ctx) { make_parts_on(w, on, owner, at, PART_JOINTS, ctx) }
 
 /// [`make_parts`] at other joints (the arena's 0x0b22: `0x3f61f8(m, +0x4c0, 0, 1)`).
 pub(super) fn make_parts_on(w: &mut MobyWorld, on: usize, owner: usize, at: usize, joints: [usize; 2], ctx: &mut Ctx) {
     for (k, j) in joints.into_iter().enumerate() {
         let id = on;
-        let (pos, rot, dd) = (w.mobys[id].pos, w.mobys[id].rot, w.mobys[id].draw_dist);
         let p = w.create(PART);
+        w.adopt(p, Some(id), &*ctx.host);
+        let dd = w.mobys[id].draw_dist;
         let pm = &mut w.mobys[p];
-        pm.update_dist = 0xff;
-        pm.drawn = 1;
-        pm.parent = Some(id);
-        pm.pos = pos;
-        pm.rot = rot;
-        pm.mode &= 0xfff8;
         pm.scale *= 0.75;
         pm.draw_dist = dd;
-        w.rebuild(p, &*ctx.host);
         place_part(w, id, p, j, ctx);
         w.rebuild(p, &*ctx.host);
         ai::set_link(&mut w.mobys[owner], at + 4 * k, Some(p));

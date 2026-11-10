@@ -109,6 +109,47 @@ pub fn throw_all(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, h: [f32; 8], spin:
     }
 }
 
+/// `0x32a2e0(m, thresholds, health)` (boot `func_002B3380`; L09 `0x326a38`, L12 `0x32dad0`, L18 `0x344b00`): the
+/// break pieces of `k` by a health — the float at `h` of moby `owner`'s pvars, its most the s16 at `h + 4` — with
+/// `k`'s pvars at `b` the thresholds (`+0..` one of 255 health by piece, `+0x10` the health last seen). The first time
+/// with health, the pieces whose threshold is under it shown (`+0x7c`); a piece shown whose threshold the health falls
+/// under breaks off (L00 `0x2dbdb0`, mode 1: 90 a second spin, 15 gravity, 2..4 a second 90..120° either way of the
+/// camera's heading and 5..8 up), with the level's sound 7 for the first. True when one broke. (The troopers'
+/// turrets, crate::moby::classes::trooper; Damosel's stalkers and dropships, crate::moby::classes::level18.)
+pub fn part_break(w: &mut MobyWorld, ctx: &mut Ctx, k: usize, b: usize, owner: usize, h: usize) -> bool {
+    let (hp, most) = (w.mobys[owner].pv_f(h), w.mobys[owner].pv_s(h + 4).max(1) as f32);
+    let byte = |hp: f32| (hp.max(0.0) / most * 255.0) as i32 as u8;
+    let m = &w.mobys[k];
+    if m.pv_f(b + 0x10) == 0.0 && hp != 0.0 {
+        let n = w.class(m.o_class).map_or(0, |c| c.pieces.len()).min(MAX_PIECE);
+        let mut bits = m.bangles;
+        for p in 0..n {
+            let t = m.pv_b(b + p);
+            if t != 0 && t < byte(hp) { bits |= 1 << p; }
+        }
+        w.mobys[k].bangles = bits;
+    }
+    let mut broke = false;
+    if hp < w.mobys[k].pv_f(b + 0x10) {
+        for p in 0..MAX_PIECE as u8 {
+            let m = &w.mobys[k];
+            if m.bangles & (1 << p) == 0 || m.pv_b(b + p as usize) <= byte(hp) { continue; }
+            let cam = ctx.host.camera_rows()[0];
+            let rng = &mut ctx.game.rng;
+            let a = crate::hero::physics::add_rot(rng.randf_signed(90.0, 120.0) * 0.017_453_294, crate::hero::physics::atan2(cam[0], cam[1]));
+            let s = rng.randf(2.0, 4.0) * 0.016_666_668;
+            let up = rng.randf(5.0, 8.0) * 0.016_666_668;
+            let (class, pos, rot) = (m.o_class, m.pos, m.rot);
+            spawn(w, ctx, class, Some(k), pos, rot, None, 90.0, 15.0, p, [a.cos() * s, a.sin() * s, up], 0xff, 1);
+            w.mobys[k].bangles &= !(1 << p);
+            if !broke { ctx.host.play_level_sound(None, 7, 0); }
+            broke = true;
+        }
+    }
+    w.mobys[k].set_pv_f(b + 0x10, hp);
+    broke
+}
+
 /// The mask's bits.
 const MAX_PIECE: usize = 15;
 

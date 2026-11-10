@@ -9,11 +9,12 @@
 //!   its state 2.
 //! * **0x12ed** ([`update_12ed`], `0x38d8b8`, 1 placed): two cuboids that each ask for their music.
 //! * **0x0f20** ([`update_0f20`], `0x38d770`, 1 placed): hides the level's enemies in its scene 3.
-//! * **0x040f** ([`update_040f`], `0x38d600`, 2 placed): cuboids that kill Ratchet.
 //! * **0x0efa** ([`update_0efa`], `0x41c6f0`, 3 placed): two cuboids that set the death height.
 //! * **0x0fec** (`0x41eea0`, 1 placed): shown out of the scenes — level 12's guide, crate::moby::classes::level12::launcher.
 //! * **0x11b0** ([`update_11b0`], `0x425c00`, 1 placed): flag bytes set by cuboids.
 //! * **0x1225** ([`update_1225`], `0x427c88`, 1 placed): gone with another moby once its mission is done.
+//!
+//! The kill cuboids 0x040f (`0x38d600`, L14's and L20's too): crate::moby::classes::kill_zone.
 //!
 //! The engine functions: `0x2fa528` add_rot, `0x36a110` the class sound, `0x328ff0` = L00 `0x31ed78`
 //! (crate::hero::physics::ease), `0x32b7c0` = L00 `0x321858` (crate::level::LevelData::in_cuboid), `0x3387a8` the music
@@ -103,43 +104,6 @@ pub fn update_0f20(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             for m in w.mobys.iter_mut().filter(|m| m.state < 0x80 && ENEMIES.contains(&m.o_class)) {
                 m.has_collision = false;
                 m.mode = (m.mode | 0x41) & 0xefff;
-            }
-        }
-        _ => {}
-    }
-}
-
-/// 0x040f (`0x38d600`): its pvars `[0..0x80]` 32 cuboids that kill, `[0x80..0x100]` 32 that kill at once (−1 none),
-/// `[0x100]` ≠ 0: the first kind only slows a glide. **0**: update distance 0xff, 1. **1**: Ratchet in one of the first
-/// (`0x32b7c0`): with `[0x100]` his glide's sink 0.25 (`0x18c2e8`); else as Ratchet (`0x18c0d4` = 0) his fall out of
-/// the level, state 0x74 (`0x2cf1f8(0x74, 1)`, not again while in it), another body his death (`0x2be1f8`, after a
-/// fade `0x2f2770(10)`); in one of the second his death.
-///
-/// Not ported: the blocking fade to black of 10 frames (`0x2f2770`: it draws the frames itself before the death).
-pub fn update_040f(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
-    let m = &mut w.mobys[id];
-    match m.state {
-        0 => {
-            m.update_dist = 0xff;
-            m.state = 1;
-        }
-        1 => {
-            let p = ctx.hero.pos;
-            let glide = m.pv_i(0x100) != 0;
-            for k in 0..32 {
-                let c = m.pv_i(4 * k);
-                if c < 0 || !ctx.level.in_cuboid(c, p) { continue; }
-                if glide {
-                    ctx.hero.glide_sink = 0.25;
-                } else if ctx.hero.mode == 0 {
-                    if ctx.hero.state != 0x74 { ctx.hero.request_state(0x74, true); }
-                } else {
-                    ctx.hero.die();
-                }
-            }
-            for k in 0..32 {
-                let c = m.pv_i(0x80 + 4 * k);
-                if 0 <= c && ctx.level.in_cuboid(c, p) { ctx.hero.die(); }
             }
         }
         _ => {}

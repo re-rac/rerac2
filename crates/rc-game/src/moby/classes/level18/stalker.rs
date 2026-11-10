@@ -1,6 +1,6 @@
 //! Damosel's stalker **0x0f0a** (L18 `0x431738`, 38 placed; the decomp's `func_L18_00430248`): legs that carry a
-//! body 0x0f0b on their joint 0 (its own update the shadow alone, L09's `0x3f85e8`: crate::moby::classes::level09::
-//! trooper::update_0d0e) with a gun on the body's joint 2 — a beam 0x0f0e, or with `+0x7fc` set a lobber 0x0f0d.
+//! body 0x0f0b on their joint 0 (its own update the shadow alone, L09's `0x3f85e8`: crate::moby::classes::
+//! trooper::update_turret) with a gun on the body's joint 2 — a beam 0x0f0e, or with `+0x7fc` set a lobber 0x0f0d.
 //! It hunts Ratchet and the breeders 0x0b69 (crate::moby::classes::level18::breeder) of a group; some come in hidden
 //! on a dropship 0x0ede (crate::moby::classes::level18::dropship) that calls [`carried`], [`release`] and [`die`]. On
 //! the framework (crate::moby::ai): health `+0x20` (16 by default; its status `+0x2e`, its damage byte `+0x34`, its
@@ -52,7 +52,7 @@
 //! (`0x342658` = L00 `0x327e38`, crate::moby::ai::take_damage; the state before kept from 5 and 9..13): without a body
 //! and dead its bolts and gone; dead, 1 in 7 to 14 with 8 health, else its sequence again on its parts; its group
 //! roused ([`rouse`], `0x434250`: each in 4 to 5 out of 6). On a 0x0f59, under 90 or its kill height, its status 2 or
-//! dead outside 13: gone (bolts on the 0x0f59). The body's break pieces by its health ([`part_break`], `0x344b00` = L00
+//! dead outside 13: gone (bolts on the 0x0f59). The body's break pieces by its health (crate::moby::shards::part_break, `0x344b00` = L00
 //! `0x32a2e0`); its piece 1 off, the inner body 0x0f0c made (sequence 0x14, mode 6, mirrored as it is); the body and
 //! inner body take its ambient (`0x32e370` / `0x32e340` = L00 `0x313330` / `0x313300`). Its group's count at Ratchet
 //! (`0x434318`: 8, 13, or 9..12 out of 8); the target search (`0x345e10` = L00 `0x32ad38`, its area and range, height
@@ -287,43 +287,6 @@ fn rouse(w: &mut MobyWorld, id: usize) {
 /// `0x434318(m)`: at Ratchet — 8, 13, or 9..12 out of 8.
 fn at_hero(state: u8, prev: u8) -> bool { state == 8 || state == 13 || ((9..=12).contains(&state) && prev == 8) }
 
-/// `0x344b00(m, b, health)` (L00 `0x32a2e0`, as crate::moby::classes::level09::trooper's) with the health of moby
-/// `owner` at `h` (its most at `h + 4`): the break pieces of `k` (`+b..` a threshold of 255 health by piece, `+b+0x10`
-/// the health last seen) shown while the health is over them, thrown off as it drops under.
-pub(super) fn part_break(w: &mut MobyWorld, ctx: &mut Ctx, k: usize, b: usize, owner: usize, h: usize) -> bool {
-    let (hp, most) = (w.mobys[owner].pv_f(h), w.mobys[owner].pv_s(h + 4).max(1) as f32);
-    let byte = |hp: f32| (hp.max(0.0) / most * 255.0) as i32 as u8;
-    let m = &w.mobys[k];
-    if m.pv_f(b + 0x10) == 0.0 && hp != 0.0 {
-        let n = w.class(m.o_class).map_or(0, |c| c.pieces.len()).min(15);
-        let mut bits = m.bangles;
-        for p in 0..n {
-            let t = m.pv_b(b + p);
-            if t != 0 && t < byte(hp) { bits |= 1 << p; }
-        }
-        w.mobys[k].bangles = bits;
-    }
-    let mut broke = false;
-    if hp < w.mobys[k].pv_f(b + 0x10) {
-        for p in 0..15u8 {
-            let m = &w.mobys[k];
-            if m.bangles & (1 << p) == 0 || m.pv_b(b + p as usize) <= byte(hp) { continue; }
-            let cam = ctx.host.camera_rows()[0];
-            let rng = &mut ctx.game.rng;
-            let a = crate::hero::physics::add_rot(rng.randf_signed(90.0, 120.0) * 0.017_453_294, atan2(cam[0], cam[1]));
-            let s = rng.randf(2.0, 4.0) * 0.016_666_668;
-            let up = rng.randf(5.0, 8.0) * 0.016_666_668;
-            let (class, pos, rot) = (m.o_class, m.pos, m.rot);
-            crate::moby::shards::spawn(w, ctx, class, Some(k), pos, rot, None, 90.0, 15.0, p, [a.cos() * s, a.sin() * s, up], 0xff, 1);
-            w.mobys[k].bangles &= !(1 << p);
-            if !broke { ctx.host.play_level_sound(None, 7, 0); }
-            broke = true;
-        }
-    }
-    w.mobys[k].set_pv_f(b + 0x10, hp);
-    broke
-}
-
 /// 0x0f0a (module docs).
 pub fn update_0f0a(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if w.mobys[id].pvars.len() < PVARS { w.mobys[id].pvars.resize(PVARS, 0); }
@@ -504,7 +467,7 @@ fn head(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
         return;
     }
     if let Some(b) = link(w, id, BODY_L) {
-        part_break(w, ctx, b, 0x20, id, H);
+        crate::moby::shards::part_break(w, ctx, b, 0x20, id, H);
         if w.mobys[b].bangles & 2 == 0 && link(w, id, INNER_L).is_none() {
             let k = make_part(w, id, ctx, INNER);
             ai::set_link(&mut w.mobys[id], INNER_L, Some(k));

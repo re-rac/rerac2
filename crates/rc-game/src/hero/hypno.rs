@@ -1,5 +1,5 @@
 //! The Hypnomatic's body (`0x18c0d4` = 4): a creature the Hypnomatic took over (the biter 0x0ec0 and the gunner 0x0ee1,
-//! crate::moby::classes::level18::capturable) played in Ratchet's machine on Damosel, Grelbin and Yeedil. Its states
+//! crate::moby::classes::capturable) played in Ratchet's machine on Damosel, Grelbin and Yeedil. Its states
 //! live only in the hero code those levels carry (L18 addresses; L19 has the same code at its own places, L20 its own
 //! copy): SetState `0x2e02e8`, the physics `0x2d7758`, the transitions `0x2e6b50` with the hit intake `0x2d02b8`, the
 //! body's tick `0x2c41f0` (L19 `0x2a9d60`), the gun `0x2c4000` (L19 `0x2a9b70`, L20 `0x2b91f0`), the switch `0x2cfe70`
@@ -21,7 +21,7 @@
 //! 0x6f) — in use, the sequence 11 (blend 5, from frame 1) at three times the speed; let go, at the sequence's end the
 //! walk's 14 (blend 8) or the idle's 13 (blend 9). While the sequence 11 plays the gunner fires from its two guns in
 //! turn every 6 ticks in use, the second 3 after (from the 4th tick), 0x0ed4 from one on 5 of each 6 (the shots:
-//! crate::moby::classes::level18::capturable::shoot).
+//! crate::moby::classes::capturable::shoot).
 //!
 //! **Its bite** (0x93: □ within 9 ticks, a creature other than the gunner): the biter's wait 90 (`0x429bc0`) and its
 //! sequence 10 (blend 5, from frame 1); still (1/97 up, 1/129 down, its own yaw), the creature's attack
@@ -50,7 +50,7 @@ use crate::hero::anim::AnimCtl;
 use crate::moby::{Ctx, MobyWorld};
 use crate::pad::button;
 
-/// The creatures (crate::moby::classes::level18::capturable).
+/// The creatures (crate::moby::classes::capturable).
 pub const BITER: i16 = 0x0ec0;
 pub const GUNNER: i16 = 0x0ee1;
 const GUNNER_B: i16 = 0x0ed4;
@@ -547,7 +547,7 @@ impl Hero {
 /// The body's world side after the hero's tick (and after the way back, from the item pass): its requests (module
 /// docs); while it plays, its time into the creature's `+0x3bc` and the creature's death height read.
 pub fn pass(world: &mut MobyWorld, ctx: &mut Ctx) {
-    use crate::moby::classes::level18::capturable;
+    use crate::moby::classes::capturable;
     let body = ctx.hero.body.moby.filter(|_| ctx.hero.mode == 4);
     for r in std::mem::take(&mut ctx.hero.hypno.reqs) {
         match r {

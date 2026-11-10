@@ -143,8 +143,6 @@ fn blast_damage(r: &ItemRow) -> f32 {
     }
 }
 
-/// `0x2eef88(out, a, b)` = b × a.
-fn cross_ba(a: V3, b: V3) -> V3 { cross(b, a) }
 
 /// `v` turned by `a` about `axis` (`0x31fe98` + `0x321b28`).
 fn turn(v: V3, axis: V3, a: f32) -> V3 { crate::gravity::rotate(v, set_len(axis, 1.0), a) }
@@ -292,8 +290,8 @@ pub fn spawn(w: &mut MobyWorld, ctx: &mut Ctx, pos: V3, vel: V3, lock: Option<us
     let roll = ctx.game.rng.randi(0xff);
     let up = ctx.hero.gravity.up_at(pos);
     let r0 = unit(vel);
-    let r1 = unit(cross_ba(r0, up));
-    let r2 = cross_ba(r1, r0);
+    let r1 = unit(cross(up, r0));
+    let r2 = cross(r0, r1);
     let m = &mut w.mobys[id];
     m.pvars.resize(crate::moby::PVAR_BYTES, 0);
     m.drawn = 1;
@@ -513,8 +511,8 @@ fn finish(w: &mut MobyWorld, id: usize, ctx: &mut Ctx, start: V3, up: V3, target
     {
         let m = &mut w.mobys[id];
         let r0 = unit(m.pv_v(pv::VEL));
-        let r1 = unit(cross_ba(r0, up));
-        let r2 = cross_ba(r1, r0);
+        let r1 = unit(cross(up, r0));
+        let r2 = cross(r0, r1);
         m.rows = [r0, r1, r2];
         let ph = add_rot(m.pv_f(pv::BOB_PHASE), 0.06);
         m.set_pv_f(pv::BOB_PHASE, ph);
