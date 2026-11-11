@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.1.6-alpha
+
+Every planet of the galaxy now has its creatures, machines and people.
+
+- Barlow, Notak, Siberius, Tabora, Dobbo, Joba, Todano, Boldan, the Aranos prison, Snivelak, Smolg, Damosel, Grelbin
+  and Yeedil: their enemies, bosses, lifts, traps, puzzles and the people you talk to.
+- The space fights of Feltzin, Hrugis and Gorn, the Giant Clank fights in orbit, the hoverbike races and the
+  Insomniac Museum.
+- The hovership and the glider rides, Clank's commands to the robots, and the crystal and raritanium collecting.
+- The energy barriers and force fields are drawn, and water behaves the same on every planet.
+- Crates break into pieces everywhere, enemies flinch under a stream of fire, and the parked ship rocks as you stand on
+  it.
+- The Heavy Lancer fires its own shots, the Lock On mod works, the pad rumbles, and the game saves on its own.
+
 ## v0.1.5-alpha
 
 Maktar and Endako can now be played through, and most of the arsenal is in Ratchet's hands.
