@@ -229,7 +229,7 @@ impl Hero {
         if (sw[1] == 0 || sw[1] == 1) && f < 5.5 { self.target_speed = 0.058_333_337; }
         if !anim.view().blending() && sw[7] as f32 <= f && f <= sw[8] as f32 {
             let j = if sw[1] == 1 { 0 } else { 2 };
-            self.hits_out.push(super::HeroHit { centre: self.pos, r: 0.25, damage: 1.0, flags: 0x10000, dir: [0.0; 3], joints: Some([j, j | 1]) });
+            self.hits_out.push(super::HeroHit { centre: self.pos, r: 0.25, damage: 1.0, flags: 0x10000, dir: [0.0; 3], joints: Some([j, j | 1]), ..Default::default() });
         }
         approach(1.0, 0.2, &mut self.anim_speed);
         if self.melee.aim == 0 && self.melee.target.is_none() {

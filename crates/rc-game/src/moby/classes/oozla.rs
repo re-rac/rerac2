@@ -1834,14 +1834,15 @@ pub fn update_0a1e(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
 ///   (3) or 0x12fe (4) (`0x325830`); in 4 a △ press (`0x138324 & 0x10`) queues the sale's scene 0x28 and starts it: 5.
 ///
 /// * **Every tick** (not deleted): its idle and look (crate::moby::talk::idle / look: looking in sequence 0, no
-///   fidget, the pitch within ±10°, `0x3d4804..0x3d4bb8`; the aims `0x31a0e0`).
+///   fidget, the pitch within ±10°, `0x3d4804..0x3d4bb8`; the aims `0x31a0e0`), then its prop held in its hand
+///   ([`hold_prop`]).
 ///
 /// It marks its talk record (`0x3259b0`, crate::moby::talk::mark) once the scene 0x27 is queued and with the texts
 /// 0x1300 / 0x12fe, holds the level's NPC busy word `0x1b22a8` (crate::moby::talk::busy) while its scenes play, and
 /// asks for the autosave `0x303030(0, −1)` after the sale (crate::game::GameState::autosave).
 ///
-/// Not ported: its prop's set-up and joint (`0x309b28`, `0x315f20`, `0x31a700(m, prop, 2, 0)`), the camera
-/// `0x42d968` of `+0x12c`.
+/// Not ported: its prop's set-up (`0x309b28`, `0x315f20`) and animation (`0x309188`), the camera `0x42d968` of
+/// `+0x12c`.
 pub fn update_0ace(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     use crate::moby::talk::{self, Layout, Timer};
     const LOOK: Layout = Layout { look_seq: 0, fidget: None, idle: 0x11e, seen: Timer::Word(0x114), glance: Timer::Word(0x118), pitch: 0.174_532_95 };
@@ -1849,6 +1850,26 @@ pub fn update_0ace(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
     if 0x80 <= w.mobys[id].state { return; }
     talk::idle(w, id, ctx, &LOOK);
     talk::look(w, id, ctx, &LOOK);
+    hold_prop(w, id, ctx);
+}
+
+/// `0x31a700(m, prop, 2, 0)`: the prop `+0x128` put on the seller's joint 2 (`0x3084e0`: the joint's rows and place in
+/// the world), its matrix's columns made unit (`0x3158f8`), hidden with it (mode 0x41, else cleared), not updated and
+/// its matrix kept (mode 6, with the rows kept).
+fn hold_prop(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
+    let Some(c) = w.mobys[id].pv_link(0x128).filter(|&c| w.mobys.get(c).is_some_and(|m| m.state < 0x80)) else { return };
+    let Some((rows, pos)) = ctx.host.joint_matrix(&w.mobys[id], 2) else { return };
+    let mut rows = rows;
+    for j in 0..3 {
+        let l = (rows[0][j] * rows[0][j] + rows[1][j] * rows[1][j] + rows[2][j] * rows[2][j]).sqrt();
+        if 0.0 < l { for r in &mut rows { r[j] /= l; } }
+    }
+    let hidden = w.mobys[id].mode & 1 != 0;
+    let m = &mut w.mobys[c];
+    (m.pos, m.rows) = (pos, rows);
+    if hidden { m.mode |= 0x41 } else { m.mode &= !0x41 }
+    m.mode |= mode::NO_UPDATE | mode::NO_MATRIX | mode::KEEP_ROWS;
+    w.rebuild(c, &*ctx.host);
 }
 
 fn states_0ace(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {

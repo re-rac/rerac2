@@ -246,6 +246,9 @@ fn flight(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             set_pv_f(m, 0x64, k);
             let mut s = pv_f(m, 0x60) + k;
             let l = len(d);
+            // Under 5 ticks from the hand it takes the hand's sequence 1 again (`0x31b5f0(m, 1, 0, 5)`); the throw's 6
+            // has no rate, so nothing else ends it after a throw from the look stance (no swing sets the hand's).
+            if l / s < 5.0 && ctx.host.anim(m).is_some_and(|a| a.seq_b != 1) { ctx.host.set_anim(m, 1, 0, 5); }
             let arrived = l <= s;
             if arrived { s = l; }
             set_pv_f(m, 0x60, s);

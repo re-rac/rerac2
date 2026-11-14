@@ -33,7 +33,7 @@
 //!
 //! Not ported: the splashes and ripples (`0x339b60`).
 
-use crate::hero::physics::{add, add_rot, approach, atan2, dist, dist2, ease, ease_speed, len, len2, rot_dist, scale, sub, sub_rot, turn_ease, V3};
+use crate::hero::physics::{add, add_rot, approach, atan2, dist, dist2, ease, ease_speed, len, len2, rot_dist, scale, set_len, sub, sub_rot, turn_ease, V3};
 use crate::moby::joint_aim::ASK;
 use crate::moby::{carry_hero, Ctx, MobyWorld};
 use crate::rumble::{one, rec, Pattern, NONE};
@@ -283,7 +283,9 @@ fn states(w: &mut MobyWorld, id: usize, ctx: &mut Ctx) {
             let mut v = m.pv_f(0x2c4);
             ease_speed(len(d), 0.001_666_666_7, 0.001_666_666_7, 0.100_000_01, &mut v);
             m.set_pv_f(0x2c4, v);
-            if v < len(d) { d = scale(d, v / len(d)); }
+            // At the spot (no way left) a braking speed under 0 leaves it there (`set_len`: zero stays zero); the
+            // division by the length made its place NaN and it was gone until the level was reset.
+            if v < len(d) { d = set_len(d, v); }
             m.pos = add(m.pos, d);
             let curve = if diving { &DIVE } else { &RISE };
             let k = (m.state_ticks.max(0) as usize).min(180);

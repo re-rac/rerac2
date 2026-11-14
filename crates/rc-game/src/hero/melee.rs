@@ -12,8 +12,8 @@
 //! On ice (`0x18b2b2`) the swing 0x13 only slides and the glove punch 0x1f pushes and slides (`0x2b96a0`).
 //!
 //! Not ported: the stats counters the entries bump (`0x18c3d8`, `0x18c750`, `0x18c75c`, `0x18c600`), the sounds
-//! (`0x2b9c90`, `0x2d6cc8`), the strafe and the gravity frames (`0x18c0e3` ≠ 0), the jump attack's ground sparks
-//! and wall hit (`0x2e14b0` with flag 0x10), the comet aim `0x41fe58`'s own search (`0x3257a0`: the plain aim is
+//! (`0x2b9c90`, `0x2d6cc8`), the strafe and the gravity frames (`0x18c0e3` ≠ 0), the jump attack's ground sparks,
+//! the comet aim `0x41fe58`'s own search (`0x3257a0`: the plain aim is
 //! used) and 0x4d (the swim family).
 
 use super::physics::*;
@@ -205,7 +205,7 @@ impl Hero {
             for d in [0.0, -0.872_664_6, 0.872_664_6] {
                 let (s, c) = add_rot(self.rot[2], d).sin_cos();
                 let centre = add(self.pos, [c * 0.8, s * 0.8, 0.55]);
-                self.hits_out.push(super::HeroHit { centre, r: 0.8, damage: 3.0, flags: 0x30000, dir, joints: None });
+                self.hits_out.push(super::HeroHit { centre, r: 0.8, damage: 3.0, flags: 0x30000, dir, joints: None, ..Default::default() });
             }
         }
         if 10 < self.timer { self.edge_brake(env, 3.7, 0.0); }
@@ -352,7 +352,17 @@ impl Hero {
                 } else {
                     self.aim_turn(0.05, 0.282_160_5);
                 }
-                let rise = if 2.25 < self.height { 0.064_166_67 } else if 1.8 < self.height { 0.089_833_33 } else { 0.128_333_34 };
+                // Falling past frame 23.5 with no blend running: a 0.4 sphere 0.5 under him (`0x2d3b18(−0.5)`)
+                // hits what is below (`0x2e14b0` with flag 0x10, the faces seen from inside too: a crate he stands
+                // on), damage 2, flags 0x10000, along twice his forward row, the wrench's kind 0x470100 and no
+                // knock-back limit (5627.925).
+                if !v.blending() && 23.5 < frame && self.disp[2] < 0.0 && self.air_ticks != 0 {
+                    let centre = if self.gravity.mode == 0 { add(self.pos, [0.0, 0.0, -0.5]) } else { add(self.pos, scale(self.gravity.down, 0.5)) };
+                    self.hits_out.push(super::HeroHit {
+                        centre, r: 0.4, damage: 2.0, flags: 0x10000, dir: scale(self.rows[0], 2.0), joints: None, query: 0x10, kind: 0x47_0100, limit: f32::from_bits(0x45af_df66),
+                    });
+                }
+                let rise =if 2.25 < self.height { 0.064_166_67 } else if 1.8 < self.height { 0.089_833_33 } else { 0.128_333_34 };
                 if 8 < self.timer {
                     if 0xe < self.timer {
                         self.gravity(0.036_111_11);

@@ -94,12 +94,17 @@ impl Hero {
             }
         }
         let o = hit?;
-        if o.moby.is_some() { return None; }
+        // A ledge on a moby only when it says so (Moby::grabbable).
+        let moby = o.moby;
+        if let Some(id) = moby {
+            if !env.scene.and_then(|s| s.mobys.moby(id)).is_some_and(|m| m.grab) { return None; }
+        }
         let edge = o.point;
         let dz = edge[2] - pos[2];
         if max_up < dz { return None; }
         let near = add(edge, scale(UP, 0.005));
-        if env.line(sub(near, fwd), near, 2).is_some() { return None; }
+        // Nothing in the way but the ledge's own moby.
+        if env.line(sub(near, fwd), near, 2).is_some_and(|b| b.moby.is_none() || b.moby != moby) { return None; }
         if dz + self.height < min_above || dz < 0.5 { return None; }
         // The wall below the edge.
         let mut q = add(add(edge, fwd), scale(UP, -wall_down));
@@ -126,7 +131,7 @@ impl Hero {
             match env.line(add(c, e1), add(c, e2), 4) {
                 None => {
                     let hang = add(add(c, scale(n, out)), scale(UP, -hang_down));
-                    return Some(Ledge { hang, edge: c, yaw: atan2(n[0], n[1]), moby: None });
+                    return Some(Ledge { hang, edge: c, yaw: atan2(n[0], n[1]), moby });
                 }
                 Some(o) => c = o.point,
             }

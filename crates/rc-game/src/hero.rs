@@ -433,7 +433,7 @@ pub struct Hero {
 }
 
 /// A hit Ratchet's body deals (`0x2e14b0` + `0x31d4c8`): a sphere, the damage, the flags, the direction.
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Default)]
 pub struct HeroHit {
     pub centre: V3,
     pub r: f32,
@@ -442,6 +442,10 @@ pub struct HeroHit {
     pub dir: V3,
     /// Centred between two of Ratchet's joints instead (the item pass reads them).
     pub joints: Option<[usize; 2]>,
+    /// The sphere's query flags (`0x2e14b0`'s third argument) and the template's `t[6]` / `t[3]` the caller sets.
+    pub query: u32,
+    pub kind: u32,
+    pub limit: f32,
 }
 
 impl Default for Hero {
@@ -565,12 +569,11 @@ impl Hero {
     /// The start of `0x2c3330`: the state, group and sequence timers. Its ~35 countdown timers belong to states not
     /// ported yet.
     fn post_move(&mut self) {
-        // `0x2b9488`: in a frame (or while `0x18a038` counts) his up springs toward the frame's up; its mode-0 branch
-        // (the pitch and roll easing back to 0) runs only after a frame (crate::gravity::Gravity::tilted).
+        // `0x2b9488`: in a frame (or while `0x18a038` counts) his up springs toward the frame's up; out of one his pitch
+        // and roll ease back to 0 (what the slide, a frame or a swing left).
         if !self.no_update && (self.gravity.mode != 0 || self.gravity.walkway_hold != 0) {
             self.frame_align();
-            self.gravity.tilted = true;
-        } else if !self.no_update && self.gravity.tilted {
+        } else if !self.no_update {
             self.frame_release();
         }
         self.timer += 1;
